@@ -11,7 +11,9 @@ The ctemplate package contains a library implementing a simple but powerful temp
 Ctemplate is distributed under the terms of the 
 [http://www.opensource.org/licenses/bsd-license.php BSD License].
 
-For downloads, news, and other information, visit our 
+To learn more about how to use ctemplate, see the 
+[http://google-ctemplate.googlecode.com/svn/trunk/docs/ Documentation].
+For downloads, news and other information, visit our 
 [http://code.google.com/p/google-ctemplate Project Page].
 
 == Example ==
