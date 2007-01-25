@@ -1,0 +1,56 @@
+#summary Home page for Google Ctemplate
+#labels Featured
+
+= Google Ctemplate =
+
+A simple but powerful template language for C++.
+
+== Overview ==
+
+The ctemplate package contains a library implementing a simple but powerful template language for C++. It emphasizes separating logic from presentation: it is impossible to embed application logic in this template language.
+
+Ctemplate is distributed under the terms of the 
+[http://www.opensource.org/licenses/bsd-license.php BSD License].
+
+For downloads, news, and other information, visit our 
+[http://code.google.com/p/google-ctemplate Project Page].
+
+== Example ==
+
+This is by no means a complete example; it simply gives you a feel for what the ctemplate API looks like.
+
+Here is a simple template file:
+{{{
+Hello {{NAME}},
+You have just won ${{VALUE}}!
+{{#IN_CA}}Well, ${{TAXED_VALUE}}, after taxes.{{/IN_CA}}
+}}}
+
+Here is a C++ program to fill in the template, which we assume is stored in the file 'example.tpl':
+{{{
+#include <stdlib.h>
+#include <string>
+#include <iostream>  
+#include <google/template.h>  
+int main(int argc, char** argv) {
+  google::TemplateDictionary dict("example");
+  dict.SetValue("NAME", "John Smith")
+  int winnings = random() % 100000;
+  dict.SetIntValue("VALUE", winnings);
+  dict.SetFormattedValue("TAXED_VALUE", "%.2f", winnings * 0.83);
+  // For now, assume everyone lives in CA.
+  // (Try running the program with a 0 here instead!)
+  if (1) {
+    dict.ShowSection("IN_CA");
+  }
+  google::Template* tpl = google::Template::GetTemplate("example.tpl",
+                                                        google::DO_NOT_STRIP);
+  std::string output;
+  tpl->Expand(&output, &dict);
+  std::cout << output;
+  return 0;
+}
+}}}
+
+
+
