@@ -12,7 +12,7 @@ Ctemplate is distributed under the terms of the
 [http://www.opensource.org/licenses/bsd-license.php BSD License].
 
 To learn more about how to use ctemplate, see the 
-[http://google-ctemplate.googlecode.com/svn/trunk/docs/ Documentation].
+[http://google-ctemplate.googlecode.com/svn/trunk/docs/index.html Documentation].
 For downloads, news and other information, visit our 
 [http://code.google.com/p/google-ctemplate Project Page].
 
@@ -52,5 +52,4 @@ int main(int argc, char** argv) {
   return 0;
 }
 }}}
-
 
