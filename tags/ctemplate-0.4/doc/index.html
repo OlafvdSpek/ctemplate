@@ -1,0 +1,110 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+  <title>Google Template System</title>
+
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <link href="http://www.google.com/favicon.ico" type="image/x-icon"
+        rel="shortcut icon">
+  <link href="designstyle.css" type="text/css" rel="stylesheet">
+  <style>
+  <!--
+  ol.bluelist li {
+    color: #3366ff;
+    font-family: sans-serif;
+  }
+  ol.bluelist li p {
+    color: #000;
+    font-family: "Times Roman", times, serif;
+  }
+  ul.blacklist li {  
+    color: #000;
+    font-family: "Times Roman", times, serif;
+  }
+  //-->
+  </style>
+</head>
+<body>
+
+<h1> <a name="Google_Template_System"></a>Google Template System </h1>
+<center><strong>Status: Current</strong> &nbsp;
+<small>(as of 16 February 2006)</small></center>
+<br>
+
+Welcome to the Google C++ template system!  As a quick start, here's a
+small but complete program that uses this template library.  For more
+details see, the links below.
+
+<h3>Template file <code>example.tpl</code></h3>
+<pre>
+   Hello {{NAME}},
+   You have just won ${{VALUE}}!
+   {{#IN_CA}}Well, ${{TAXED_VALUE}}, after taxes.{{/IN_CA}}
+</pre>
+
+<h3>C++ program <code>example.cc</code></h3>
+<pre>
+   #include &lt;stdlib.h>
+   #include &lt;string>
+   #include &lt;iostream>
+   #include &lt;google/template.h>
+   int main(int argc, char** argv) {
+      google::TemplateDictionary dict("example");
+      dict.SetValue("NAME", "John Smith");
+      int winnings = random() % 100000;
+      dict.SetIntValue("VALUE", winnings);
+      dict.SetFormattedValue("TAXED_VALUE", "%.2f", winnings * 0.83);
+      // For now, assume everyone lives in CA.
+      // (Try running the program with a 0 here instead!)
+      if (1) {
+        dict.ShowSection("IN_CA");
+      }
+
+      google::Template* tpl = google::Template::GetTemplate("example.tpl",
+                                                            google::DO_NOT_STRIP);
+      std::string output;
+      tpl->Expand(&output, &dict);
+      std::cout &lt;&lt; output;
+      return 0;
+   }
+</pre>
+
+<h3>Compiling and linking (using gcc)</h3>
+<pre>
+   gcc -o example example.cc -lctemplate_nothreads
+</pre>
+
+<p>I can use the "nothreads" library because <code>example.cc</code>
+doesn't use threads.  If <code>example.cc</code> were threaded, I
+would do something like this instead:</p>
+<pre>
+   gcc -o example example.cc -lctemplate -pthread
+</pre>
+
+<p>See the README for more details about the two different ctemplate
+libraries.</p>
+
+
+<h2>In-depth Documentation</h2>
+
+<ol>
+  <li> <A HREF="howto.html">Howto</A>: Introduction to the Google
+       Template system, and a tutorial for using it. </li>
+
+  <li> <A HREF="tips.html">Tips</A>: Advice, tips, and recommendations
+       for best practices with templates, to make them easier to write
+       and maintain, and to avoid common template mistakes. </li>
+
+  <li> <A HREF="example.html">Examples</A>: Some example templates and
+       application code that uses them.  These are taken from actual
+       Google applications. </li>
+</ol>
+
+<hr>
+<address>
+Craig Silverstein<br>
+Last modified: Wed Feb 15 23:21:42 PST 2006
+</address>
+
+</body>
+</html>
