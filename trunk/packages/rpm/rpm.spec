@@ -54,7 +54,7 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root)
 
-%doc AUTHORS COPYING ChangeLog INSTALL NEWS README doc/designstyle.css doc/index.html doc/howto.html doc/tips.html doc/example.html contrib/README.contrib contrib/highlighting.vim contrib/tpl-mode.el
+%doc AUTHORS COPYING ChangeLog INSTALL NEWS README doc/designstyle.css doc/index.html doc/howto.html doc/tips.html doc/example.html doc/xss_resources.html contrib/README.contrib contrib/highlighting.vim contrib/tpl-mode.el
 
 %{prefix}/lib/libctemplate.so.0
 %{prefix}/lib/libctemplate.so.0.0.0

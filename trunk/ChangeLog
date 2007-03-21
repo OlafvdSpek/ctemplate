@@ -23,3 +23,13 @@ Mon Aug 21 17:44:32 2006  Google Inc. <opensource@google.com>
 	* New contrib/ directory entry: emacs syntax highlighting (tonyg)
 	* Allow escape-modifiers to affect includes, not just vars (csilvers)
 	* Add JSON escape-functor (majewski)
+
+Mon Jan 15 14:10:42 2007  Google Inc. <opensource@google.com>
+	
+	* ctemplate: version 0.4 release
+	* Improve html-escaping by adding single-quote (bdangelo)
+	* Improve javascript-escaping by adding more characters too (smknappy)
+	* Add url-escaping, for url query parameters (dcoker)
+	* Add support for "pre" escaping, which preserves whitespace (dboswell)
+	* Typo fixes in documentation (csilvers)
+	* Expand() returns false if a template file failed to load (jmittleman)

@@ -137,7 +137,8 @@ ctemplateinclude_HEADERS = \
 docdir = $(prefix)/share/doc/$(PACKAGE)-$(VERSION)
 dist_doc_DATA = AUTHORS COPYING ChangeLog INSTALL NEWS README \
 	doc/designstyle.css doc/index.html \
-	doc/howto.html doc/tips.html doc/example.html
+	doc/howto.html doc/tips.html doc/example.html \
+	doc/xss_resources.html
 
 
 

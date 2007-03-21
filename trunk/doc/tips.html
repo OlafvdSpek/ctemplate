@@ -7,7 +7,7 @@
 <link href="http://www.google.com/favicon.ico" type="image/x-icon"
       rel="shortcut icon">
 <link href="designstyle.css" type="text/css" rel="stylesheet">
-<style>
+<style type="text/css">
 <!--
   ol.bluelist li {
     color: #3366ff;
@@ -28,7 +28,7 @@
 <body>
 
 <h1>Tips and Guidelines for Using the Google Template System</h1>
-<small>(as of 27 February 2006)</small></center>
+<small>(as of 1 September 2006)</small>
 
 <br>
 
@@ -174,7 +174,8 @@ named <code>fill_one_search_result_dictionary</code>.)
      and Header File Generator" below for more explanation about
      constant prefixes.)</p> </li>
 
-<li> Use SetFormattedValue discriminately.
+<li> <a name="tip_setformattedvalue"></a>Use SetFormattedValue
+     discriminately.
 
      <p> This method should never be used to sneak HTML into the
      executable as in</p>
@@ -412,25 +413,51 @@ named <code>fill_one_search_result_dictionary</code>.)
      </ul>
      </li>
 
-<li> Use variable-modifiers (eg <code>{{VAR:html_escape}}</code>) or
-     <code>SetEscapedValue</code> when necessary to prevent security
-     violations.
+<li> Use the appropriate variable-modifiers (eg
+     <code>{{VAR:h}}</code>) to prevent Cross-Site-Scripting
+     security vulnerabilities.
 
-     <p>Variable-modifiers make it very easy to html-escape (or
-     otherwise escape) text that needs to be escaped for safety.  Use
-     <code>:h</code>, <code>:j</code> and friends liberally.</p>
+     <p>Apply the appropriate variable-modifiers liberally and omit
+     them only in those (usually rare) cases where there is a specific
+     reason the template variable should not be escaped, for example:
+     <ul class=blacklist>
+       <li>The template variable contains HTML markup that should be
+       interpreted by the browser.  In this case you must be very careful to
+       ensure that the variable can in no case contain "harmful" HTML.  Also,
+       keep in mind the <a href="#tip_setformattedvalue">above
+         recommendation</a> on the use of <code>SetFormattedValue</code> and
+       consider moving the HTML markup into the template.</li>
+
+       <li>The variable is known to be already escaped at the point it
+       is inserted into the template (for example, the value might be
+       kept in escaped form in a storage backend). Here, escaping again
+       via a variable-modifier would result in "double escaping".  You
+       must ensure that the variable has been escaped with the
+       appropriate escape function for the HTML context into which it
+       will be inserted into the template (i.e., HTML-escaping versus
+       javascript-escaping).</li>
+
+     </ul>
+     
+     <p>Applying the modifier even if you don't expect the variable
+     to contain (malicious) HTML markup keeps you on the safe side.
+     It also serves to self-document the template by making it
+     obvious that no XSS can result from the template variable in
+     question. It is recommended to comment uses of modifier-less
+     template variables accordingly, for example</p>
+     <pre>
+     {{#SNIPPET1_SECTION}}
+        {{! SNIPPET1 is HTML-escaped in SnippetGenerator::getSnippetForResult }}
+        &lt;br&gt;{{SNIPPET1}}
+     {{/SNIPPET1_SECTION}}
+     </pre>
 
      <p>For situations where you need to provisionally escape, or use
      an escape routine other than the built-in ones, the
      <code>Escaped</code> versions of the set-value methods
      are useful utility functions to use.</p>
-
-     <p>As a guide for when to use this: every value accepted
-     from a user must be HTML-escaped before redisplaying it on
-     another page. The escaping 
-     prevents the user from executing scripts or displaying raw HTML
-     via their input values. These methods make it simple to prevent
-     scripting security violations when used where necessary.</p> </li>
+     
+     </li>
 
 <li> Do not leave an extra space when using <code>{{BI_SPACE}}</code>
 
@@ -438,17 +465,19 @@ named <code>fill_one_search_result_dictionary</code>.)
      replaced by a single space. It is used where you need to make
      sure a space is preserved at the end of a line. It is a common
      mistake to leave an extra space before this marker, which results
-     in not one, but two, spaces created in the document.</p> </li>
+     in not one, but two, spaces created in the document.</p>
 
-     <p>Incorrect:<pre>
+     <p>Incorrect:</p><pre>
 &lt;table border=0 {{BI_SPACE}}
-       align=center></pre></p>
+       align=center></pre>
 
-     <p>Correct:<pre>
+     <p>Correct:</p><pre>
 &lt;table border=0{{BI_SPACE}}
-       align=center></pre></p>
+       align=center></pre>
 
+     </li>
 
+</ol>
 <hr>
 <ul>
   <li> <A HREF="howto.html">Howto</A> </li>
