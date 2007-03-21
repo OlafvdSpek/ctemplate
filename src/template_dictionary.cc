@@ -88,9 +88,11 @@ static StaticMutexInit g_static_mutex_initializer;  // constructs early
 /*static*/ TemplateDictionary::GlobalDict* TemplateDictionary::global_dict_
   = NULL;
 /*static*/ TemplateDictionary::HtmlEscape TemplateDictionary::html_escape;
+/*static*/ TemplateDictionary::PreEscape TemplateDictionary::pre_escape;
 /*static*/ TemplateDictionary::XmlEscape TemplateDictionary::xml_escape;
 /*static*/ TemplateDictionary::JavascriptEscape TemplateDictionary::javascript_escape;
 /*static*/ TemplateDictionary::JsonEscape TemplateDictionary::json_escape;
+/*static*/ TemplateDictionary::UrlQueryEscape TemplateDictionary::url_query_escape;
 
 
 // ----------------------------------------------------------------------
@@ -744,13 +746,16 @@ const char *TemplateDictionary::GetIncludeTemplateName(const string& variable,
 
 // ----------------------------------------------------------------------
 // HtmlEscape
+// PreEscape
 // XMLEscape
+// UrlQueryEscape
 // JavascriptEscape
 //    Escape functors that can be used by SetEscapedValue().
 //    Each takes a string as input and gives a string as output.
 // ----------------------------------------------------------------------
 
-// Escapes < > " & <non-space whitespace> to &lt; &gt; &quot; &amp; <space>
+// Escapes < > " ' & <non-space whitespace> to &lt; &gt; &quot; &#39;
+// &amp; <space>
 string TemplateDictionary::HtmlEscape::operator()(const string& in) const {
   string out;
   // we'll reserve some space in out to account for minimal escaping: say 12%
@@ -759,10 +764,31 @@ string TemplateDictionary::HtmlEscape::operator()(const string& in) const {
     switch (in[i]) {
       case '&': out += "&amp;"; break;
       case '"': out += "&quot;"; break;
+      case '\'': out += "&#39;"; break;
       case '<': out += "&lt;"; break;
       case '>': out += "&gt;"; break;
       case '\r': case '\n': case '\v': case '\f':
       case '\t': out += " "; break;      // non-space whitespace
+      default: out += in[i];
+    }
+  }
+  return out;
+}
+
+// Escapes < > " ' & to &lt; &gt; &quot; &#39; &amp;
+// (Same as HtmlEscape but leaves whitespace alone.)
+string TemplateDictionary::PreEscape::operator()(const string& in) const {
+  string out;
+  // we'll reserve some space in out to account for minimal escaping: say 12%
+  out.reserve(in.size() + in.size()/8 + 16);
+  for (int i = 0; i < in.length(); ++i) {
+    switch (in[i]) {
+      case '&': out += "&amp;"; break;
+      case '"': out += "&quot;"; break;
+      case '\'': out += "&#39;"; break;
+      case '<': out += "&lt;"; break;
+      case '>': out += "&gt;"; break;
+      // All other whitespace we leave alone!
       default: out += in[i];
     }
   }
@@ -799,10 +825,43 @@ string TemplateDictionary::JavascriptEscape::operator()(const string& in) const 
       case '\r': out += "\\r"; break;
       case '\n': out += "\\n"; break;
       case '\b': out += "\\b"; break;
+      case '&': out += "\\x26"; break;
+      case '<': out += "\\x3c"; break;
+      case '>': out += "\\x3e"; break;
+      case '=': out += "\\x3d"; break;
       default: out += in[i];
     }
   }
   return out;
+}
+
+string TemplateDictionary::UrlQueryEscape::operator()(const string& in) const {
+  // Everything not matching [0-9a-zA-Z.,_*/~!()-] is escaped.
+  static unsigned long _safe_characters[8] = {
+    0x00000000L, 0x03fff702L, 0x87fffffeL, 0x47fffffeL,
+    0x00000000L, 0x00000000L, 0x00000000L, 0x00000000L
+  };
+
+  int max_string_length = in.size() * 3 + 1;
+  char out[max_string_length];
+
+  int i;
+  int j;
+
+  for (i = 0, j = 0; i < in.size(); i++) {
+    unsigned char c = in[i];
+    if (c == ' ') {
+      out[j++] = '+';
+    } else if ((_safe_characters[(c)>>5] & (1 << ((c) & 31)))) {
+      out[j++] = c;
+    } else {
+      out[j++] = '%';
+      out[j++] = ((c>>4) < 10 ? ((c>>4) + '0') : (((c>>4) - 10) + 'A'));
+      out[j++] = ((c&0xf) < 10 ? ((c&0xf) + '0') : (((c&0xf) - 10) + 'A'));
+    }
+  }
+  out[j++] = '\0';
+  return string(out);
 }
 
 // Escapes " / \ <BS> <FF> <CR> <LF> <TAB> to \" \/ \\ \b \f \r \n \t

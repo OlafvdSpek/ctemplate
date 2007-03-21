@@ -198,9 +198,14 @@ class TemplateDictionary {
   // --- ESCAPE FUNCTORS
   // Some commonly-used escape functors.
 
-  // Escapes < > " & <non-space whitespace> to &lt; &gt; &quot; &amp; <space>
+  // Escapes < > " ' & <non-space whitespace> to &lt; &gt; &quot;
+  // &#39; &amp; <space>
   struct HtmlEscape { std::string operator()(const std::string&) const; };
   static HtmlEscape html_escape;
+
+  // Same as HtmlEscape but leaves all whitespace alone. Eg. for <pre>..</pre>
+  struct PreEscape { std::string operator()(const std::string&) const; };
+  static PreEscape pre_escape;
 
   // Escapes &nbsp; to &#160;
   struct XmlEscape { std::string operator()(const std::string&) const; };
@@ -209,6 +214,11 @@ class TemplateDictionary {
   // Escapes " ' \ <CR> <LF> <BS> to \" \' \\ \r \n \b
   struct JavascriptEscape { std::string operator()(const std::string&) const; };
   static JavascriptEscape javascript_escape;
+
+  // Escapes characters not in [0-9a-zA-Z.,_:*/~!()-] as %-prefixed hex.
+  // Space is encoded as a +.
+  struct UrlQueryEscape { std::string operator()(const std::string&) const; };
+  static UrlQueryEscape url_query_escape;
 
   // Escapes " \ / <FF> <CR> <LF> <BS> <TAB> to \" \\ \/ \f \r \n \b \t
   struct JsonEscape { std::string operator()(const std::string&) const; };

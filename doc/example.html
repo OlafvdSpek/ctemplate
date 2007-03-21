@@ -7,7 +7,7 @@
 <link href="http://www.google.com/favicon.ico" type="image/x-icon"
       rel="shortcut icon">
 <link href="designstyle.css" type="text/css" rel="stylesheet">
-<style>
+<style type="text/css">
 <!--
   ol.bluelist li {
     color: #3366ff;
@@ -28,7 +28,7 @@
 <body>
 
 <h1>Template Examples</h1>
-<small>(as of 27 February 2006)</small></center>
+<small>(as of 1 September 2006)</small>
 <br>
 
 
@@ -48,8 +48,10 @@ search results page:</p>
 {{#ONE_RESULT}}
     {{! Note: there are two SUBITEM_SECTIONs. They both show or hide together}}
     {{#SUBITEM_SECTION}}&lt;blockquote>{{/SUBITEM_SECTION}}
-    &lt;p>&lt;a href={{JUMP_TO_URL:html_escape}}  target=nw>{{LEAD_LINE}}&lt;/a>&lt;font size=-1>
+    {{! LEAD_LINE is received HTML-escaped from the backend.}}
+    &lt;p>&lt;a href="{{JUMP_TO_URL:html_escape}}"  target=nw>{{LEAD_LINE}}&lt;/a>&lt;font size=-1>
 
+    {{! SNIPPET1, SNIPPET2 are HTML-escaped in the snippet generator.}}
     {{#SNIPPET1_SECTION}}
         &lt;br>{{SNIPPET1}}
     {{/SNIPPET1_SECTION}}
@@ -59,30 +61,31 @@ search results page:</p>
     {{/SNIPPET2_SECTION}}
 
     {{#DESCRIPTION_SECTION}}
+        {{! DESC is received HTML-escaped from the backend.}}
         &lt;br>&lt;span class=f>Description:&lt;/span> {{DESC}}
     {{/DESCRIPTION_SECTION}}
 
     {{#CATEGORY_SECTION}}
-        &lt;br>&lt;span class=f>Category:&lt;/span> &lt;a href={{CAT_URL:html_escape}} class=f>
-	{{CATEGORY}}&lt;/a>
+        &lt;br>&lt;span class=f>Category:&lt;/span> &lt;a href="{{CAT_URL:html_escape}}" class=f>
+	{{CATEGORY:html_escape}}&lt;/a>
     {{/CATEGORY_SECTION}}
 
     {{#LASTLINE_SECTION}}
-        &lt;br>&lt;font color={{ALT_TEXT_COLOR}}>{{URL}}
-        {{#KS_SECTION}}} - {{KSIZE}}{{/KS_SECTION}}}
-        {{#CACHE_SECTION}}} - &lt;a href={{CACHE_URL:html_escape}} class=f>Cached&lt;/A>
+        &lt;br>&lt;font color="{{ALT_TEXT_COLOR:h}}">{{URL:h}}
+        {{#KS_SECTION}}} - {{KSIZE:h}}{{/KS_SECTION}}}
+        {{#CACHE_SECTION}}} - &lt;a href="{{CACHE_URL:h}}" class=f>Cached&lt;/A>
 	{{/CACHE_SECTION}}}
-        {{#SIM_SECTION}}} - &lt;a href={{SIM_PAGES_URL:html_escape}} class=f>Similar pages&lt;/A>
+        {{#SIM_SECTION}}} - &lt;a href="{{SIM_PAGES_URL:h}}" class=f>Similar pages&lt;/A>
 	{{/SIM_SECTION}}}
 
         {{#STOCK_SECTION}}
-             -  &lt;a href={{STOCK_URL:html_escape}} class=f>Stock quotes: {{STOCK_SYMBOL}}&lt;/a>
+             -  &lt;a href="{{STOCK_URL:h}}" class=f>Stock quotes: {{STOCK_SYMBOL:h}}&lt;/a>
         {{/STOCK_SECTION}}
         &lt;/font>
     {{/LASTLINE_SECTION}}           
 
     {{#MORE_SECTION}}
-        &lt;br>[ &lt;a href={{MORE_URL:html_escape}} class=f>More results from {{MORE_LABEL}}&lt;/a> ]
+        &lt;br>[ &lt;a href="{{MORE_URL:h}}" class=f>More results from {{MORE_LABEL:h}}&lt;/a> ]
     {{/MORE_SECTION}}
 
     &lt;/font>&lt;br>
@@ -112,7 +115,7 @@ using google::STRIP_WHITESPACE;
 
 // IsEmpty
 //    A simple utility function
-static bool IsEmpty(const string &str) {
+static bool IsEmpty(const string &amp;str) {
   return str.empty();
 }
 
@@ -158,7 +161,7 @@ void fill_search_results_dictionary(TemplateDictionary *dictionary,
        ++iter) {
     QueryResult *qr = (*iter);
 
-    // Create a new sub-dictionary named "Result Dict <n>" for this entry
+    // Create a new sub-dictionary named "Result Dict &lt;n>" for this entry
 
     ++resCount;
 
@@ -189,10 +192,10 @@ void fill_search_results_dictionary(TemplateDictionary *dictionary,
                                               "CATEGORY_SECTION");
 
 
-    if (IsEmpty(qr->GetDisplayUrl()) &&
-        IsEmpty(qr->GetPageSize()) &&
-        IsEmpty(qr->GetCachedUrl()) &&
-        IsEmpty(qr->GetSimilarPagesUrl()) &&
+    if (IsEmpty(qr->GetDisplayUrl()) &amp;&amp;
+        IsEmpty(qr->GetPageSize()) &amp;&amp;
+        IsEmpty(qr->GetCachedUrl()) &amp;&amp;
+        IsEmpty(qr->GetSimilarPagesUrl()) &amp;&amp;
         (IsEmpty(qr->GetStockUrl()) ||
          IsEmpty(qr->GetStockSymbol())) ) {
       // there is nothing on the last line, so hide it altogether
@@ -235,8 +238,8 @@ void output_page(const Query* query) {
   Template* tpl = Template::GetTemplate(SEARCH_RESULTS_FN, STRIP_WHITESPACE);
   TemplateDictionary dict("search-results dict");
   string output;
-  fill_search_results_dictionary(&dict, query);
-  tpl->Expand(&output, &dict);
+  fill_search_results_dictionary(&amp;dict, query);
+  tpl->Expand(&amp;output, &amp;dict);
   // output now holds the expanded template
 }
 

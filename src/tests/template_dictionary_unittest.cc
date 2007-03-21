@@ -194,6 +194,13 @@ class TemplateDictionaryUnittest {
     dict.SetEscapedValue("hardest HTML",
                          "<A HREF='foo'\nid=\"bar\t\t&&\vbaz\">",
                          TemplateDictionary::html_escape);
+    dict.SetEscapedValue("easy PRE", "foo",
+                         TemplateDictionary::pre_escape);
+    dict.SetEscapedValue("harder PRE", "foo & bar",
+                         TemplateDictionary::pre_escape);
+    dict.SetEscapedValue("hardest PRE",
+                         " \"--\v--\f--\n--\t--&--<-->--'--\"",
+                         TemplateDictionary::pre_escape);
     dict.SetEscapedValue("easy XML", "xoo",
                          TemplateDictionary::xml_escape);
     dict.SetEscapedValue("harder XML", "xoo & xar",
@@ -207,6 +214,9 @@ class TemplateDictionaryUnittest {
     dict.SetEscapedValue("hardest JS",
                          ("f = 'foo';\r\n\tprint \"\\&foo = \b\", \"foo\""),
                          TemplateDictionary::javascript_escape);
+    dict.SetEscapedValue("close script JS",
+                         "//--></script><script>alert(123);</script>",
+                         TemplateDictionary::javascript_escape);
     dict.SetEscapedValue("easy JSON", "joo",
                          TemplateDictionary::json_escape);
     dict.SetEscapedValue("harder JSON", "f = \"joo\"; e = 'joo';",
@@ -214,6 +224,38 @@ class TemplateDictionaryUnittest {
     dict.SetEscapedValue("hardest JSON",
                          ("f = 'foo';\r\n\t\fprint \"\\&foo = /\b\", \"foo\""),
                          TemplateDictionary::json_escape);
+
+    // Test data for URL Query Escaping.  The first three tests do not need
+    // escaping.
+    dict.SetEscapedValue("query escape 0", "",
+                         TemplateDictionary::url_query_escape);
+    dict.SetEscapedValue("query escape 1", "noop",
+                         TemplateDictionary::url_query_escape);
+    dict.SetEscapedValue("query escape 2",
+                         "0123456789abcdefghjijklmnopqrstuvwxyz"
+                         "ABCDEFGHIJKLMNOPQRSTUVWXYZ.-_*/~!(),",
+                         TemplateDictionary::url_query_escape);
+    dict.SetEscapedValue("query escape 3", " ?a=b;c#d ",
+                         TemplateDictionary::url_query_escape);
+    dict.SetEscapedValue("query escape 4", "#$%&+<=>?@[\\]^`{|}",
+                         TemplateDictionary::url_query_escape);
+    dict.SetEscapedValue("query escape 5", "\xDE\xAD\xCA\xFE",
+                         TemplateDictionary::url_query_escape);
+    dict.SetEscapedValue("query escape 6", "\"':",
+                         TemplateDictionary::url_query_escape);
+
+    // Test cases for URL Query Escaping
+    ASSERT_STREQ(dict.GetSectionValue("query escape 0"), "");
+    ASSERT_STREQ(dict.GetSectionValue("query escape 1"), "noop");
+    ASSERT_STREQ(dict.GetSectionValue("query escape 2"),
+                 "0123456789abcdefghjijklmnopqrstuvwxyz"
+                 "ABCDEFGHIJKLMNOPQRSTUVWXYZ.-_*/~!(),");
+    ASSERT_STREQ(dict.GetSectionValue("query escape 3"), "+%3Fa%3Db%3Bc%23d+");
+    ASSERT_STREQ(dict.GetSectionValue("query escape 4"),
+                 "%23%24%25%26%2B%3C%3D%3E%3F%40%5B%5C%5D%5E%60%7B%7C%7D");
+    ASSERT_STREQ(dict.GetSectionValue("query escape 5"), "%DE%AD%CA%FE");
+    ASSERT_STREQ(dict.GetSectionValue("query escape 6"), "%22%27%3A");
+
     FooEscaper foo_escaper;
     dict.SetEscapedValue("easy foo", "hello there!",
                          FooEscaper());
@@ -231,26 +273,38 @@ class TemplateDictionaryUnittest {
     ASSERT_STREQ(dict.GetSectionValue("easy HTML"), "foo");
     ASSERT_STREQ(dict.GetSectionValue("harder HTML"), "foo &amp; bar");
     ASSERT_STREQ(dict.GetSectionValue("hardest HTML"),
-                 "&lt;A HREF='foo' id=&quot;bar  &amp;&amp; baz&quot;&gt;");
+                 "&lt;A HREF=&#39;foo&#39; id=&quot;bar  &amp;&amp; "
+                 "baz&quot;&gt;");
+    ASSERT_STREQ(dict.GetSectionValue("easy PRE"), "foo");
+    ASSERT_STREQ(dict.GetSectionValue("harder PRE"), "foo &amp; bar");
+    ASSERT_STREQ(dict.GetSectionValue("hardest PRE"),
+                 " &quot;--\v--\f--\n--\t--&amp;--&lt;--&gt;--&#39;--&quot;");
     ASSERT_STREQ(dict.GetSectionValue("easy XML"), "xoo");
     ASSERT_STREQ(dict.GetSectionValue("harder XML"), "xoo & xar");
     ASSERT_STREQ(dict.GetSectionValue("hardest XML"),
                  "xoo &#160; xar&#160;xaz &nbsp");
     ASSERT_STREQ(dict.GetSectionValue("easy JS"), "joo");
-    ASSERT_STREQ(dict.GetSectionValue("harder JS"), "f = \\'joo\\';");
+    ASSERT_STREQ(dict.GetSectionValue("harder JS"), "f \\x3d \\'joo\\';");
     ASSERT_STREQ(dict.GetSectionValue("hardest JS"),
-                 "f = \\'foo\\';\\r\\n\tprint \\\"\\\\&foo = \\b\\\", \\\"foo\\\"");
+                 "f \\x3d \\'foo\\';\\r\\n\tprint \\\"\\\\\\x26foo \\x3d "
+                 "\\b\\\", \\\"foo\\\"");
+    ASSERT_STREQ(dict.GetSectionValue("close script JS"),
+                 "//--\\x3e\\x3c/script\\x3e\\x3cscript\\x3e"
+                 "alert(123);\\x3c/script\\x3e");
     ASSERT_STREQ(dict.GetSectionValue("easy JSON"), "joo");
-    ASSERT_STREQ(dict.GetSectionValue("harder JSON"), "f = \\\"joo\\\"; e = 'joo';");
+    ASSERT_STREQ(dict.GetSectionValue("harder JSON"), "f = \\\"joo\\\"; "
+                 "e = 'joo';");
     ASSERT_STREQ(dict.GetSectionValue("hardest JSON"),
-                 "f = 'foo';\\r\\n\\t\\fprint \\\"\\\\&foo = \\/\\b\\\", \\\"foo\\\"");
+                 "f = 'foo';\\r\\n\\t\\fprint \\\"\\\\&foo = \\/\\b\\\", "
+                 "\\\"foo\\\"");
     ASSERT_STREQ(dict.GetSectionValue("easy foo"), "foo");
     ASSERT_STREQ(dict.GetSectionValue("harder foo"), "foo");
     ASSERT_STREQ(dict.GetSectionValue("easy double"), "doo");
     ASSERT_STREQ(dict.GetSectionValue("harder double"),
-                                      "&lt;A HREF=\\'foo\\'&gt;\\n");
+                 "\\x3cA HREF\\x3d\\&#39;foo\\&#39;\\x3e\\n");
     ASSERT_STREQ(dict.GetSectionValue("hardest double"),
-                 "print \\&quot;&lt;A HREF=\\'foo\\'&gt;\\&quot;;\\r\\n\\\\1;");
+                 "print \\&quot;\\x3cA HREF\\x3d\\&#39;foo\\&#39;\\x3e\\&quot;;"
+                 "\\r\\n\\\\1;");
   }
 
   static void TestSetEscapedFormattedValue() {
@@ -258,11 +312,19 @@ class TemplateDictionaryUnittest {
 
     dict.SetEscapedFormattedValue("HTML", TemplateDictionary::html_escape,
                                   "This is <%s> #%.4f", "a & b", 1.0/3);
+    dict.SetEscapedFormattedValue("PRE", TemplateDictionary::pre_escape,
+                                  "if %s x = %.4f;", "(a < 1 && b > 2)\n\t", 1.0/3);
+    dict.SetEscapedFormattedValue("URL", TemplateDictionary::url_query_escape,
+                                  "pageviews-%s", "r?egex");
     dict.SetEscapedFormattedValue("XML", TemplateDictionary::xml_escape,
                                   "This&nbsp;is&nb%s -- ok?", "sp; #1&nbsp;");
 
     ASSERT_STREQ(dict.GetSectionValue("HTML"),
                  "This is &lt;a &amp; b&gt; #0.3333");
+    ASSERT_STREQ(dict.GetSectionValue("PRE"),
+                 "if (a &lt; 1 &amp;&amp; b &gt; 2)\n\t x = 0.3333;");
+    ASSERT_STREQ(dict.GetSectionValue("URL"), "pageviews-r%3Fegex");
+
     ASSERT_STREQ(dict.GetSectionValue("XML"),
                  "This&#160;is&#160; #1&#160; -- ok?");
   }

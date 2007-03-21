@@ -125,8 +125,9 @@ class Template {
 
   // Expand
   //   Expands the template into a string using the values
-  //   in the supplied dictionary.
-  void Expand(std::string *output_buffer,
+  //   in the supplied dictionary.  Returns true iff all the template
+  //   files load and parse correctly.
+  bool Expand(std::string *output_buffer,
               const TemplateDictionary *dictionary) const;
 
   // Dump
@@ -196,7 +197,7 @@ class Template {
   // force_annotate_dict is a dictionary that can be used to force
   // annotations: even if dictionary->ShouldAnnotateOutput() is false,
   // if force_annotate_dict->ShouldAnnotateOutput() is true, we annotate.
-  void Expand(class ExpandEmitter *expand_emitter,
+  bool Expand(class ExpandEmitter *expand_emitter,
               const TemplateDictionary *dictionary,
               const TemplateDictionary *force_annotate_dict) const;
 

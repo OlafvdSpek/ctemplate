@@ -187,13 +187,23 @@ static string HtmlModifier(const string& input, const string&) {
   return TemplateDictionary::html_escape(input);
 }
 
+static string PreModifier(const string& input, const string&) {
+  return TemplateDictionary::pre_escape(input);
+}
+
 static string JavascriptModifier(const string& input, const string&) {
   return TemplateDictionary::javascript_escape(input);
 }
 
+static string UrlQueryEscapeModifier(const string& input, const string&) {
+  return TemplateDictionary::url_query_escape(input);
+}
+
 static const Modifier g_modifiers[] = {
   { "html_escape", 'h', MODVAL_FORBIDDEN, &HtmlModifier },
+  { "pre_escape", 'p', MODVAL_FORBIDDEN, &PreModifier },
   { "javascript_escape", 'j', MODVAL_FORBIDDEN, &JavascriptModifier },
+  { "url_query_escape", 'u', MODVAL_FORBIDDEN, &UrlQueryEscapeModifier },
 };
 
 
@@ -384,7 +394,8 @@ class TemplateNode {
   // not NULL, and force_annotate_dictionary->ShoudlAnnotateOutput() is
   // true, the output is annotated, even if
   // dictionary->ShouldAnnotateOutput() is false.
-  virtual void Expand(ExpandEmitter *output_buffer,
+  // Returns true iff all the template files load and parse correctly.
+  virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionary *dictionary,
                       const TemplateDictionary *force_annotate) const = 0;
 
@@ -464,10 +475,12 @@ class TextTemplateNode : public TemplateNode {
 
   // Expands the text node by simply outputting the text string. This
   // virtual method does not use TemplateDictionary or force_annotate.
-  virtual void Expand(ExpandEmitter *output_buffer,
+  // Returns true iff all the template files load and parse correctly.
+  virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionary *,
                       const TemplateDictionary *) const {
     output_buffer->Emit(text_, textlen_);
+    return true;
   }
 
   // A noop for text nodes
@@ -510,7 +523,8 @@ class VariableTemplateNode : public TemplateNode {
 
   // Expands the variable node by outputting the value (if there is one)
   // of the node variable which is retrieved from the dictionary
-  virtual void Expand(ExpandEmitter *output_buffer,
+  // Returns true iff all the template files load and parse correctly.
+  virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionary *dictionary,
                       const TemplateDictionary *force_annotate) const;
 
@@ -530,7 +544,7 @@ class VariableTemplateNode : public TemplateNode {
   const Token token_;
 };
 
-void VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
+bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
                                   const TemplateDictionary *dictionary,
                                   const TemplateDictionary *force_annotate)
     const {
@@ -553,6 +567,8 @@ void VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
   if (ShouldAnnotateOutput(dictionary, force_annotate)) {
     output_buffer->Emit(CloseAnnotation("VAR"));
   }
+
+  return true;
 }
 
 // ----------------------------------------------------------------------
@@ -579,7 +595,8 @@ class TemplateTemplateNode : public TemplateNode {
   // dictionary if none other is provided in the TemplateDictionary),
   // and then outputting this newly expanded template in place of the
   // original variable.
-  virtual void Expand(ExpandEmitter *output_buffer,
+  // Returns true iff all the template files load and parse correctly.
+  virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionary *dictionary,
                       const TemplateDictionary *force_annotate) const;
 
@@ -602,14 +619,16 @@ class TemplateTemplateNode : public TemplateNode {
 
 // If no value is found in the dictionary for the template variable
 // in this node, then no output is generated in place of this variable.
-void TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
+bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
                                   const TemplateDictionary *dictionary,
                                   const TemplateDictionary *force_annotate)
     const {
+  bool error_free = true;
+
   string variable(token_.text, token_.textlen);
   if (dictionary->IsHiddenTemplate(variable)) {
     // if this "template include" section is "hidden", do nothing
-    return;
+    return true;
   }
 
   // see if there is a vector of dictionaries for this template
@@ -635,6 +654,7 @@ void TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
     // if there was a problem retrieving the template, bail!
     if (!included_template) {
       LOG(ERROR) << "Failed to load included template: " << filename << endl;
+      error_free = false;
       continue;
     }
 
@@ -653,15 +673,17 @@ void TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
     // modify the string, and append to output_buffer.  Otherwise (common
     // case), we can just expand into the output-buffer directly.
     if (token_.modifier_plus_values.empty()) {  // no need to modify sub-template
-      included_template->Expand(output_buffer,
-                                *dv_iter ? *dv_iter : dictionary,
-                                ShouldAnnotateOutput(dictionary, force_annotate));
+      error_free &= included_template->Expand(
+          output_buffer,
+          *dv_iter ? *dv_iter : dictionary,
+          ShouldAnnotateOutput(dictionary, force_annotate));
     } else {
       string sub_template;
       StringEmitter subtemplate_buffer(&sub_template);
-      included_template->Expand(&subtemplate_buffer,
-                                *dv_iter ? *dv_iter : dictionary,
-                                ShouldAnnotateOutput(dictionary, force_annotate));
+      error_free &= included_template->Expand(
+          &subtemplate_buffer,
+          *dv_iter ? *dv_iter : dictionary,
+          ShouldAnnotateOutput(dictionary, force_annotate));
       ModifyString(token_.modifier_plus_values, &sub_template);
       output_buffer->Emit(sub_template);
     }
@@ -669,6 +691,8 @@ void TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
       output_buffer->Emit(CloseAnnotation("INC"));
     }
   }
+
+  return error_free;
 }
 
 // ----------------------------------------------------------------------
@@ -705,7 +729,8 @@ class SectionTemplateNode : public TemplateNode {
   //     iteration of the section as well as to show a non-hidden section,
   //     allowing the section template syntax to be used for both conditional
   //     and iterative text).
-  virtual void Expand(ExpandEmitter *output_buffer,
+  // Returns true iff all the template files load and parse correctly.
+  virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionary *dictionary,
                       const TemplateDictionary* force_annotate) const;
 
@@ -770,10 +795,12 @@ SectionTemplateNode::~SectionTemplateNode() {
           << string(token_.text, token_.textlen) << endl;
 }
 
-void SectionTemplateNode::Expand(ExpandEmitter *output_buffer,
+bool SectionTemplateNode::Expand(ExpandEmitter *output_buffer,
                                  const TemplateDictionary *dictionary,
                                  const TemplateDictionary *force_annotate)
     const {
+  bool error_free = true;
+
   const vector<TemplateDictionary*> *dv;
 
   string variable(token_.text, token_.textlen);
@@ -784,7 +811,7 @@ void SectionTemplateNode::Expand(ExpandEmitter *output_buffer,
     dv = g_use_current_dict;   // 'expand once, using the passed in dictionary'
   } else {
     if (dictionary->IsHiddenSection(variable)) {
-      return;      // if this section is "hidden", do nothing
+      return true;      // if this section is "hidden", do nothing
     }
     dv = &dictionary->GetDictionaries(variable);
     if (dv->empty())    // empty dict means 'expand once using containing dict'
@@ -802,15 +829,18 @@ void SectionTemplateNode::Expand(ExpandEmitter *output_buffer,
     // We force children to annotate the output if we have to.
     NodeList::const_iterator iter = node_list_.begin();
     for (; iter != node_list_.end(); ++iter) {
-      (*iter)->Expand(output_buffer,
-                      *dv_iter ? *dv_iter : dictionary,
-                      ShouldAnnotateOutput(dictionary, force_annotate));
+      error_free &=
+        (*iter)->Expand(output_buffer,
+                        *dv_iter ? *dv_iter : dictionary,
+                        ShouldAnnotateOutput(dictionary, force_annotate));
     }
 
     if (ShouldAnnotateOutput(dictionary, force_annotate)) {
       output_buffer->Emit(CloseAnnotation("SEC"));
     }
   }
+
+  return error_free;
 }
 
 void SectionTemplateNode::WriteHeaderEntries(string *outstring,
@@ -1627,9 +1657,12 @@ int Template::InsertFile(const char *file, int len, char* buffer) {
 //    appropriate value from the passed-in dictionary.
 // ----------------------------------------------------------------------
 
-void Template::Expand(ExpandEmitter *expand_emitter,
+bool Template::Expand(ExpandEmitter *expand_emitter,
                       const TemplateDictionary *dict,
                       const TemplateDictionary *force_annotate_output) const {
+  // Accumulator for the results of Expand for each sub-tree.
+  bool error_free = true;
+
   // We hold mutex_ the entire time we expand, because
   // ReloadIfChanged(), which also holds mutex_, is allowed to delete
   // tree_, and we want to make sure it doesn't do that (in another
@@ -1640,7 +1673,7 @@ void Template::Expand(ExpandEmitter *expand_emitter,
   if (state() != TS_READY) {
     // We'd like to reload if state_ == TS_RELOAD, but we're a const method
     mutex_->Unlock();
-    return;
+    return false;
   }
 
   const bool should_annotate = (dict->ShouldAnnotateOutput() ||
@@ -1662,19 +1695,21 @@ void Template::Expand(ExpandEmitter *expand_emitter,
   }
 
   // We force our sub-tree to annotate output if we annotate output
-  tree_->Expand(expand_emitter, dict, force_annotate_output);
+  error_free &= tree_->Expand(expand_emitter, dict, force_annotate_output);
 
   if (should_annotate) {
     expand_emitter->Emit(TemplateNode::CloseAnnotation("FILE"));
   }
 
   mutex_->Unlock();
+
+  return error_free;
 }
 
-void Template::Expand(string *output_buffer,
+bool Template::Expand(string *output_buffer,
                       const TemplateDictionary *dict) const {
   StringEmitter e(output_buffer);
-  Expand(&e, dict, NULL);
+  return Expand(&e, dict, NULL);
 }
 
 _END_GOOGLE_NAMESPACE_

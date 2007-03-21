@@ -156,9 +156,10 @@ static Template* StringToTemplate(const string& s, Strip strip) {
 // This is esp. useful for calling from within gdb.
 // The gdb nice-ness is balanced by the need for the caller to delete the buf.
 
-static const char* ExpandIs(Template* tpl, TemplateDictionary *dict) {
+static const char* ExpandIs(Template* tpl, TemplateDictionary *dict,
+                            bool expected) {
   string outstring;
-  tpl->Expand(&outstring, dict);
+  ASSERT(expected == tpl->Expand(&outstring, dict));
 
   char* buf = new char [outstring.size()+1];
   strcpy(buf, outstring.c_str());
@@ -166,8 +167,12 @@ static const char* ExpandIs(Template* tpl, TemplateDictionary *dict) {
 }
 
 static void AssertExpandIs(Template* tpl, TemplateDictionary *dict,
-                           const string& is) {
-  const char* buf = ExpandIs(tpl, dict);
+                           const string& is, bool expected) {
+  const char* buf = ExpandIs(tpl, dict, expected);
+  if (strcmp(buf, is.c_str())) {
+    printf("expected = '%s'\n", is.c_str());
+    printf("actual   = '%s'\n", buf);
+  }
   ASSERT_STREQ(buf, is.c_str());
   delete [] buf;
 }
@@ -182,52 +187,75 @@ class TemplateUnittest {
   static void TestVariable() {
     Template* tpl = StringToTemplate("hi {{VAR}} lo", STRIP_WHITESPACE);
     TemplateDictionary dict("dict");
-    AssertExpandIs(tpl, &dict, "hi  lo");
+    AssertExpandIs(tpl, &dict, "hi  lo", true);
     dict.SetValue("VAR", "yo");
-    AssertExpandIs(tpl, &dict, "hi yo lo");
+    AssertExpandIs(tpl, &dict, "hi yo lo", true);
     dict.SetValue("VAR", "yoyo");
-    AssertExpandIs(tpl, &dict, "hi yoyo lo");
+    AssertExpandIs(tpl, &dict, "hi yoyo lo", true);
     dict.SetValue("VA", "noyo");
     dict.SetValue("VAR ", "noyo2");
     dict.SetValue("var", "noyo3");
-    AssertExpandIs(tpl, &dict, "hi yoyo lo");
+    AssertExpandIs(tpl, &dict, "hi yoyo lo", true);
   }
 
   static void TestVariableWithModifiers() {
     Template* tpl = StringToTemplate("hi {{VAR:html_escape}} lo",
                                      STRIP_WHITESPACE);
     TemplateDictionary dict("dict");
-    dict.SetValue("VAR", "yo");
-    AssertExpandIs(tpl, &dict, "hi yo lo");
-    dict.SetValue("VAR", "yo&yo");
-    AssertExpandIs(tpl, &dict, "hi yo&amp;yo lo");
 
+    // Test with no modifiers.
+    dict.SetValue("VAR", "yo");
+    AssertExpandIs(tpl, &dict, "hi yo lo", true);
+    dict.SetValue("VAR", "yo&yo");
+    AssertExpandIs(tpl, &dict, "hi yo&amp;yo lo", true);
+
+    // Test with URL escaping.
+    tpl = StringToTemplate("<a href=\"/servlet?param={{VAR:u}}\">",
+                           STRIP_WHITESPACE);
+    AssertExpandIs(tpl, &dict, "<a href=\"/servlet?param=yo%26yo\">", true);
+    tpl = StringToTemplate("<a href='/servlet?param={{VAR:url_query_escape}}'>",
+                           STRIP_WHITESPACE);
+    AssertExpandIs(tpl, &dict, "<a href='/servlet?param=yo%26yo'>", true);
+
+    // Test with multiple URL escaping.
+    tpl = StringToTemplate("<a href=\"/servlet?param={{VAR:u:u}}\">",
+                           STRIP_WHITESPACE);
+    AssertExpandIs(tpl, &dict, "<a href=\"/servlet?param=yo%2526yo\">", true);
+
+    // Test HTML escaping.
     tpl = StringToTemplate("hi {{VAR:h}} lo", STRIP_WHITESPACE);
-    AssertExpandIs(tpl, &dict, "hi yo&amp;yo lo");
+    AssertExpandIs(tpl, &dict, "hi yo&amp;yo lo", true);
 
     tpl = StringToTemplate("hi {{VAR:h:h}} lo", STRIP_WHITESPACE);
-    AssertExpandIs(tpl, &dict, "hi yo&amp;amp;yo lo");
+    AssertExpandIs(tpl, &dict, "hi yo&amp;amp;yo lo", true);
 
+    // Test with no modifiers.
     tpl = StringToTemplate("hi {{VAR}} lo", STRIP_WHITESPACE);
-    AssertExpandIs(tpl, &dict, "hi yo&yo lo");
+    AssertExpandIs(tpl, &dict, "hi yo&yo lo", true);
 
     // Check that ordering is right
     dict.SetValue("VAR", "yo\nyo");
     tpl = StringToTemplate("hi {{VAR:h}} lo", STRIP_WHITESPACE);
-    AssertExpandIs(tpl, &dict, "hi yo yo lo");
+    AssertExpandIs(tpl, &dict, "hi yo yo lo", true);
+    tpl = StringToTemplate("hi {{VAR:p}} lo", STRIP_WHITESPACE);
+    AssertExpandIs(tpl, &dict, "hi yo\nyo lo", true);
     tpl = StringToTemplate("hi {{VAR:j}} lo", STRIP_WHITESPACE);
-    AssertExpandIs(tpl, &dict, "hi yo\\nyo lo");
+    AssertExpandIs(tpl, &dict, "hi yo\\nyo lo", true);
     tpl = StringToTemplate("hi {{VAR:h:j}} lo", STRIP_WHITESPACE);
-    AssertExpandIs(tpl, &dict, "hi yo yo lo");
+    AssertExpandIs(tpl, &dict, "hi yo yo lo", true);
     tpl = StringToTemplate("hi {{VAR:j:h}} lo", STRIP_WHITESPACE);
-    AssertExpandIs(tpl, &dict, "hi yo\\nyo lo");
+    AssertExpandIs(tpl, &dict, "hi yo\\nyo lo", true);
 
     // Check more complicated modifiers using fullname
     tpl = StringToTemplate("hi {{VAR:javascript_escape:h}} lo",
                            STRIP_WHITESPACE);
-    AssertExpandIs(tpl, &dict, "hi yo\\nyo lo");
+    AssertExpandIs(tpl, &dict, "hi yo\\nyo lo", true);
     tpl = StringToTemplate("hi {{VAR:j:html_escape}} lo",
                            STRIP_WHITESPACE);
+    AssertExpandIs(tpl, &dict, "hi yo\\nyo lo", true);
+    tpl = StringToTemplate("hi {{VAR:pre_escape:j}} lo",
+                           STRIP_WHITESPACE);
+    AssertExpandIs(tpl, &dict, "hi yo\\nyo lo", true);
 
     // Check that illegal modifiers are rejected
     tpl = StringToTemplate("hi {{VAR:j:h2}} lo", STRIP_WHITESPACE);
@@ -247,6 +275,9 @@ class TemplateUnittest {
     ASSERT(tpl == NULL);
     tpl = StringToTemplate("hi {{VAR:html_escape=yes}} lo", STRIP_WHITESPACE);
     ASSERT(tpl == NULL);
+    tpl = StringToTemplate("hi {{VAR:url_query_escape=wombats}} lo",
+                           STRIP_WHITESPACE);
+    ASSERT(tpl == NULL);
 
     // Check we don't allow modifiers on sections
     tpl = StringToTemplate("hi {{#VAR:h}} lo {{/VAR}}", STRIP_WHITESPACE);
@@ -258,24 +289,24 @@ class TemplateUnittest {
         "boo!\nhi {{#SEC}}lo{{#SUBSEC}}jo{{/SUBSEC}}{{/SEC}} bar",
         STRIP_WHITESPACE);
     TemplateDictionary dict("dict");
-    AssertExpandIs(tpl, &dict, "boo!hi  bar");
+    AssertExpandIs(tpl, &dict, "boo!hi  bar", true);
     dict.ShowSection("SEC");
-    AssertExpandIs(tpl, &dict, "boo!hi lo bar");
+    AssertExpandIs(tpl, &dict, "boo!hi lo bar", true);
     dict.ShowSection("SEC");
-    AssertExpandIs(tpl, &dict, "boo!hi lo bar");
+    AssertExpandIs(tpl, &dict, "boo!hi lo bar", true);
     // This should work even though subsec isn't a child of the main dict
     dict.ShowSection("SUBSEC");
-    AssertExpandIs(tpl, &dict, "boo!hi lojo bar");
+    AssertExpandIs(tpl, &dict, "boo!hi lojo bar", true);
 
     TemplateDictionary dict2("dict2");
     dict2.AddSectionDictionary("SEC");
-    AssertExpandIs(tpl, &dict2, "boo!hi lo bar");
+    AssertExpandIs(tpl, &dict2, "boo!hi lo bar", true);
     dict2.AddSectionDictionary("SEC");
-    AssertExpandIs(tpl, &dict2, "boo!hi lolo bar");
+    AssertExpandIs(tpl, &dict2, "boo!hi lolo bar", true);
     dict2.AddSectionDictionary("sec");
-    AssertExpandIs(tpl, &dict2, "boo!hi lolo bar");
+    AssertExpandIs(tpl, &dict2, "boo!hi lolo bar", true);
     dict2.ShowSection("SUBSEC");
-    AssertExpandIs(tpl, &dict2, "boo!hi lojolojo bar");
+    AssertExpandIs(tpl, &dict2, "boo!hi lojolojo bar", true);
   }
 
   static void TestInclude() {
@@ -284,42 +315,57 @@ class TemplateUnittest {
     string incname_bad = StringToTemplateFile("{{syntax_error");
     Template* tpl = StringToTemplate("hi {{>INC}} bar\n", STRIP_WHITESPACE);
     TemplateDictionary dict("dict");
-    AssertExpandIs(tpl, &dict, "hi  bar");
+    AssertExpandIs(tpl, &dict, "hi  bar", true);
     dict.AddIncludeDictionary("INC");
-    AssertExpandIs(tpl, &dict, "hi  bar");   // noop: no filename was set
+    AssertExpandIs(tpl, &dict, "hi  bar", true);   // noop: no filename was set
     dict.AddIncludeDictionary("INC")->SetFilename("/notarealfile ");
-    AssertExpandIs(tpl, &dict, "hi  bar");   // noop: illegal filename
+    AssertExpandIs(tpl, &dict, "hi  bar", false);   // noop: illegal filename
     dict.AddIncludeDictionary("INC")->SetFilename(incname);
-    AssertExpandIs(tpl, &dict, "hi include file bar");
+    AssertExpandIs(tpl, &dict, "hi include file bar", false);
     dict.AddIncludeDictionary("INC")->SetFilename(incname_bad);
-    AssertExpandIs(tpl, &dict, "hi include file bar");  // noop: syntax error
+    AssertExpandIs(tpl, &dict, "hi include file bar",
+                   false);  // noop: syntax error
     dict.AddIncludeDictionary("INC")->SetFilename(incname);
-    AssertExpandIs(tpl, &dict, "hi include fileinclude file bar");
+    AssertExpandIs(tpl, &dict, "hi include fileinclude file bar", false);
     dict.AddIncludeDictionary("inc")->SetFilename(incname);
-    AssertExpandIs(tpl, &dict, "hi include fileinclude file bar");
+    AssertExpandIs(tpl, &dict, "hi include fileinclude file bar", false);
     dict.AddIncludeDictionary("INC")->SetFilename(incname2);
-    AssertExpandIs(tpl, &dict, "hi include fileinclude fileinc2 bar");
+    AssertExpandIs(tpl, &dict, "hi include fileinclude fileinc2 bar", false);
 
     // Now test that includes preserve Strip
     Template* tpl2 = StringToTemplate("hi {{>INC}} bar", DO_NOT_STRIP);
-    AssertExpandIs(tpl2, &dict, "hi include file\ninclude file\ninc2\n bar");
+    AssertExpandIs(tpl2, &dict, "hi include file\ninclude file\ninc2\n bar",
+                   false);
   }
 
   static void TestIncludeWithModifiers() {
     string incname = StringToTemplateFile("include & print file\n");
     string incname2 = StringToTemplateFile("inc2\n");
-    // Note this also tests that html-escape, but not javascript-escape,
-    // escapes \n to <space>
+    string incname3 = StringToTemplateFile("yo&yo");
+    // Note this also tests that html-escape, but not javascript-escape or
+    // pre-escape, escapes \n to <space>
     Template* tpl1 = StringToTemplate("hi {{>INC:h}} bar\n", DO_NOT_STRIP);
     Template* tpl2 = StringToTemplate("hi {{>INC:javascript_escape}} bar\n",
                                       DO_NOT_STRIP);
+    Template* tpl3 = StringToTemplate("hi {{>INC:pre_escape}} bar\n",
+                                      DO_NOT_STRIP);
+    Template* tpl4 = StringToTemplate("hi {{>INC:u}} bar\n", DO_NOT_STRIP);
+
     TemplateDictionary dict("dict");
-    AssertExpandIs(tpl1, &dict, "hi  bar\n");
+    AssertExpandIs(tpl1, &dict, "hi  bar\n", true);
     dict.AddIncludeDictionary("INC")->SetFilename(incname);
-    AssertExpandIs(tpl1, &dict, "hi include &amp; print file  bar\n");
+    AssertExpandIs(tpl1, &dict, "hi include &amp; print file  bar\n", true);
     dict.AddIncludeDictionary("INC")->SetFilename(incname2);
-    AssertExpandIs(tpl1, &dict, "hi include &amp; print file inc2  bar\n");
-    AssertExpandIs(tpl2, &dict, "hi include & print file\\ninc2\\n bar\n");
+    AssertExpandIs(tpl1, &dict, "hi include &amp; print file inc2  bar\n",
+                   true);
+    AssertExpandIs(tpl2, &dict, "hi include \\x26 print file\\ninc2\\n bar\n",
+                   true);
+    AssertExpandIs(tpl3, &dict, "hi include &amp; print file\ninc2\n bar\n",
+                   true);
+    dict.AddIncludeDictionary("INC")->SetFilename(incname3);
+    AssertExpandIs(tpl4, &dict,
+                   "hi include+%26+print+file%0Ainc2%0Ayo%26yo bar\n",
+                   true);
 
     // Don't test modifier syntax here; that's in TestVariableWithModifiers()
   }
@@ -331,18 +377,18 @@ class TemplateUnittest {
     TemplateDictionary dict("dict");
     dict.SetValue("FOO", "foo");
     dict.ShowSection("SEC");
-    AssertExpandIs(tpl, &dict, "foofoofoo");
+    AssertExpandIs(tpl, &dict, "foofoofoo", true);
 
     TemplateDictionary dict2("dict2");
     dict2.SetValue("FOO", "foo");
     TemplateDictionary* sec = dict2.AddSectionDictionary("SEC");
-    AssertExpandIs(tpl, &dict2, "foofoofoo");
+    AssertExpandIs(tpl, &dict2, "foofoofoo", true);
     sec->SetValue("FOO", "bar");
-    AssertExpandIs(tpl, &dict2, "foobarbar");
+    AssertExpandIs(tpl, &dict2, "foobarbar", true);
     TemplateDictionary* sec2 = sec->AddSectionDictionary("SEC");
-    AssertExpandIs(tpl, &dict2, "foobarbar");
+    AssertExpandIs(tpl, &dict2, "foobarbar", true);
     sec2->SetValue("FOO", "baz");
-    AssertExpandIs(tpl, &dict2, "foobarbaz");
+    AssertExpandIs(tpl, &dict2, "foobarbaz", true);
 
     // Now test an include template, which shouldn't inherit from its parents
     tpl = StringToTemplate("{{FOO}}{{#SEC}}hi{{/SEC}}\n{{>INC}}",
@@ -353,7 +399,7 @@ class TemplateUnittest {
     incdict.ShowSection("SEC");
     incdict.SetValue("FOO", "foo");
     incdict.AddIncludeDictionary("INC")->SetFilename(incname);
-    AssertExpandIs(tpl, &incdict, "foohiinclude file");
+    AssertExpandIs(tpl, &incdict, "foohiinclude file", true);
   }
 
   // Tests that we append to the output string, rather than overwrite
@@ -361,11 +407,11 @@ class TemplateUnittest {
     Template* tpl = StringToTemplate("hi", STRIP_WHITESPACE);
     TemplateDictionary dict("test_expand");
     string output("premade");
-    tpl->Expand(&output, &dict);
+    ASSERT(tpl->Expand(&output, &dict));
     ASSERT_STREQ(output.c_str(), "premadehi");
 
     tpl = StringToTemplate("   lo   ", STRIP_WHITESPACE);
-    tpl->Expand(&output, &dict);
+    ASSERT(tpl->Expand(&output, &dict));
     ASSERT_STREQ(output.c_str(), "premadehilo");
   }
 
@@ -397,7 +443,7 @@ class TemplateUnittest {
              "\nhi {{#SEC=SEC}}lo{{/SEC}} bar{{/SEC}}{{/FILE}}",
              FLAGS_test_tmpdir.c_str(), FLAGS_test_tmpdir.c_str(),
              FLAGS_test_tmpdir.c_str());
-    AssertExpandIs(tpl, &dict, expected);
+    AssertExpandIs(tpl, &dict, expected, true);
 
     dict.SetAnnotateOutput("/template.");
     AssertExpandIs(tpl, &dict,
@@ -407,10 +453,11 @@ class TemplateUnittest {
                    "{{/SEC}}{{/FILE}}{{/INC}}"
                    "{{#INC=INC}}{{#FILE=/template.002}}"
                    "{{#SEC=__MAIN__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
-                   "\nhi {{#SEC=SEC}}lo{{/SEC}} bar{{/SEC}}{{/FILE}}");
+                   "\nhi {{#SEC=SEC}}lo{{/SEC}} bar{{/SEC}}{{/FILE}}", true);
 
     dict.SetAnnotateOutput(NULL);   // should turn off annotations
-    AssertExpandIs(tpl, &dict, "boo!\ninclude file\ninclude #2\n\nhi lo bar");
+    AssertExpandIs(tpl, &dict, "boo!\ninclude file\ninclude #2\n\nhi lo bar",
+                   true);
   }
 
   static void TestGetTemplate() {
@@ -466,9 +513,9 @@ class TemplateUnittest {
       Template* tpl1 = StringToTemplate(tests[i][0], DO_NOT_STRIP);
       Template* tpl2 = StringToTemplate(tests[i][0], STRIP_BLANK_LINES);
       Template* tpl3 = StringToTemplate(tests[i][0], STRIP_WHITESPACE);
-      AssertExpandIs(tpl1, &dict, tests[i][1]);
-      AssertExpandIs(tpl2, &dict, tests[i][2]);
-      AssertExpandIs(tpl3, &dict, tests[i][3]);
+      AssertExpandIs(tpl1, &dict, tests[i][1], true);
+      AssertExpandIs(tpl2, &dict, tests[i][2], true);
+      AssertExpandIs(tpl3, &dict, tests[i][3], true);
     }
   }
 
@@ -491,7 +538,7 @@ class TemplateUnittest {
     sleep(1);
     ASSERT(tpl->ReloadIfChanged());   // true: change, even if not contentful
     tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);  // needed
-    AssertExpandIs(tpl, &dict, "{valid template}");
+    AssertExpandIs(tpl, &dict, "{valid template}", true);
 
     StringToFile("exists now!", nonexistent);
     tpl2 = Template::GetTemplate(nonexistent, STRIP_WHITESPACE);
@@ -507,21 +554,21 @@ class TemplateUnittest {
     unlink(nonexistent.c_str());      // here today...
     sleep(1);
     ASSERT(!tpl2->ReloadIfChanged()); // false: file has disappeared
-    AssertExpandIs(tpl2, &dict, "exists now!");  // last non-error value
+    AssertExpandIs(tpl2, &dict, "exists now!", true);  // last non-error value
 
     StringToFile("lazarus", nonexistent);
     sleep(1);
     ASSERT(tpl2->ReloadIfChanged());  // true: file exists again
 
     tpl2 = Template::GetTemplate(nonexistent, STRIP_WHITESPACE);
-    AssertExpandIs(tpl2, &dict, "lazarus");
+    AssertExpandIs(tpl2, &dict, "lazarus", true);
     StringToFile("{new template}", filename);
     tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);  // needed
-    AssertExpandIs(tpl, &dict, "{valid template}");   // haven't reloaded
+    AssertExpandIs(tpl, &dict, "{valid template}", true);   // haven't reloaded
     sleep(1);
     ASSERT(tpl->ReloadIfChanged());   // true: change, even if not contentful
     tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);  // needed
-    AssertExpandIs(tpl, &dict, "{new template}");
+    AssertExpandIs(tpl, &dict, "{new template}", true);
 
     // Now change both tpl and tpl2
     StringToFile("{all-changed}", filename);
@@ -529,8 +576,8 @@ class TemplateUnittest {
     Template::ReloadAllIfChanged();
     tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);  // needed
     tpl2 = Template::GetTemplate(nonexistent, STRIP_WHITESPACE);
-    AssertExpandIs(tpl, &dict, "{all-changed}");
-    AssertExpandIs(tpl2, &dict, "lazarus2");
+    AssertExpandIs(tpl, &dict, "{all-changed}", true);
+    AssertExpandIs(tpl2, &dict, "lazarus2", true);
   }
 
   static void TestTemplateRootDirectory() {
@@ -673,7 +720,7 @@ class TemplateUnittest {
     ASSERT(badsyntax.size() == 2);  // we did not refresh the bad syntax list
     badsyntax = TemplateNamelist::GetBadSyntaxList(true, DO_NOT_STRIP);
     // After refresh, the file we just registerd also added in bad syntax list
-    ASSERT(badsyntax.size() == 3);  // 
+    ASSERT(badsyntax.size() == 3);
 
     TemplateNamelist::RegisterTemplate("A_non_existant_file.tpl");
     names = TemplateNamelist::GetList();

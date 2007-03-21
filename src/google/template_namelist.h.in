@@ -74,10 +74,11 @@
 //   exist and are syntactically correct.
 
 class TemplateNamelist {
+  friend class TemporaryRegisterTemplate;
  private:
   // Standard hash libs don't define hash<string>, but do define hash<char*>
   struct TemplateHasher {
-    bool operator()(const std::string& s) const {
+    size_t operator()(const std::string& s) const {
       return @ac_cv_cxx_hash_namespace@::hash<const char*>()(s.c_str());
     }
   };

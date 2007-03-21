@@ -8,7 +8,7 @@
 <link href="http://www.google.com/favicon.ico" type="image/x-icon"
       rel="shortcut icon">
 <link href="designstyle.css" type="text/css" rel="stylesheet">
-<style>
+<style type="text/css">
 <!--
   ol.bluelist li {
     color: #3366ff;
@@ -29,7 +29,6 @@
 <body>
 
 <h1>How To Use the Google Template System</h1>
-<small>(as of 27 February 2006)</small></center>
 <br>
 
 
@@ -80,7 +79,7 @@ embedded in the templates to the data that they will format.  Here's
 a simple template:</p>
 <pre>
    &lt;html>&lt;head>&lt;title>{{TITLE}}&lt;/title>{{META_TAGS}}&lt;/head>
-   &lt;body>{{BODY}}&lt;/body></html>
+   &lt;body>{{BODY}}&lt;/body>&lt;/html>
 </pre>
 
 <p>Here's a dictionary that one could use to instantiate the template:</p>
@@ -297,12 +296,26 @@ are the modifiers that are supported:</p>
 <table border=1 cellpadding=3>
 <tr><th>long name</th><th>short name</th><th>description</th></tr>
 
-<tr><td><code>:html_escape<code></td><td><code>:h</code></td>
+<tr><td><code>:html_escape</code></td><td><code>:h</code></td>
     <td>html-escapes the variable before output
-        (eg <code>&amp</code> -> <code>&amp;amp</code>)</td>
+        (eg <code>&amp;</code> -> <code>&amp;amp;</code>)</td>
 </tr>
 
-<tr><td><code>:javascript_escape<code></td><td><code>:j</code></td>
+<tr><td><code>:pre_escape</code></td><td><code>:p</code></td>
+    <td>pre-escapes the variable before output (same as html_escape but
+      whitespace is preserved; useful for &lt;pre&gt;...&lt;/pre&gt;)</td>
+</tr>
+
+<tr><td><code>:url_query_escape</code></td><td><code>:u</code></td>
+    <td>performs URL escaping on the variable before output.  
+        space is turned into +, and everything other than [0-9a-zA-Z.,_:*/~!()-], is
+        transformed into %-style escapes.  Use this when you are building
+        URLs with variables as parameters: 
+        <pre>&lt;a href="http://google.com/search?q={{QUERY:u}}"&gt;{{QUERY:h}}&lt;/a&gt;</pre>
+    </td> 
+</tr>
+
+<tr><td><code>:javascript_escape</code></td><td><code>:j</code></td>
     <td>javascript-escapes the variable before output
         (eg <code>"</code> -> <code>\"</code>)</td>
 </tr>
@@ -469,7 +482,7 @@ the following template:
 Last five searches:&lt;ol>
 {{#PREV_SEARCHES}
 &lt;li> {{PREV_SEARCH}}
-{{/PREV_SEARCH}}
+{{/PREV_SEARCHES}}
 &lt;/ol>
 
 {{>RESULT_TEMPLATE}}
@@ -508,7 +521,7 @@ with a different scoping rule.  You can call
 variable that can be used by all templates in an applications.  This
 is quite rare.</p>
 
-<p>You can also call <code>dict->SetTemplateGlobalDictionary(name,
+<p>You can also call <code>dict->SetTemplateGlobalValue(name,
 value)</code>.  This sets a variable that is seen by all child
 dictionaries of this dictionary: sub-sections you create via
 <code>AddSectionDictionary</code>, and included templates you create
@@ -516,7 +529,7 @@ via <code>AddIncludeDictionary</code> (both described below).  This
 differs from <code>SetValue()</code>, because <code>SetValue()</code>
 values are never inherited across template-includes.  Almost always,
 <code>SetValue</code> is what you want;
-<code>SetTemplateGlobalDictionary</code> is intended for variables
+<code>SetTemplateGlobalValue</code> is intended for variables
 that are "global" to a particular template but not all templates, such
 as a color scheme to use, a language code, etc.</p>
 
@@ -552,7 +565,7 @@ helper routines to help setting values of a few special forms.</p>
 <pre>
    google::TemplateDictionary* dict = new google::TemplateDictionary("var example");
    dict->SetValue("FOOTER", "Aren't these great results?");
-   class StarEscape { string operator()(const string& in) const { return string("*") + in + string("*"); } };
+   class StarEscape { string operator()(const string&amp; in) const { return string("*") + in + string("*"); } };
    dict->SetEscapedValue("USERNAME", username, StarEscape());
 </pre>
 
@@ -630,10 +643,10 @@ value, escape_functor, section_name)</code>, which lets you escape
    dict->SetValueAndShowSection("USERNAME", username, "CHANGE_USER");
 
    // Moving on...
-   GetPrevSearches(prev_searches, &num_prev_searches);
+   GetPrevSearches(prev_searches, &amp;num_prev_searches);
    if (num_prev_searches > 0) {
       for (int i = 0; i < num_prev_searches; ++i) {
-         TemplateDictionary* sub_dict = dict->AddSectionDictionary("CHANGE_USER");
+         TemplateDictionary* sub_dict = dict->AddSectionDictionary("PREV_SEARCHES");
          sub_dict->SetEscapedValue("PREV_SEARCH", prev_searches[i],
                                    TemplateDictionary::html_escape);
       }
@@ -647,7 +660,7 @@ value, escape_functor, section_name)</code>, which lets you escape
 exactly like <code>SetSectionDictionary(name)</code>.  However, since
 variable inheritence doesn't work across include boundaries, there is
 no template-include equivalent to <code>ShowSection()</code> or
-<code>SetValueAndShowSection()</code>.<p>
+<code>SetValueAndShowSection()</code>.</p>
 
 <p>One difference bewteen template-includes and sections is that for a
 sub-dictionary that you create via
@@ -661,7 +674,7 @@ it's relative to <A HREF="#managing">template_root</A>.</p>
 <pre>
    using google::TemplateDictionary;
    TemplateDictionary* dict = new TemplateDictionary("include example");   
-   GetResults(results, &num_results);
+   GetResults(results, &amp;num_results);
    for (int i = 0; i < num_results; ++i) {
       TemplateDictionary* sub_dict = dict->AddIncludeDictionary("RESULT_TEMPLATE");
       sub_dict->SetFilename("results.tpl");
@@ -685,10 +698,12 @@ the output in a string:</p>
 <pre>
    google::Template* tpl = google::Template::GetTemplate(&lt;filename&gt;, google::STRIP_WHITESPACE);
    google::TemplateDictionary dict("debug-name");
-   FillDictionary(&dict, ...);
+   FillDictionary(&amp;dict, ...);
    string output;
-   <font color=red>tpl->Expand(&output, &dict);</font>
+   bool error_free = <font color=red>tpl->Expand(&amp;output, &amp;dict);</font>
    // output now holds the expanded template
+   // Expand returns false if the system cannot load any of the template files 
+   // referenced by the TemplateDictionary.
 </pre>
 
 <p>The expanded template is written to the string <code>output</code>.
@@ -725,6 +740,143 @@ as input and emits a C++ code snippet (an .h file) that defines a
 string with those template contents.  This makes it easy to start by
 using a normal, file-based template, and then switch to
 template-from-string later if you so desire.</p>
+
+
+<h2>Security Considerations</h2>
+
+<p>Like all web applications, programs that use the Google Template System
+to create HTML documents can be vulnerable to Cross-Site-Scripting (XSS)
+attacks unless data inserted into a template is appropriately sanitized
+and/or escaped.  Which specific form of escaping or sanitization is
+required depends on the context in which the template variable appears
+within a HTML document (such as, regular "inner text", within a
+<code>&lt;script&gt;</code> tag, or within an <code>onClick</code>
+handler).  The remainder of this section provides a brief summary of
+techniques to prevent XSS vulnerabilities due to template variables in
+various HTML contexts.  Note that while escaping is typically required,
+escaping alone is often not enough!  You also may need to sanitize or
+validate the input, as for instance with URL attributes.  For further
+information, refer to additional <a
+  href="xss_resources.html">resources</a> on Cross-Site-Scripting
+issues.</p>
+
+<ol class=bluelist>
+<li>Regular text (outside of tags and other special situations).
+
+  <p>Use the <code>:html_escape</code> or <code>:h</code> modifier to
+  HTML-escape the variable:</p>
+  <pre>
+    &lt;h1&gt;{{HEADING:h}}&lt;/h1&gt;
+  </pre>
+</li>
+
+<li>HTML tag attributes.
+
+  <p>Ensure that the attribute is enclosed in double quotes in the template, and
+  use the <code>:html_escape</code> or <code>:h</code> modifier to escape the
+  variable:</p>
+  <pre>
+    &lt;form ...
+      &lt;input name=q value=&quot;{{QUERY:h}}&quot;&gt;
+    &lt;/form&gt;
+  </pre>
+</li>
+
+<li>URL attributes (eg., href/src).
+
+  <p>Validate that the URL is a well-formed URL with an appropriate
+  scheme (e.g., http(s), ftp, mailto).  Then enclose the URL in quotes
+  in the template and use the <code>:html_escape</code> or
+  <code>:h</code> modifier to escape the variable:</p>
+  <pre>
+    &lt;img src="{{IMAGE_URL:h}}"&gt;
+  </pre>
+</li>
+
+<li>Beware of inserting variables containing data from untrusted sources
+into the context of a <code>style</code> tag or attribute.
+
+  <p>Certain CSS style-sheet constructs can result in the invocation of
+  javascript. To prevent XSS, the variable must be carefully validated and
+  sanitized.
+  </p>
+</li>
+
+<li>Populating javascript variables.
+
+  <p>For string literals: Ensure that the literal is enclosed in quotes
+  and apply the <code>:javascript_escape</code> or <code>:j</code>
+  modifier to escape the variable:</p>
+  <pre>
+  &lt;script&gt;
+    // ...
+    var msg_text  = '{{MESSAGE:j}}';
+    // ...
+  &lt;/script&gt;
+  </pre>
+
+  <p>Literals of non-string types cannot be quoted and escaped.
+  Instead, ensure that the variable's value is set such that it is
+  guaranteed that the resulting string corresponds to a javascript
+  literal of the expected type. For example, use</p>
+  <pre>
+    dict->SetValueInt("NUM_ITEMS", num_items);
+  </pre>
+  <p>to populate an integer javascript variable in the template
+  fragment</p>
+  <pre>
+  &lt;script&gt;
+    // ...
+    var num_items = {{NUM_ITEMS}};
+    // ...
+  &lt;/script&gt;
+  </pre>
+
+</li>
+
+<li>Populating javascript variables within event handlers such as
+<code>onClick</code>.
+
+  <p>Tag attributes whose values are evaluated as a javascript
+  expression (such as <code>on{Click,Load,etc}</code> handlers) require an
+  additional consideration, since the attribute's value is HTML-unescaped
+  by the browser before it is passed to the javascript interpreter.
+
+  <p>To avoid XSS vulnerabilities, it is in generally necessary to 
+  HTML-escape after javascript-escaping:</p>
+  <pre>
+    &lt;button ...
+                 onclick='GotoUrl(&quot;{{TARGET_URL:j:h}}&quot;);'&gt;
+  </pre>
+</li>
+
+<li>Consider other potential sources of XSS.
+
+  <p>There are a number of scenarios in which XSS can arise that are
+  unrelated to the insertion of values into HTML templates,
+  including,</p>
+
+  <ul class=blacklist>
+    <li>injection into HTTP headers such as <code>Location</code>,</li>
+
+    <li>incorrect browser-side guess of the content-encoding of a HTML
+    document without explicitly specified <code>charset</code>,</li>
+
+    <li>incorrect browser-side guess of a non-HTML document's
+    content-type that overrides the document's specified
+    <code>Content-Type</code>,</li>
+
+    <li>browser-side handling of documents served for download-to-disk
+    (<code>Content-Disposition: attachment</code>).</li>
+
+  </ul>
+
+  <p>Please consult additional <a
+    href="xss_resources.html">documentation</a> on Cross-Site-Scripting
+  for more detailed discussion of such issues.</p>
+</li>
+
+</ol>
 
 
 <h2> Working Effectively with Templates </h2>
@@ -948,7 +1100,7 @@ the executable.</p>
 <p>Usage is <code>template-converter &lt;template filename&gt;</code>.
 C++ code is output is to stdout; it can be stored in a .h file or
 included directly into a C++ file.  Perl must be installed to use this
-script.<p>
+script.</p>
 
 <hr>
 <ul>
@@ -962,7 +1114,6 @@ script.<p>
 <hr>
 <address>
 Craig Silverstein<br>
-27 February 2006
 </address>
 
 </body>
