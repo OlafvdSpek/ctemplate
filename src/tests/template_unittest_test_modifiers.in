@@ -8,5 +8,7 @@
 {{! There should be no problem with this comment having a : in it. }}
   <IMG src=foo.jpg align={{ALIGNMENT}}>
   <IMG src="mouseover() {img=\'foo.jpg\' align={{ALIGNMENT:j}}}">
+
+{{>SIMPLE:html_escape}}
 </body>
 </html>{{BI_NEWLINE}}

@@ -337,6 +337,14 @@ struct Token {
   }
 };
 
+// This applies the modifiers to a string, modifying the string in place
+static void ModifyString(const ModifierAndNonces& modifiers, string* s) {
+  for (ModifierAndNonces::const_iterator it = modifiers.begin();
+       it != modifiers.end();  ++it) {
+    *s = (*it->first)(*s, it->second);
+  }
+}
+
 };  // anonymous namespace
 
 // ----------------------------------------------------------------------
@@ -538,10 +546,7 @@ void VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
     output_buffer->Emit(value);               // so just emit it
   } else {
     string modified_value(value);
-    for (ModifierAndNonces::const_iterator it = token_.modifier_plus_values.begin();
-         it != token_.modifier_plus_values.end();  ++it) {
-      modified_value = (*it->first)(modified_value, it->second);
-    }
+    ModifyString(token_.modifier_plus_values, &modified_value);
     output_buffer->Emit(modified_value);
   }
 
@@ -644,10 +649,22 @@ void TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
 
     // sub-dictionary NULL means 'just use the current dictionary instead'.
     // We force children to annotate the output if we have to.
-    included_template->Expand(output_buffer,
-                              *dv_iter ? *dv_iter : dictionary,
-                              ShouldAnnotateOutput(dictionary, force_annotate));
-
+    // If the include-template has modifiers, we need to expand to a string,
+    // modify the string, and append to output_buffer.  Otherwise (common
+    // case), we can just expand into the output-buffer directly.
+    if (token_.modifier_plus_values.empty()) {  // no need to modify sub-template
+      included_template->Expand(output_buffer,
+                                *dv_iter ? *dv_iter : dictionary,
+                                ShouldAnnotateOutput(dictionary, force_annotate));
+    } else {
+      string sub_template;
+      StringEmitter subtemplate_buffer(&sub_template);
+      included_template->Expand(&subtemplate_buffer,
+                                *dv_iter ? *dv_iter : dictionary,
+                                ShouldAnnotateOutput(dictionary, force_annotate));
+      ModifyString(token_.modifier_plus_values, &sub_template);
+      output_buffer->Emit(sub_template);
+    }
     if (ShouldAnnotateOutput(dictionary, force_annotate)) {
       output_buffer->Emit(CloseAnnotation("INC"));
     }
@@ -1123,11 +1140,13 @@ Token SectionTemplateNode::GetNextToken(Template *my_template) {
                                 g_modifiers[mod_index].modifier, value_string));
       }
 
-      // For now, we only allow variable nodes to have modifiers
-      // TODO(csilvers): figure out what they mean for sections/includes
-      if (!modifiers.empty() && ttype != TOKENTYPE_VARIABLE) {
+      // For now, we only allow variable and include nodes to have modifiers.
+      // TODO(csilvers): figure out if it's useful to have to for sections
+      if (!modifiers.empty() &&
+          ttype != TOKENTYPE_VARIABLE && ttype != TOKENTYPE_TEMPLATE) {
         FAIL(string(token_start, token_end - token_start)
-             << "malformed: only variables are allowed to have modifiers");
+             << "malformed: only variables and template-includes "
+             << "are allowed to have modifiers");
       }
 
       // Whew!  We passed the guantlet.  Get ready for the next token
