@@ -31,14 +31,16 @@
 // Author: Frank H. Jernigan
 
 #include "config.h"
+#include <assert.h>
 #include <stdlib.h>
 #include <unistd.h>              // for access()
 #include <time.h>                // for time_t
 #include <sys/stat.h>            // for stat()
-#include <vector>
 #include <string>
+#include <vector>                // that's MissingListType, SyntaxListType
 #include <iostream>              // for cerr
 #include <algorithm>             // for find()
+#include <google/ctemplate/hash_set.h>  // that's NameListType
 #include <google/template_namelist.h>
 #include <google/template.h>     // for Strip, GetTemplate(), etc.
 
@@ -47,9 +49,9 @@ _START_GOOGLE_NAMESPACE_
 using std::string;
 using std::vector;
 
-/*static*/ vector<string> *TemplateNamelist::namelist_ = NULL;
-/*static*/ vector<string> *TemplateNamelist::missing_list_ = NULL;
-/*static*/ vector<string> *TemplateNamelist::bad_syntax_list_ = NULL;
+TemplateNamelist::NameListType *TemplateNamelist::namelist_ = NULL;
+TemplateNamelist::MissingListType *TemplateNamelist::missing_list_ = NULL;
+TemplateNamelist::SyntaxListType *TemplateNamelist::bad_syntax_list_ = NULL;
 
 // PathJoin
 //    Joins a and b together to form a path.  If 'b' starts with '/'
@@ -66,25 +68,21 @@ static string PathJoin(const string& a, const string& b) {
   return a + '/' + b;
 }
 
-
-// constructor
-//   Make sure there is a namelist_ and then push the name onto it
-TemplateNamelist::TemplateNamelist(const string& name) {
+// Make sure there is a namelist_ and then insert the name onto it
+const char* TemplateNamelist::RegisterTemplate(const char* name) {
   if (!namelist_) {
-    namelist_ = new vector<string>;
+    namelist_ = new NameListType;
   }
-
-  // TODO namelist_ should be a hash_map
-  if (find(namelist_->begin(), namelist_->end(), name) == namelist_->end()) {
-    namelist_->push_back(name);
-  }
+  std::pair<NameListType::iterator, bool> insert_result = namelist_->insert(name);
+  // return a pointer to the entry corresponding to name;
+  return insert_result.first->c_str();
 }
 
 // GetList
-// Make sure there is a namelist_ and then return a reference to it
-const vector<string>& TemplateNamelist::GetList() {
-  if (!namelist_) {
-    namelist_ = new vector<string>;
+// Make sure there is a namelist_ and return a reference to it.
+const TemplateNamelist::NameListType& TemplateNamelist::GetList() {
+  if ( !namelist_ ) {
+    namelist_ = new NameListType;
   }
   return *namelist_;
 }
@@ -98,10 +96,11 @@ const vector<string>& TemplateNamelist::GetList() {
 //   and adds to the list any that are missing
 //   On subsequent calls, if refresh is false it merely returns the
 //   list created in the prior call that refreshed the list.
-const vector<string>& TemplateNamelist::GetMissingList(bool refresh) {
+const TemplateNamelist::MissingListType& TemplateNamelist::GetMissingList(
+    bool refresh) {
   if (!missing_list_) {
-    missing_list_ = new vector<string>;
-    refresh = true; // always refresh the first time
+    missing_list_ = new MissingListType;
+    refresh = true;  // always refresh the first time
   }
 
   if (refresh) {
@@ -111,10 +110,10 @@ const vector<string>& TemplateNamelist::GetMissingList(bool refresh) {
     // by the method SetTemplateRootDirectory anyway)
     assert(root_dir.at(root_dir.length()-1) == '/');
 
-    const vector<string>& the_list = TemplateNamelist::GetList();
+    const NameListType& the_list = TemplateNamelist::GetList();
     missing_list_->clear();
 
-    for (vector<string>::const_iterator iter = the_list.begin();
+    for (NameListType::const_iterator iter = the_list.begin();
          iter != the_list.end();
          ++iter) {
       // Only prepend root_dir if *iter isn't an absolute path:
@@ -125,6 +124,8 @@ const vector<string>& TemplateNamelist::GetMissingList(bool refresh) {
       }
     }
   }
+
+  sort(missing_list_->begin(), missing_list_->end());
   return *missing_list_;
 }
 
@@ -139,25 +140,25 @@ const vector<string>& TemplateNamelist::GetMissingList(bool refresh) {
 //   files in the bad syntax list which are in the missing list.
 //   On subsequent calls, if refresh is false it merely returns the
 //   list created in the prior call that refreshed the list.
-const vector<string>& TemplateNamelist::GetBadSyntaxList(bool refresh,
-                                                         Strip strip) {
+const TemplateNamelist::SyntaxListType& TemplateNamelist::GetBadSyntaxList(
+    bool refresh, Strip strip) {
   if (!bad_syntax_list_) {
-    bad_syntax_list_ = new vector<string>;
-    refresh = true; // always refresh the first time
+    bad_syntax_list_ = new SyntaxListType;
+    refresh = true;  // always refresh the first time
   }
 
   if (refresh) {
-    const vector<string>& the_list = TemplateNamelist::GetList();
+    const NameListType& the_list = TemplateNamelist::GetList();
 
     bad_syntax_list_->clear();
 
-    const vector<string>& missing_list = GetMissingList(true);
-    for (vector<string>::const_iterator iter = the_list.begin();
+    const MissingListType& missing_list = GetMissingList(true);
+    for (NameListType::const_iterator iter = the_list.begin();
          iter != the_list.end();
          ++iter) {
       Template *tpl = Template::GetTemplate((*iter), strip);
       if (!tpl) {
-        vector<string>::const_iterator pos =
+        MissingListType::const_iterator pos =
           find(missing_list.begin(), missing_list.end(), (*iter));
         // If it's not in the missing list, then we're here because it caused
         // an error during parsing
@@ -177,8 +178,8 @@ time_t TemplateNamelist::GetLastmodTime() {
 
   const string& root_dir = Template::template_root_directory();
   assert(root_dir.at(root_dir.length()-1) == '/');
-  const vector<string>& the_list = TemplateNamelist::GetList();
-  for (vector<string>::const_iterator iter = the_list.begin();
+  const NameListType& the_list = TemplateNamelist::GetList();
+  for (NameListType::const_iterator iter = the_list.begin();
        iter != the_list.end();
        ++iter) {
     // Only prepend root_dir if *iter isn't an absolute path:
@@ -194,14 +195,14 @@ time_t TemplateNamelist::GetLastmodTime() {
 // AllDoExist
 bool TemplateNamelist::AllDoExist() {
   // AllDoExist always refreshes the list, hence the "true"
-  const vector<string>& missing_list = TemplateNamelist::GetMissingList(true);
+  const MissingListType& missing_list = TemplateNamelist::GetMissingList(true);
   return missing_list.empty();
 }
 
 // IsAllSyntaxOkay
 bool TemplateNamelist::IsAllSyntaxOkay(Strip strip) {
   // IsAllSyntaxOkay always refreshes the list, hence the "true"
-  const vector<string>& bad_syntax_list =
+  const SyntaxListType& bad_syntax_list =
     TemplateNamelist::GetBadSyntaxList(true, strip);
   return bad_syntax_list.empty();
 }

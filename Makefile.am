@@ -18,6 +18,7 @@ googleinclude_HEADERS = \
 	src/google/template_namelist.h \
 	src/google/template_from_string.h \
 	src/google/ctemplate/hash_map.h
+	src/google/ctemplate/hash_set.h
 noinst_HEADERS = \
 	src/base/arena.h.in \
 	src/google/template.h.in \
@@ -28,7 +29,9 @@ noinst_HEADERS = \
 
 ctemplateincludedir = $(googleincludedir)/ctemplate
 # The 'private' header files go into /usr/local/include/google/ctemplate.
-ctemplateinclude_HEADERS = src/google/ctemplate/hash_map.h
+ctemplateinclude_HEADERS = \
+	src/google/ctemplate/hash_map.h \
+	src/google/ctemplate/hash_set.h
 
 
 docdir = $(prefix)/share/doc/$(PACKAGE)-$(VERSION)
@@ -67,46 +70,66 @@ libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG
 libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS)
 libctemplate_la_LIBADD = $(PTHREAD_LIBS)
 
+# automake will make different .o files for this library, which is good,
+# because we use an extra compiler flag.
+lib_LTLIBRARIES += libctemplate_nothreads.la
+libctemplate_nothreads_la_SOURCES = $(libctemplate_la_SOURCES)
+libctemplate_nothreads_la_CXXFLAGS = -DNDEBUG -DNO_THREADS
+
 # Helper apps
 bin_PROGRAMS += make_tpl_varnames_h
 make_tpl_varnames_h_SOURCES = $(googleinclude_HEADERS) src/config.h \
 	src/make_tpl_varnames_h.cc
-make_tpl_varnames_h_CXXFLAGS = $(PTHREAD_CFLAGS)
-make_tpl_varnames_h_LDFLAGS = $(PTHREAD_CFLAGS)
-make_tpl_varnames_h_LDADD = libctemplate.la $(PTHREAD_LIBS)
+make_tpl_varnames_h_LDADD = libctemplate_nothreads.la
 
 bin_SCRIPTS += src/template-converter
 
+# For each of the tests, we test with and without threads
 
-TESTS += template_dictionary_unittest
+TESTS += template_dictionary_unittest template_dictionary_nothreads_unittest
 template_dictionary_unittest_SOURCES = src/tests/template_dictionary_unittest.cc
 template_dictionary_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
 template_dictionary_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_dictionary_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
+template_dictionary_nothreads_unittest_SOURCES = $(template_dictionary_unittest_SOURCES)
+template_dictionary_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_dictionary_nothreads_unittest_LDADD = libctemplate_nothreads.la
 
-TESTS += template_setglobals_unittest
+TESTS += template_setglobals_unittest template_setglobals_nothreads_unittest
 template_setglobals_unittest_SOURCES = src/tests/template_setglobals_unittest.cc
 template_setglobals_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
 template_setglobals_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_setglobals_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
+template_setglobals_nothreads_unittest_SOURCES = $(template_setglobals_unittest_SOURCES)
+template_setglobals_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_setglobals_nothreads_unittest_LDADD = libctemplate_nothreads.la
 
-TESTS += template_from_string_unittest
+TESTS += template_from_string_unittest template_from_string_nothreads_unittest
 template_from_string_unittest_SOURCES = src/tests/template_from_string_unittest.cc
 template_from_string_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
 template_from_string_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_from_string_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
+template_from_string_nothreads_unittest_SOURCES = $(template_from_string_unittest_SOURCES)
+template_from_string_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_from_string_nothreads_unittest_LDADD = libctemplate_nothreads.la
 
-TESTS += template_unittest
+TESTS += template_unittest template_nothreads_unittest
 template_unittest_SOURCES = src/tests/template_unittest.cc
 template_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
 template_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
+template_nothreads_unittest_SOURCES = src/tests/template_unittest.cc
+template_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_nothreads_unittest_LDADD = libctemplate_nothreads.la
 
-TESTS += template_regtest
+TESTS += template_regtest template_nothreads_regtest
 template_regtest_SOURCES = src/tests/template_regtest.cc
 template_regtest_CXXFLAGS = $(PTHREAD_CFLAGS)
 template_regtest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_regtest_LDADD = libctemplate.la $(PTHREAD_LIBS)
+template_nothreads_regtest_SOURCES = $(template_regtest_SOURCES)
+template_nothreads_regtest_CXXFLAGS = -DNO_THREADS
+template_nothreads_regtest_LDADD = libctemplate_nothreads.la
 
 make_tpl_varnames_h_unittest_sh: $(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
                                  make_tpl_varnames_h
@@ -133,4 +156,4 @@ EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb 
 
 ## If you create hash_map.h, hash_set.h, and/or hash_fun.h via the
 ## ACC_CXX_MAKE_*_H configure.ac macros, add those files here.
-DISTCLEANFILES = src/google/ctemplate/hash_map.h
+DISTCLEANFILES = src/google/ctemplate/hash_map.h src/google/ctemplate/hash_set.h

@@ -31,6 +31,7 @@
 // Author: Frank H. Jernigan
 
 #include "config.h"
+#include <assert.h>
 #include <stdio.h>
 #include <google/template.h>
 #include <google/template_dictionary.h>

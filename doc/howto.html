@@ -491,14 +491,29 @@ depends on its type.</p>
 value.  For most variables, the right method to call is
 <code>dict->SetValue(name, value)</code>.  (The name and value
 can be specified as strings in a variety of ways: C++ strings, char
-*'s, or char *'s plus length.)  You can also call
-<code>google::TemplateDictionary::SetGlobalValue(name, value)</code> -- no
-<code>TemplateDictionary</code> instance needed here -- to set a
-variable that can be used by all templates in an applications.  This is
-quite rare.</p>
+*'s, or char *'s plus length.)</p>
 
-<p>In addition to <code>SetValue()</code>, there are a few helper
-routines to help setting values of a few special forms.</p>
+<p>There are two other ways to set a variable's value as well, each
+with a different scoping rule.  You can call
+<code>google::TemplateDictionary::SetGlobalValue(name, value)</code>
+-- no <code>TemplateDictionary</code> instance needed here -- to set a
+variable that can be used by all templates in an applications.  This
+is quite rare.</p>
+
+<p>You can also call <code>dict->SetTemplateGlobalDictionary(name,
+value)</code>.  This sets a variable that is seen by all child
+dictionaries of this dictionary: sub-sections you create via
+<code>AddSectionDictionary</code>, and included templates you create
+via <code>AddIncludeDictionary</code> (both described below).  This
+differs from <code>SetValue()</code>, because <code>SetValue()</code>
+values are never inherited across template-includes.  Almost always,
+<code>SetValue</code> is what you want;
+<code>SetTemplateGlobalDictionary</code> is intended for variables
+that are "global" to a particular template but not all templates, such
+as a color scheme to use, a language code, etc.</p>
+
+<p>To make it easier to use <code>SetValue()</code>, there are a few
+helper routines to help setting values of a few special forms.</p>
 
 <ul>
   <li> <code>SetIntValue(name, int)</code>: takes an int as the value. </li>
@@ -780,10 +795,10 @@ more detail.</p>
        dictionary to a template, add marker-strings to the output to
        indicate what template-substitutions the system was making.
        This takes a string argument which can be used to shorten the
-       filenames printed in the annotations: any filename that starts
-       with the string you give, that string is elided from the
-       filename before printing.  It's confusing, but fear not: it's
-       safe to just always pass in the empty string. </li>
+       filenames printed in the annotations: if the filename contains
+       the string you give, everything before that string is elided
+       from the filename before printing.  It's confusing, but fear
+       not: it's safe to just always pass in the empty string. </li>
 </ul>
 
 <p>Finally, <code>ClearCache()</code> removes all template objects

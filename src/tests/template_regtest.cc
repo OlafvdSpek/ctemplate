@@ -48,7 +48,7 @@
 #include <assert.h>
 #include <sys/types.h>
 #if HAVE_DIRENT_H
-# include <dirent.h>     // for scandir()
+#include <dirent.h>       // for opendir() etc
 #else
 # define dirent direct
 # if HAVE_SYS_NDIR_H
@@ -116,6 +116,7 @@ struct Testdata {
   string input_template_name;   // the filename of the input template
   string input_template;        // the contents of the input template
   vector<string> output;        // entry i is the output of using dict i.
+  vector<string> annotated_output;  // used to test annotations
 };
 
 static void ReadToString(const char* filename, string* s) {
@@ -131,48 +132,53 @@ static void ReadToString(const char* filename, string* s) {
   fclose(fp);
 }
 
-static int select_testdata(const struct dirent* d) {
-  return !strncmp(d->d_name, "template_unittest_test",
-                  sizeof("template_unittest_test")-1);
-}
-
 // expensive to resize this vector and copy it and all, but that's ok
 static vector<Testdata> ReadDataFiles(const char* testdata_dir) {
   vector<Testdata> retval;
+  vector<string> namelist;
 
-  struct dirent **namelist;
-  int n = scandir(testdata_dir, &namelist, select_testdata, alphasort);
-  if (n < 0)
-    PFATAL("scandir");
+  DIR* dir = opendir(testdata_dir);
+  struct dirent* dir_entry;
+  if (dir == NULL) PFATAL("opendir");
+  while ( (dir_entry=readdir(dir)) != NULL ) {
+    if (!strncmp(dir_entry->d_name, "template_unittest_test",
+                 sizeof("template_unittest_test")-1)) {
+      namelist.push_back(dir_entry->d_name);    // collect test files
+    }
+  }
+  if (closedir(dir) != 0) PFATAL("closedir");
+  sort(namelist.begin(), namelist.end());
 
-  for (int i = 0; i < n; ++i) {
-    // happily, due to select_testdata, we know strlen(d_name) is pretty big
+  for (int i = 0; i < namelist.size(); ++i) {
+    vector<string>* new_output = NULL;
     char fname[PATH_MAX];
-    snprintf(fname, sizeof(fname), "%s/%s", testdata_dir, namelist[i]->d_name);
+    snprintf(fname, sizeof(fname), "%s/%s", testdata_dir, namelist[i].c_str());
+    // happily, due to strncmp above, we know namelist[i] is bigger than 20
     if (!strcmp(fname + strlen(fname) - 3, ".in")) {
       retval.push_back(Testdata());
-      retval.back().input_template_name = string(namelist[i]->d_name);
+      retval.back().input_template_name = namelist[i];
       ReadToString(fname, &retval.back().input_template);
-
     } else if (!strcmp(fname + strlen(fname) - 4, ".out")) {
+      new_output = &retval.back().output;
+    } else if (!strcmp(fname + strlen(fname) - 9, ".anno_out")) {
+      new_output = &retval.back().annotated_output;
+    } else {
+      ASSERT(fname == "filename must end in either .in, .out, or .anno_out");
+    }
+    if (new_output) {            // the .out and .anno_out cases
       ASSERT(!retval.empty());   // an .out without any corresponding .in?
-      ASSERT(strlen(namelist[i]->d_name) >
+      ASSERT(namelist[i].length() >
              retval.back().input_template_name.length() + 4);
       // input file is foo.in, and output is foo_dictYY.out.  This gets to YY.
-      const char* dictnum_pos = (namelist[i]->d_name +
+      const char* dictnum_pos = (namelist[i].c_str() +
                                  retval.back().input_template_name.length() + 2);
       int dictnum = atoi(dictnum_pos);   // just ignore chars after the YY
       ASSERT(dictnum);                   // dictnums should start with 01
-      for (int i = retval.back().output.size(); i < dictnum; ++i)
-        retval.back().output.push_back(string());
-      ReadToString(fname, &retval.back().output[dictnum-1]);
-
-    } else {
-      ASSERT(fname == "filename must end in either .in or .out");
+      for (int i = new_output->size(); i < dictnum; ++i)
+        new_output->push_back(string());
+      ReadToString(fname, &((*new_output)[dictnum-1]));
     }
-    free(namelist[i]);
   }
-  free(namelist);
   return retval;
 }
 
@@ -321,7 +327,6 @@ static TemplateDictionary* MakeDictionary(int i) {
 static void TestExpand(const vector<Testdata>& testdata) {
   for (vector<Testdata>::const_iterator one_test = testdata.begin();
        one_test != testdata.end(); ++one_test) {
-    // TODO(csilvers): test annotations too
     Template* tpl_none = Template::GetTemplate(one_test->input_template_name,
                                                DO_NOT_STRIP);
     Template* tpl_lines = Template::GetTemplate(one_test->input_template_name,
@@ -386,6 +391,25 @@ static void TestExpand(const vector<Testdata>& testdata) {
       ASSERT(output_none == output_strnone);
       ASSERT(output_lines == output_strlines);
       ASSERT(output_ws == output_strws);
+    }
+
+    // The annotation test is a bit simpler; we only strip one way
+    for (vector<string>::const_iterator out = one_test->annotated_output.begin();
+         out != one_test->annotated_output.end(); ++out) {
+      int dictnum = out - one_test->annotated_output.begin() + 1;
+      // If output is the empty string, we assume the file does not exist
+      if (out->empty())
+        continue;
+
+      printf("Testing template %s on dict #%d (annotated)\n",
+             one_test->input_template_name.c_str(), dictnum);
+
+      TemplateDictionary* dict = MakeDictionary(dictnum);
+      dict->SetAnnotateOutput("/template_unittest_test");
+      string output;
+      tpl_lines->Expand(&output, dict);
+      ASSERT(*out == output);
+      delete dict;   // it's our responsibility
     }
   }
 }

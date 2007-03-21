@@ -62,6 +62,7 @@
 #ifndef _GOOGLE_ARENA_H_
 #define _GOOGLE_ARENA_H_
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <vector>
@@ -177,6 +178,16 @@ class UnsafeArena : public BaseArena {
   }
   void* AllocAligned(const size_t size, const int align) {
     return GetMemory(size, align);
+  }
+  char* Calloc(const size_t size) {
+    void* return_value = Alloc(size);
+    memset(return_value, 0, size);
+    return reinterpret_cast<char*>(return_value);
+  }
+  void* CallocAligned(const size_t size, const int align) {
+    void* return_value = AllocAligned(size, align);
+    memset(return_value, 0, size);
+    return return_value;
   }
   void Free(void* memory, size_t size) {
     ReturnMemory(memory, size);

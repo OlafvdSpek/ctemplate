@@ -192,9 +192,13 @@ class Template {
   //   iff the tree-builder encountered no errors.
   bool BuildTree(const char *input_buffer, const char* input_buffer_end);
 
-  // Internal version of Expand, used for recursive calls
+  // Internal version of Expand, used for recursive calls.
+  // force_annotate_dict is a dictionary that can be used to force
+  // annotations: even if dictionary->ShouldAnnotateOutput() is false,
+  // if force_annotate_dict->ShouldAnnotateOutput() is true, we annotate.
   void Expand(class ExpandEmitter *expand_emitter,
-              const TemplateDictionary *dictionary) const;
+              const TemplateDictionary *dictionary,
+              const TemplateDictionary *force_annotate_dict) const;
 
   // set_state
   //   Sets the state of the template.  Used during BuildTree().

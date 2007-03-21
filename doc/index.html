@@ -69,6 +69,22 @@ details see, the links below.
    }
 </pre>
 
+<h3>Compiling and linking (using gcc)</h3>
+<pre>
+   gcc -o example example.cc -lctemplate_nothreads
+</pre>
+
+<p>I can use the "nothreads" library because <code>example.cc</code>
+doesn't use threads.  If <code>example.cc</code> were threaded, I
+would do something like this instead:</p>
+<pre>
+   gcc -o example example.cc -lctemplate -pthread
+</pre>
+
+<p>See the README for more details about the two different ctemplate
+libraries.</p>
+
+
 <h2>In-depth Documentation</h2>
 
 <ol>

@@ -40,6 +40,13 @@
 //     http://www.aristeia.com/BookErrata/M27Comments_frames.html
 
 #include "config.h"
+#include <sys/types.h>         // one place uintptr_t might be
+#ifdef HAVE_INTTYPES_H
+# include <inttypes.h>         // another place uintptr_t might be
+#endif
+#ifdef HAVE_UNISTD_H           // last place uintptr_t might be
+# include <unistd.h>           // also, for getpagesize()
+#endif
 #include "base/arena.h"
 
 _START_GOOGLE_NAMESPACE_
@@ -108,7 +115,7 @@ void BaseArena::Reset() {
 
   // We do not know for sure whether or not the first block is aligned,
   // so we fix that right now.
-  const int overage = reinterpret_cast<unsigned long>(freestart_) &
+  const int overage = reinterpret_cast<uintptr_t>(freestart_) &
                       (kDefaultAlignment-1);
   if (overage > 0) {
     const int waste = kDefaultAlignment - overage;
@@ -116,7 +123,7 @@ void BaseArena::Reset() {
     remaining_ -= waste;
   }
   freestart_when_empty_ = freestart_;
-  assert(!(reinterpret_cast<unsigned long>(freestart_)&(kDefaultAlignment-1)));
+  assert(!(reinterpret_cast<uintptr_t>(freestart_)&(kDefaultAlignment-1)));
 }
 
 // ----------------------------------------------------------------------
@@ -174,7 +181,7 @@ void* BaseArena::GetMemoryFallback(const size_t size, const int align) {
   }
 
   const int overage =
-    (reinterpret_cast<unsigned long>(freestart_) & (align-1));
+    (reinterpret_cast<uintptr_t>(freestart_) & (align-1));
   if (overage) {
     const int waste = align - overage;
     freestart_ += waste;
@@ -190,7 +197,7 @@ void* BaseArena::GetMemoryFallback(const size_t size, const int align) {
   remaining_ -= size;
   last_alloc_ = freestart_;
   freestart_ += size;
-  assert(0 == (reinterpret_cast<unsigned long>(last_alloc_) & (align-1)));
+  assert(0 == (reinterpret_cast<uintptr_t>(last_alloc_) & (align-1)));
   return reinterpret_cast<void*>(last_alloc_);
 }
 

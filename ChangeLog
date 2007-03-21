@@ -4,3 +4,14 @@ Mon Mar 13 22:20:46 2006  Google Inc. <opensource@google.com>
 	  The ctemplate package contains a library implementing a simple
 	  but powerful template language for C++.  It emphasizes
 	  separating logic from presentation.
+
+Wed Jun 14 14:56:04 2006  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.2 release
+	* API CHANGE: new typedefs (and types) for namelist functions (csilvers)
+	* carry annotation status through to child templates/sections (ehamon)
+	* Support registering templates after global construct time (njain)
+	* Add pthread-rwlock support for darwin (csilvers)
+	* SetTemplateGlobalValue(): new variable type with new scoping (ehamon)
+	* Export a nothreads version of the ctemplate library (csilvers)
+	* Got rid of scandir call, which should improve portability (csilvers)

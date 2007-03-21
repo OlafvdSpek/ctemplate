@@ -5,7 +5,7 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 0.1, opensource@google.com)
+AC_INIT(ctemplate, 0.2, opensource@google.com)
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
@@ -50,12 +50,14 @@ AC_CXX_STL_NAMESPACE
 AC_DEFINE_GOOGLE_NAMESPACE(google)
 
 AC_CXX_MAKE_HASH_MAP_H(src/google/ctemplate/hash_map.h)
+AC_CXX_MAKE_HASH_SET_H(src/google/ctemplate/hash_set.h)
 
 ## Check out ../autoconf/ for other macros you can call to do useful stuff
 
 AC_SUBST(ac_google_namespace)
 AC_SUBST(ac_google_start_namespace)
 AC_SUBST(ac_google_end_namespace)
+AC_SUBST(ac_cv_cxx_hash_namespace)
 if test "$ac_cv___attribute__" == "yes"; then
    AC_SUBST(ac_google_attribute, 1)
 else

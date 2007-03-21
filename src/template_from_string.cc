@@ -33,7 +33,7 @@
 
 #include "config.h"
 #include <assert.h>
-#ifdef HAVE_PTHREAD
+#if defined(HAVE_PTHREAD) && !defined(NO_THREADS)
 #include <pthread.h>
 #endif
 #include <string>
@@ -43,7 +43,7 @@
 
 _START_GOOGLE_NAMESPACE_
 
-#ifdef HAVE_PTHREAD
+#if defined(HAVE_PTHREAD) && !defined(NO_THREADS)
 # define LOCK(m) pthread_mutex_lock(m)
 # define UNLOCK(m) pthread_mutex_unlock(m)
   // This is used to protect g_template_from_string_cache, below
