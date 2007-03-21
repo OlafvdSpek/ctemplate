@@ -15,3 +15,11 @@ Wed Jun 14 14:56:04 2006  Google Inc. <opensource@google.com>
 	* SetTemplateGlobalValue(): new variable type with new scoping (ehamon)
 	* Export a nothreads version of the ctemplate library (csilvers)
 	* Got rid of scandir call, which should improve portability (csilvers)
+
+Mon Aug 21 17:44:32 2006  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.3 release
+	* New contrib/ directory entry: vi syntax highlighting (patlac)
+	* New contrib/ directory entry: emacs syntax highlighting (tonyg)
+	* Allow escape-modifiers to affect includes, not just vars (csilvers)
+	* Add JSON escape-functor (majewski)

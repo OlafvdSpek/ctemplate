@@ -152,7 +152,8 @@ deb: dist-gzip packages/deb.sh packages/deb/*
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
 EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb \
-	$(SCRIPTS) libtool
+	$(SCRIPTS) libtool \
+	contrib
 
 ## If you create hash_map.h, hash_set.h, and/or hash_fun.h via the
 ## ACC_CXX_MAKE_*_H configure.ac macros, add those files here.

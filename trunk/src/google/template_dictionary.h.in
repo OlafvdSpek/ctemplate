@@ -210,6 +210,10 @@ class TemplateDictionary {
   struct JavascriptEscape { std::string operator()(const std::string&) const; };
   static JavascriptEscape javascript_escape;
 
+  // Escapes " \ / <FF> <CR> <LF> <BS> <TAB> to \" \\ \/ \f \r \n \b \t
+  struct JsonEscape { std::string operator()(const std::string&) const; };
+  static JsonEscape json_escape;
+
 
   // --- DEBUGGING TOOLS
 

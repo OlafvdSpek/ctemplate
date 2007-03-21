@@ -90,6 +90,7 @@ static StaticMutexInit g_static_mutex_initializer;  // constructs early
 /*static*/ TemplateDictionary::HtmlEscape TemplateDictionary::html_escape;
 /*static*/ TemplateDictionary::XmlEscape TemplateDictionary::xml_escape;
 /*static*/ TemplateDictionary::JavascriptEscape TemplateDictionary::javascript_escape;
+/*static*/ TemplateDictionary::JsonEscape TemplateDictionary::json_escape;
 
 
 // ----------------------------------------------------------------------
@@ -798,6 +799,27 @@ string TemplateDictionary::JavascriptEscape::operator()(const string& in) const 
       case '\r': out += "\\r"; break;
       case '\n': out += "\\n"; break;
       case '\b': out += "\\b"; break;
+      default: out += in[i];
+    }
+  }
+  return out;
+}
+
+// Escapes " / \ <BS> <FF> <CR> <LF> <TAB> to \" \/ \\ \b \f \r \n \t
+string TemplateDictionary::JsonEscape::operator()(const string& in) const {
+  string out;
+  // we'll reserve some space in out to account for minimal escaping: say 1.5%
+  out.reserve(in.size() + in.size()/64 + 2);
+  for (int i = 0; i < in.length(); ++i) {
+    switch (in[i]) {
+      case '"': out += "\\\""; break;
+      case '\\': out += "\\\\"; break;
+      case '/': out += "\\/"; break;
+      case '\b': out += "\\b"; break;
+      case '\f': out += "\\f"; break;
+      case '\n': out += "\\n"; break;
+      case '\r': out += "\\r"; break;
+      case '\t': out += "\\t"; break;
       default: out += in[i];
     }
   }

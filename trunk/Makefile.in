@@ -209,7 +209,8 @@ template_nothreads_regtest_LDADD = libctemplate_nothreads.la
 
 noinst_PROGRAMS = $(TESTS)
 EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb \
-	$(SCRIPTS) libtool
+	$(SCRIPTS) libtool \
+	contrib
 
 
 DISTCLEANFILES = src/google/ctemplate/hash_map.h src/google/ctemplate/hash_set.h

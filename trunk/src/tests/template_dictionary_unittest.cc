@@ -207,6 +207,13 @@ class TemplateDictionaryUnittest {
     dict.SetEscapedValue("hardest JS",
                          ("f = 'foo';\r\n\tprint \"\\&foo = \b\", \"foo\""),
                          TemplateDictionary::javascript_escape);
+    dict.SetEscapedValue("easy JSON", "joo",
+                         TemplateDictionary::json_escape);
+    dict.SetEscapedValue("harder JSON", "f = \"joo\"; e = 'joo';",
+                         TemplateDictionary::json_escape);
+    dict.SetEscapedValue("hardest JSON",
+                         ("f = 'foo';\r\n\t\fprint \"\\&foo = /\b\", \"foo\""),
+                         TemplateDictionary::json_escape);
     FooEscaper foo_escaper;
     dict.SetEscapedValue("easy foo", "hello there!",
                          FooEscaper());
@@ -233,6 +240,10 @@ class TemplateDictionaryUnittest {
     ASSERT_STREQ(dict.GetSectionValue("harder JS"), "f = \\'joo\\';");
     ASSERT_STREQ(dict.GetSectionValue("hardest JS"),
                  "f = \\'foo\\';\\r\\n\tprint \\\"\\\\&foo = \\b\\\", \\\"foo\\\"");
+    ASSERT_STREQ(dict.GetSectionValue("easy JSON"), "joo");
+    ASSERT_STREQ(dict.GetSectionValue("harder JSON"), "f = \\\"joo\\\"; e = 'joo';");
+    ASSERT_STREQ(dict.GetSectionValue("hardest JSON"),
+                 "f = 'foo';\\r\\n\\t\\fprint \\\"\\\\&foo = \\/\\b\\\", \\\"foo\\\"");
     ASSERT_STREQ(dict.GetSectionValue("easy foo"), "foo");
     ASSERT_STREQ(dict.GetSectionValue("harder foo"), "foo");
     ASSERT_STREQ(dict.GetSectionValue("easy double"), "doo");

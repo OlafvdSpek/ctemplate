@@ -294,6 +294,12 @@ static TemplateDictionary* MakeDict1() {
   TemplateDictionary* footer_dict = dict->AddIncludeDictionary("FOOTER");
   footer_dict->SetFilename("template_unittest_test_footer.in");
 
+  // --- These are used by template_unittest_test_modifiers.in
+
+  // UPDATE and UPDATE_SECTION we inherit from test_html.in
+  TemplateDictionary* inc_simple = dict->AddIncludeDictionary("SIMPLE");
+  inc_simple->SetFilename("template_unittest_test_simple.in");
+
   return dict;
 }
 

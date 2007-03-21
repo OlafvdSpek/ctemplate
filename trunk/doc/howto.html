@@ -234,7 +234,10 @@ HREF="#modifiers">modifiers</A>.  In that case, the template-system
 starts by finding the appropriate value for that variable in the
 dictionary, just like normal.  Then it applies each modifier to the
 variable, left to right.  Finally, it emits the modified value to the
-output.</p>
+output.  Template-includes can have modifiers in a similar way.  In
+such cases, after the sub-template is expanded, but before its content
+is injected into the current template, it has the modifiers
+applied.</p>
 
 <p>If no dictionary key is found for a given template marker, then the
 template marker is ignored: if a variable, it expands to the empty
@@ -252,7 +255,7 @@ syntax error for any template marker to violate this rule.</p>
 whatsoever, including (single) curly braces and NUL characters.</p>
 
 
-<h3><A NAME="modifiers">Variable Modifiers</A></h3>
+<h3><A NAME="modifiers">Modifiers</A></h3>
 
 <p>Recall that variables look like this: <code>{{VARNAME}}</code>.  We
 actually allow a more generic form: the variable name may be followed
@@ -269,6 +272,11 @@ this:</p>
 <code>{{NAME}}</code>.  If you set <code>NAME</code> in your
 dictionary to be <code>Jim &amp; Bob</code>, what will actually be
 emitted in the template is <code>Jim &amp;amp; Bob</code>.</p>
+
+<p>Modifiers work for variable names and also for template-includes:
+<code>{{>SUB_TEMPLATE:html_escape}}</code> means that when you expand
+<code>SUB_TEMPLATE</code>, html-escape the expanded text before
+inserting it into the current template.</p>
 
 <p>You can chain modifiers together.  This template first html-escapes
 <code>NAME</code>, and then javascript-escapes that result:</p>

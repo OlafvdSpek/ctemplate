@@ -1,11 +1,11 @@
 ## Process this file with autoconf to produce configure.
 ## In general, the safest way to proceed is to run the following:
-##    % aclocal -I `pwd`/../autoconf && autoheader && autoconf && automake
+##    % aclocal -I . -I `pwd`/../autoconf && autoheader && autoconf && automake
 
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 0.2, opensource@google.com)
+AC_INIT(ctemplate, 0.3, opensource@google.com)
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)

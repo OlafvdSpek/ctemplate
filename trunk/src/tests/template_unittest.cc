@@ -248,10 +248,8 @@ class TemplateUnittest {
     tpl = StringToTemplate("hi {{VAR:html_escape=yes}} lo", STRIP_WHITESPACE);
     ASSERT(tpl == NULL);
 
-    // Check we don't allow modifiers on sections or include-templates
+    // Check we don't allow modifiers on sections
     tpl = StringToTemplate("hi {{#VAR:h}} lo {{/VAR}}", STRIP_WHITESPACE);
-    ASSERT(tpl == NULL);
-    tpl = StringToTemplate("hi {{>VAR:html_escape}} lo", STRIP_WHITESPACE);
     ASSERT(tpl == NULL);
   }
 
@@ -307,6 +305,25 @@ class TemplateUnittest {
     AssertExpandIs(tpl2, &dict, "hi include file\ninclude file\ninc2\n bar");
   }
 
+  static void TestIncludeWithModifiers() {
+    string incname = StringToTemplateFile("include & print file\n");
+    string incname2 = StringToTemplateFile("inc2\n");
+    // Note this also tests that html-escape, but not javascript-escape,
+    // escapes \n to <space>
+    Template* tpl1 = StringToTemplate("hi {{>INC:h}} bar\n", DO_NOT_STRIP);
+    Template* tpl2 = StringToTemplate("hi {{>INC:javascript_escape}} bar\n",
+                                      DO_NOT_STRIP);
+    TemplateDictionary dict("dict");
+    AssertExpandIs(tpl1, &dict, "hi  bar\n");
+    dict.AddIncludeDictionary("INC")->SetFilename(incname);
+    AssertExpandIs(tpl1, &dict, "hi include &amp; print file  bar\n");
+    dict.AddIncludeDictionary("INC")->SetFilename(incname2);
+    AssertExpandIs(tpl1, &dict, "hi include &amp; print file inc2  bar\n");
+    AssertExpandIs(tpl2, &dict, "hi include & print file\\ninc2\\n bar\n");
+
+    // Don't test modifier syntax here; that's in TestVariableWithModifiers()
+  }
+
   // Tests that vars inherit/override their parents properly
   static void TestInheritence() {
     Template* tpl = StringToTemplate("{{FOO}}{{#SEC}}{{FOO}}{{#SEC}}{{FOO}}{{/SEC}}{{/SEC}}",
@@ -353,6 +370,8 @@ class TemplateUnittest {
   }
 
   // Tests annotation, in particular inheriting annotation among children
+  // This should be called first, so the filenames don't change as we add
+  // more tests.
   static void TestAnnotation() {
     string incname = StringToTemplateFile("include {{#ISEC}}file{{/ISEC}}\n");
     string incname2 = StringToTemplateFile("include #2\n");
@@ -369,11 +388,11 @@ class TemplateUnittest {
     dict.SetAnnotateOutput("");
     char expected[10240];           // 10k should be big enough!
     snprintf(expected, sizeof(expected),
-             "{{#FILE=%s/template.034}}{{#SEC=__MAIN__}}boo!\n"
-             "{{#INC=INC}}{{#FILE=%s/template.032}}"
+             "{{#FILE=%s/template.003}}{{#SEC=__MAIN__}}boo!\n"
+             "{{#INC=INC}}{{#FILE=%s/template.001}}"
              "{{#SEC=__MAIN__}}include {{#SEC=ISEC}}file{{/SEC}}\n"
              "{{/SEC}}{{/FILE}}{{/INC}}"
-             "{{#INC=INC}}{{#FILE=%s/template.033}}"
+             "{{#INC=INC}}{{#FILE=%s/template.002}}"
              "{{#SEC=__MAIN__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
              "\nhi {{#SEC=SEC}}lo{{/SEC}} bar{{/SEC}}{{/FILE}}",
              FLAGS_test_tmpdir.c_str(), FLAGS_test_tmpdir.c_str(),
@@ -382,11 +401,11 @@ class TemplateUnittest {
 
     dict.SetAnnotateOutput("/template.");
     AssertExpandIs(tpl, &dict,
-                   "{{#FILE=/template.034}}{{#SEC=__MAIN__}}boo!\n"
-                   "{{#INC=INC}}{{#FILE=/template.032}}"
+                   "{{#FILE=/template.003}}{{#SEC=__MAIN__}}boo!\n"
+                   "{{#INC=INC}}{{#FILE=/template.001}}"
                    "{{#SEC=__MAIN__}}include {{#SEC=ISEC}}file{{/SEC}}\n"
                    "{{/SEC}}{{/FILE}}{{/INC}}"
-                   "{{#INC=INC}}{{#FILE=/template.033}}"
+                   "{{#INC=INC}}{{#FILE=/template.002}}"
                    "{{#SEC=__MAIN__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
                    "\nhi {{#SEC=SEC}}lo{{/SEC}} bar{{/SEC}}{{/FILE}}");
 
@@ -671,13 +690,16 @@ class TemplateUnittest {
 int main(int argc, char** argv) {
   CleanTestDir(FLAGS_test_tmpdir);
 
+  // This goes first so that future tests don't mess up the filenames
+  TemplateUnittest::TestAnnotation();
+
   TemplateUnittest::TestVariable();
   TemplateUnittest::TestVariableWithModifiers();
   TemplateUnittest::TestSection();
   TemplateUnittest::TestInclude();
+  TemplateUnittest::TestIncludeWithModifiers();
   TemplateUnittest::TestInheritence();
   TemplateUnittest::TestExpand();
-  TemplateUnittest::TestAnnotation();
 
   TemplateUnittest::TestGetTemplate();
   TemplateUnittest::TestStrip();
