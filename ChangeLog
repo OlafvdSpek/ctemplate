@@ -1,0 +1,6 @@
+Mon Mar 13 22:20:46 2006  Google Inc. <opensource@google.com>
+
+	* ctemplate: initial release:
+	  The ctemplate package contains a library implementing a simple
+	  but powerful template language for C++.  It emphasizes
+	  separating logic from presentation.
