@@ -58,6 +58,8 @@ rm -rf $RPM_BUILD_ROOT
 
 %{prefix}/lib/libctemplate.so.0
 %{prefix}/lib/libctemplate.so.0.0.0
+%{prefix}/lib/libctemplate_nothreads.so.0
+%{prefix}/lib/libctemplate_nothreads.so.0.0.0
 
 %files devel
 %defattr(-,root,root)
@@ -67,5 +69,8 @@ rm -rf $RPM_BUILD_ROOT
 %{prefix}/lib/libctemplate.a
 %{prefix}/lib/libctemplate.la
 %{prefix}/lib/libctemplate.so
+%{prefix}/lib/libctemplate_nothreads.a
+%{prefix}/lib/libctemplate_nothreads.la
+%{prefix}/lib/libctemplate_nothreads.so
 %{prefix}/bin/make_tpl_varnames_h
 %{prefix}/bin/template-converter

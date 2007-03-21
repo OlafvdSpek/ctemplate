@@ -136,6 +136,16 @@ class TemplateDictionary {
   static void SetGlobalValue(const TemplateString variable,
                              const TemplateString value);
 
+  // This is used for a value that you want to be 'global', but only
+  // in the scope of a given template, including all its sections and
+  // all its sub-included dictionaries.  The main difference between
+  // SetTemplateGlobalValue() and SetValue(), is that
+  // SetTemplateGlobalValue() values persist across template-includes.
+  // This is intended for session-global data; since that should be
+  // fairly rare, we don't provide variants.
+  void SetTemplateGlobalValue(const TemplateString variable,
+                              const TemplateString value);
+
 
   // --- Routines for SECTIONS
   // We show a section once per dictionary that is added with its name.
@@ -221,6 +231,7 @@ class TemplateDictionary {
   friend class SectionTemplateNode;   // for access to GetSectionValue(), etc.
   friend class TemplateTemplateNode;  // for access to GetSectionValue(), etc.
   friend class VariableTemplateNode;  // for access to GetSectionValue(), etc.
+  friend class TemplateNode;          // for access to ShouldAnnotateOutput()
   friend class Template;              // for access to ShouldAnnotateOutput()
   friend class TemplateDictionaryUnittest;
   friend class TemplateSetGlobalsUnittest;
@@ -247,6 +258,15 @@ class TemplateDictionary {
                                    HASH_NAMESPACE::hash<const char*>, streq>
      GlobalDict;
 
+  // Constructor created for all children dictionaries. This includes
+  // both a pointer to the parent dictionary and also the the
+  // template-global dictionary from which all children (both
+  // IncludeDictionary and SectionDictionary) inherit.  Values are
+  // filled into global_template_dict via SetTemplateGlobalValue.
+  explicit TemplateDictionary(const std::string& name,
+                              class UnsafeArena* arena,
+                              TemplateDictionary* parent_dict,
+                              VariableDict* template_global_dict);
 
   // Helps set up the static stuff
   static GlobalDict* SetupGlobalDictUnlocked();
@@ -283,6 +303,12 @@ class TemplateDictionary {
   VariableDict* variable_dict_;
   SectionDict* section_dict_;
   IncludeDict* include_dict_;
+
+  // Like variable_dict_, but persists across template-includes.
+  // Unlike the global dict in that only this template and its children
+  // get to see the values.  So it's halfway in between.
+  VariableDict* template_global_dict_;
+  bool template_global_dict_owner_;  // true iff our class new-ed template_g_d_
 
   // My parent dictionary, used when variable lookups at this level fail.
   // Note this is only for *variables*, not sections or templates.

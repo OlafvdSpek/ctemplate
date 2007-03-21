@@ -54,14 +54,15 @@
 #  include <ndir.h>
 # endif
 #endif
-#include <vector>
-#include <algorithm>      // for sort
+#include <vector>         // for MissingListType, SyntaxListType
+#include <google/ctemplate/hash_set.h>       // for NameListType
 #include "google/template.h"
 #include "google/template_dictionary.h"
 #include "google/template_namelist.h"
 
 using std::vector;
 using std::string;
+using HASH_NAMESPACE::hash_set;
 using GOOGLE_NAMESPACE::Template;
 using GOOGLE_NAMESPACE::TemplateDictionary;
 using GOOGLE_NAMESPACE::TemplateNamelist;
@@ -325,6 +326,17 @@ class TemplateUnittest {
     AssertExpandIs(tpl, &dict2, "foobarbar");
     sec2->SetValue("FOO", "baz");
     AssertExpandIs(tpl, &dict2, "foobarbaz");
+
+    // Now test an include template, which shouldn't inherit from its parents
+    tpl = StringToTemplate("{{FOO}}{{#SEC}}hi{{/SEC}}\n{{>INC}}",
+                           STRIP_WHITESPACE);
+    string incname = StringToTemplateFile(
+        "include {{FOO}}{{#SEC}}invisible{{/SEC}}file\n");
+    TemplateDictionary incdict("dict");
+    incdict.ShowSection("SEC");
+    incdict.SetValue("FOO", "foo");
+    incdict.AddIncludeDictionary("INC")->SetFilename(incname);
+    AssertExpandIs(tpl, &incdict, "foohiinclude file");
   }
 
   // Tests that we append to the output string, rather than overwrite
@@ -338,6 +350,48 @@ class TemplateUnittest {
     tpl = StringToTemplate("   lo   ", STRIP_WHITESPACE);
     tpl->Expand(&output, &dict);
     ASSERT_STREQ(output.c_str(), "premadehilo");
+  }
+
+  // Tests annotation, in particular inheriting annotation among children
+  static void TestAnnotation() {
+    string incname = StringToTemplateFile("include {{#ISEC}}file{{/ISEC}}\n");
+    string incname2 = StringToTemplateFile("include #2\n");
+    Template* tpl = StringToTemplate(
+        "boo!\n{{>INC}}\nhi {{#SEC}}lo{{#SUBSEC}}jo{{/SUBSEC}}{{/SEC}} bar",
+        DO_NOT_STRIP);
+    TemplateDictionary dict("dict");
+    dict.ShowSection("SEC");
+    TemplateDictionary* incdict = dict.AddIncludeDictionary("INC");
+    incdict->SetFilename(incname);
+    incdict->ShowSection("ISEC");
+    dict.AddIncludeDictionary("INC")->SetFilename(incname2);
+
+    dict.SetAnnotateOutput("");
+    char expected[10240];           // 10k should be big enough!
+    snprintf(expected, sizeof(expected),
+             "{{#FILE=%s/template.034}}{{#SEC=__MAIN__}}boo!\n"
+             "{{#INC=INC}}{{#FILE=%s/template.032}}"
+             "{{#SEC=__MAIN__}}include {{#SEC=ISEC}}file{{/SEC}}\n"
+             "{{/SEC}}{{/FILE}}{{/INC}}"
+             "{{#INC=INC}}{{#FILE=%s/template.033}}"
+             "{{#SEC=__MAIN__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
+             "\nhi {{#SEC=SEC}}lo{{/SEC}} bar{{/SEC}}{{/FILE}}",
+             FLAGS_test_tmpdir.c_str(), FLAGS_test_tmpdir.c_str(),
+             FLAGS_test_tmpdir.c_str());
+    AssertExpandIs(tpl, &dict, expected);
+
+    dict.SetAnnotateOutput("/template.");
+    AssertExpandIs(tpl, &dict,
+                   "{{#FILE=/template.034}}{{#SEC=__MAIN__}}boo!\n"
+                   "{{#INC=INC}}{{#FILE=/template.032}}"
+                   "{{#SEC=__MAIN__}}include {{#SEC=ISEC}}file{{/SEC}}\n"
+                   "{{/SEC}}{{/FILE}}{{/INC}}"
+                   "{{#INC=INC}}{{#FILE=/template.033}}"
+                   "{{#SEC=__MAIN__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
+                   "\nhi {{#SEC=SEC}}lo{{/SEC}} bar{{/SEC}}{{/FILE}}");
+
+    dict.SetAnnotateOutput(NULL);   // should turn off annotations
+    AssertExpandIs(tpl, &dict, "boo!\ninclude file\ninclude #2\n\nhi lo bar");
   }
 
   static void TestGetTemplate() {
@@ -487,6 +541,7 @@ class TemplateUnittest {
   }
 
   static void TestThreadSafety() {
+#if defined(HAVE_PTHREAD) && !defined(NO_THREADS)
     string filename = StringToTemplateFile("(testing thread-safety)");
 
     // GetTemplate() is the most thread-contended routine.  We get a
@@ -510,6 +565,7 @@ class TemplateUnittest {
         ASSERT(template_ptr == one_template_ptr);
       }
     }
+#endif
   }
 
   // Tests all the static methods in TemplateNamelist
@@ -521,17 +577,17 @@ class TemplateUnittest {
     Template::SetTemplateRootDirectory(FLAGS_test_tmpdir);
     time_t after_time = time(NULL);   // f1, f2, f3 all written by now
 
-    vector<string> names = TemplateNamelist::GetList();
-    sort(names.begin(), names.end());
+    TemplateNamelist::NameListType names = TemplateNamelist::GetList();
     ASSERT(names.size() == 4);
-    ASSERT(names[0] == NONEXISTENT_FN);
-    ASSERT(names[1] == INVALID1_FN);
-    ASSERT(names[2] == INVALID2_FN);
-    ASSERT(names[3] == VALID1_FN);
+    ASSERT(names.find(NONEXISTENT_FN) != names.end());
+    ASSERT(names.find(INVALID1_FN) != names.end());
+    ASSERT(names.find(INVALID2_FN) != names.end());
+    ASSERT(names.find(VALID1_FN) != names.end());
 
     // Before creating the files INVALID1_FN, etc., all should be missing.
     for (int i = 0; i < 3; ++i) {   // should be consistent all 3 times
-      vector<string> missing = TemplateNamelist::GetMissingList(false);
+      const TemplateNamelist::MissingListType& missing =
+        TemplateNamelist::GetMissingList(false);
       ASSERT(missing.size() == 4);
     }
     // Everyone is missing, but nobody should have bad syntax
@@ -547,7 +603,8 @@ class TemplateUnittest {
     Template::ClearCache();
 
     // When GetMissingList is false, we don't reload, so you still get all-gone
-    vector<string> missing = TemplateNamelist::GetMissingList(false);
+    TemplateNamelist::MissingListType missing =
+      TemplateNamelist::GetMissingList(false);
     ASSERT(missing.size() == 4);
     // But with true, we should have a different story
     missing = TemplateNamelist::GetMissingList(true);
@@ -559,8 +616,8 @@ class TemplateUnittest {
 
     // IsAllSyntaxOK did a badsyntax check, before the files were created.
     // So with a false arg, should still say everything is ok
-    vector<string> badsyntax = TemplateNamelist::GetBadSyntaxList(false,
-                                                                  DO_NOT_STRIP);
+    TemplateNamelist::SyntaxListType badsyntax =
+      TemplateNamelist::GetBadSyntaxList(false, DO_NOT_STRIP);
     ASSERT(badsyntax.size() == 0);
     // But IsAllSyntaxOK forces a refresh
     ASSERT(!TemplateNamelist::IsAllSyntaxOkay(DO_NOT_STRIP));
@@ -582,6 +639,31 @@ class TemplateUnittest {
     fclose(fp);
     modtime = TemplateNamelist::GetLastmodTime();
     ASSERT(modtime > after_time);
+
+    // Checking if we can register templates at run time.
+    string f4 = StringToTemplateFile("{{ONE_GOOD_TEMPLATE}}");
+    TemplateNamelist::RegisterTemplate(f4.c_str());
+    names = TemplateNamelist::GetList();
+    ASSERT(names.size() == 5);
+
+    string f5 = StringToTemplateFile("{{ONE BAD TEMPLATE}}");
+    TemplateNamelist::RegisterTemplate(f5.c_str());
+    names = TemplateNamelist::GetList();
+    ASSERT(names.size() == 6);
+    badsyntax = TemplateNamelist::GetBadSyntaxList(false, DO_NOT_STRIP);
+    ASSERT(badsyntax.size() == 2);  // we did not refresh the bad syntax list
+    badsyntax = TemplateNamelist::GetBadSyntaxList(true, DO_NOT_STRIP);
+    // After refresh, the file we just registerd also added in bad syntax list
+    ASSERT(badsyntax.size() == 3);  // 
+
+    TemplateNamelist::RegisterTemplate("A_non_existant_file.tpl");
+    names = TemplateNamelist::GetList();
+    ASSERT(names.size() == 7);
+    missing = TemplateNamelist::GetMissingList(false);
+    ASSERT(missing.size() == 1);  // we did not refresh the missing list
+    missing = TemplateNamelist::GetMissingList(true);
+    // After refresh, the file we just registerd also added in missing list
+    ASSERT(missing.size() == 2);
   }
 
 };
@@ -595,6 +677,7 @@ int main(int argc, char** argv) {
   TemplateUnittest::TestInclude();
   TemplateUnittest::TestInheritence();
   TemplateUnittest::TestExpand();
+  TemplateUnittest::TestAnnotation();
 
   TemplateUnittest::TestGetTemplate();
   TemplateUnittest::TestStrip();

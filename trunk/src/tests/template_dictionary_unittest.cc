@@ -473,10 +473,67 @@ class TemplateDictionaryUnittest {
     ASSERT_STREQ(dump.c_str(), expected);
   }
 
+  static void TestSetTemplateGlobalValue() {
+    // The functionality involving it passing across the included dictionaries
+    // is also tested in TestAddIncludeDictionary
+    TemplateDictionary dict("test_SetTemplateGlobalValue", NULL);
+    TemplateDictionary* subdict = dict.AddSectionDictionary("section1");
+    TemplateDictionary* subsubdict =
+      subdict->AddSectionDictionary("section1's child");
+    TemplateDictionary* includedict = dict.AddIncludeDictionary("include1");
+
+    // Setting a template value after sub dictionaries are created should
+    // affect the sub dictionaries as well.
+    dict.SetTemplateGlobalValue("TEMPLATEVAL", "templateval");
+    ASSERT_STREQ(dict.GetSectionValue("TEMPLATEVAL"), "templateval");
+    ASSERT_STREQ(subdict->GetSectionValue("TEMPLATEVAL"), "templateval");
+    ASSERT_STREQ(subsubdict->GetSectionValue("TEMPLATEVAL"), "templateval");
+    ASSERT_STREQ(includedict->GetSectionValue("TEMPLATEVAL"), "templateval");
+
+    // sub dictionaries after you set the template value should also
+    // get the template value
+    TemplateDictionary* subdict2 = dict.AddSectionDictionary("section2");
+    TemplateDictionary* includedict2 = dict.AddIncludeDictionary("include2");
+    ASSERT_STREQ(subdict2->GetSectionValue("TEMPLATEVAL"), "templateval");
+    ASSERT_STREQ(includedict2->GetSectionValue("TEMPLATEVAL"), "templateval");
+
+    // setting a template value on a sub dictionary should affect all the other
+    // sub dictionaries and the parent as well
+    subdict->SetTemplateGlobalValue("TEMPLATEVAL2", "templateval2");
+    ASSERT_STREQ(dict.GetSectionValue("TEMPLATEVAL2"), "templateval2");
+    ASSERT_STREQ(subdict->GetSectionValue("TEMPLATEVAL2"), "templateval2");
+    ASSERT_STREQ(subsubdict->GetSectionValue("TEMPLATEVAL2"), "templateval2");
+    ASSERT_STREQ(includedict->GetSectionValue("TEMPLATEVAL2"), "templateval2");
+    ASSERT_STREQ(subdict2->GetSectionValue("TEMPLATEVAL2"), "templateval2");
+    ASSERT_STREQ(includedict2->GetSectionValue("TEMPLATEVAL2"), "templateval2");
+
+    includedict->SetTemplateGlobalValue("TEMPLATEVAL3", "templateval3");
+    ASSERT_STREQ(dict.GetSectionValue("TEMPLATEVAL3"), "templateval3");
+    ASSERT_STREQ(subdict->GetSectionValue("TEMPLATEVAL3"), "templateval3");
+    ASSERT_STREQ(subsubdict->GetSectionValue("TEMPLATEVAL3"), "templateval3");
+    ASSERT_STREQ(includedict->GetSectionValue("TEMPLATEVAL3"), "templateval3");
+    ASSERT_STREQ(subdict2->GetSectionValue("TEMPLATEVAL3"), "templateval3");
+    ASSERT_STREQ(includedict2->GetSectionValue("TEMPLATEVAL3"), "templateval3");
+
+    // you should be able to override a template value with a regular value
+    // and the overwritten regular value should pass on to its children
+    subdict->SetValue("TEMPLATEVAL2", "subdictval");
+    includedict->SetValue("TEMPLATEVAL2", "includedictval");
+    ASSERT_STREQ(dict.GetSectionValue("TEMPLATEVAL2"), "templateval2");
+    ASSERT_STREQ(subdict->GetSectionValue("TEMPLATEVAL2"), "subdictval");
+    ASSERT_STREQ(subsubdict->GetSectionValue("TEMPLATEVAL2"), "subdictval");
+    ASSERT_STREQ(includedict->GetSectionValue("TEMPLATEVAL2"),
+                 "includedictval");
+    ASSERT_STREQ(subdict2->GetSectionValue("TEMPLATEVAL2"), "templateval2");
+    ASSERT_STREQ(includedict2->GetSectionValue("TEMPLATEVAL2"),
+                 "templateval2");
+  }
+
   static void TestAddIncludeDictionary() {
     TemplateDictionary dict("test_SetAddIncludeDictionary", NULL);
     dict.SetValue("TOPLEVEL", "foo");
     dict.SetValue("TOPLEVEL2", "foo2");
+    dict.SetTemplateGlobalValue("TEMPLATELEVEL", "foo3");
 
     TemplateDictionary* subdict_1a = dict.AddIncludeDictionary("include1");
     subdict_1a->SetFilename("incfile1a");
@@ -488,6 +545,8 @@ class TemplateDictionaryUnittest {
     TemplateDictionary* subdict_2 = dict.AddIncludeDictionary("include2");
     subdict_2->SetFilename("foo/bar");
     subdict_2->SetValue("TOPLEVEL", "bar");    // overriding top dict
+    // overriding template dict
+    subdict_2->SetValue("TEMPLATELEVEL", "subfoo3");
     TemplateDictionary* subdict_2_1 = subdict_2->AddIncludeDictionary("sub");
     subdict_2_1->SetFilename("baz");
     subdict_2_1->SetIntValue("GLOBAL", 21);    // overrides value in setUp()
@@ -498,11 +557,13 @@ class TemplateDictionaryUnittest {
     ASSERT_STREQ(dict.GetSectionValue("GLOBAL"), "top");
     ASSERT_STREQ(dict.GetSectionValue("TOPLEVEL"), "foo");
     ASSERT_STREQ(dict.GetSectionValue("TOPLEVEL2"), "foo2");
+    ASSERT_STREQ(dict.GetSectionValue("TEMPLATELEVEL"), "foo3");
     ASSERT_STREQ(dict.GetSectionValue("SUBLEVEL"), "");
 
     ASSERT_STREQ(subdict_1a->GetSectionValue("GLOBAL"), "top");
     ASSERT_STREQ(subdict_1a->GetSectionValue("TOPLEVEL"), "");
     ASSERT_STREQ(subdict_1a->GetSectionValue("TOPLEVEL2"), "");
+    ASSERT_STREQ(subdict_1a->GetSectionValue("TEMPLATELEVEL"), "foo3");
     ASSERT_STREQ(subdict_1a->GetSectionValue("SUBLEVEL"), "subfoo");
 
     ASSERT_STREQ(subdict_1b->GetSectionValue("GLOBAL"), "top");
@@ -513,6 +574,7 @@ class TemplateDictionaryUnittest {
     ASSERT_STREQ(subdict_2->GetSectionValue("GLOBAL"), "top");
     ASSERT_STREQ(subdict_2->GetSectionValue("TOPLEVEL"), "bar");
     ASSERT_STREQ(subdict_2->GetSectionValue("TOPLEVEL2"), "");
+    ASSERT_STREQ(subdict_2->GetSectionValue("TEMPLATELEVEL"), "subfoo3");
     ASSERT_STREQ(subdict_2->GetSectionValue("SUBLEVEL"), "");
 
     ASSERT_STREQ(subdict_2_1->GetSectionValue("GLOBAL"), "21");
@@ -586,6 +648,9 @@ class TemplateDictionaryUnittest {
        "   BI_SPACE: > <\n"
        "   GLOBAL: >top<\n"
        "};\n"
+       "template dictionary {\n"
+       "   TEMPLATELEVEL: >foo3<\n"
+       "};\n"
        "dictionary 'test_SetAddIncludeDictionary' {\n"
        "   TOPLEVEL: >foo<\n"
        "   TOPLEVEL2: >foo2<\n"
@@ -617,6 +682,7 @@ class TemplateDictionaryUnittest {
        "       GLOBAL: >top<\n"
        "     };\n"
        "     dictionary 'test_SetAddIncludeDictionary/include2#1 (intended for foo/bar)' {\n"
+       "       TEMPLATELEVEL: >subfoo3<\n"
        "       TOPLEVEL: >bar<\n"
        "       include-template sub (dict 1 of 1, from baz) -->\n"
        "         global dictionary {\n"
@@ -632,7 +698,6 @@ class TemplateDictionaryUnittest {
        "}\n");
     ASSERT_STREQ(dump.c_str(), expected);
   }
-
 };
 
 _END_GOOGLE_NAMESPACE_
@@ -651,7 +716,7 @@ int main(int argc, char** argv) {
   TemplateDictionaryUnittest::TestAddSectionDictionary();
   TemplateDictionaryUnittest::TestShowSection();
   TemplateDictionaryUnittest::TestSetValueAndShowSection();
-
+  TemplateDictionaryUnittest::TestSetTemplateGlobalValue();
   TemplateDictionaryUnittest::TestAddIncludeDictionary();
 
   printf("DONE.\n");

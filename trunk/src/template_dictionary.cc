@@ -42,7 +42,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>             // for varargs with StringAppendV
-#ifdef HAVE_PTHREAD
+#if defined(HAVE_PTHREAD) && !defined(NO_THREADS)
 # include <pthread.h>
 #endif
 #include <string>
@@ -61,12 +61,20 @@ using HASH_NAMESPACE::hash_map;
 
 #define SAFE_PTHREAD(fncall)  do { if ((fncall) != 0) abort(); } while (0)
 
-#if defined HAVE_PTHREAD && defined HAVE_RWLOCK
+#if defined(HAVE_PTHREAD) && defined(HAVE_RWLOCK) && !defined(NO_THREADS)
 # define STATIC_ROLOCK  SAFE_PTHREAD(pthread_rwlock_rdlock(&g_static_mutex))
 # define STATIC_RWLOCK  SAFE_PTHREAD(pthread_rwlock_wrlock(&g_static_mutex))
 # define STATIC_UNLOCK  SAFE_PTHREAD(pthread_rwlock_unlock(&g_static_mutex))
-  static pthread_rwlock_t g_static_mutex = PTHREAD_RWLOCK_INITIALIZER;
-#elif defined HAVE_PTHREAD
+// PTHREAD_RWLOCK_INITIALIZER isn't defined on OS X, at least as of 6/1/06.
+// We use a static class instance to force initialization at program-start time.
+static pthread_rwlock_t g_static_mutex;
+namespace {   // keep this class name from polluting the global namespace
+struct StaticMutexInit {
+  StaticMutexInit() { SAFE_PTHREAD(pthread_rwlock_init(&g_static_mutex, NULL)); }
+};
+static StaticMutexInit g_static_mutex_initializer;  // constructs early
+}
+#elif defined(HAVE_PTHREAD) && !defined(NO_THREADS)
 # define STATIC_ROLOCK  SAFE_PTHREAD(pthread_mutex_lock(&g_static_mutex))
 # define STATIC_RWLOCK  SAFE_PTHREAD(pthread_mutex_lock(&g_static_mutex))
 # define STATIC_UNLOCK  SAFE_PTHREAD(pthread_mutex_unlock(&g_static_mutex))
@@ -117,7 +125,30 @@ TemplateDictionary::TemplateDictionary(const string& name, UnsafeArena* arena)
       variable_dict_(new VariableDict(3)),
       section_dict_(new SectionDict(3)),
       include_dict_(new IncludeDict(3)),
+      template_global_dict_(new VariableDict(3)),
+      template_global_dict_owner_(true),
       parent_dict_(NULL),
+      filename_(NULL),
+      template_path_start_for_annotations_(NULL) {
+  STATIC_RWLOCK;
+  if (global_dict_ == NULL)
+    global_dict_ = SetupGlobalDictUnlocked();
+  STATIC_UNLOCK;
+}
+
+TemplateDictionary::TemplateDictionary(const string& name, UnsafeArena* arena,
+                                       TemplateDictionary* parent_dict,
+                                       VariableDict* template_global_dict)
+    : name_(name),
+      arena_(arena), should_delete_arena_(false),  // parents own it
+      // dicts are initialized to have 3 buckets (that's small).
+      // TODO(csilvers): use the arena for these instead
+      variable_dict_(new VariableDict(3)),
+      section_dict_(new SectionDict(3)),
+      include_dict_(new IncludeDict(3)),
+      template_global_dict_(template_global_dict),
+      template_global_dict_owner_(false),
+      parent_dict_(parent_dict),
       filename_(NULL),
       template_path_start_for_annotations_(NULL) {
   STATIC_RWLOCK;
@@ -149,6 +180,13 @@ TemplateDictionary::~TemplateDictionary() {
   delete variable_dict_;
   delete section_dict_;
   delete include_dict_;
+
+  // do not use whether there's a parent to determine if you own a template
+  // dict. They are shared across included templates, even though included
+  // templates have no parent dict.
+  if (template_global_dict_owner_) {
+    delete template_global_dict_;
+  }
   if (should_delete_arena_)
     delete arena_;
 }
@@ -255,6 +293,20 @@ void TemplateDictionary::SetFormattedValue(const TemplateString variable,
 //    methods need to be.
 
 // ----------------------------------------------------------------------
+// TemplateDictionary::SetTemplateGlobalValue()
+//    Sets a value in the template-global dict.  Unlike normal
+//    variable lookups, these persist across sub-includes.
+// ----------------------------------------------------------------------
+
+void TemplateDictionary::SetTemplateGlobalValue(const TemplateString variable,
+                                                const TemplateString value) {
+  assert(template_global_dict_ != NULL);
+  if (template_global_dict_) {
+    (*template_global_dict_)[Memdup(variable)] = Memdup(value);
+  }
+}
+
+// ----------------------------------------------------------------------
 // TemplateDictionary::SetGlobalValue()
 //    Sets a value in the global dict.  Note this is a static method.
 // ----------------------------------------------------------------------
@@ -303,8 +355,8 @@ TemplateDictionary* TemplateDictionary::AddSectionDictionary(
   char dictsize[64];
   snprintf(dictsize, sizeof(dictsize), "%"PRIuS, dicts->size() + 1);
   string newname(name_ + "/" + section_name.ptr_ + "#" + dictsize);
-  TemplateDictionary* retval = new TemplateDictionary(newname, arena_);
-  retval->parent_dict_ = this;
+  TemplateDictionary* retval = new TemplateDictionary(newname, arena_, this,
+                                                      template_global_dict_);
   dicts->push_back(retval);
   return retval;
 }
@@ -312,9 +364,9 @@ TemplateDictionary* TemplateDictionary::AddSectionDictionary(
 void TemplateDictionary::ShowSection(const TemplateString section_name) {
   // TODO(csilvers): make a string instead, or key on char*/length pairs
   if (section_dict_->find(section_name.ptr_) == section_dict_->end()) {
-    TemplateDictionary* empty_dict = new TemplateDictionary("empty dictionary",
-                                                            arena_);
-    empty_dict->parent_dict_ = this;
+    TemplateDictionary* empty_dict =
+      new TemplateDictionary("empty dictionary", arena_, this,
+                             template_global_dict_);
     DictVector* sub_dict = new DictVector;
     sub_dict->push_back(empty_dict);
     (*section_dict_)[Memdup(section_name)] = sub_dict;
@@ -365,8 +417,8 @@ TemplateDictionary* TemplateDictionary::AddIncludeDictionary(
   char dictsize[64];
   snprintf(dictsize, sizeof(dictsize), "%"PRIuS, dicts->size() + 1);
   string newname(name_ + "/" + include_name.ptr_ + "#" + dictsize);
-  TemplateDictionary* retval = new TemplateDictionary(newname, arena_);
-  retval->parent_dict_ = NULL;    // redundant, but hey, let's be explicit
+  TemplateDictionary* retval =
+    new TemplateDictionary(newname, arena_, NULL, template_global_dict_);
   dicts->push_back(retval);
   return retval;
 }
@@ -443,6 +495,25 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
 
     IndentLine(out, indent);
     out->append("};\n");
+  }
+
+  if (template_global_dict_owner_) {
+    assert(template_global_dict_ != NULL);
+    if (template_global_dict_ && !template_global_dict_->empty()) {
+      IndentLine(out, indent);
+      out->append("template dictionary {\n");
+      vector<pair<const char*, const char*> > sorted_template_dict;
+      SortByStringKeyInto(*template_global_dict_, &sorted_template_dict);
+      for (vector<pair<const char*, const char*> >::const_iterator it
+             = sorted_template_dict.begin();
+           it != sorted_template_dict.end();  ++it) {
+        IndentLine(out, indent + kIndent);
+        out->append(kQuot + it->first + kQuot + ": >" + it->second + "<\n");
+      }
+
+      IndentLine(out, indent);
+      out->append("};\n");
+    }
   }
 
   IndentLine(out, indent);
@@ -596,14 +667,26 @@ const char *TemplateDictionary::GetSectionValue(const string& variable) const {
     if (it != d->variable_dict_->end())
       return it->second;
   }
-  // If we get here, we found no match in dict tree.  Last chance: global dict.
-  STATIC_ROLOCK;
-  GlobalDict::const_iterator it = global_dict_->find(variable.c_str());
-  const char* retval = "";    // what we'll return if global lookup fails
-  if (it != global_dict_->end())
-    retval = it->second;
-  STATIC_UNLOCK;
-  return retval;
+
+  // No match in the dict tree. Check the template-global dict.
+  assert(template_global_dict_ != NULL);
+  if (template_global_dict_) {               // just being paranoid!
+    VariableDict::const_iterator it =
+      template_global_dict_->find(variable.c_str());
+    if (it != template_global_dict_->end())
+      return it->second;
+  }
+
+  // No match in dict tree or template-global dict.  Last chance: global dict.
+  {
+    STATIC_ROLOCK;
+    GlobalDict::const_iterator it = global_dict_->find(variable.c_str());
+    const char* retval = "";    // what we'll return if global lookup fails
+    if (it != global_dict_->end())
+      retval = it->second;
+    STATIC_UNLOCK;
+    return retval;
+  }
 }
 
 bool TemplateDictionary::IsHiddenSection(const string& name) const {
