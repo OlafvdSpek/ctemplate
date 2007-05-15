@@ -33,10 +33,7 @@
 
 #include "config.h"
 
-// Needed for pthread_rwlock_*.  If it causes problems, you could take
-// it out, but then you'd have to unset HAVE_RWLOCK (at least on linux).
-#define _XOPEN_SOURCE 500   // needed to get the rwlock calls
-
+#include "base/mutex.h"     // This must go first so we get _XOPEN_SOURCE
 #include <assert.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -45,9 +42,6 @@
 #include <sys/stat.h>
 #include <unistd.h>         // for stat() and open()
 #include <string.h>
-#if defined(HAVE_PTHREAD) && !defined(NO_THREADS)
-# include <pthread.h>
-#endif
 #include <iostream>         // for logging
 #include <iomanip>          // for indenting in Dump()
 #include <string>
@@ -70,58 +64,14 @@ using HASH_NAMESPACE::hash;
 
 const int kIndent = 2;            // num spaces to indent each level
 
-#define SAFE_PTHREAD(fncall)  do { if ((fncall) != 0) abort(); } while (0)
-
-#if defined(HAVE_PTHREAD) && !defined(NO_THREADS)
-# ifdef HAVE_RWLOCK
-  // Easiest to use a wrapper class for the read-write mutex
-  class RWLock {
-   public:
-    RWLock()      { SAFE_PTHREAD(pthread_rwlock_init(&lock_, NULL)); }
-    ~RWLock()     { SAFE_PTHREAD(pthread_rwlock_destroy(&lock_)); }
-    void LockRO() { SAFE_PTHREAD(pthread_rwlock_rdlock(&lock_)); }
-    void LockRW() { SAFE_PTHREAD(pthread_rwlock_wrlock(&lock_)); }
-    void Unlock() { SAFE_PTHREAD(pthread_rwlock_unlock(&lock_)); }
-   private:
-    pthread_rwlock_t lock_;
-  };
-# else
-  // Not as efficient, but the best we can do if !HAVE_RWLOCK
-  class RWLock {
-   public:
-    RWLock()      { SAFE_PTHREAD(pthread_mutex_init(&lock_, NULL)); }
-    ~RWLock()     { SAFE_PTHREAD(pthread_mutex_destroy(&lock_)); }
-    void LockRO() { SAFE_PTHREAD(pthread_mutex_lock(&lock_)); }
-    void LockRW() { SAFE_PTHREAD(pthread_mutex_lock(&lock_)); }
-    void Unlock() { SAFE_PTHREAD(pthread_mutex_unlock(&lock_)); }
-   private:
-    pthread_mutex_t lock_;
-  };
-# endif
-
-  // Mutexes protecting the globals below.  First protects g_use_current_dict
-  // and template_root_directory_, second protects g_template_cache.
-  static pthread_mutex_t g_static_mutex = PTHREAD_MUTEX_INITIALIZER;
-  static pthread_mutex_t g_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
-  // This protects vars_seen in WriteOneHeaderEntry, below.
-  static pthread_mutex_t g_header_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-# define LOCK(m)    SAFE_PTHREAD(pthread_mutex_lock(m))
-# define UNLOCK(m)  SAFE_PTHREAD(pthread_mutex_unlock(m))
-#else
-  class RWLock {   // since mutex_ has this type
-   public:
-    RWLock() {}
-    void LockRO() {}
-    void LockRW() {}
-    void Unlock() {}
-  };
-# define LOCK(m)
-# define UNLOCK(m)
-#endif
-
 namespace {
 
+// Mutexes protecting the globals below.  First protects g_use_current_dict
+// and template_root_directory_, second protects g_template_cache.
+// Third protects vars_seen in WriteOneHeaderEntry, below.
+static Mutex g_static_mutex;
+static Mutex g_cache_mutex;
+static Mutex g_header_mutex;
 const char * const kDefaultTemplateDirectory = "./";
 const char * const kMainSectionName = "__MAIN__";
 static vector<TemplateDictionary*>* g_use_current_dict;  // vector == {NULL}
@@ -187,23 +137,31 @@ static string HtmlModifier(const string& input, const string&) {
   return TemplateDictionary::html_escape(input);
 }
 
-static string PreModifier(const string& input, const string&) {
-  return TemplateDictionary::pre_escape(input);
-}
-
 static string JavascriptModifier(const string& input, const string&) {
   return TemplateDictionary::javascript_escape(input);
+}
+
+static string JsonModifier(const string& input, const string&) {
+  return TemplateDictionary::json_escape(input);
+}
+
+static string PreModifier(const string& input, const string&) {
+  return TemplateDictionary::pre_escape(input);
 }
 
 static string UrlQueryEscapeModifier(const string& input, const string&) {
   return TemplateDictionary::url_query_escape(input);
 }
 
+// Using "o" for JSON is not really very intuitive; template authors should
+// either use json_escape in full, or provide a comment explaining the
+// non-intuitive shortening.
 static const Modifier g_modifiers[] = {
   { "html_escape", 'h', MODVAL_FORBIDDEN, &HtmlModifier },
-  { "pre_escape", 'p', MODVAL_FORBIDDEN, &PreModifier },
   { "javascript_escape", 'j', MODVAL_FORBIDDEN, &JavascriptModifier },
-  { "url_query_escape", 'u', MODVAL_FORBIDDEN, &UrlQueryEscapeModifier },
+  { "json_escape", 'o', MODVAL_FORBIDDEN, &JsonModifier },
+  { "pre_escape", 'p', MODVAL_FORBIDDEN, &PreModifier },
+  { "url_query_escape", 'u', MODVAL_FORBIDDEN, &UrlQueryEscapeModifier }
 };
 
 
@@ -245,7 +203,7 @@ class HeaderEntryStringHash {   // not all STL implementations define this...
 static void WriteOneHeaderEntry(string *outstring,
                                 const string& variable,
                                 const string& full_pathname) {
-  LOCK(&g_header_mutex);
+  MutexLock ml(&g_header_mutex);
 
   // we use hash_map instead of hash_set just to keep the stl size down
   static hash_map<string, bool, HeaderEntryStringHash> vars_seen;
@@ -303,7 +261,6 @@ static void WriteOneHeaderEntry(string *outstring,
     }
     vars_seen[variable] = true;
   }
-  UNLOCK(&g_header_mutex);
 }
 
 // ----------------------------------------------------------------------
@@ -869,7 +826,7 @@ void SectionTemplateNode::Dump(int level) const {
 // --- AddSubnode and its sub-routines
 
 void SectionTemplateNode::AddTextNode(const char* text, int textlen) {
-  if (text != "") {  // ignore null text sections
+  if (textlen > 0) {  // ignore null text sections
     node_list_.push_back(new TextTemplateNode(text, textlen));
   }
 }
@@ -1216,7 +1173,7 @@ Template::Template(const string& filename, Strip strip)
     : filename_(filename), filename_mtime_(0), strip_(strip),
       state_(TS_EMPTY),
       template_text_(NULL), template_text_len_(0), tree_(NULL),
-      parse_state_(), mutex_(new RWLock) {
+      parse_state_(), mutex_(new Mutex) {
   // Make sure g_use_current_dict, etc. are initted before any possbility
   // of calling Expand() or other Template classes that access globals.
   AssureGlobalsInitialized();
@@ -1247,21 +1204,20 @@ Template::~Template() {
 // NOTE: This function must be called by any static function that
 // accesses any of the variables set here.
 void Template::AssureGlobalsInitialized() {
-  LOCK(&g_static_mutex);   // protects all the vars defined here
+  MutexLock ml(&g_static_mutex);   // protects all the vars defined here
   if (template_root_directory_ == NULL) {  // only need to run this once!
     template_root_directory_ = new string(kDefaultTemplateDirectory);
     // this_dict is a dictionary with a single NULL entry in it
     g_use_current_dict = new vector<TemplateDictionary*>;
     g_use_current_dict->push_back(NULL);
   }
-  UNLOCK(&g_static_mutex);
 }
 
 Template *Template::GetTemplate(const string& filename, Strip strip) {
   // No need to have the cache-mutex acquired for this step
   string abspath(PathJoin(template_root_directory(), filename));
 
-  LOCK(&g_cache_mutex);
+  MutexLock ml(&g_cache_mutex);
   if (g_template_cache == NULL)
     g_template_cache = new TemplateCache;
 
@@ -1277,7 +1233,6 @@ Template *Template::GetTemplate(const string& filename, Strip strip) {
     tpl = new Template(abspath, strip);
     (*g_template_cache)[pair<string, Strip>(abspath, strip)] = tpl;
   }
-  UNLOCK(&g_cache_mutex);   // we're done messing with g_template_cache
 
   // if the statis is not TS_READY, then it is TS_ERROR at this
   // point. If it is TS_ERROR, we leave the state as is, but return
@@ -1374,7 +1329,7 @@ bool Template::SetTemplateRootDirectory(const string& directory) {
   AssureGlobalsInitialized();
 
   // This is needed since we access/modify template_root_directory_
-  LOCK(&g_static_mutex);
+  MutexLock ml(&g_static_mutex);
   // make sure it ends with '/'
   if (directory.length() == 0 || directory[directory.length()-1] != '/') {
     *template_root_directory_ = directory + '/';
@@ -1383,7 +1338,6 @@ bool Template::SetTemplateRootDirectory(const string& directory) {
   }
   VLOG(2) << "Setting Template directory to " << *template_root_directory_
           << endl;
-  UNLOCK(&g_static_mutex);
   return true;
 }
 
@@ -1391,10 +1345,8 @@ bool Template::SetTemplateRootDirectory(const string& directory) {
 string Template::template_root_directory() {
   // Make sure template_root_directory_ has been initialized
   AssureGlobalsInitialized();
-  LOCK(&g_static_mutex);   // protects the static var template_root_directory_
-  string retval = *template_root_directory_;
-  UNLOCK(&g_static_mutex);
-  return retval;
+  MutexLock ml(&g_static_mutex);   // protects the static var t_r_d_
+  return *template_root_directory_;
 }
 
 void Template::set_state(TemplateState new_state) {
@@ -1428,21 +1380,19 @@ bool Template::ReloadIfChanged() {
   // from different threads, they don't stomp on tree_ and state_.
   // This is still not perfect, since set_filename() could stomp
   // on filename_ while we're reading it, but it's good enough.
-  mutex_->LockRW();
+  WriterMutexLock ml(mutex_);
 
   struct stat statbuf;
   if (stat(filename_.c_str(), &statbuf) != 0) {
     LOG(WARNING) << "Unable to stat file " << filename_ << endl;
     // We keep the old tree if there is one, otherwise we're in error
     set_state(tree_ ? TS_READY : TS_ERROR);
-    mutex_->Unlock();
     return false;
   }
   if (statbuf.st_mtime == filename_mtime_ && filename_mtime_ > 0
       && tree_) {   // force a reload if we don't already have a tree_
     VLOG(1) << "Not reloading file " << filename_ << ": no new mod-time" << endl;
     set_state(TS_READY);
-    mutex_->Unlock();
     return false;   // file's timestamp hasn't changed, so no need to reload
   }
 
@@ -1451,7 +1401,6 @@ bool Template::ReloadIfChanged() {
     LOG(ERROR) << "Can't find file " << filename_ << "; skipping" << endl;
     // We keep the old tree if there is one, otherwise we're in error
     set_state(tree_ ? TS_READY : TS_ERROR);
-    mutex_->Unlock();
     return false;
   }
   char* file_buffer = new char[statbuf.st_size];
@@ -1462,7 +1411,6 @@ bool Template::ReloadIfChanged() {
     delete[] file_buffer;
     // We could just keep the old tree, but probably safer to say 'error'
     set_state(TS_ERROR);
-    mutex_->Unlock();
     return false;
   }
   fclose(fp);
@@ -1480,19 +1428,16 @@ bool Template::ReloadIfChanged() {
   // of input_buffer in every case, and will eventually delete it.
   if ( BuildTree(input_buffer, input_buffer + buflen) ) {
     assert(state() == TS_READY);
-    mutex_->Unlock();
     return true;
   } else {
     assert(state() != TS_READY);
-    mutex_->Unlock();
     return false;
   }
 }
 
 void Template::ReloadAllIfChanged() {
-  LOCK(&g_cache_mutex);   // this protects the static g_template_cache
+  MutexLock ml(&g_cache_mutex);   // this protects the static g_template_cache
   if (g_template_cache == NULL) {
-    UNLOCK(&g_cache_mutex);
     return;
   }
   for (TemplateCache::const_iterator iter = g_template_cache->begin();
@@ -1500,7 +1445,6 @@ void Template::ReloadAllIfChanged() {
        ++iter) {
     (*iter).second->set_state(TS_RELOAD);
   }
-  UNLOCK(&g_cache_mutex);
 }
 
 // ----------------------------------------------------------------------
@@ -1509,9 +1453,8 @@ void Template::ReloadAllIfChanged() {
 // ----------------------------------------------------------------------
 
 void Template::ClearCache() {
-  LOCK(&g_cache_mutex);   // this protects the static g_template_cache
+  MutexLock ml(&g_cache_mutex);   // this protects the static g_template_cache
   if (g_template_cache == NULL) {
-    UNLOCK(&g_cache_mutex);
     return;
   }
   for (TemplateCache::const_iterator iter = g_template_cache->begin();
@@ -1521,7 +1464,6 @@ void Template::ClearCache() {
   }
   delete g_template_cache;
   g_template_cache = NULL;
-  UNLOCK(&g_cache_mutex);
 }
 
 // ----------------------------------------------------------------------
@@ -1668,11 +1610,10 @@ bool Template::Expand(ExpandEmitter *expand_emitter,
   // tree_, and we want to make sure it doesn't do that (in another
   // thread) while we're expanding.  We also protect state_, etc.
   // Note we only need a read-lock here, so many expands can go on at once.
-  mutex_->LockRO();
+  ReaderMutexLock ml(mutex_);
 
   if (state() != TS_READY) {
     // We'd like to reload if state_ == TS_RELOAD, but we're a const method
-    mutex_->Unlock();
     return false;
   }
 
@@ -1700,8 +1641,6 @@ bool Template::Expand(ExpandEmitter *expand_emitter,
   if (should_annotate) {
     expand_emitter->Emit(TemplateNode::CloseAnnotation("FILE"));
   }
-
-  mutex_->Unlock();
 
   return error_free;
 }

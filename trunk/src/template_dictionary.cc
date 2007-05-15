@@ -33,18 +33,11 @@
 // Based on the 'old' TemplateDictionary by Frank Jernigan.
 
 #include "config.h"
-
-// Needed for pthread_rwlock_*.  If it causes problems, you could take
-// it out, but then you'd have to unset HAVE_RWLOCK (at least on linux).
-#define _XOPEN_SOURCE 500       // needed to get the rwlock calls
-
+#include "base/mutex.h"     // This must go first so we get _XOPEN_SOURCE
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>             // for varargs with StringAppendV
-#if defined(HAVE_PTHREAD) && !defined(NO_THREADS)
-# include <pthread.h>
-#endif
 #include <string>
 #include <algorithm>            // for sort
 #include <vector>
@@ -59,31 +52,7 @@ using std::string;
 using std::pair;
 using HASH_NAMESPACE::hash_map;
 
-#define SAFE_PTHREAD(fncall)  do { if ((fncall) != 0) abort(); } while (0)
-
-#if defined(HAVE_PTHREAD) && defined(HAVE_RWLOCK) && !defined(NO_THREADS)
-# define STATIC_ROLOCK  SAFE_PTHREAD(pthread_rwlock_rdlock(&g_static_mutex))
-# define STATIC_RWLOCK  SAFE_PTHREAD(pthread_rwlock_wrlock(&g_static_mutex))
-# define STATIC_UNLOCK  SAFE_PTHREAD(pthread_rwlock_unlock(&g_static_mutex))
-// PTHREAD_RWLOCK_INITIALIZER isn't defined on OS X, at least as of 6/1/06.
-// We use a static class instance to force initialization at program-start time.
-static pthread_rwlock_t g_static_mutex;
-namespace {   // keep this class name from polluting the global namespace
-struct StaticMutexInit {
-  StaticMutexInit() { SAFE_PTHREAD(pthread_rwlock_init(&g_static_mutex, NULL)); }
-};
-static StaticMutexInit g_static_mutex_initializer;  // constructs early
-}
-#elif defined(HAVE_PTHREAD) && !defined(NO_THREADS)
-# define STATIC_ROLOCK  SAFE_PTHREAD(pthread_mutex_lock(&g_static_mutex))
-# define STATIC_RWLOCK  SAFE_PTHREAD(pthread_mutex_lock(&g_static_mutex))
-# define STATIC_UNLOCK  SAFE_PTHREAD(pthread_mutex_unlock(&g_static_mutex))
-  static pthread_mutex_t g_static_mutex = PTHREAD_MUTEX_INITIALIZER;
-#else
-# define STATIC_ROLOCK
-# define STATIC_RWLOCK
-# define STATIC_UNLOCK
-#endif
+static Mutex g_static_mutex;
 
 /*static*/ TemplateDictionary::GlobalDict* TemplateDictionary::global_dict_
   = NULL;
@@ -133,10 +102,9 @@ TemplateDictionary::TemplateDictionary(const string& name, UnsafeArena* arena)
       parent_dict_(NULL),
       filename_(NULL),
       template_path_start_for_annotations_(NULL) {
-  STATIC_RWLOCK;
+  MutexLock ml(&g_static_mutex);
   if (global_dict_ == NULL)
     global_dict_ = SetupGlobalDictUnlocked();
-  STATIC_UNLOCK;
 }
 
 TemplateDictionary::TemplateDictionary(const string& name, UnsafeArena* arena,
@@ -154,10 +122,9 @@ TemplateDictionary::TemplateDictionary(const string& name, UnsafeArena* arena,
       parent_dict_(parent_dict),
       filename_(NULL),
       template_path_start_for_annotations_(NULL) {
-  STATIC_RWLOCK;
+  MutexLock ml(&g_static_mutex);
   if (global_dict_ == NULL)
     global_dict_ = SetupGlobalDictUnlocked();
-  STATIC_UNLOCK;
 }
 
 TemplateDictionary::~TemplateDictionary() {
@@ -190,9 +157,83 @@ TemplateDictionary::~TemplateDictionary() {
   if (template_global_dict_owner_) {
     delete template_global_dict_;
   }
-  if (should_delete_arena_)
+  if (should_delete_arena_) {
     delete arena_;
+  }
 }
+
+// ----------------------------------------------------------------------
+// TemplateDictionary::MakeCopy()
+//    Makes a recursive copy: so we copy any include dictionaries and
+//    section dictionaries we see as well.  InternalMakeCopy() is
+//    needed just so we can ensure that if we're doing a copy of a
+//    subtree, it's due to a recursive call.
+// ----------------------------------------------------------------------
+
+TemplateDictionary* TemplateDictionary::InternalMakeCopy(
+    const string& name_of_copy, UnsafeArena* arena) {
+  TemplateDictionary* newdict;
+  if (is_rootlevel_template()) {    // rootlevel uses public constructor
+    newdict = new TemplateDictionary(name_of_copy, arena);
+  } else {                          // recursve calls use private contructor
+    // Note: we always use our own arena, even when we have a parent
+    newdict = new TemplateDictionary(name_of_copy, arena,
+                                     parent_dict_, template_global_dict_);
+  }
+
+  // Copy the variable dictionary
+  for (VariableDict::const_iterator it = variable_dict_->begin();
+       it != variable_dict_->end(); ++it) {
+    newdict->SetValue(it->first, it->second);
+  }
+  // ...and the template-global-dict, if we're the owner of it
+  if (template_global_dict_owner_) {
+    for (VariableDict::const_iterator it = template_global_dict_->begin();
+         it != template_global_dict_->end(); ++it) {
+      newdict->SetTemplateGlobalValue(it->first, it->second);
+    }
+  }
+  // Copy the section dictionary
+  for (SectionDict::iterator it = section_dict_->begin();
+       it != section_dict_->end();  ++it) {
+    DictVector* dicts = new DictVector;
+    (*newdict->section_dict_)[newdict->Memdup(it->first)] = dicts;
+    for (DictVector::iterator it2 = it->second->begin();
+         it2 != it->second->end(); ++it2) {
+      TemplateDictionary* subdict = *it2;
+      dicts->push_back(subdict->InternalMakeCopy(subdict->name(),
+                                                 newdict->arena_));
+    }
+  }
+  // Copy the includes-dictionary
+  for (IncludeDict::iterator it = include_dict_->begin();
+       it != include_dict_->end();  ++it) {
+    DictVector* dicts = new DictVector;
+    (*newdict->include_dict_)[newdict->Memdup(it->first)] = dicts;
+    for (DictVector::iterator it2 = it->second->begin();
+         it2 != it->second->end(); ++it2) {
+      TemplateDictionary* subdict = *it2;
+      dicts->push_back(subdict->InternalMakeCopy(subdict->name(),
+                                                 newdict->arena_));
+    }
+  }
+
+  // Finally, copy everything else not set properly by the constructor
+  newdict->filename_ = newdict->Memdup(filename_);
+  newdict->template_path_start_for_annotations_ =
+      newdict->Memdup(template_path_start_for_annotations_);
+
+  return newdict;
+}
+
+TemplateDictionary* TemplateDictionary::MakeCopy(const string& name_of_copy,
+                                                 UnsafeArena* arena) {
+  if (!is_rootlevel_template()) {  // we're not at the root, which is illegal
+    return NULL;
+  }
+  return InternalMakeCopy(name_of_copy, arena);
+}
+
 
 // ----------------------------------------------------------------------
 // TemplateDictionary::StringAppendV()
@@ -325,11 +366,10 @@ void TemplateDictionary::SetTemplateGlobalValue(const TemplateString variable,
   memcpy(value_copy, value.ptr_, value.length_);
   value_copy[value.length_] = '\0';
 
-  STATIC_RWLOCK;
+  MutexLock ml(&g_static_mutex);
   if (global_dict_ == NULL)
     global_dict_ = SetupGlobalDictUnlocked();
   (*global_dict_)[variable_copy] = value_copy;
-  STATIC_UNLOCK;
 }
 
 // ----------------------------------------------------------------------
@@ -485,9 +525,8 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
 
     vector<pair<const char*, const char*> > sorted_global_dict;
     {
-      STATIC_ROLOCK;
+      ReaderMutexLock ml(&g_static_mutex);
       SortByStringKeyInto(*global_dict_, &sorted_global_dict);
-      STATIC_UNLOCK;
     }
     for (vector<pair<const char*, const char*> >::const_iterator it
            = sorted_global_dict.begin();
@@ -682,12 +721,11 @@ const char *TemplateDictionary::GetSectionValue(const string& variable) const {
 
   // No match in dict tree or template-global dict.  Last chance: global dict.
   {
-    STATIC_ROLOCK;
+    ReaderMutexLock ml(&g_static_mutex);
     GlobalDict::const_iterator it = global_dict_->find(variable.c_str());
     const char* retval = "";    // what we'll return if global lookup fails
     if (it != global_dict_->end())
       retval = it->second;
-    STATIC_UNLOCK;
     return retval;
   }
 }
@@ -842,26 +880,22 @@ string TemplateDictionary::UrlQueryEscape::operator()(const string& in) const {
     0x00000000L, 0x00000000L, 0x00000000L, 0x00000000L
   };
 
-  int max_string_length = in.size() * 3 + 1;
-  char out[max_string_length];
+  string out;
+  out.reserve(in.size() * 3 + 1);
 
-  int i;
-  int j;
-
-  for (i = 0, j = 0; i < in.size(); i++) {
+  for (int i = 0; i < in.size(); i++) {
     unsigned char c = in[i];
     if (c == ' ') {
-      out[j++] = '+';
+      out += '+';
     } else if ((_safe_characters[(c)>>5] & (1 << ((c) & 31)))) {
-      out[j++] = c;
+      out += c;
     } else {
-      out[j++] = '%';
-      out[j++] = ((c>>4) < 10 ? ((c>>4) + '0') : (((c>>4) - 10) + 'A'));
-      out[j++] = ((c&0xf) < 10 ? ((c&0xf) + '0') : (((c&0xf) - 10) + 'A'));
+      out += '%';
+      out += ((c>>4) < 10 ? ((c>>4) + '0') : (((c>>4) - 10) + 'A'));
+      out += ((c&0xf) < 10 ? ((c&0xf) + '0') : (((c&0xf) - 10) + 'A'));
     }
   }
-  out[j++] = '\0';
-  return string(out);
+  return out;
 }
 
 // Escapes " / \ <BS> <FF> <CR> <LF> <TAB> to \" \/ \\ \b \f \r \n \t

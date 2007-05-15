@@ -771,6 +771,57 @@ class TemplateDictionaryUnittest {
        "}\n");
     ASSERT_STREQ(dump.c_str(), expected);
   }
+
+  static void TestMakeCopy(bool use_local_arena) {
+    UnsafeArena local_arena(1024);
+    UnsafeArena* arena = NULL;
+    if (use_local_arena)
+      arena = &local_arena;
+
+    // First, let's make a non-trivial template dictionary (We use
+    // 'new' because later we'll test deleting this dict but keeping
+    // around the copy.)
+    TemplateDictionary* dict = new TemplateDictionary("testdict", arena);
+
+    dict->SetValue("TOPLEVEL", "foo");
+
+    dict->SetTemplateGlobalValue("TEMPLATELEVEL", "foo3");
+
+    TemplateDictionary* subdict_1a = dict->AddIncludeDictionary("include1");
+    subdict_1a->SetFilename("incfile1a");
+    subdict_1a->SetValue("SUBLEVEL", "subfoo");
+    TemplateDictionary* subdict_1b = dict->AddIncludeDictionary("include1");
+    // Let's try not calling SetFilename on this one.
+    subdict_1b->SetValue("SUBLEVEL", "subbar");
+
+    TemplateDictionary* subdict_2a = dict->AddSectionDictionary("section1");
+    TemplateDictionary* subdict_2b = dict->AddSectionDictionary("section1");
+    subdict_2a->SetValue("SUBLEVEL", "subfoo");
+    subdict_2b->SetValue("SUBLEVEL", "subbar");
+    TemplateDictionary* subdict_3 = dict->AddSectionDictionary("section2");
+    subdict_3->SetValue("TOPLEVEL", "bar");    // overriding top dict
+    TemplateDictionary* subdict_3_1 = subdict_3->AddSectionDictionary("sub");
+    subdict_3_1->SetIntValue("GLOBAL", 21);    // overrides value in setUp()
+
+    string orig;
+    dict->DumpToString(&orig);
+
+    // Make a copy
+    TemplateDictionary* dict_copy = dict->MakeCopy("testdict", NULL);
+    // Make sure it doesn't work to copy a sub-dictionary
+    ASSERT(subdict_1a->MakeCopy("copy of subdict") == NULL);
+    ASSERT(subdict_2a->MakeCopy("copy of subdict") == NULL);
+
+    // Delete the original dict, to make sure the copy really is independent
+    delete dict;
+    dict = NULL;
+    string copy;
+    dict_copy->DumpToString(&copy);
+    delete dict_copy;
+
+    ASSERT_STREQ(orig.c_str(), copy.c_str());
+
+  }
 };
 
 _END_GOOGLE_NAMESPACE_
@@ -791,6 +842,9 @@ int main(int argc, char** argv) {
   TemplateDictionaryUnittest::TestSetValueAndShowSection();
   TemplateDictionaryUnittest::TestSetTemplateGlobalValue();
   TemplateDictionaryUnittest::TestAddIncludeDictionary();
+
+  TemplateDictionaryUnittest::TestMakeCopy(true);    // use our own arena
+  TemplateDictionaryUnittest::TestMakeCopy(false);   // use fake arena
 
   printf("DONE.\n");
   return 0;

@@ -33,3 +33,11 @@ Mon Jan 15 14:10:42 2007  Google Inc. <opensource@google.com>
 	* Add support for "pre" escaping, which preserves whitespace (dboswell)
 	* Typo fixes in documentation (csilvers)
 	* Expand() returns false if a template file failed to load (jmittleman)
+
+Mon May 14 17:27:10 2007  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.5 release
+	* Add new MakeCopy() method to copy template dictionaries (csilvers)
+	* Add JSON-escaping (mikepurvis)
+	* Internal change that should ease thread-handling a bit (csilvers)
+	* Fix url_query_escape to avoid stack overflow (csilvers)

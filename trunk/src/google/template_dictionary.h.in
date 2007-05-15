@@ -56,6 +56,8 @@
 
 @ac_google_start_namespace@
 
+class UnsafeArena;
+
 // Most methods below take a TemplateString rather than a C++ string.
 // This is for efficiency: it can avoid extra string copies.
 // For any argument that takes a TemplateString, you can pass in any of:
@@ -88,10 +90,18 @@ class TemplateDictionary {
   // arena is used to store all names and values.  It can be NULL (the
   //    default), in which case we create own own arena.
   explicit TemplateDictionary(const std::string& name,
-                              class UnsafeArena* arena=NULL);
+                              UnsafeArena* arena=NULL);
   ~TemplateDictionary();
   const std::string& name() const { return name_; }
 
+  // Returns a recursive copy of this dictionary.  This dictionary
+  // *must* be a "top-level" dictionary (that is, not created via
+  // AddSectionDictionary() or AddIncludeDictionary()).  Caller owns
+  // the resulting dict, and must delete it.  If arena is NULL, we
+  // create our own.  Returns NULL if the copy fails (probably because
+  // the "top-level" rule was violated).
+  TemplateDictionary* MakeCopy(const std::string& name_of_copy,
+                               UnsafeArena* arena=NULL);
 
   // --- Routines for VARIABLES
   // These are the five main routines used to set the value of a variable.
@@ -285,9 +295,17 @@ class TemplateDictionary {
   // Helps set up the static stuff
   static GlobalDict* SetupGlobalDictUnlocked();
 
+  // This is true iff this template was created via the public constructor,
+  // and not the private one used for subsidiary dicts (section/include)
+  bool is_rootlevel_template() const { return template_global_dict_owner_; }
+
   // Utility functions for copying a string into the arena.
   const char *Memdup(const char* s, int slen);
   const char *Memdup(const TemplateString& s) {return Memdup(s.ptr_, s.length_);}
+
+  // Used for recursive MakeCopy calls.
+  TemplateDictionary* InternalMakeCopy(const std::string& name_of_copy,
+                                       UnsafeArena* arena);
 
   // Used to do the formatting for the SetFormatted*() functions
   static int StringAppendV(char* space, char** out,

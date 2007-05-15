@@ -65,7 +65,6 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 
 %{prefix}/include/google
-%{prefix}/lib/debug
 %{prefix}/lib/libctemplate.a
 %{prefix}/lib/libctemplate.la
 %{prefix}/lib/libctemplate.so

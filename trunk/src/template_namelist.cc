@@ -39,7 +39,7 @@
 #include <string>
 #include <vector>                // that's MissingListType, SyntaxListType
 #include <iostream>              // for cerr
-#include <algorithm>             // for find()
+#include <algorithm>             // for binary_search
 #include <google/ctemplate/hash_set.h>  // that's NameListType
 #include <google/template_namelist.h>
 #include <google/template.h>     // for Strip, GetTemplate(), etc.
@@ -96,6 +96,7 @@ const TemplateNamelist::NameListType& TemplateNamelist::GetList() {
 //   and adds to the list any that are missing
 //   On subsequent calls, if refresh is false it merely returns the
 //   list created in the prior call that refreshed the list.
+//   Returns a sorted list of missing templates.
 const TemplateNamelist::MissingListType& TemplateNamelist::GetMissingList(
     bool refresh) {
   if (!missing_list_) {
@@ -158,11 +159,9 @@ const TemplateNamelist::SyntaxListType& TemplateNamelist::GetBadSyntaxList(
          ++iter) {
       Template *tpl = Template::GetTemplate((*iter), strip);
       if (!tpl) {
-        MissingListType::const_iterator pos =
-          find(missing_list.begin(), missing_list.end(), (*iter));
-        // If it's not in the missing list, then we're here because it caused
-        // an error during parsing
-        if (pos == missing_list.end()) {
+        if (!binary_search(missing_list.begin(), missing_list.end(), *iter)) {
+          // If it's not in the missing list, then we're here because
+          // it caused an error during parsing
           bad_syntax_list_->push_back(*iter);
           std::cerr << "ERROR loading template: " << (*iter) << std::endl;
         }
