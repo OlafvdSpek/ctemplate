@@ -32,10 +32,8 @@
 //
 
 #include "config.h"
+#include "base/mutex.h"     // This must go first so we get _XOPEN_SOURCE
 #include <assert.h>
-#if defined(HAVE_PTHREAD) && !defined(NO_THREADS)
-#include <pthread.h>
-#endif
 #include <string>
 #include <google/ctemplate/hash_map.h>
 #include <google/template_from_string.h>
@@ -43,20 +41,11 @@
 
 _START_GOOGLE_NAMESPACE_
 
-#if defined(HAVE_PTHREAD) && !defined(NO_THREADS)
-# define LOCK(m) pthread_mutex_lock(m)
-# define UNLOCK(m) pthread_mutex_unlock(m)
-  // This is used to protect g_template_from_string_cache, below
-  static pthread_mutex_t g_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
-#else
-# define LOCK(m)
-# define UNLOCK(m)
-#endif
+static Mutex g_cache_mutex;
 
 using std::string;
 using std::pair;
 using HASH_NAMESPACE::hash_map;
-
 
 // TemplateFromString Constructor
 // Calls its parent with an empty string for filename so the parent's
@@ -111,7 +100,7 @@ TemplateFromString *TemplateFromString::GetTemplate(const string& template_name,
                                                     Strip strip) {
   // Only perform this method when you have the lock so multiple threads
   // don't conflict over inserting and retrieving into the cache
-  LOCK(&g_cache_mutex);
+  MutexLock ml(&g_cache_mutex);
   if (g_template_from_string_cache == NULL) {
     g_template_from_string_cache = new TemplateFromStringCache;
   }
@@ -126,7 +115,6 @@ TemplateFromString *TemplateFromString::GetTemplate(const string& template_name,
     (*g_template_from_string_cache)[pair<string, Strip>(template_name, strip)] =
       tpl;
   }
-  UNLOCK(&g_cache_mutex);  // done messing with the cache
 
   // state_ can be TS_RELOAD if ReloadAllIfChanged() touched this file.
   // That's fine; we'll just ignore the reload directive for this guy.

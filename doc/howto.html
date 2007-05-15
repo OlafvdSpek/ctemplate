@@ -319,7 +319,18 @@ are the modifiers that are supported:</p>
     <td>javascript-escapes the variable before output
         (eg <code>"</code> -> <code>\"</code>)</td>
 </tr>
+
+<tr><td><code>:json_escape</code></td><td><code>:o</code></td>
+    <td>json-escapes a variable before output as a string in json;
+        similar to javascript escaping, but ignores characters such
+        as <code>=</code> and <code>&</code>.</td>
+</tr>
+
 </table>
+
+<p><strong>NOTE:</strong> At the moment, there are no filters for handling XML
+attributes and text nodes. For HTML snippets, use the html filter; in other
+situations, it may be appropriate to use CDATA blocks.</p>
 
 
 <h3> <A NAME="inheritence">Details on Dictionary Lookup</A> </h3>
@@ -740,6 +751,24 @@ as input and emits a C++ code snippet (an .h file) that defines a
 string with those template contents.  This makes it easy to start by
 using a normal, file-based template, and then switch to
 template-from-string later if you so desire.</p>
+
+
+<h3> Copying a Template Dictionary </h3>
+
+<p>You can use the <code>MakeCopy()</code> method on a template
+dictionary to make a "deep" copy of the template.  This can be useful
+for situations like the following: you want to fill a template several
+times, each time with 90% of the values the same, but the last 10%
+different.  Computing the values is slow.  Here's how you can use
+<code>MakeCopy()</code> to do it:</p>
+<ol>
+  <li> fill dict with 90%
+  <li> <code>newdict1 = dict->MakeCopy();</code>
+  <li> fill newdict1 with last 10%
+  <li> <code>newdict2 = dict->MakeCopy();</code>
+  <li> fill newdict2 with last 10%
+  <li> etc.
+</ol>
 
 
 <h2>Security Considerations</h2>

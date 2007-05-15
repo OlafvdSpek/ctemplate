@@ -245,7 +245,7 @@ class Template {
   // The mutex object used during ReloadIfChanged to prevent the same
   // object from reloading the template file in parallel by different
   // threads.
-  mutable class RWLock* mutex_;   // RWLock defined in template.cc
+  mutable class Mutex* mutex_;
 
   // The root directory for all templates. Defaults to "./" until
   // SetTemplateRootDirectory changes it

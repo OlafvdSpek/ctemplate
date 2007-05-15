@@ -62,13 +62,16 @@ noinst_SCRIPTS = src/tests/make_tpl_varnames_h_unittest.sh
 
 ## vvvv RULES TO MAKE THE LIBRARIES, BINARIES, AND UNITTESTS
 
+# These are the symbols (classes, mostly) we want to export from our library
+CTEMPLATE_SYMBOLS = '[^A-Za-z](Template|TemplateDictionary|TemplateNamelist|TemplateFromString|TemplateString|TemplateState|Strip)[^A-Za-z]'
+
 lib_LTLIBRARIES += libctemplate.la
 libctemplate_la_SOURCES = $(googleinclude_HEADERS) src/config.h \
-	src/base/arena.h src/base/arena.cc \
+	src/base/arena.h src/base/arena.cc src/base/mutex.h src/base/mutex.cc \
 	src/template.cc src/template_dictionary.cc src/template_namelist.cc \
 	src/template_from_string.cc
 libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG
-libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS)
+libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) -export-symbols-regex $(CTEMPLATE_SYMBOLS)
 libctemplate_la_LIBADD = $(PTHREAD_LIBS)
 
 # automake will make different .o files for this library, which is good,
@@ -76,6 +79,7 @@ libctemplate_la_LIBADD = $(PTHREAD_LIBS)
 lib_LTLIBRARIES += libctemplate_nothreads.la
 libctemplate_nothreads_la_SOURCES = $(libctemplate_la_SOURCES)
 libctemplate_nothreads_la_CXXFLAGS = -DNDEBUG -DNO_THREADS
+libctemplate_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_SYMBOLS)
 
 # Helper apps
 bin_PROGRAMS += make_tpl_varnames_h
