@@ -42,6 +42,9 @@
  * it to the Google namespace.
  */
 
+#ifndef GOOGLE_MUTEX_H__
+#define GOOGLE_MUTEX_H__
+
 #include "config.h"    // to figure out pthreads support
 
 #if defined(NO_THREADS)
@@ -132,3 +135,5 @@ class WriterMutexLock {
 #define MutexLock(x) COMPILE_ASSERT(0, mutex_lock_decl_missing_var_name)
 #define ReaderMutexLock(x) COMPILE_ASSERT(0, rmutex_lock_decl_missing_var_name)
 #define WriterMutexLock(x) COMPILE_ASSERT(0, wmutex_lock_decl_missing_var_name)
+
+#endif  /* #define GOOGLE_MUTEX_H__ */

@@ -36,12 +36,14 @@
 #include <assert.h>
 #include <vector>
 #include <google/template_dictionary.h>
+#include <google/template_modifiers.h>
 #include "base/arena.h"
+#include "tests/template_test_util.h"
 
 using std::string;
 using std::vector;
 
-// This works in both debug mode and NDEBUG mode.n
+// This works in both debug mode and NDEBUG mode.
 #define ASSERT(cond)  do {                                      \
   if (!(cond)) {                                                \
     printf("ASSERT FAILED, line %d: %s\n", __LINE__, #cond);    \
@@ -70,22 +72,33 @@ using std::vector;
 
 _START_GOOGLE_NAMESPACE_
 
-class FooEscaper {   // test escape-functor that replaces all input with "foo"
+// test escape-functor that replaces all input with "foo"
+class FooEscaper : public template_modifiers::TemplateModifier {
  public:
-  string operator()(const string& in) const { return "foo"; }
+  void Modify(const char* in, int inlen, ExpandEmitter* outbuf,
+              const string& arg) const {
+    assert(arg.empty());    // we don't take an argument
+    outbuf->Emit("foo");
+  }
 };
 
-class NullEscaper {   // test escape-functor that replaces all input with ""
+// test escape-functor that replaces all input with ""
+class NullEscaper : public template_modifiers::TemplateModifier {
  public:
-  string operator()(const string& in) const { return ""; }
+  void Modify(const char* in, int inlen, ExpandEmitter* outbuf,
+              const string& arg) const {
+    assert(arg.empty());    // we don't take an argument
+  }
 };
 
-class DoubleEscaper {  // first does javascript-escaping, then html-escaping
+// first does javascript-escaping, then html-escaping
+class DoubleEscaper : public template_modifiers::TemplateModifier {
  public:
-  string operator()(const string& in) const {
-    return (TemplateDictionary::html_escape(
-                TemplateDictionary::javascript_escape(
-                    in)));
+  void Modify(const char* in, int inlen, ExpandEmitter* outbuf,
+              const string& arg) const {
+    assert(arg.empty());    // we don't take an argument
+    string tmp = TemplateDictionary::javascript_escape(in, inlen);
+    TemplateDictionary::html_escape.Modify(tmp.data(), tmp.size(), outbuf, "");
   }
 };
 
@@ -123,9 +136,10 @@ class TemplateDictionaryUnittest {
       dict.SetValue("FOO", "foo");
       dict.SetValue(string("FOO2"), TemplateString("foo2andmore", 4));
 
+      TemplateDictionaryPeer peer(&dict);
       // verify what happened
-      ASSERT_STREQ(dict.GetSectionValue("FOO"), "foo");
-      ASSERT_STREQ(dict.GetSectionValue("FOO2"), "foo2");
+      ASSERT_STREQ(peer.GetSectionValue("FOO"), "foo");
+      ASSERT_STREQ(peer.GetSectionValue("FOO2"), "foo2");
       string dump;
       dict.DumpToString(&dump);
       char expected[256];
@@ -144,15 +158,51 @@ class TemplateDictionaryUnittest {
     }
   }
 
+  static void TestSetValueWithNUL() {
+    TemplateDictionary dict("test_SetValueWithNUL", NULL);
+    TemplateDictionaryPeer peer(&dict);
+
+    // Test copying char*s, strings, and explicit TemplateStrings
+    dict.SetValue(string("FOO\0BAR", 7), string("QUX\0QUUX", 8));
+    dict.SetGlobalValue(string("GOO\0GAR", 7), string("GUX\0GUUX", 8));
+
+    // FOO should not match FOO\0BAR
+    ASSERT_STREQ(peer.GetSectionValue("FOO"), "");
+    ASSERT_STREQ(peer.GetSectionValue("GOO"), "");
+
+    const char* r = peer.GetSectionValue(string("FOO\0BAR", 7));
+    ASSERT(memcmp(r, "QUX\0QUUX", 8) == 0);
+    r = peer.GetSectionValue(string("GOO\0GAR", 7));
+    ASSERT(memcmp(r, "GUX\0GUUX", 8) == 0);
+
+    string dump;
+    dict.DumpToString(&dump);
+    // We can't use ASSERT_STREQ here because of the embedded NULs.
+    // They also require I count the length of the string by hand. :-(
+    string expected(("global dictionary {\n"
+                     "   BI_NEWLINE: >\n"
+                     "<\n"
+                     "   BI_SPACE: > <\n"
+                     "   GLOBAL: >top<\n"
+                     "   GOO\0GAR: >GUX\0GUUX<\n"
+                     "};\n"
+                     "dictionary 'test_SetValueWithNUL' {\n"
+                     "   FOO\0BAR: >QUX\0QUUX<\n"
+                     "}\n"),
+                    160);
+    ASSERT(dump == expected);
+  }
+
   static void TestSetIntValue() {
     TemplateDictionary dict("test_SetIntValue", NULL);
+    TemplateDictionaryPeer peer(&dict);
 
     dict.SetIntValue("INT", 5);
     // - is an illegal varname in templates, but perfectly fine in dicts
     dict.SetIntValue("-INT", -5);
 
-    ASSERT_STREQ(dict.GetSectionValue("INT"), "5");
-    ASSERT_STREQ(dict.GetSectionValue("-INT"), "-5");
+    ASSERT_STREQ(peer.GetSectionValue("INT"), "5");
+    ASSERT_STREQ(peer.GetSectionValue("-INT"), "-5");
     string dump;
     dict.DumpToString(&dump);
     ASSERT_STRSTR(dump.c_str(), "\n   INT: >5<\n");
@@ -187,75 +237,24 @@ class TemplateDictionaryUnittest {
   static void TestSetEscapedValue() {
     TemplateDictionary dict("test_SetEscapedValue", NULL);
 
-    dict.SetEscapedValue("easy HTML", "foo",
-                         TemplateDictionary::html_escape);
-    dict.SetEscapedValue("harder HTML", "foo & bar",
-                         TemplateDictionary::html_escape);
     dict.SetEscapedValue("hardest HTML",
                          "<A HREF='foo'\nid=\"bar\t\t&&\vbaz\">",
                          TemplateDictionary::html_escape);
-    dict.SetEscapedValue("easy PRE", "foo",
-                         TemplateDictionary::pre_escape);
-    dict.SetEscapedValue("harder PRE", "foo & bar",
-                         TemplateDictionary::pre_escape);
-    dict.SetEscapedValue("hardest PRE",
-                         " \"--\v--\f--\n--\t--&--<-->--'--\"",
-                         TemplateDictionary::pre_escape);
-    dict.SetEscapedValue("easy XML", "xoo",
-                         TemplateDictionary::xml_escape);
-    dict.SetEscapedValue("harder XML", "xoo & xar",
-                         TemplateDictionary::xml_escape);
-    dict.SetEscapedValue("hardest XML", "xoo &nbsp; xar&nbsp;xaz &nbsp",
-                         TemplateDictionary::xml_escape);
-    dict.SetEscapedValue("easy JS", "joo",
-                         TemplateDictionary::javascript_escape);
-    dict.SetEscapedValue("harder JS", "f = 'joo';",
-                         TemplateDictionary::javascript_escape);
     dict.SetEscapedValue("hardest JS",
                          ("f = 'foo';\r\n\tprint \"\\&foo = \b\", \"foo\""),
                          TemplateDictionary::javascript_escape);
-    dict.SetEscapedValue("close script JS",
-                         "//--></script><script>alert(123);</script>",
-                         TemplateDictionary::javascript_escape);
-    dict.SetEscapedValue("easy JSON", "joo",
-                         TemplateDictionary::json_escape);
-    dict.SetEscapedValue("harder JSON", "f = \"joo\"; e = 'joo';",
-                         TemplateDictionary::json_escape);
-    dict.SetEscapedValue("hardest JSON",
-                         ("f = 'foo';\r\n\t\fprint \"\\&foo = /\b\", \"foo\""),
-                         TemplateDictionary::json_escape);
-
-    // Test data for URL Query Escaping.  The first three tests do not need
-    // escaping.
     dict.SetEscapedValue("query escape 0", "",
                          TemplateDictionary::url_query_escape);
-    dict.SetEscapedValue("query escape 1", "noop",
-                         TemplateDictionary::url_query_escape);
-    dict.SetEscapedValue("query escape 2",
-                         "0123456789abcdefghjijklmnopqrstuvwxyz"
-                         "ABCDEFGHIJKLMNOPQRSTUVWXYZ.-_*/~!(),",
-                         TemplateDictionary::url_query_escape);
-    dict.SetEscapedValue("query escape 3", " ?a=b;c#d ",
-                         TemplateDictionary::url_query_escape);
-    dict.SetEscapedValue("query escape 4", "#$%&+<=>?@[\\]^`{|}",
-                         TemplateDictionary::url_query_escape);
-    dict.SetEscapedValue("query escape 5", "\xDE\xAD\xCA\xFE",
-                         TemplateDictionary::url_query_escape);
-    dict.SetEscapedValue("query escape 6", "\"':",
-                         TemplateDictionary::url_query_escape);
 
-    // Test cases for URL Query Escaping
+    ASSERT_STREQ(dict.GetSectionValue("hardest HTML"),
+                 "&lt;A HREF=&#39;foo&#39; id=&quot;bar  &amp;&amp; "
+                 "baz&quot;&gt;");
+    ASSERT_STREQ(dict.GetSectionValue("hardest JS"),
+                 "f \\x3d \\'foo\\';\\r\\n\tprint \\\"\\\\\\x26foo \\x3d "
+                 "\\b\\\", \\\"foo\\\"");
     ASSERT_STREQ(dict.GetSectionValue("query escape 0"), "");
-    ASSERT_STREQ(dict.GetSectionValue("query escape 1"), "noop");
-    ASSERT_STREQ(dict.GetSectionValue("query escape 2"),
-                 "0123456789abcdefghjijklmnopqrstuvwxyz"
-                 "ABCDEFGHIJKLMNOPQRSTUVWXYZ.-_*/~!(),");
-    ASSERT_STREQ(dict.GetSectionValue("query escape 3"), "+%3Fa%3Db%3Bc%23d+");
-    ASSERT_STREQ(dict.GetSectionValue("query escape 4"),
-                 "%23%24%25%26%2B%3C%3D%3E%3F%40%5B%5C%5D%5E%60%7B%7C%7D");
-    ASSERT_STREQ(dict.GetSectionValue("query escape 5"), "%DE%AD%CA%FE");
-    ASSERT_STREQ(dict.GetSectionValue("query escape 6"), "%22%27%3A");
 
+    // Test using hand-made modifiers.
     FooEscaper foo_escaper;
     dict.SetEscapedValue("easy foo", "hello there!",
                          FooEscaper());
@@ -270,33 +269,6 @@ class TemplateDictionaryUnittest {
                          "print \"<A HREF='foo'>\";\r\n\\1;",
                          double_escaper);
 
-    ASSERT_STREQ(dict.GetSectionValue("easy HTML"), "foo");
-    ASSERT_STREQ(dict.GetSectionValue("harder HTML"), "foo &amp; bar");
-    ASSERT_STREQ(dict.GetSectionValue("hardest HTML"),
-                 "&lt;A HREF=&#39;foo&#39; id=&quot;bar  &amp;&amp; "
-                 "baz&quot;&gt;");
-    ASSERT_STREQ(dict.GetSectionValue("easy PRE"), "foo");
-    ASSERT_STREQ(dict.GetSectionValue("harder PRE"), "foo &amp; bar");
-    ASSERT_STREQ(dict.GetSectionValue("hardest PRE"),
-                 " &quot;--\v--\f--\n--\t--&amp;--&lt;--&gt;--&#39;--&quot;");
-    ASSERT_STREQ(dict.GetSectionValue("easy XML"), "xoo");
-    ASSERT_STREQ(dict.GetSectionValue("harder XML"), "xoo & xar");
-    ASSERT_STREQ(dict.GetSectionValue("hardest XML"),
-                 "xoo &#160; xar&#160;xaz &nbsp");
-    ASSERT_STREQ(dict.GetSectionValue("easy JS"), "joo");
-    ASSERT_STREQ(dict.GetSectionValue("harder JS"), "f \\x3d \\'joo\\';");
-    ASSERT_STREQ(dict.GetSectionValue("hardest JS"),
-                 "f \\x3d \\'foo\\';\\r\\n\tprint \\\"\\\\\\x26foo \\x3d "
-                 "\\b\\\", \\\"foo\\\"");
-    ASSERT_STREQ(dict.GetSectionValue("close script JS"),
-                 "//--\\x3e\\x3c/script\\x3e\\x3cscript\\x3e"
-                 "alert(123);\\x3c/script\\x3e");
-    ASSERT_STREQ(dict.GetSectionValue("easy JSON"), "joo");
-    ASSERT_STREQ(dict.GetSectionValue("harder JSON"), "f = \\\"joo\\\"; "
-                 "e = 'joo';");
-    ASSERT_STREQ(dict.GetSectionValue("hardest JSON"),
-                 "f = 'foo';\\r\\n\\t\\fprint \\\"\\\\&foo = \\/\\b\\\", "
-                 "\\\"foo\\\"");
     ASSERT_STREQ(dict.GetSectionValue("easy foo"), "foo");
     ASSERT_STREQ(dict.GetSectionValue("harder foo"), "foo");
     ASSERT_STREQ(dict.GetSectionValue("easy double"), "doo");
@@ -820,8 +792,8 @@ class TemplateDictionaryUnittest {
     delete dict_copy;
 
     ASSERT_STREQ(orig.c_str(), copy.c_str());
-
   }
+
 };
 
 _END_GOOGLE_NAMESPACE_
@@ -845,6 +817,10 @@ int main(int argc, char** argv) {
 
   TemplateDictionaryUnittest::TestMakeCopy(true);    // use our own arena
   TemplateDictionaryUnittest::TestMakeCopy(false);   // use fake arena
+
+  // We do this test last, because the NULs it inserts mess up all
+  // the c-string-based tests that use strstr() and the like.
+  TemplateDictionaryUnittest::TestSetValueWithNUL();
 
   printf("DONE.\n");
   return 0;

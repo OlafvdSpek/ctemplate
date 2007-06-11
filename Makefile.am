@@ -1,7 +1,7 @@
 ## Process this file with automake to produce Makefile.in
 
 # Make sure that when we re-make ./configure, we get the macros we need
-ACLOCAL_AMFLAGS = -I `pwd`/../autoconf
+ACLOCAL_AMFLAGS = -I m4
 
 # This is so we can #include <google/foo>
 AM_CPPFLAGS = -I$(top_srcdir)/src
@@ -14,25 +14,20 @@ googleincludedir = $(includedir)/google
 googleinclude_HEADERS = \
 	src/google/template.h \
 	src/google/template_enums.h \
+	src/google/template_modifiers.h \
 	src/google/template_dictionary.h \
+	src/google/template_emitter.h \
 	src/google/template_namelist.h \
-	src/google/template_from_string.h \
-	src/google/ctemplate/hash_map.h
-	src/google/ctemplate/hash_set.h
+	src/google/template_from_string.h
 noinst_HEADERS = \
 	src/base/arena.h.in \
 	src/google/template.h.in \
 	src/google/template_enums.h.in \
+	src/google/template_modifiers.h.in \
 	src/google/template_dictionary.h.in \
+	src/google/template_emitter.h.in \
 	src/google/template_namelist.h.in \
 	src/google/template_from_string.h.in
-
-ctemplateincludedir = $(googleincludedir)/ctemplate
-# The 'private' header files go into /usr/local/include/google/ctemplate.
-ctemplateinclude_HEADERS = \
-	src/google/ctemplate/hash_map.h \
-	src/google/ctemplate/hash_set.h
-
 
 docdir = $(prefix)/share/doc/$(PACKAGE)-$(VERSION)
 ## This is for HTML and other documentation you want to install.
@@ -45,6 +40,8 @@ dist_doc_DATA = AUTHORS COPYING ChangeLog INSTALL NEWS README \
 
 ## The libraries (.so's) you want to install
 lib_LTLIBRARIES =
+## Libraries that we want to use only internally (for our unittest binaries)
+noinst_LTLIBRARIES =
 ## The binaries you want to install
 bin_PROGRAMS =
 bin_SCRIPTS =
@@ -68,8 +65,8 @@ CTEMPLATE_SYMBOLS = '[^A-Za-z](Template|TemplateDictionary|TemplateNamelist|Temp
 lib_LTLIBRARIES += libctemplate.la
 libctemplate_la_SOURCES = $(googleinclude_HEADERS) src/config.h \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h src/base/mutex.cc \
-	src/template.cc src/template_dictionary.cc src/template_namelist.cc \
-	src/template_from_string.cc
+	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
+	src/template_namelist.cc src/template_from_string.cc
 libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG
 libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) -export-symbols-regex $(CTEMPLATE_SYMBOLS)
 libctemplate_la_LIBADD = $(PTHREAD_LIBS)
@@ -80,6 +77,29 @@ lib_LTLIBRARIES += libctemplate_nothreads.la
 libctemplate_nothreads_la_SOURCES = $(libctemplate_la_SOURCES)
 libctemplate_nothreads_la_CXXFLAGS = -DNDEBUG -DNO_THREADS
 libctemplate_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_SYMBOLS)
+
+# We could also make a library that has the TemplateDictionaryPeer
+# class.  This class is useful for testing (it provides introspection
+# on the TemplateDictionary hierarchy that's easier to use than the
+# default debugging method, TemplateDictionary::Dump()) but by the
+# same token also violates abstraction in ways that might be fragile.
+# We don't expose the library for now, until the demonstrated need
+# outweighs the costs.  If you'd like to use this library, please send
+# mail to google-ctemplate@googlegroups.com!
+##lib_LTLIBRARIES += libctemplate_testing.la
+noinst_LTLIBRARIES += libctemplate_testing.la
+libctemplate_testing_la_SOURCES = $(googleinclude_HEADERS) \
+                                  src/tests/template_test_util.h \
+                                  src/tests/template_test_util.cc
+libctemplate_testing_la_CXXFLAGS = -DNDEBUG
+CTEMPLATE_TESTING_SYMBOLS = 'TemporaryRegisterTemplate|TemplateDictionaryPeer'
+libctemplate_testing_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS)
+# This library depends on libctemplate, but it can use either libctemplate
+# or libctemplate_nothreads.  Rather than have two versions of this
+# library, I just leave out the deps entirely: you must be sure to specify
+# one of the two whenever you link this library into your code.
+#libctemplate_testing_la_LIBADD = libctemplate.la # or libctemplate_nothreads.la
+
 
 # Helper apps
 bin_PROGRAMS += make_tpl_varnames_h
@@ -95,10 +115,23 @@ TESTS += template_dictionary_unittest template_dictionary_nothreads_unittest
 template_dictionary_unittest_SOURCES = src/tests/template_dictionary_unittest.cc
 template_dictionary_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
 template_dictionary_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
-template_dictionary_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
+template_dictionary_unittest_LDADD = libctemplate.la libctemplate_testing.la \
+                                     $(PTHREAD_LIBS)
 template_dictionary_nothreads_unittest_SOURCES = $(template_dictionary_unittest_SOURCES)
 template_dictionary_nothreads_unittest_CXXFLAGS = -DNO_THREADS
-template_dictionary_nothreads_unittest_LDADD = libctemplate_nothreads.la
+template_dictionary_nothreads_unittest_LDADD = libctemplate_nothreads.la \
+                                               libctemplate_testing.la
+
+TESTS += template_modifiers_unittest template_modifiers_nothreads_unittest
+template_modifiers_unittest_SOURCES = src/tests/template_modifiers_unittest.cc
+template_modifiers_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
+template_modifiers_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
+template_modifiers_unittest_LDADD = libctemplate.la libctemplate_testing.la \
+                                    $(PTHREAD_LIBS)
+template_modifiers_nothreads_unittest_SOURCES = $(template_modifiers_unittest_SOURCES)
+template_modifiers_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_modifiers_nothreads_unittest_LDADD = libctemplate_nothreads.la \
+                                              libctemplate_testing.la
 
 TESTS += template_setglobals_unittest template_setglobals_nothreads_unittest
 template_setglobals_unittest_SOURCES = src/tests/template_setglobals_unittest.cc
@@ -159,7 +192,3 @@ libtool: $(LIBTOOL_DEPS)
 EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb \
 	$(SCRIPTS) libtool \
 	contrib
-
-## If you create hash_map.h, hash_set.h, and/or hash_fun.h via the
-## ACC_CXX_MAKE_*_H configure.ac macros, add those files here.
-DISTCLEANFILES = src/google/ctemplate/hash_map.h src/google/ctemplate/hash_set.h

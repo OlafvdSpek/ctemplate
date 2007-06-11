@@ -163,7 +163,7 @@ static vector<Testdata> ReadDataFiles(const char* testdata_dir) {
     } else if (!strcmp(fname + strlen(fname) - 9, ".anno_out")) {
       new_output = &retval.back().annotated_output;
     } else {
-      ASSERT(fname == "filename must end in either .in, .out, or .anno_out");
+      ASSERT(false);  // Filename must end in either .in, .out, or .anno_out.
     }
     if (new_output) {            // the .out and .anno_out cases
       ASSERT(!retval.empty());   // an .out without any corresponding .in?
@@ -324,7 +324,7 @@ static TemplateDictionary* MakeDictionary(int i) {
     case 1: return MakeDict1();
     case 2: return MakeDict2();
     case 3: return MakeDict3();
-    default: ASSERT((char*)i == "No dictionary with this number yet");
+    default: ASSERT(false);  // No dictionary with this number yet.
   }
   return NULL;
 }

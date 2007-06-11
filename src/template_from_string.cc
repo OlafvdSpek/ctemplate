@@ -35,7 +35,7 @@
 #include "base/mutex.h"     // This must go first so we get _XOPEN_SOURCE
 #include <assert.h>
 #include <string>
-#include <google/ctemplate/hash_map.h>
+#include HASH_MAP_H         // defined in config.h
 #include <google/template_from_string.h>
 #include <google/template.h>
 
@@ -135,8 +135,7 @@ TemplateFromString *TemplateFromString::GetTemplate(const string& template_name,
 // InvalidMethodCall
 // A static function yank the developer's chain
 static void InvalidMethodCall(const char* method_name) {
-  assert(method_name ==
-         "Programming error: can't call this method on TemplateFromString");
+  assert(false);  // Can't call this method on TemplateFromString.
 }
 
 // These last three methods merely call attention to the developer's error

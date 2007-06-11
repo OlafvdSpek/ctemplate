@@ -71,7 +71,7 @@
   "The basic indentation offset.")
 
 ;; Constant regular expressions to identify template elements.
-(defconst tpl-mode-tpl-token "[a-zA-Z][a-zA-Z0-9_:]*?")
+(defconst tpl-mode-tpl-token "[a-zA-Z][a-zA-Z0-9_:=]*?")
 (defconst tpl-mode-section (concat "\\({{[#/]"
 				   tpl-mode-tpl-token
 				   "}}\\)"))
