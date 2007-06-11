@@ -33,16 +33,20 @@
 // Based on the 'old' TemplateDictionary by Frank Jernigan.
 
 #include "config.h"
-#include "base/mutex.h"     // This must go first so we get _XOPEN_SOURCE
+#include "base/mutex.h"         // This must go first so we get _XOPEN_SOURCE
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>             // for varargs with StringAppendV
 #include <string>
-#include <algorithm>            // for sort
+#include <algorithm>            // for sort()
+#include <utility>              // for pair<>
 #include <vector>
-#include "google/ctemplate/hash_map.h"
+#include <map>
+#include HASH_MAP_H             // defined in config.h
 #include "google/template_dictionary.h"
+#include "google/template_modifiers.h"
+#include "base/mutex.h"
 #include "base/arena.h"
 
 _START_GOOGLE_NAMESPACE_
@@ -50,18 +54,54 @@ _START_GOOGLE_NAMESPACE_
 using std::vector;
 using std::string;
 using std::pair;
+using std::map;
 using HASH_NAMESPACE::hash_map;
+using template_modifiers::TemplateModifier;
 
 static Mutex g_static_mutex;
 
 /*static*/ TemplateDictionary::GlobalDict* TemplateDictionary::global_dict_
   = NULL;
-/*static*/ TemplateDictionary::HtmlEscape TemplateDictionary::html_escape;
-/*static*/ TemplateDictionary::PreEscape TemplateDictionary::pre_escape;
-/*static*/ TemplateDictionary::XmlEscape TemplateDictionary::xml_escape;
-/*static*/ TemplateDictionary::JavascriptEscape TemplateDictionary::javascript_escape;
-/*static*/ TemplateDictionary::JsonEscape TemplateDictionary::json_escape;
-/*static*/ TemplateDictionary::UrlQueryEscape TemplateDictionary::url_query_escape;
+
+// Define the modifiers
+/*static*/ const template_modifiers::HtmlEscape&
+  TemplateDictionary::html_escape = template_modifiers::html_escape;
+/*static*/ const template_modifiers::PreEscape&
+  TemplateDictionary::pre_escape = template_modifiers::pre_escape;
+/*static*/ const template_modifiers::XmlEscape&
+  TemplateDictionary::xml_escape = template_modifiers::xml_escape;
+/*static*/ const template_modifiers::JavascriptEscape&
+  TemplateDictionary::javascript_escape = template_modifiers::javascript_escape;
+/*static*/ const template_modifiers::UrlQueryEscape&
+  TemplateDictionary::url_query_escape = template_modifiers::url_query_escape;
+/*static*/ const template_modifiers::JsonEscape&
+  TemplateDictionary::json_escape = template_modifiers::json_escape;
+
+
+// ----------------------------------------------------------------------
+// TemplateDictionary::HashInsert()
+//    A convenience function that's equivalent to m[key] = value, but
+//    without needing key to have a default constructor like operator[]
+//    does.
+// ----------------------------------------------------------------------
+
+template<typename ValueType>   // ValueType should be small (pointer, int)
+void TemplateDictionary::HashInsert(
+    hash_map<TemplateString, ValueType,
+             TemplateStringHash, TemplateStringEqual>* m,
+    TemplateString key, ValueType value) {
+  // Unfortunately, insert() doesn't actually replace if key is already
+  // in the map.  Thus, in that case (insert().second == false), we need
+  // to overwrite the old value.  Since we don't define operator=, the
+  // easiest legal way to overwrite is to use the copy-constructor with
+  // placement-new.
+  pair<typename hash_map<TemplateString, ValueType,
+                         TemplateStringHash, TemplateStringEqual>::iterator,
+       bool> r = m->insert(pair<TemplateString,ValueType>(key, value));
+  if (r.second == false) {   // key already exists, so overwrite
+    new (&r.first->second) ValueType(value);
+  }
+}
 
 
 // ----------------------------------------------------------------------
@@ -81,10 +121,8 @@ TemplateDictionary::GlobalDict* TemplateDictionary::SetupGlobalDictUnlocked() {
   TemplateDictionary::GlobalDict* retval =
     new TemplateDictionary::GlobalDict(3);
   // Initialize the built-ins
-  static const char* const kBI_SPACE = "BI_SPACE";
-  static const char* const kBI_NEWLINE = "BI_NEWLINE";
-  (*retval)[kBI_SPACE] = " ";
-  (*retval)[kBI_NEWLINE] = "\n";
+  HashInsert(retval, TemplateString("BI_SPACE"), TemplateString(" "));
+  HashInsert(retval, TemplateString("BI_NEWLINE"), TemplateString("\n"));
   return retval;
 }
 
@@ -197,7 +235,7 @@ TemplateDictionary* TemplateDictionary::InternalMakeCopy(
   for (SectionDict::iterator it = section_dict_->begin();
        it != section_dict_->end();  ++it) {
     DictVector* dicts = new DictVector;
-    (*newdict->section_dict_)[newdict->Memdup(it->first)] = dicts;
+    HashInsert(newdict->section_dict_, newdict->Memdup(it->first), dicts);
     for (DictVector::iterator it2 = it->second->begin();
          it2 != it->second->end(); ++it2) {
       TemplateDictionary* subdict = *it2;
@@ -209,7 +247,7 @@ TemplateDictionary* TemplateDictionary::InternalMakeCopy(
   for (IncludeDict::iterator it = include_dict_->begin();
        it != include_dict_->end();  ++it) {
     DictVector* dicts = new DictVector;
-    (*newdict->include_dict_)[newdict->Memdup(it->first)] = dicts;
+    HashInsert(newdict->include_dict_, newdict->Memdup(it->first), dicts);
     for (DictVector::iterator it2 = it->second->begin();
          it2 != it->second->end(); ++it2) {
       TemplateDictionary* subdict = *it2;
@@ -219,9 +257,9 @@ TemplateDictionary* TemplateDictionary::InternalMakeCopy(
   }
 
   // Finally, copy everything else not set properly by the constructor
-  newdict->filename_ = newdict->Memdup(filename_);
+  newdict->filename_ = newdict->Memdup(filename_).ptr_;
   newdict->template_path_start_for_annotations_ =
-      newdict->Memdup(template_path_start_for_annotations_);
+      newdict->Memdup(template_path_start_for_annotations_).ptr_;
 
   return newdict;
 }
@@ -301,13 +339,13 @@ int TemplateDictionary::StringAppendV(char* space, char** out,
 
 void TemplateDictionary::SetValue(const TemplateString variable,
                                   const TemplateString value) {
-  (*variable_dict_)[Memdup(variable)] = Memdup(value);
+  HashInsert(variable_dict_, Memdup(variable), Memdup(value));
 }
 
 void TemplateDictionary::SetIntValue(const TemplateString variable, int value) {
   char buffer[64];   // big enough for any int
   int valuelen = snprintf(buffer, sizeof(buffer), "%d", value);
-  (*variable_dict_)[Memdup(variable)] = Memdup(buffer, valuelen);
+  HashInsert(variable_dict_, Memdup(variable), Memdup(buffer, valuelen));
 }
 
 void TemplateDictionary::SetFormattedValue(const TemplateString variable,
@@ -323,18 +361,40 @@ void TemplateDictionary::SetFormattedValue(const TemplateString variable,
   // If it fit into scratch, great, otherwise we need to copy into arena
   if (buffer == scratch) {
     scratch = arena_->Shrink(scratch, buflen+1);   // from 1024 to |value+\0|
-    (*variable_dict_)[Memdup(variable)] = scratch;
+    HashInsert(variable_dict_, Memdup(variable), TemplateString(scratch, buflen));
   } else {
     arena_->Shrink(scratch, 0);   // reclaim arena space we didn't use
-    (*variable_dict_)[Memdup(variable)] = Memdup(buffer, buflen);
+    HashInsert(variable_dict_, Memdup(variable), Memdup(buffer, buflen));
     delete[] buffer;
   }
 }
 
-// SetEscapedValue()
-// SetEscapedFormattedValue()
-//    Defined in template_dictionary.h, as all good templatized
-//    methods need to be.
+void TemplateDictionary::SetEscapedValue(TemplateString variable,
+                                         TemplateString value,
+                                         const TemplateModifier& escfn) {
+  string escaped_string(escfn(value.ptr_, value.length_));
+  SetValue(variable, escaped_string);
+}
+
+void TemplateDictionary::SetEscapedFormattedValue(TemplateString variable,
+                                                  const TemplateModifier& escfn,
+                                                  const char* format, ...) {
+  char *scratch, *buffer;
+
+  scratch = arena_->Alloc(1024);  // StringAppendV requires >=1024 bytes
+  va_list ap;
+  va_start(ap, format);
+  const int buflen = StringAppendV(scratch, &buffer, format, ap);
+  va_end(ap);
+
+  string escaped_string(escfn(buffer, buflen));
+  // Reclaim the arena space: the value we care about is now in escaped_string
+  arena_->Shrink(scratch, 0);   // reclaim arena space we didn't use
+  if (buffer != scratch)
+    delete[] buffer;
+
+  SetValue(variable, escaped_string);
+}
 
 // ----------------------------------------------------------------------
 // TemplateDictionary::SetTemplateGlobalValue()
@@ -346,7 +406,7 @@ void TemplateDictionary::SetTemplateGlobalValue(const TemplateString variable,
                                                 const TemplateString value) {
   assert(template_global_dict_ != NULL);
   if (template_global_dict_) {
-    (*template_global_dict_)[Memdup(variable)] = Memdup(value);
+    HashInsert(template_global_dict_, Memdup(variable), Memdup(value));
   }
 }
 
@@ -369,7 +429,10 @@ void TemplateDictionary::SetTemplateGlobalValue(const TemplateString variable,
   MutexLock ml(&g_static_mutex);
   if (global_dict_ == NULL)
     global_dict_ = SetupGlobalDictUnlocked();
-  (*global_dict_)[variable_copy] = value_copy;
+
+  HashInsert(global_dict_,
+             TemplateString(variable_copy, variable.length_),
+             TemplateString(value_copy, value.length_));
 }
 
 // ----------------------------------------------------------------------
@@ -384,15 +447,15 @@ void TemplateDictionary::SetTemplateGlobalValue(const TemplateString variable,
 TemplateDictionary* TemplateDictionary::AddSectionDictionary(
     const TemplateString section_name) {
   DictVector* dicts = NULL;
-  // TODO(csilvers): make a string instead, or key on char*/length pairs
-  if (section_dict_->find(section_name.ptr_) == section_dict_->end()) {
+  const SectionDict::iterator it = section_dict_->find(section_name);
+  if (it == section_dict_->end()) {
     dicts = new DictVector;
     // Since most lists will remain under 8 or 16 entries but will frequently
     // be more than four, this prevents copying from 1->2->4->8.
     dicts->reserve(8);
-    (*section_dict_)[Memdup(section_name)] = dicts;
+    HashInsert(section_dict_, Memdup(section_name), dicts);
   } else {
-    dicts = (*section_dict_)[section_name.ptr_];
+    dicts = it->second;
   }
   assert(dicts != NULL);
   char dictsize[64];
@@ -405,14 +468,13 @@ TemplateDictionary* TemplateDictionary::AddSectionDictionary(
 }
 
 void TemplateDictionary::ShowSection(const TemplateString section_name) {
-  // TODO(csilvers): make a string instead, or key on char*/length pairs
-  if (section_dict_->find(section_name.ptr_) == section_dict_->end()) {
+  if (section_dict_->find(section_name) == section_dict_->end()) {
     TemplateDictionary* empty_dict =
       new TemplateDictionary("empty dictionary", arena_, this,
                              template_global_dict_);
     DictVector* sub_dict = new DictVector;
     sub_dict->push_back(empty_dict);
-    (*section_dict_)[Memdup(section_name)] = sub_dict;
+    HashInsert(section_dict_, Memdup(section_name), sub_dict);
   }
 }
 
@@ -427,15 +489,21 @@ void TemplateDictionary::ShowSection(const TemplateString section_name) {
 void TemplateDictionary::SetValueAndShowSection(const TemplateString variable,
                                                 const TemplateString value,
                                                 const TemplateString section_name) {
-  if (value.length_ == 0)    // no value: the do-nothing case
+  if (value.length_ == 0)        // no value: the do-nothing case
     return;
   TemplateDictionary* sub_dict = AddSectionDictionary(section_name);
   sub_dict->SetValue(variable, value);
 }
 
-// SetEscapedValueAndShowSection()
-//    Defined in template_dictionary.h, as all good templatized
-//    methods need to be.
+void TemplateDictionary::SetEscapedValueAndShowSection(
+    const TemplateString variable, const TemplateString value,
+    const TemplateModifier& escfn, const TemplateString section_name) {
+  string escaped_string(escfn(value.ptr_, value.length_));
+  if (escaped_string.empty())    // no value: the do-nothing case
+    return;
+  TemplateDictionary* sub_dict = AddSectionDictionary(section_name);
+  sub_dict->SetValue(variable, escaped_string);
+}
 
 // ----------------------------------------------------------------------
 // TemplateDictionary::AddIncludeDictionary()
@@ -449,12 +517,12 @@ void TemplateDictionary::SetValueAndShowSection(const TemplateString variable,
 TemplateDictionary* TemplateDictionary::AddIncludeDictionary(
     const TemplateString include_name) {
   DictVector* dicts = NULL;
-  // TODO(csilvers): make a string instead, or key on char*/length pairs
-  if (include_dict_->find(include_name.ptr_) == include_dict_->end()) {
+  const IncludeDict::iterator it = include_dict_->find(include_name);
+  if (it == include_dict_->end()) {
     dicts = new DictVector;
-    (*include_dict_)[Memdup(include_name)] = dicts;
+    HashInsert(include_dict_, Memdup(include_name), dicts);
   } else {
-    dicts = (*include_dict_)[include_name.ptr_];
+    dicts = it->second;
   }
   assert(dicts != NULL);
   char dictsize[64];
@@ -476,7 +544,7 @@ TemplateDictionary* TemplateDictionary::AddIncludeDictionary(
 // ----------------------------------------------------------------------
 
 void TemplateDictionary::SetFilename(const TemplateString filename) {
-  filename_ = Memdup(filename);
+  filename_ = Memdup(filename).ptr_;
 }
 
 // ----------------------------------------------------------------------
@@ -497,23 +565,6 @@ static void IndentLine(string* out, int indent=0) {
   out->append(string(indent, ' ') + (indent ? " " : ""));
 }
 
-template<typename data_type>
-struct LessByStringKey {
-  typedef pair<const char*, data_type> argument_type;
-  bool operator()(argument_type p1, argument_type p2) {
-    const char* s1 = p1.first;
-    const char* s2 = p2.first;
-    return (s1 != s2) && (s2 == 0 || (s1 != 0 && strcmp(s1, s2) < 0));
-  }
-};
-
-template<typename Dict, typename ResultType>
-void SortByStringKeyInto(const Dict& dict, ResultType* result) {
-  result->assign(dict.begin(), dict.end());
-  sort(result->begin(), result->end(),
-       LessByStringKey<typename Dict::data_type>());
-}
-
 void TemplateDictionary::DumpToString(string* out, int indent) const {
   const int kIndent = 2;            // num spaces to indent each level
   static const string kQuot("");    // could use " or empty string
@@ -523,13 +574,18 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
     IndentLine(out, indent);
     out->append("global dictionary {\n");
 
-    vector<pair<const char*, const char*> > sorted_global_dict;
+    // We could be faster than converting every TemplateString into a
+    // string and inserted into an ordered data structure, but why bother?
+    map<string, string> sorted_global_dict;
     {
       ReaderMutexLock ml(&g_static_mutex);
-      SortByStringKeyInto(*global_dict_, &sorted_global_dict);
+      for (GlobalDict::const_iterator it = global_dict_->begin();
+           it != global_dict_->end();  ++it) {
+        sorted_global_dict[string(it->first.ptr_, it->first.length_)] =
+            string(it->second.ptr_, it->second.length_);
+      }
     }
-    for (vector<pair<const char*, const char*> >::const_iterator it
-           = sorted_global_dict.begin();
+    for (map<string, string>::const_iterator it = sorted_global_dict.begin();
          it != sorted_global_dict.end();  ++it) {
       IndentLine(out, indent + kIndent);
       out->append(kQuot + it->first + kQuot + ": >" + it->second + "<\n");
@@ -544,10 +600,13 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
     if (template_global_dict_ && !template_global_dict_->empty()) {
       IndentLine(out, indent);
       out->append("template dictionary {\n");
-      vector<pair<const char*, const char*> > sorted_template_dict;
-      SortByStringKeyInto(*template_global_dict_, &sorted_template_dict);
-      for (vector<pair<const char*, const char*> >::const_iterator it
-             = sorted_template_dict.begin();
+      map<string, string> sorted_template_dict;
+      for (VariableDict::const_iterator it = template_global_dict_->begin();
+           it != template_global_dict_->end();  ++it) {
+        sorted_template_dict[string(it->first.ptr_, it->first.length_)] =
+            string(it->second.ptr_, it->second.length_);
+      }
+      for (map<string,string>::const_iterator it = sorted_template_dict.begin();
            it != sorted_template_dict.end();  ++it) {
         IndentLine(out, indent + kIndent);
         out->append(kQuot + it->first + kQuot + ": >" + it->second + "<\n");
@@ -568,22 +627,28 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
   out->append("' {\n");
 
   {  // Show variables
-    vector<pair<const char*, const char*> > sorted_variable_dict;
-    SortByStringKeyInto(*variable_dict_, &sorted_variable_dict);
-    for (vector<pair<const char*, const char*> >::const_iterator it
-           = sorted_variable_dict.begin();
+    map<string, string> sorted_variable_dict;
+    for (VariableDict::const_iterator it = variable_dict_->begin();
+         it != variable_dict_->end();  ++it) {
+      sorted_variable_dict[string(it->first.ptr_, it->first.length_)] =
+          string(it->second.ptr_, it->second.length_);
+    }
+    for (map<string,string>::const_iterator it = sorted_variable_dict.begin();
          it != sorted_variable_dict.end();  ++it) {
       IndentLine(out, indent + kIndent);
       out->append(kQuot + it->first + kQuot + ": >" + it->second + "<\n");
     }
   }
 
-
   {  // Show section sub-dictionaries
-    vector<pair<const char*, DictVector*> > sorted_section_dict;
-    SortByStringKeyInto(*section_dict_, &sorted_section_dict);
-    for (vector<pair<const char*, DictVector*> >::const_iterator it
-           = sorted_section_dict.begin();
+    map<string, const DictVector*> sorted_section_dict;
+    for (SectionDict::const_iterator it = section_dict_->begin();
+         it != section_dict_->end();  ++it) {
+      sorted_section_dict[string(it->first.ptr_, it->first.length_)] =
+          it->second;
+    }
+    for (map<string, const DictVector*>::const_iterator it =
+             sorted_section_dict.begin();
          it != sorted_section_dict.end();  ++it) {
       for (DictVector::const_iterator it2 = it->second->begin();
            it2 != it->second->end(); ++it2) {
@@ -592,21 +657,21 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
         char dictnum[128];  // enough for two ints
         snprintf(dictnum, sizeof(dictnum), "dict %"PRIuS" of %"PRIuS,
                  it2 - it->second->begin() + 1, it->second->size());
-        out->append("section ");
-        out->append(it->first);
-        out->append(" (");
-        out->append(dictnum);
-        out->append(") -->\n");
+        out->append(string("section ") + it->first + " ("+dictnum+") -->\n");
         dict->DumpToString(out, indent + kIndent + kIndent);
       }
     }
   }
 
   {  // Show template-include sub-dictionaries
-    vector<pair<const char*, DictVector*> > sorted_include_dict;
-    SortByStringKeyInto(*include_dict_, &sorted_include_dict);
-    for (vector<pair<const char*, DictVector*> >::const_iterator it
-           = sorted_include_dict.begin();
+    map<string, const DictVector*> sorted_include_dict;
+    for (IncludeDict::const_iterator it = include_dict_->begin();
+         it != include_dict_->end();  ++it) {
+      sorted_include_dict[string(it->first.ptr_, it->first.length_)] =
+          it->second;
+    }
+    for (map<string, const DictVector*>::const_iterator it =
+             sorted_include_dict.begin();
          it != sorted_include_dict.end();  ++it) {
       for (int i = 0; i < it->second->size(); ++i) {
         TemplateDictionary* dict = (*it->second)[i];
@@ -637,7 +702,7 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
 void TemplateDictionary::Dump(int indent) const {
   string out;
   DumpToString(&out, indent);
-  fputs(out.c_str(), stdout);
+  fwrite(out.data(), 1, out.length(), stdout);
   fflush(stdout);
 }
 
@@ -660,8 +725,7 @@ void TemplateDictionary::Dump(int indent) const {
 
 void TemplateDictionary::SetAnnotateOutput(const char* template_path_start) {
   if (template_path_start)
-    template_path_start_for_annotations_ = Memdup(template_path_start,
-                                                  strlen(template_path_start));
+    template_path_start_for_annotations_ = Memdup(template_path_start).ptr_;
   else
     template_path_start_for_annotations_ = NULL;
 }
@@ -676,16 +740,13 @@ const char* TemplateDictionary::GetTemplatePathStart() const {
 
 // ----------------------------------------------------------------------
 // TemplateDictionary::Memdup()
-//    Copy the input into the arena, so we have a permanent copy of it.
-//    Returns a pointer to the arena-copy.  Note we do not return
-//    the length, so if the string might have internal NULs, you
-//    should save the data-length from the input.
-//       AddToVariableDict is a convenience routine which copies
-//    key and value to the arena, then uses that to set the dict.
-// ----------------------------------------------------------------------
+//    Copy the input into the arena, so we have a permanent copy of
+//    it.  Returns a pointer to the arena-copy, as a TemplateString
+//    (in case the input has internal NULs).
+//    ----------------------------------------------------------------------
 
-const char* TemplateDictionary::Memdup(const char* s, int slen) {
-  return arena_->MemdupPlusNUL(s, slen);  // add a \0, too
+TemplateString TemplateDictionary::Memdup(const char* s, int slen) {
+  return TemplateString(arena_->MemdupPlusNUL(s, slen), slen);  // add a \0 too
 }
 
 
@@ -705,34 +766,33 @@ const char* TemplateDictionary::Memdup(const char* s, int slen) {
 
 const char *TemplateDictionary::GetSectionValue(const string& variable) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
-    VariableDict::const_iterator it = d->variable_dict_->find(variable.c_str());
+    VariableDict::const_iterator it = d->variable_dict_->find(variable);
     if (it != d->variable_dict_->end())
-      return it->second;
+      return it->second.ptr_;
   }
 
   // No match in the dict tree. Check the template-global dict.
   assert(template_global_dict_ != NULL);
   if (template_global_dict_) {               // just being paranoid!
-    VariableDict::const_iterator it =
-      template_global_dict_->find(variable.c_str());
+    VariableDict::const_iterator it = template_global_dict_->find(variable);
     if (it != template_global_dict_->end())
-      return it->second;
+      return it->second.ptr_;
   }
 
   // No match in dict tree or template-global dict.  Last chance: global dict.
   {
     ReaderMutexLock ml(&g_static_mutex);
-    GlobalDict::const_iterator it = global_dict_->find(variable.c_str());
+    GlobalDict::const_iterator it = global_dict_->find(variable);
     const char* retval = "";    // what we'll return if global lookup fails
     if (it != global_dict_->end())
-      retval = it->second;
+      retval = it->second.ptr_;
     return retval;
   }
 }
 
 bool TemplateDictionary::IsHiddenSection(const string& name) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
-    if (d->section_dict_->find(name.c_str()) != d->section_dict_->end())
+    if (d->section_dict_->find(name) != d->section_dict_->end())
       return false;
   }
   return true;
@@ -741,7 +801,7 @@ bool TemplateDictionary::IsHiddenSection(const string& name) const {
 const TemplateDictionary::DictVector& TemplateDictionary::GetDictionaries(
     const string& section_name) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
-    SectionDict::const_iterator it = d->section_dict_->find(section_name.c_str());
+    SectionDict::const_iterator it = d->section_dict_->find(section_name);
     if (it != d->section_dict_->end())
       return *it->second;
   }
@@ -751,7 +811,7 @@ const TemplateDictionary::DictVector& TemplateDictionary::GetDictionaries(
 
 bool TemplateDictionary::IsHiddenTemplate(const string& name) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
-    if (d->include_dict_->find(name.c_str()) != d->include_dict_->end())
+    if (d->include_dict_->find(name) != d->include_dict_->end())
       return false;
   }
   return true;
@@ -760,7 +820,7 @@ bool TemplateDictionary::IsHiddenTemplate(const string& name) const {
 const TemplateDictionary::DictVector& TemplateDictionary::GetTemplateDictionaries(
     const string& variable) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
-    IncludeDict::const_iterator it = d->include_dict_->find(variable.c_str());
+    IncludeDict::const_iterator it = d->include_dict_->find(variable);
     if (it != d->include_dict_->end())
       return *it->second;
   }
@@ -771,7 +831,7 @@ const TemplateDictionary::DictVector& TemplateDictionary::GetTemplateDictionarie
 const char *TemplateDictionary::GetIncludeTemplateName(const string& variable,
                                                        int dictnum) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
-    IncludeDict::const_iterator it = d->include_dict_->find(variable.c_str());
+    IncludeDict::const_iterator it = d->include_dict_->find(variable);
     if (it != d->include_dict_->end()) {
       TemplateDictionary* dict = (*it->second)[dictnum];
       return dict->filename_ ? dict->filename_ : "";   // map NULL to ""
@@ -779,144 +839,6 @@ const char *TemplateDictionary::GetIncludeTemplateName(const string& variable,
   }
   assert("Call IsHiddenTemplate before GetIncludeTemplateName" == NULL);
   abort();
-}
-
-
-// ----------------------------------------------------------------------
-// HtmlEscape
-// PreEscape
-// XMLEscape
-// UrlQueryEscape
-// JavascriptEscape
-//    Escape functors that can be used by SetEscapedValue().
-//    Each takes a string as input and gives a string as output.
-// ----------------------------------------------------------------------
-
-// Escapes < > " ' & <non-space whitespace> to &lt; &gt; &quot; &#39;
-// &amp; <space>
-string TemplateDictionary::HtmlEscape::operator()(const string& in) const {
-  string out;
-  // we'll reserve some space in out to account for minimal escaping: say 12%
-  out.reserve(in.size() + in.size()/8 + 16);
-  for (int i = 0; i < in.length(); ++i) {
-    switch (in[i]) {
-      case '&': out += "&amp;"; break;
-      case '"': out += "&quot;"; break;
-      case '\'': out += "&#39;"; break;
-      case '<': out += "&lt;"; break;
-      case '>': out += "&gt;"; break;
-      case '\r': case '\n': case '\v': case '\f':
-      case '\t': out += " "; break;      // non-space whitespace
-      default: out += in[i];
-    }
-  }
-  return out;
-}
-
-// Escapes < > " ' & to &lt; &gt; &quot; &#39; &amp;
-// (Same as HtmlEscape but leaves whitespace alone.)
-string TemplateDictionary::PreEscape::operator()(const string& in) const {
-  string out;
-  // we'll reserve some space in out to account for minimal escaping: say 12%
-  out.reserve(in.size() + in.size()/8 + 16);
-  for (int i = 0; i < in.length(); ++i) {
-    switch (in[i]) {
-      case '&': out += "&amp;"; break;
-      case '"': out += "&quot;"; break;
-      case '\'': out += "&#39;"; break;
-      case '<': out += "&lt;"; break;
-      case '>': out += "&gt;"; break;
-      // All other whitespace we leave alone!
-      default: out += in[i];
-    }
-  }
-  return out;
-}
-
-// Escapes &nbsp; to &#160;
-// TODO(csilvers): have this do something more useful, once all callers have
-//                 been fixed.  Dunno what 'more useful' might be, yet.
-string TemplateDictionary::XmlEscape::operator()(const string& in) const {
-  string out(in);
-
-  string::size_type pos = 0;
-  while (1) {
-    pos = out.find("&nbsp;", pos);
-    if ( pos == string::npos )
-      break;
-    out.replace(pos, sizeof("&nbsp;")-1, "&#160;");
-    pos += sizeof("&#160;")-1;   // start searching again after the replacement
-  };
-  return out;
-}
-
-// Escapes " ' \ <CR> <LF> <BS> to \" \' \\ \r \n \b
-string TemplateDictionary::JavascriptEscape::operator()(const string& in) const {
-  string out;
-  // we'll reserve some space in out to account for minimal escaping: say 1.5%
-  out.reserve(in.size() + in.size()/64 + 2);
-  for (int i = 0; i < in.length(); ++i) {
-    switch (in[i]) {
-      case '"': out += "\\\""; break;
-      case '\'': out += "\\'"; break;
-      case '\\': out += "\\\\"; break;
-      case '\r': out += "\\r"; break;
-      case '\n': out += "\\n"; break;
-      case '\b': out += "\\b"; break;
-      case '&': out += "\\x26"; break;
-      case '<': out += "\\x3c"; break;
-      case '>': out += "\\x3e"; break;
-      case '=': out += "\\x3d"; break;
-      default: out += in[i];
-    }
-  }
-  return out;
-}
-
-string TemplateDictionary::UrlQueryEscape::operator()(const string& in) const {
-  // Everything not matching [0-9a-zA-Z.,_*/~!()-] is escaped.
-  static unsigned long _safe_characters[8] = {
-    0x00000000L, 0x03fff702L, 0x87fffffeL, 0x47fffffeL,
-    0x00000000L, 0x00000000L, 0x00000000L, 0x00000000L
-  };
-
-  string out;
-  out.reserve(in.size() * 3 + 1);
-
-  for (int i = 0; i < in.size(); i++) {
-    unsigned char c = in[i];
-    if (c == ' ') {
-      out += '+';
-    } else if ((_safe_characters[(c)>>5] & (1 << ((c) & 31)))) {
-      out += c;
-    } else {
-      out += '%';
-      out += ((c>>4) < 10 ? ((c>>4) + '0') : (((c>>4) - 10) + 'A'));
-      out += ((c&0xf) < 10 ? ((c&0xf) + '0') : (((c&0xf) - 10) + 'A'));
-    }
-  }
-  return out;
-}
-
-// Escapes " / \ <BS> <FF> <CR> <LF> <TAB> to \" \/ \\ \b \f \r \n \t
-string TemplateDictionary::JsonEscape::operator()(const string& in) const {
-  string out;
-  // we'll reserve some space in out to account for minimal escaping: say 1.5%
-  out.reserve(in.size() + in.size()/64 + 2);
-  for (int i = 0; i < in.length(); ++i) {
-    switch (in[i]) {
-      case '"': out += "\\\""; break;
-      case '\\': out += "\\\\"; break;
-      case '/': out += "\\/"; break;
-      case '\b': out += "\\b"; break;
-      case '\f': out += "\\f"; break;
-      case '\n': out += "\\n"; break;
-      case '\r': out += "\\r"; break;
-      case '\t': out += "\\t"; break;
-      default: out += in[i];
-    }
-  }
-  return out;
 }
 
 _END_GOOGLE_NAMESPACE_

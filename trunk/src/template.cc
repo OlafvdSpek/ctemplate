@@ -40,7 +40,7 @@
 #include <time.h>
 #include <ctype.h>          // for isspace()
 #include <sys/stat.h>
-#include <unistd.h>         // for stat() and open()
+#include <unistd.h>         // for stat() and open() and getcwd()
 #include <string.h>
 #include <iostream>         // for logging
 #include <iomanip>          // for indenting in Dump()
@@ -48,9 +48,18 @@
 #include <list>
 #include <vector>
 #include <utility>          // for pair
-#include <google/ctemplate/hash_map.h>
-#include "google/template.h"
-#include "google/template_dictionary.h"
+#include HASH_MAP_H         // defined in config.h
+#include <google/template.h>
+#include <google/template_modifiers.h>
+#include <google/template_dictionary.h>
+
+#ifndef PATH_MAX
+#ifdef MAXPATHLEN
+#define PATH_MAX        MAXPATHLEN
+#else
+#define PATH_MAX        4096         // seems conservative for max filename len!
+#endif
+#endif
 
 _START_GOOGLE_NAMESPACE_
 
@@ -98,71 +107,8 @@ static int kVerbosity = 0;   // you can change this by hand to get vlogs
 #define LOG_TEMPLATE_NAME(severity, template) \
    LOG(severity) << "Template " << template->template_file() << ": "
 
-// ----------------------------------------------------------------------
-// Modifiers
-//    We allow variables to have modifiers, each possibly with a value
-//    associated with it.  Format is
-//       {{VARNAME:modname[=modifier-value]:modname[=modifier-value]:...}}
-//    Modname refers to a functor that takes the variable's value
-//    and modifier-value (empty-string if no modifier-value was
-//    specified), and returns a munged values.  Modifiers are applied
-//    left-to-right.  We define the legal modnames here, and the
-///   functors they refer to.
-//
-//    Modifiers have a long-name, an optional short-name (one char;
-//    may be \0 if you don't want a shortname), and a functor that's
-//    applied to the variable.  The functor always takes a string and
-//    a nonce (the modifier-value) as input, even if value_status is
-//    MODVAL_FORBIDDEN.
-// ----------------------------------------------------------------------
-
-enum ModvalStatus { MODVAL_FORBIDDEN, MODVAL_OPTIONAL, MODVAL_REQUIRED };
-
-// I wanted to use functors and subclassing, but I couldn't get it to
-// work -- it always called the superclass operator() -- so I just use
-// function pointers.  Presumably it's just as efficient in practice.
-// Downside is you can't subclass these guys to keep around state. :-(
-typedef string (*ModifierFunctor)(const string& input, const string& nonce);
-
-struct Modifier {
-  const char* long_name;
-  char short_name;
-  ModvalStatus value_status;
-  ModifierFunctor modifier;
-};
-
-typedef vector< pair<ModifierFunctor, string> > ModifierAndNonces;
-
-static string HtmlModifier(const string& input, const string&) {
-  return TemplateDictionary::html_escape(input);
-}
-
-static string JavascriptModifier(const string& input, const string&) {
-  return TemplateDictionary::javascript_escape(input);
-}
-
-static string JsonModifier(const string& input, const string&) {
-  return TemplateDictionary::json_escape(input);
-}
-
-static string PreModifier(const string& input, const string&) {
-  return TemplateDictionary::pre_escape(input);
-}
-
-static string UrlQueryEscapeModifier(const string& input, const string&) {
-  return TemplateDictionary::url_query_escape(input);
-}
-
-// Using "o" for JSON is not really very intuitive; template authors should
-// either use json_escape in full, or provide a comment explaining the
-// non-intuitive shortening.
-static const Modifier g_modifiers[] = {
-  { "html_escape", 'h', MODVAL_FORBIDDEN, &HtmlModifier },
-  { "javascript_escape", 'j', MODVAL_FORBIDDEN, &JavascriptModifier },
-  { "json_escape", 'o', MODVAL_FORBIDDEN, &JsonModifier },
-  { "pre_escape", 'p', MODVAL_FORBIDDEN, &PreModifier },
-  { "url_query_escape", 'u', MODVAL_FORBIDDEN, &UrlQueryEscapeModifier }
-};
+typedef vector< pair<const template_modifiers::TemplateModifier*, string> >
+  ModifierAndNonces;
 
 
 // ----------------------------------------------------------------------
@@ -264,8 +210,8 @@ static void WriteOneHeaderEntry(string *outstring,
 }
 
 // ----------------------------------------------------------------------
-// Token
-//    A Token is a string marked with a token type enum.  The string
+// TemplateToken
+//    A TemplateToken is a string marked with a token type enum.  The string
 //    has different meanings for different token types.  For text, the
 //    string is the text itself.   For variable and template types, the
 //    string is the name of the variable holding the value or the
@@ -279,7 +225,9 @@ enum TemplateTokenType { TOKENTYPE_UNUSED,        TOKENTYPE_TEXT,
                          TOKENTYPE_SECTION_END,   TOKENTYPE_TEMPLATE,
                          TOKENTYPE_COMMENT,       TOKENTYPE_NULL };
 
-// A Token is a typed string. The semantics of the string depends on the
+}  // anonymous namespace
+
+// A TemplateToken is a typed string. The semantics of the string depends on the
 // token type, as follows:
 //   TOKENTYPE_TEXT          - the text
 //   TOKENTYPE_VARIABLE      - the name of the variable
@@ -292,27 +240,56 @@ enum TemplateTokenType { TOKENTYPE_UNUSED,        TOKENTYPE_TEXT,
 // All non-comment tokens may also have modifiers, which follow the name
 // of the token: the syntax is {{<PREFIX><NAME>:<mod>:<mod>:<mod>...}}
 // The modifiers are also stored as a string, starting with the first :
-struct Token {
+struct TemplateToken {
   TemplateTokenType type;
   const char* text;
   int textlen;
   ModifierAndNonces modifier_plus_values;
-  Token(TemplateTokenType t, const char* txt, int len,
-        const ModifierAndNonces* modval)
+  TemplateToken(TemplateTokenType t, const char* txt, int len,
+                const ModifierAndNonces* modval)
       : type(t), text(txt), textlen(len) {
     if (modval) modifier_plus_values = *modval;
   }
+
+  string ToString() const {   // used for debugging (annotations)
+    string retval(text, textlen);
+    for (ModifierAndNonces::const_iterator it = modifier_plus_values.begin();
+         it != modifier_plus_values.end();  ++it) {
+      const char* modname = template_modifiers::FindModifierName(it->first);
+      retval += string(":") + (modname ? modname : "<unknown>");
+    }
+    return retval;
+  }
 };
 
-// This applies the modifiers to a string, modifying the string in place
-static void ModifyString(const ModifierAndNonces& modifiers, string* s) {
-  for (ModifierAndNonces::const_iterator it = modifiers.begin();
-       it != modifiers.end();  ++it) {
-    *s = (*it->first)(*s, it->second);
+// This applies the modifiers to the string in/inlen, and writes the end
+// result directly to the end of outbuf.  Precondition: |modifiers| > 0.
+static void EmitModifiedString(const ModifierAndNonces& modifiers,
+                               const char* in, int inlen,
+                               ExpandEmitter* outbuf) {
+  // If there's more than one modifiers, we need to store the
+  // intermediate results in a temp-buffer.  We use a string.
+  string scratch;
+  if (modifiers.size() > 1) {
+    // We'll assume that each modifier adds about 12% to the input size.  We
+    // should exponentiate by |modifiers| but we just multiply, to save time.
+    scratch.reserve((inlen + inlen/8) * (modifiers.size()-1) + 16);
+    StringEmitter scratchbuf(&scratch);
+    // Each time through, we append the latest version of the string to
+    // scratch, and keep a pointer pointing to the most recent version.
+    // Except for (rare!) vars with 3+ modifiers, this loop at most once.
+    for (ModifierAndNonces::const_iterator it = modifiers.begin();
+         it != modifiers.end()-1;  ++it) {
+      const int startpos = scratch.size();  // where we start appendend
+      it->first->Modify(in, inlen, &scratchbuf, it->second);
+      in = scratch.data() + startpos;       // point to the new "in"
+      inlen = scratch.size() - startpos;
+    }
   }
+  // For the last modifier, we can write directly into outbuf
+  assert(!modifiers.empty());
+  modifiers.back().first->Modify(in, inlen, outbuf, modifiers.back().second);
 }
-
-};  // anonymous namespace
 
 // ----------------------------------------------------------------------
 // TemplateNode
@@ -321,25 +298,6 @@ static void ModifyString(const ModifierAndNonces& modifiers, string* s) {
 //    Each of these we see becomes one TemplateNode.  TemplateNode
 //    is the abstract base class; each component has its own type.
 // ----------------------------------------------------------------------
-
-// This class allows us to support various types for Expand.
-class ExpandEmitter {
- public:
-  ExpandEmitter() {}
-  virtual ~ExpandEmitter() {}
-  virtual void Emit(const string& s) = 0;
-  virtual void Emit(const char* s) = 0;
-  virtual void Emit(const char* s, int slen) = 0;
-};
-
-class StringEmitter : public ExpandEmitter {
-  string* const outbuf_;
- public:
-  StringEmitter(string* outbuf) : outbuf_(outbuf) {}
-  virtual void Emit(const string& s) { *outbuf_ += s; }
-  virtual void Emit(const char* s) { *outbuf_ += s; }
-  virtual void Emit(const char* s, int slen) { outbuf_->append(s, slen); }
-};
 
 class TemplateNode {
  public:
@@ -468,7 +426,7 @@ class TextTemplateNode : public TemplateNode {
 
 class VariableTemplateNode : public TemplateNode {
  public:
-  explicit VariableTemplateNode(const Token& token)
+  explicit VariableTemplateNode(const TemplateToken& token)
       : token_(token) {
     VLOG(2) << "Constructing VariableTemplateNode: "
             << string(token_.text, token_.textlen) << endl;
@@ -498,27 +456,24 @@ class VariableTemplateNode : public TemplateNode {
   }
 
  protected:
-  const Token token_;
+  const TemplateToken token_;
 };
 
 bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
                                   const TemplateDictionary *dictionary,
                                   const TemplateDictionary *force_annotate)
     const {
-  string var(token_.text, token_.textlen);
-
   if (ShouldAnnotateOutput(dictionary, force_annotate)) {
-    // TODO(csilvers): include modifier info in the annotation
-    output_buffer->Emit(OpenAnnotation("VAR", var));
+    output_buffer->Emit(OpenAnnotation("VAR", token_.ToString()));
   }
 
+  const string var(token_.text, token_.textlen);
   const char *value = dictionary->GetSectionValue(var);
   if (token_.modifier_plus_values.empty()) {   // no need to modify value
     output_buffer->Emit(value);               // so just emit it
   } else {
-    string modified_value(value);
-    ModifyString(token_.modifier_plus_values, &modified_value);
-    output_buffer->Emit(modified_value);
+    EmitModifiedString(token_.modifier_plus_values, value, strlen(value),
+                       output_buffer);
   }
 
   if (ShouldAnnotateOutput(dictionary, force_annotate)) {
@@ -537,7 +492,7 @@ bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
 
 class TemplateTemplateNode : public TemplateNode {
  public:
-  explicit TemplateTemplateNode(const Token& token, Strip strip)
+  explicit TemplateTemplateNode(const TemplateToken& token, Strip strip)
       : token_(token), strip_(strip) {
     VLOG(2) << "Constructing TemplateTemplateNode: "
             << string(token_.text, token_.textlen) << endl;
@@ -570,7 +525,7 @@ class TemplateTemplateNode : public TemplateNode {
   }
 
  protected:
-  const Token token_; // text is the name of a template file
+  const TemplateToken token_; // text is the name of a template file
   Strip strip_;       // Flag to pass from parent template to included template
 };
 
@@ -582,7 +537,7 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
     const {
   bool error_free = true;
 
-  string variable(token_.text, token_.textlen);
+  const string variable(token_.text, token_.textlen);
   if (dictionary->IsHiddenTemplate(variable)) {
     // if this "template include" section is "hidden", do nothing
     return true;
@@ -621,7 +576,7 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
     // then the template explansion will be iterative, just as though
     // the included template were an iterated section.
     if (ShouldAnnotateOutput(dictionary, force_annotate)) {
-      output_buffer->Emit(OpenAnnotation("INC", variable));
+      output_buffer->Emit(OpenAnnotation("INC", token_.ToString()));
     }
 
     // sub-dictionary NULL means 'just use the current dictionary instead'.
@@ -641,8 +596,9 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
           &subtemplate_buffer,
           *dv_iter ? *dv_iter : dictionary,
           ShouldAnnotateOutput(dictionary, force_annotate));
-      ModifyString(token_.modifier_plus_values, &sub_template);
-      output_buffer->Emit(sub_template);
+      EmitModifiedString(token_.modifier_plus_values,
+                         sub_template.data(), sub_template.size(),
+                         output_buffer);
     }
     if (ShouldAnnotateOutput(dictionary, force_annotate)) {
       output_buffer->Emit(CloseAnnotation("INC"));
@@ -660,7 +616,7 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
 
 class SectionTemplateNode : public TemplateNode {
  public:
-  explicit SectionTemplateNode(const Token& token);
+  explicit SectionTemplateNode(const TemplateToken& token);
   virtual ~SectionTemplateNode();
 
   // The highest level parsing method. Reads a single token from the
@@ -699,7 +655,7 @@ class SectionTemplateNode : public TemplateNode {
   virtual void Dump(int level) const;
 
  protected:
-  const Token token_;   // text is the name of the section
+  const TemplateToken token_;   // text is the name of the section
   NodeList node_list_;  // The list of subnodes in the section
 
   // A protected method used in parsing the template file
@@ -720,19 +676,20 @@ class SectionTemplateNode : public TemplateNode {
   // lines in the output. If the template author desires a newline to be
   // retained after a final marker on a line, they must add a space character
   // between the marker and the linefeed character.
-  Token GetNextToken(Template* my_template);
+  TemplateToken GetNextToken(Template* my_template);
 
   // The specific methods called used by AddSubnode to add the
   // different types of nodes to this section node.
   void AddTextNode(const char* text, int textlen);
-  void AddVariableNode(const Token& token);
-  void AddTemplateNode(const Token& token, Template* my_template);
-  void AddSectionNode(const Token& token, Template* my_template);
+  void AddVariableNode(const TemplateToken& token);
+  void AddTemplateNode(const TemplateToken& token, Template* my_template);
+  void AddSectionNode(const TemplateToken& token, Template* my_template);
 };
 
 // --- constructor and destructor, Expand, Dump, and WriteHeaderEntries
 
-SectionTemplateNode::SectionTemplateNode(const Token& token) : token_(token) {
+SectionTemplateNode::SectionTemplateNode(const TemplateToken& token)
+    : token_(token) {
   VLOG(2) << "Constructing SectionTemplateNode: "
           << string(token_.text, token_.textlen) << endl;
 }
@@ -760,7 +717,7 @@ bool SectionTemplateNode::Expand(ExpandEmitter *output_buffer,
 
   const vector<TemplateDictionary*> *dv;
 
-  string variable(token_.text, token_.textlen);
+  const string variable(token_.text, token_.textlen);
 
   // The section named __MAIN__ is special: you always expand it exactly
   // once using the containing (main) dictionary.
@@ -778,7 +735,7 @@ bool SectionTemplateNode::Expand(ExpandEmitter *output_buffer,
   vector<TemplateDictionary*>::const_iterator dv_iter = dv->begin();
   for (; dv_iter != dv->end(); ++dv_iter) {
     if (ShouldAnnotateOutput(dictionary, force_annotate)) {
-      output_buffer->Emit(OpenAnnotation("SEC", variable));
+      output_buffer->Emit(OpenAnnotation("SEC", token_.ToString()));
     }
 
     // Expand using the section-specific dictionary.  A sub-dictionary
@@ -831,12 +788,12 @@ void SectionTemplateNode::AddTextNode(const char* text, int textlen) {
   }
 }
 
-void SectionTemplateNode::AddVariableNode(const Token& token) {
+void SectionTemplateNode::AddVariableNode(const TemplateToken& token) {
   node_list_.push_back(new VariableTemplateNode(token));
 }
 
 // AddSectionNode
-void SectionTemplateNode::AddSectionNode(const Token& token,
+void SectionTemplateNode::AddSectionNode(const TemplateToken& token,
                                          Template *my_template) {
   SectionTemplateNode *new_node = new SectionTemplateNode(token);
 
@@ -849,7 +806,7 @@ void SectionTemplateNode::AddSectionNode(const Token& token,
   node_list_.push_back(new_node);
 }
 
-void SectionTemplateNode::AddTemplateNode(const Token& token,
+void SectionTemplateNode::AddTemplateNode(const TemplateToken& token,
                                           Template *my_template) {
   // pass the flag values from my_template to the new node
   node_list_.push_back(new TemplateTemplateNode(token, my_template->strip_));
@@ -873,7 +830,7 @@ bool SectionTemplateNode::AddSubnode(Template *my_template) {
     return false;
   }
 
-  Token token = GetNextToken(my_template);
+  TemplateToken token = GetNextToken(my_template);
 
   switch (token.type) {
     case TOKENTYPE_TEXT:
@@ -957,7 +914,7 @@ string *Template::template_root_directory_ = NULL;
   my_template->set_state(TS_ERROR);                                       \
   /* make extra-sure we never try to parse anything more */               \
   my_template->parse_state_.bufstart = my_template->parse_state_.bufend;  \
-  return Token(TOKENTYPE_NULL, "", 0, NULL);                              \
+  return TemplateToken(TOKENTYPE_NULL, "", 0, NULL);                      \
 } while (0)
 
 // Parses the text of the template file in the input_buffer as
@@ -975,12 +932,12 @@ string *Template::template_root_directory_ = NULL;
 // inappropriate characters in a name, not finding the closing curly
 // braces, etc.) an error message is logged, the error state of the
 // template is set, and a NULL token is returned.  Updates parse_state_.
-Token SectionTemplateNode::GetNextToken(Template *my_template) {
+TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
   Template::ParseState* ps = &my_template->parse_state_;   // short abbrev.
   const char* token_start = ps->bufstart;
 
   if (ps->bufstart >= ps->bufend) {    // at end of buffer
-    return Token(TOKENTYPE_NULL, "", 0, NULL);
+    return TemplateToken(TOKENTYPE_NULL, "", 0, NULL);
   }
 
   switch (ps->phase) {
@@ -1004,7 +961,8 @@ Token SectionTemplateNode::GetNextToken(Template *my_template) {
           ps->bufstart = token_end;  // next token starts just after the {
         }
       }
-      return Token(TOKENTYPE_TEXT, token_start, token_end-token_start, NULL);
+      return TemplateToken(TOKENTYPE_TEXT, token_start,
+                           token_end - token_start, NULL);
     }
 
     case Template::ParseState::GETTING_NAME: {
@@ -1062,7 +1020,7 @@ Token SectionTemplateNode::GetNextToken(Template *my_template) {
         ps->bufstart = MaybeEatNewline(ps->bufstart, ps->bufend,
                                        my_template->strip_);
         // For comments, don't bother returning the text
-        return Token(ttype, "", 0, NULL);
+        return TemplateToken(ttype, "", 0, NULL);
       }
 
       // Now we have the name, possibly with following modifiers.
@@ -1094,41 +1052,38 @@ Token SectionTemplateNode::GetNextToken(Template *my_template) {
           value = mod_end;
         string value_string(value, mod_end - value);
         // Convert the string to a functor, and error out if we can't.
-        int mod_index = -1;
-        for (int i = 0; i < sizeof(g_modifiers)/sizeof(*g_modifiers); ++i) {
-          if ((value - mod == 1 &&
-               *mod == g_modifiers[i].short_name) ||
-              (value - mod == strlen(g_modifiers[i].long_name) &&
-               !memcmp(mod, g_modifiers[i].long_name, value - mod))) {
-            mod_index = i;
-            break;
-          }
-        }
+        const template_modifiers::ModifierInfo* modstruct =
+            template_modifiers::FindModifier(mod, value - mod);
         // There are various ways a modifier syntax can be illegal.
-        if (mod_index == -1) {
+        if (modstruct == NULL) {
           FAIL("Unknown modifier for variable "
                << string(token_start, mod_start - token_start) << ": "
                << "'" << string(mod, value - mod) << "'");
-        } else if ((g_modifiers[mod_index].value_status == MODVAL_FORBIDDEN &&
-                    value < mod_end)) {
+        } else if ((modstruct->value_status
+                    == template_modifiers::MODVAL_FORBIDDEN) &&
+                   value < mod_end) {
           FAIL("Modifier for variable "
                << string(token_start, mod_start - token_start) << ":"
                << string(mod, value - mod) << " "
                << "has illegal mod-value '" << value_string << "'");
-        } else if ((g_modifiers[mod_index].value_status == MODVAL_REQUIRED &&
-                    value == mod_end)) {
+        } else if ((modstruct->value_status
+                    == template_modifiers::MODVAL_REQUIRED) &&
+                   value == mod_end) {
           FAIL("Modifier for variable "
                << string(token_start, mod_start - token_start) << ":"
                << string(mod, value - mod) << " "
                << "is missing a required mod-value");
         }
 
-        modifiers.push_back(pair<ModifierFunctor,string>(
-                                g_modifiers[mod_index].modifier, value_string));
+        modifiers.push_back(
+            pair<const template_modifiers::TemplateModifier*, string>(
+                modstruct->modifier, value_string));
       }
 
-      // For now, we only allow variable and include nodes to have modifiers.
-      // TODO(csilvers): figure out if it's useful to have to for sections
+      // For now, we only allow variable and include nodes to have
+      // modifiers.  I think it's better not to have this for
+      // sections, but instead to modify all the text and vars in the
+      // section appropriately, but I could be convinced otherwise.
       if (!modifiers.empty() &&
           ttype != TOKENTYPE_VARIABLE && ttype != TOKENTYPE_TEMPLATE) {
         FAIL(string(token_start, token_end - token_start)
@@ -1148,7 +1103,8 @@ Token SectionTemplateNode::GetNextToken(Template *my_template) {
       }
 
       // create and return the TEXT token that we found
-      return Token(ttype, token_start, mod_start - token_start, &modifiers);
+      return TemplateToken(ttype, token_start, mod_start - token_start,
+                           &modifiers);
     }
 
     default: {
@@ -1265,8 +1221,8 @@ bool Template::BuildTree(const char* input_buffer,
   parse_state_.bufend = input_buffer_end;
   parse_state_.phase = ParseState::GETTING_TEXT;
   SectionTemplateNode *top_node = new SectionTemplateNode(
-      Token(TOKENTYPE_SECTION_START,
-            kMainSectionName, strlen(kMainSectionName), NULL));
+      TemplateToken(TOKENTYPE_SECTION_START,
+                    kMainSectionName, strlen(kMainSectionName), NULL));
   while (top_node->AddSubnode(this)) {
     // Add the rest of the template in.
   }
@@ -1322,8 +1278,6 @@ void Template::Dump(const char *filename) const {
 //    the filename of a given template object's input.
 // ----------------------------------------------------------------------
 
-// TODO(csilvers): convert input into an absolute path using getcwd() if
-//                 needed?  That makes code safer it client does a chdir().
 bool Template::SetTemplateRootDirectory(const string& directory) {
   // Make sure template_root_directory_ has been initialized
   AssureGlobalsInitialized();
@@ -1336,6 +1290,20 @@ bool Template::SetTemplateRootDirectory(const string& directory) {
   } else {
     *template_root_directory_ = directory;
   }
+  // Make the directory absolute if it isn't already.  This makes code
+  // safer if client later does a chdir.
+  if ((*template_root_directory_)[0] != '/') {
+    char* cwdbuf = new char[PATH_MAX];   // new to avoid stack overflow
+    const char* cwd = getcwd(cwdbuf, PATH_MAX);
+    if (!cwd) {   // probably not possible, but best to be defensive
+      LOG(WARNING) << "Unable to convert '" << *template_root_directory_
+                   << "' to an absolute path, with cwd=" << cwdbuf;
+    } else {
+      *template_root_directory_ = PathJoin(cwd, *template_root_directory_);
+    }
+    delete[] cwdbuf;
+  }
+
   VLOG(2) << "Setting Template directory to " << *template_root_directory_
           << endl;
   return true;

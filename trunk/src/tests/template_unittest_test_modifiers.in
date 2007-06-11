@@ -4,6 +4,7 @@
   {{UPDATE}}
   {{UPDATE:h}}
   {{UPDATE:javascript_escape}}
+  {{UPDATE:h:u}}
 {{/UPDATE_SECTION}}
 {{! There should be no problem with this comment having a : in it. }}
   <IMG src=foo.jpg align={{ALIGNMENT}}>

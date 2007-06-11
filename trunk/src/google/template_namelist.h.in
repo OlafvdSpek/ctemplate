@@ -42,7 +42,7 @@
 #include <time.h>    // for time_t
 #include <string>
 #include <vector>
-#include <google/ctemplate/hash_set.h>
+#include HASH_SET_H      // defined in config.h
 #include <google/template_enums.h>   // for Strip
 
 // RegisterTemplateFilename

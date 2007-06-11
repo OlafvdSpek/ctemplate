@@ -3,8 +3,14 @@
 /* Namespace for Google classes */
 #undef GOOGLE_NAMESPACE
 
-/* the namespace of hash_map */
+/* the location of <hash_map> */
+#undef HASH_MAP_H
+
+/* the namespace of hash_map/hash_set */
 #undef HASH_NAMESPACE
+
+/* the location of <hash_set> */
+#undef HASH_SET_H
 
 /* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
    */

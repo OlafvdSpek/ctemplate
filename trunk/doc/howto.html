@@ -179,9 +179,8 @@ exists.  Note the case must match as well.</p>
 
 <p>The value associated with a key differs according to key type.  The
 value associated with a <i>variable</i> is simple: it's the value for
-that variable.  (Niggly implementation note: this value may not have
-internal NUL -- that is, \0 -- characters.  It's a TODO to allow this
-one day.)</p>
+that variable.  Both keys and values can be any 8-bit
+character-string, and may include internal NULs (\0).</p>
 
 <p>The value associated with a <i>section</i> is more complicated, and
 somewhat recursive: it's a list of data dictionaries.  Come
@@ -324,6 +323,53 @@ are the modifiers that are supported:</p>
     <td>json-escapes a variable before output as a string in json;
         similar to javascript escaping, but ignores characters such
         as <code>=</code> and <code>&</code>.</td>
+</tr>
+
+<tr><td><code>:html_escape_with_arg</code></td><td><code>:H</code></td>
+    <td>special purpose html escaping. See below for details</td>
+</tr>
+
+<tr><td><code>:none</code></td><td></td>
+    <td>leaves the variable  as is</td>
+</tr>
+
+</table>
+
+<p>The <code>html_escape_with_arg</code> modifier is a bit different
+because it requires a value to specify the type of escaping to use.
+For example, this template is equivalent to using
+the <code>pre_escape</code> modifier:</p>
+<pre>
+   &lt;html>&lt;body>&lt;pre>{{BODY:H=pre}}&lt/pre>&lt;/body>&lt;/html>
+</pre>
+
+<p>Here are the values that are supported by
+the <code>html_escape_with_arg</code> modifier:</p>
+<table border=1 cellpadding=3>
+<tr><th>value</th><th>description</th></tr>
+
+<tr><td><code>=snippet</code></td>
+    <td>like <code>html_escape</code>, but allows HTML entities and
+        some tags to pass through unchanged. The allowed tags
+        are <code>&lt;br></code>, <code>&lt;wbr></code>, <code>&lt;b></code>,
+        and <code>&lt;/b></code>.</td>
+</tr>
+
+<tr><td><code>=pre</code></td><td>
+    <td>same as <code>pre_escape</code></td>
+</tr>
+
+<tr><td><code>=url</code></td><td>
+    <td>ensures that a variable contains a safe URL. Safe means that
+        it is either a http or https URL, or else it has no protocol
+        specified.  If the URL is safe it is html-escaped, otherwise
+        it is replaced with <code>#</code>.</td>
+</tr>
+
+<tr><td><code>=attribute</code></td>
+    <td>replaces characters not safe for an use in an unquoted
+        attribute with underscore. Safe characters are alphanumeric,
+        underscore, dash, period, and colon.</td>
 </tr>
 
 </table>

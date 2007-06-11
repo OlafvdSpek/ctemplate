@@ -1,11 +1,10 @@
 ## Process this file with autoconf to produce configure.
-## In general, the safest way to proceed is to run the following:
-##    % aclocal -I . -I `pwd`/../autoconf && autoheader && autoconf && automake
+## In general, the safest way to proceed is to run ./autogen.sh
 
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 0.5, opensource@google.com)
+AC_INIT(ctemplate, 0.6, opensource@google.com)
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
@@ -49,8 +48,8 @@ AC_RWLOCK
 AC_CXX_STL_NAMESPACE
 AC_DEFINE_GOOGLE_NAMESPACE(google)
 
-AC_CXX_MAKE_HASH_MAP_H(src/google/ctemplate/hash_map.h)
-AC_CXX_MAKE_HASH_SET_H(src/google/ctemplate/hash_set.h)
+# Figures out where hash_map and hash_set live, and what namespace they use
+AC_CXX_STL_HASH
 
 ## Check out ../autoconf/ for other macros you can call to do useful stuff
 
@@ -58,6 +57,7 @@ AC_SUBST(ac_google_namespace)
 AC_SUBST(ac_google_start_namespace)
 AC_SUBST(ac_google_end_namespace)
 AC_SUBST(ac_cv_cxx_hash_namespace)
+AC_SUBST(ac_cv_cxx_hash_map)
 if test "$ac_cv___attribute__" == "yes"; then
    AC_SUBST(ac_google_attribute, 1)
 else
@@ -68,6 +68,7 @@ fi
 AC_CONFIG_FILES([Makefile \
                  src/base/arena.h src/google/template_enums.h \
 		 src/google/template.h src/google/template_from_string.h \
+		 src/google/template_modifiers.h src/google/template_emitter.h \
 		 src/google/template_dictionary.h \
 		 src/google/template_namelist.h])
 AC_OUTPUT

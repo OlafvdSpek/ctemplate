@@ -40,7 +40,7 @@
 #include <vector>                // that's MissingListType, SyntaxListType
 #include <iostream>              // for cerr
 #include <algorithm>             // for binary_search
-#include <google/ctemplate/hash_set.h>  // that's NameListType
+#include HASH_SET_H              // (defined in config.h)  for NameListType
 #include <google/template_namelist.h>
 #include <google/template.h>     // for Strip, GetTemplate(), etc.
 

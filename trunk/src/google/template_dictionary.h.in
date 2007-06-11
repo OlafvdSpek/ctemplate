@@ -48,11 +48,12 @@
 #define TEMPLATE_TEMPLATE_DICTIONARY_H__
 
 #include <stdlib.h>      // for NULL
-#include <string.h>      // for the strcmp() in streq
+#include <string.h>      // for the memcmp() in CompareTemplateString()
 #include <stdarg.h>      // for StringAppendV()
 #include <string>
 #include <vector>
-#include <google/ctemplate/hash_map.h>
+#include @ac_cv_cxx_hash_map@
+#include <google/template_modifiers.h>
 
 @ac_google_start_namespace@
 
@@ -116,23 +117,19 @@ class TemplateDictionary {
 #endif
       ;  // starts at 3 because of implicit 1st arg 'this'
 
-  // The functor should be a class that defines
-  //    string operator()(const string& in) const;
-  // It takes 'value' as input and gives output that's actually stored
-  // in the template.  Below we defined some useful escape-functors.
+  // TemplateModifier is defined in template_modifier.h, which also provides
+  // some functors to use (particularly useful ones are also defined below).
   // NOTE: This method is provided for convenience, but it's better to call
   //       SetValue() and do the escaping in the template itself when possible:
   //            "...{{MYVAR:html_escape}}..."
-  template<class EscapeFunctor>
   void SetEscapedValue(const TemplateString variable, const TemplateString value,
-                       EscapeFunctor escape_functor);
+                       const template_modifiers::TemplateModifier& escfn);
 
   // NOTE: This method is provided for convenience, but it's better to call
   //       SetFormattedValue() and do the escaping in the template itself:
   //            "...{{MYVAR:html_escape}}..."
-  template<class EscapeFunctor>
   void SetEscapedFormattedValue(const TemplateString variable,
-                                EscapeFunctor escape_functor,
+                                const template_modifiers::TemplateModifier& escfn,
                                 const char* format, ...)
 #if @ac_google_attribute@
        __attribute__((__format__ (__printf__, 4, 5)))
@@ -183,13 +180,14 @@ class TemplateDictionary {
                               const TemplateString value,
                               const TemplateString section_name);
 
+  // In this case, we hide the section if the *escaped* value of the variable
+  // is the empty string.
   // NOTE: This method is provided for convenience, but it's better to call
   //       SetValueAndShowSection() and do the escaping in the template itself:
   //            "...{{MYVAR:html_escape}}..."
-  template<class EscapeFunctor>
   void SetEscapedValueAndShowSection(const TemplateString variable,
                                      const TemplateString value,
-                                     EscapeFunctor escape_functor,
+                                     const template_modifiers::TemplateModifier& escfn,
                                      const TemplateString section_name);
 
 
@@ -206,33 +204,17 @@ class TemplateDictionary {
 
 
   // --- ESCAPE FUNCTORS
-  // Some commonly-used escape functors.
+  // Some commonly-used escape functors.  These just point to the
+  // variable of the same name in template_modifiers.h.  For the full
+  // list of escape functors, and documentation on them, see
+  // template_modifiers.h.
 
-  // Escapes < > " ' & <non-space whitespace> to &lt; &gt; &quot;
-  // &#39; &amp; <space>
-  struct HtmlEscape { std::string operator()(const std::string&) const; };
-  static HtmlEscape html_escape;
-
-  // Same as HtmlEscape but leaves all whitespace alone. Eg. for <pre>..</pre>
-  struct PreEscape { std::string operator()(const std::string&) const; };
-  static PreEscape pre_escape;
-
-  // Escapes &nbsp; to &#160;
-  struct XmlEscape { std::string operator()(const std::string&) const; };
-  static XmlEscape xml_escape;
-
-  // Escapes " ' \ <CR> <LF> <BS> to \" \' \\ \r \n \b
-  struct JavascriptEscape { std::string operator()(const std::string&) const; };
-  static JavascriptEscape javascript_escape;
-
-  // Escapes characters not in [0-9a-zA-Z.,_:*/~!()-] as %-prefixed hex.
-  // Space is encoded as a +.
-  struct UrlQueryEscape { std::string operator()(const std::string&) const; };
-  static UrlQueryEscape url_query_escape;
-
-  // Escapes " \ / <FF> <CR> <LF> <BS> <TAB> to \" \\ \/ \f \r \n \b \t
-  struct JsonEscape { std::string operator()(const std::string&) const; };
-  static JsonEscape json_escape;
+  static const template_modifiers::HtmlEscape& html_escape;
+  static const template_modifiers::PreEscape& pre_escape;
+  static const template_modifiers::XmlEscape& xml_escape;
+  static const template_modifiers::JavascriptEscape& javascript_escape;
+  static const template_modifiers::UrlQueryEscape& url_query_escape;
+  static const template_modifiers::JsonEscape& json_escape;
 
 
   // --- DEBUGGING TOOLS
@@ -257,30 +239,57 @@ class TemplateDictionary {
   friend class VariableTemplateNode;  // for access to GetSectionValue(), etc.
   friend class TemplateNode;          // for access to ShouldAnnotateOutput()
   friend class Template;              // for access to ShouldAnnotateOutput()
+  // For unittesting code using a TemplateDictionary.
+  friend class TemplateDictionaryPeer;
+  // TODO(csilvers): get these classes to use the peer class
   friend class TemplateDictionaryUnittest;
   friend class TemplateSetGlobalsUnittest;
 
   // The dictionary types
-  struct streq {
-    bool operator()(const char* s1, const char* s2) const {
-      return ((s1 == 0 && s2 == 0) ||
-              (s1 && s2 && *s1 == *s2 && strcmp(s1, s2) == 0));
+  // Normally we'd put this code directly in TemplateStringHash, below, but
+  // TemplateString friendship rules require the code to be at this level.
+  inline static size_t HashTemplateString(const TemplateString& s) {
+    // This is a terrible hash-function
+    unsigned long r = 0;
+    for (int i = 0; i < s.length_; i++)
+      r = 5 * r + s.ptr_[i];
+    return static_cast<size_t>(r);
+  }
+  struct TemplateStringHash {
+    size_t operator()(const TemplateString& s) const {
+      return HashTemplateString(s);
     }
   };
+
+  inline static bool CompareTemplateString(const TemplateString& a,
+                                           const TemplateString& b) {
+    return (a.length_ == b.length_ && memcmp(a.ptr_, b.ptr_, a.length_) == 0);
+  }
+  struct TemplateStringEqual {
+    bool operator()(const TemplateString& a, const TemplateString& b) const {
+      return CompareTemplateString(a, b);
+    }
+  };
+
+  // This is a helper function to insert <key,value> into m.  Normally,
+  // we'd just use m[key] == value, but hash_map rules require
+  // TemplateString::operator== and default constructor to be public for
+  // that to compile, and we'd rather now allow that.
+  template<typename ValueType>
+  static void HashInsert(@ac_cv_cxx_hash_namespace@::hash_map<TemplateString, ValueType,
+                                  TemplateStringHash, TemplateStringEqual>* m,
+                         TemplateString key, ValueType value);
+
   typedef std::vector<TemplateDictionary *>  DictVector;
-  typedef HASH_NAMESPACE::hash_map<const char*, const char*,
-                                   HASH_NAMESPACE::hash<const char*>, streq>
-     VariableDict;
-  typedef HASH_NAMESPACE::hash_map<const char*, DictVector*,
-                                   HASH_NAMESPACE::hash<const char*>, streq>
-     SectionDict;
-  typedef HASH_NAMESPACE::hash_map<const char*, DictVector*,
-                                   HASH_NAMESPACE::hash<const char*>, streq>
-     IncludeDict;
+  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, TemplateString,
+                   TemplateStringHash, TemplateStringEqual> VariableDict;
+  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, DictVector*,
+                   TemplateStringHash, TemplateStringEqual> SectionDict;
+  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, DictVector*,
+                   TemplateStringHash, TemplateStringEqual> IncludeDict;
   // This is used only for global_dict_, which is just like a VariableDict
-  typedef HASH_NAMESPACE::hash_map<const char*, const char*,
-                                   HASH_NAMESPACE::hash<const char*>, streq>
-     GlobalDict;
+  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, TemplateString,
+                   TemplateStringHash, TemplateStringEqual> GlobalDict;
 
   // Constructor created for all children dictionaries. This includes
   // both a pointer to the parent dictionary and also the the
@@ -300,8 +309,10 @@ class TemplateDictionary {
   bool is_rootlevel_template() const { return template_global_dict_owner_; }
 
   // Utility functions for copying a string into the arena.
-  const char *Memdup(const char* s, int slen);
-  const char *Memdup(const TemplateString& s) {return Memdup(s.ptr_, s.length_);}
+  TemplateString Memdup(const char* s, int slen);
+  TemplateString Memdup(const TemplateString& s) {
+    return Memdup(s.ptr_, s.length_);
+  }
 
   // Used for recursive MakeCopy calls.
   TemplateDictionary* InternalMakeCopy(const std::string& name_of_copy,
@@ -315,13 +326,14 @@ class TemplateDictionary {
   bool ShouldAnnotateOutput() const;
   const char* GetTemplatePathStart() const;
 
-  // Needed because Template::Expand() and its children try to call these
+  // How Template::Expand() and its children access the template-dictionary.
+  // TODO(csilvers): have inputs be a TemplateString rather than a string&.
+  // TODO(csilvers): have GetSectionValue return a TemplateString.
   const char *GetSectionValue(const std::string& variable) const;
   bool IsHiddenSection(const std::string& name) const;
   const DictVector& GetDictionaries(const std::string& section_name) const;
   bool IsHiddenTemplate(const std::string& name) const;
-  const char *GetIncludeTemplateName(const std::string& variable, int dictnum)
-      const;
+  const char *GetIncludeTemplateName(const std::string& variable, int dictnum) const;
   const DictVector& GetTemplateDictionaries(const std::string& include_name) const;
 
 
@@ -363,44 +375,6 @@ class TemplateDictionary {
   TemplateDictionary(const TemplateDictionary&);
   void operator=(const TemplateDictionary&);
 };
-
-
-// Alas, template code needs to be defined in a .h file, not a .cc
-
-template<class EscapeFunctor>
-void TemplateDictionary::SetEscapedValue(TemplateString variable,
-                                         TemplateString value,
-                                         EscapeFunctor escape_functor) {
-  std::string escval(escape_functor(std::string(value.ptr_, value.length_)));
-  SetValue(variable, escval);
-}
-
-template<class EscapeFunctor>
-void TemplateDictionary::SetEscapedFormattedValue(TemplateString variable,
-                                                  EscapeFunctor escape_functor,
-                                                  const char* format, ...) {
-  char scratch[1024], *buffer;
-  va_list ap;
-  va_start(ap, format);
-  const int buflen = StringAppendV(scratch, &buffer, format, ap);
-  va_end(ap);
-
-  std::string escaped_string(escape_functor(std::string(buffer, buflen)));
-  SetValue(variable, escaped_string);
-  if (buffer != scratch)
-    delete[] buffer;
-}
-
-template<class EscapeFunctor>
-void TemplateDictionary::SetEscapedValueAndShowSection(
-    const TemplateString variable, const TemplateString value,
-    EscapeFunctor escape_functor, const TemplateString section_name) {
-  std::string escval(escape_functor(std::string(value.ptr_, value.length_)));
-  if (escval.length() == 0)    // no value: the do-nothing case
-    return;
-  TemplateDictionary* sub_dict = AddSectionDictionary(section_name);
-  sub_dict->SetValue(variable, escval);
-}
 
 @ac_google_end_namespace@
 

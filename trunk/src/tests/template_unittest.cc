@@ -55,7 +55,7 @@
 # endif
 #endif
 #include <vector>         // for MissingListType, SyntaxListType
-#include <google/ctemplate/hash_set.h>       // for NameListType
+#include HASH_SET_H       // (defined in config.h)  for NameListType
 #include "google/template.h"
 #include "google/template_dictionary.h"
 #include "google/template_namelist.h"
@@ -228,6 +228,13 @@ class TemplateUnittest {
 
     tpl = StringToTemplate("hi {{VAR:h:h}} lo", STRIP_WHITESPACE);
     AssertExpandIs(tpl, &dict, "hi yo&amp;amp;yo lo", true);
+
+    // Test special HTML escaping
+    dict.SetValue("URL_VAR", "javascript:void");
+    dict.SetValue("SNIPPET_VAR", "<b>foo & bar</b>");
+    tpl = StringToTemplate("hi {{VAR:H=attribute}} {{URL_VAR:H=url}} "
+                           "{{SNIPPET_VAR:H=snippet}} lo", STRIP_WHITESPACE);
+    AssertExpandIs(tpl, &dict, "hi yo_yo # <b>foo & bar</b> lo", true);
 
     // Test with no modifiers.
     tpl = StringToTemplate("hi {{VAR}} lo", STRIP_WHITESPACE);
