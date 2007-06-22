@@ -39,13 +39,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <assert.h>
 #include <vector>
 #include <string>
 #include <algorithm>      // for sort
 #include <sys/types.h>
+#ifdef HAVE_DIRENT_H
 #include <dirent.h>       // for readdir
+#endif
 #include <google/template_from_string.h>
 #include <google/template_dictionary.h>
 
@@ -133,6 +137,8 @@ class TemplateFromStringUnittest {
   }
 
   static void TestGetTemplate() {
+    TemplateDictionary dict("dict");
+
     // Tests the cache
     const char* const tpltext = "{This is perfectly valid} yay!";
     const char* const tpltext2 = "This will be ignored";
@@ -148,6 +154,22 @@ class TemplateFromStringUnittest {
     ASSERT(tpl1 == tpl2);
     ASSERT(tpl3 == tpl4);
     ASSERT(tpl1 != tpl3);
+    AssertExpandIs(tpl1, &dict, tpltext);
+    AssertExpandIs(tpl2, &dict, tpltext);
+    AssertExpandIs(tpl3, &dict, tpltext);
+    AssertExpandIs(tpl4, &dict, tpltext);
+
+    // Tests our mechanism for ignoring the cache (first arg is empty-string)
+    Template* tpl1b = TemplateFromString::GetTemplate(
+        "", tpltext, DO_NOT_STRIP);
+    Template* tpl2b = TemplateFromString::GetTemplate(
+        "", tpltext2, DO_NOT_STRIP);
+    ASSERT(tpl1b != tpl2b);
+    AssertExpandIs(tpl1b, &dict, tpltext);
+    AssertExpandIs(tpl2b, &dict, tpltext2);
+    // When you don't cache the template, you have to delete it!
+    delete tpl1b;
+    delete tpl2b;
 
     // Tests that syntax errors cause us to return NULL
     Template* tpl5 = StringToTemplate("{{This has spaces in it}}", DO_NOT_STRIP);

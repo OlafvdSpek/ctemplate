@@ -40,7 +40,9 @@
 #include <time.h>
 #include <ctype.h>          // for isspace()
 #include <sys/stat.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>         // for stat() and open() and getcwd()
+#endif
 #include <string.h>
 #include <iostream>         // for logging
 #include <iomanip>          // for indenting in Dump()
@@ -78,6 +80,9 @@ namespace {
 // Mutexes protecting the globals below.  First protects g_use_current_dict
 // and template_root_directory_, second protects g_template_cache.
 // Third protects vars_seen in WriteOneHeaderEntry, below.
+// Lock priority invariant: you should never acquire a Template::mutex_
+// while holding one of these mutexes.
+// TODO(csilvers): assert this in the codebase.
 static Mutex g_static_mutex;
 static Mutex g_cache_mutex;
 static Mutex g_header_mutex;
@@ -267,24 +272,28 @@ struct TemplateToken {
 static void EmitModifiedString(const ModifierAndNonces& modifiers,
                                const char* in, int inlen,
                                ExpandEmitter* outbuf) {
-  // If there's more than one modifiers, we need to store the
-  // intermediate results in a temp-buffer.  We use a string.
-  string scratch;
+  string result;
   if (modifiers.size() > 1) {
-    // We'll assume that each modifier adds about 12% to the input size.  We
-    // should exponentiate by |modifiers| but we just multiply, to save time.
-    scratch.reserve((inlen + inlen/8) * (modifiers.size()-1) + 16);
-    StringEmitter scratchbuf(&scratch);
-    // Each time through, we append the latest version of the string to
-    // scratch, and keep a pointer pointing to the most recent version.
-    // Except for (rare!) vars with 3+ modifiers, this loop at most once.
-    for (ModifierAndNonces::const_iterator it = modifiers.begin();
+    // If there's more than one modifiers, we need to store the
+    // intermediate results in a temp-buffer.  We use a string.
+    // We'll assume that each modifier adds about 12% to the input
+    // size.
+    result.reserve((inlen + inlen/8) + 16);
+    StringEmitter scratchbuf(&result);
+    modifiers.front().first->Modify(in, inlen, &scratchbuf,
+                                    modifiers.front().second);
+    // Only used when modifiers.size() > 2
+    for (ModifierAndNonces::const_iterator it = modifiers.begin()+1;
          it != modifiers.end()-1;  ++it) {
-      const int startpos = scratch.size();  // where we start appendend
-      it->first->Modify(in, inlen, &scratchbuf, it->second);
-      in = scratch.data() + startpos;       // point to the new "in"
-      inlen = scratch.size() - startpos;
+      string output_of_this_modifier;
+      output_of_this_modifier.reserve(result.size() + result.size()/8 + 16);
+      StringEmitter scratchbuf2(&output_of_this_modifier);
+      it->first->Modify(result.c_str(), result.size(),
+                        &scratchbuf2, it->second);
+      result.swap(output_of_this_modifier);
     }
+    in = result.data();
+    inlen = result.size();
   }
   // For the last modifier, we can write directly into outbuf
   assert(!modifiers.empty());
@@ -626,6 +635,8 @@ class SectionTemplateNode : public TemplateNode {
   // section, or template to the list of nodes contained in this
   // section.  Returns true iff we really added a node and didn't just
   // end a section or hit a syntax error in the template file.
+  // You should hold a write-lock on my_template->mutex_ when calling this.
+  // (unless you're calling it from a constructor).
   bool AddSubnode(Template *my_template);
 
   // Expands a section node as follows:
@@ -932,6 +943,8 @@ string *Template::template_root_directory_ = NULL;
 // inappropriate characters in a name, not finding the closing curly
 // braces, etc.) an error message is logged, the error state of the
 // template is set, and a NULL token is returned.  Updates parse_state_.
+// You should hold a write-lock on my_template->mutex_ when calling this
+// (unless you're calling it from a constructor).
 TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
   Template::ParseState* ps = &my_template->parse_state_;   // short abbrev.
   const char* token_start = ps->bufstart;
@@ -1120,9 +1133,11 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
 // Template::~Template()
 // Template::AssureGlobalsInitialized()
 // Template::GetTemplate()
-//   Calls ReloadIfChanged to load the template the first time.
-//   The constructor is private; GetTemplate() is the factory
-//   method used to actually construct a new template if needed.
+//   Calls ReloadIfChanged to load the template the first time.  The
+//   constructor is private; GetTemplate() is the factory method
+//   used to actually construct a new template if needed -- it's the
+//   only thing that calls the template constructor -- and where we
+//   actually call ReloadIfChanged() (based on state_ == TS_EMPTY).
 // ----------------------------------------------------------------------
 
 Template::Template(const string& filename, Strip strip)
@@ -1134,10 +1149,7 @@ Template::Template(const string& filename, Strip strip)
   // of calling Expand() or other Template classes that access globals.
   AssureGlobalsInitialized();
 
-  // phase_ indicates what type of thing we expect next during tokenization.
-  // We start off expecting text, hence the initial value is GETTING_TEXT
-
-  VLOG(2) << endl << "Constructing Template for " << template_file() << endl;
+  VLOG(2) << "Constructing Template for " << template_file();
 
   // Preserve whitespace in Javascript files because carriage returns
   // can convey meaning for comment termination and closures
@@ -1145,8 +1157,6 @@ Template::Template(const string& filename, Strip strip)
        !strcmp(filename.c_str() + filename.length() - 3, ".js") ) {
     strip = STRIP_BLANK_LINES;
   }
-
-  ReloadIfChanged();
 }
 
 Template::~Template() {
@@ -1173,26 +1183,33 @@ Template *Template::GetTemplate(const string& filename, Strip strip) {
   // No need to have the cache-mutex acquired for this step
   string abspath(PathJoin(template_root_directory(), filename));
 
-  MutexLock ml(&g_cache_mutex);
-  if (g_template_cache == NULL)
-    g_template_cache = new TemplateCache;
+  Template* tpl = NULL;
+  {
+    MutexLock ml(&g_cache_mutex);
+    if (g_template_cache == NULL)
+      g_template_cache = new TemplateCache;
 
-  Template *tpl = (*g_template_cache)[pair<string, Strip>(abspath, strip)];
-  if (tpl) {
-    // Note: if the status is TS_ERROR here, we don't attempt
-    // to reload the template file, but we don't return
-    // the template object either
-    if (tpl->state() == TS_RELOAD) {
-      tpl->ReloadIfChanged();
+    tpl = (*g_template_cache)[pair<string, Strip>(abspath, strip)];
+    if (!tpl) {
+      tpl = new Template(abspath, strip);
+      (*g_template_cache)[pair<string, Strip>(abspath, strip)] = tpl;
     }
-  } else {
-    tpl = new Template(abspath, strip);
-    (*g_template_cache)[pair<string, Strip>(abspath, strip)] = tpl;
   }
 
-  // if the statis is not TS_READY, then it is TS_ERROR at this
-  // point. If it is TS_ERROR, we leave the state as is, but return
-  // NULL. We won't try to load the template file again until the
+  // Even though we only read state() here, not write it, we acquire
+  // the lock in write-mode in case we have to call ReloadIfChanged.
+  WriterMutexLock ml(tpl->mutex_);
+
+  // Note: if the status is TS_ERROR here, we don't attempt to reload
+  // the template file, but we don't return the template object
+  // either.  If the state is TS_EMPTY, it means tpl was just constructed
+  // and doesn't have *any* content yet, so we should certainly reload.
+  if (tpl->state() == TS_RELOAD || tpl->state() == TS_EMPTY) {
+    tpl->ReloadIfChangedLocked();
+  }
+
+  // If the state is TS_ERROR, we leave the state as is, but return
+  // NULL.  We won't try to load the template file again until the
   // state gets changed to TS_RELOAD by another call to
   // ReloadAllIfChanged.
   if (tpl->state() != TS_READY) {
@@ -1214,6 +1231,8 @@ Template *Template::GetTemplate(const string& filename, Strip strip) {
 
 // NOTE: BuildTree takes over ownership of input_buffer, and will delete it.
 //       It should have been created via new[].
+// You should hold a write-lock on mutex_ before calling this
+// (unless you're calling it from a constructor).
 bool Template::BuildTree(const char* input_buffer,
                          const char* input_buffer_end) {
   // Assign an arbitrary name to the top-level node
@@ -1331,6 +1350,7 @@ const char *Template::template_file() const {
 
 // ----------------------------------------------------------------------
 // Template::ReloadIfChanged()
+// Template::ReloadIfChangedLocked()
 // Template::ReloadAllIfChanged()
 //    If one template, try immediately to reload it from disk.  If
 //    all templates, just set all their statuses to TS_RELOAD, so
@@ -1341,14 +1361,8 @@ const char *Template::template_file() const {
 //    and parsed it.  It never returns true if filename_ is "".
 // ----------------------------------------------------------------------
 
-bool Template::ReloadIfChanged() {
+bool Template::ReloadIfChangedLocked() {
   if (filename_.empty()) return false;
-
-  // This entire routine is protected by mutex_ so when it's called
-  // from different threads, they don't stomp on tree_ and state_.
-  // This is still not perfect, since set_filename() could stomp
-  // on filename_ while we're reading it, but it's good enough.
-  WriterMutexLock ml(mutex_);
 
   struct stat statbuf;
   if (stat(filename_.c_str(), &statbuf) != 0) {
@@ -1403,35 +1417,62 @@ bool Template::ReloadIfChanged() {
   }
 }
 
+bool Template::ReloadIfChanged() {
+  // ReloadIfChanged() is protected by mutex_ so when it's called from
+  // different threads, they don't stomp on tree_ and state_.
+  WriterMutexLock ml(mutex_);
+  return ReloadIfChangedLocked();
+}
+
 void Template::ReloadAllIfChanged() {
-  MutexLock ml(&g_cache_mutex);   // this protects the static g_template_cache
-  if (g_template_cache == NULL) {
-    return;
+  // This is slightly annoying: we copy all the template-pointers to
+  // a vector, so we don't have to hold g_cache_mutex while messing
+  // with the templates (which would violate our lock invariant).
+  vector<Template*> templates_in_cache;
+  {
+    MutexLock ml(&g_cache_mutex);   // this protects the static g_template_cache
+    if (g_template_cache == NULL) {
+      return;
+    }
+    for (TemplateCache::const_iterator iter = g_template_cache->begin();
+         iter != g_template_cache->end();
+         ++iter) {
+      templates_in_cache.push_back(iter->second);
+    }
   }
-  for (TemplateCache::const_iterator iter = g_template_cache->begin();
-       iter != g_template_cache->end();
+  for (vector<Template*>::iterator iter = templates_in_cache.begin();
+       iter != templates_in_cache.end();
        ++iter) {
-    (*iter).second->set_state(TS_RELOAD);
+    WriterMutexLock ml((*iter)->mutex_);
+    (*iter)->set_state(TS_RELOAD);
   }
 }
 
 // ----------------------------------------------------------------------
 // Template::ClearCache()
-//   Deletes all the objects in the template cache
+//   Deletes all the objects in the template cache.  Note: it's
+//   dangerous to clear the cache if other threads are still
+//   referencing the templates that are stored in it!
 // ----------------------------------------------------------------------
 
 void Template::ClearCache() {
-  MutexLock ml(&g_cache_mutex);   // this protects the static g_template_cache
-  if (g_template_cache == NULL) {
-    return;
+  // We clear the cache by swapping it with an empty cache.  This lets
+  // us delete the items in the cache at our leisure without needing
+  // to hold g_cache_mutex.
+  TemplateCache tmp_cache;
+  {
+    MutexLock ml(&g_cache_mutex);  // this protects the static g_template_cache
+    if (g_template_cache == NULL) {
+      return;
+    }
+    g_template_cache->swap(tmp_cache);   // now g_template_cache is empty
   }
-  for (TemplateCache::const_iterator iter = g_template_cache->begin();
-       iter != g_template_cache->end();
+  // Now delete everything we've removed from the cache.
+  for (TemplateCache::const_iterator iter = tmp_cache.begin();
+       iter != tmp_cache.end();
        ++iter) {
-    delete (*iter).second;
+    delete iter->second;
   }
-  delete g_template_cache;
-  g_template_cache = NULL;
 }
 
 // ----------------------------------------------------------------------

@@ -64,7 +64,7 @@ CTEMPLATE_SYMBOLS = '[^A-Za-z](Template|TemplateDictionary|TemplateNamelist|Temp
 
 lib_LTLIBRARIES += libctemplate.la
 libctemplate_la_SOURCES = $(googleinclude_HEADERS) src/config.h \
-	src/base/arena.h src/base/arena.cc src/base/mutex.h src/base/mutex.cc \
+	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
 	src/template_namelist.cc src/template_from_string.cc
 libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG

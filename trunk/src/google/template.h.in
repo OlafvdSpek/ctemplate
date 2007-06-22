@@ -201,6 +201,10 @@ class Template {
               const TemplateDictionary *dictionary,
               const TemplateDictionary *force_annotate_dict) const;
 
+  // Internal version of ReloadIfChanged, used when the function already
+  // has a write-lock on mutex_.
+  bool ReloadIfChangedLocked();
+
   // set_state
   //   Sets the state of the template.  Used during BuildTree().
   void set_state(TemplateState new_state);

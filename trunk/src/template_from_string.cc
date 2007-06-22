@@ -41,6 +41,9 @@
 
 _START_GOOGLE_NAMESPACE_
 
+// Lock priority invariant: you should never acquire a
+// TemplateFromString::mutex_ while holding this mutex.
+// TODO(csilvers): assert this in the codebase.
 static Mutex g_cache_mutex;
 
 using std::string;
@@ -53,11 +56,11 @@ using HASH_NAMESPACE::hash_map;
 // the template text is taken from the second parameter. After that, the
 // object is identical to a Template object, except that it cannot be
 // "reloaded."
-TemplateFromString::TemplateFromString(const string& template_name,
+TemplateFromString::TemplateFromString(const string& cache_key,
                                        const string& template_text,
                                        Strip strip)
     : Template("", strip) {
-  filename_ = template_name;    // for cache and reporting purposes only
+  filename_ = cache_key;    // for cache and reporting purposes only
 
   // We know that InsertFile never writes more output than it gets input.
   // While we allocate buffer here, BuildTree takes ownership and deletes it.
@@ -94,27 +97,30 @@ static TemplateFromStringCache *g_template_from_string_cache = NULL;
 
 // TemplateFromString::GetTemplate
 // Makes sure the template cache has been created and then tries to
-// retrieve a TemplateFromString object from it via the template_name.
-TemplateFromString *TemplateFromString::GetTemplate(const string& template_name,
+// retrieve a TemplateFromString object from it via the cache_key.
+TemplateFromString *TemplateFromString::GetTemplate(const string& cache_key,
                                                     const string& template_text,
                                                     Strip strip) {
-  // Only perform this method when you have the lock so multiple threads
-  // don't conflict over inserting and retrieving into the cache
-  MutexLock ml(&g_cache_mutex);
-  if (g_template_from_string_cache == NULL) {
-    g_template_from_string_cache = new TemplateFromStringCache;
+  TemplateFromString *tpl = NULL;
+  if (cache_key.empty()) {   // user doesn't want to use the cache
+    tpl = new TemplateFromString(cache_key, template_text, strip);
+  } else {
+    MutexLock ml(&g_cache_mutex);
+    if (g_template_from_string_cache == NULL) {
+      g_template_from_string_cache = new TemplateFromStringCache;
+    }
+    // If the object isn't really a TemplateFromString this will be a cache miss
+    tpl = (*g_template_from_string_cache)[pair<string,Strip>(cache_key, strip)];
+
+    // If we didn't find one, then create one and store it in the cache
+    if (!tpl) {
+      tpl = new TemplateFromString(cache_key, template_text, strip);
+      (*g_template_from_string_cache)[pair<string, Strip>(cache_key, strip)] =
+          tpl;
+    }
   }
 
-  // If the object isn't really a TemplateFromString, this will be a cache miss
-  TemplateFromString *tpl =
-    (*g_template_from_string_cache)[pair<string, Strip>(template_name, strip)];
-
-  // If we didn't find one, then create one and store it in the cache
-  if (!tpl) {
-    tpl = new TemplateFromString(template_name, template_text, strip);
-    (*g_template_from_string_cache)[pair<string, Strip>(template_name, strip)] =
-      tpl;
-  }
+  WriterMutexLock ml(tpl->mutex_);   // to access state()
 
   // state_ can be TS_RELOAD if ReloadAllIfChanged() touched this file.
   // That's fine; we'll just ignore the reload directive for this guy.

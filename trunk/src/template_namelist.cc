@@ -33,7 +33,9 @@
 #include "config.h"
 #include <assert.h>
 #include <stdlib.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>              // for access()
+#endif
 #include <time.h>                // for time_t
 #include <sys/stat.h>            // for stat()
 #include <string>
