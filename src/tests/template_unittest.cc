@@ -289,6 +289,24 @@ class TemplateUnittest {
     // Check we don't allow modifiers on sections
     tpl = StringToTemplate("hi {{#VAR:h}} lo {{/VAR}}", STRIP_WHITESPACE);
     ASSERT(tpl == NULL);
+
+    // Test when expanded grows by more than 12% per modifier.
+    dict.SetValue("VAR", "http://a.com?b=c&d=e&f=g&q=a>b");
+    tpl = StringToTemplate("{{VAR:u:j:h}}",
+                           STRIP_WHITESPACE);
+    AssertExpandIs(tpl, &dict,
+                   "http%3A//a.com%3Fb%3Dc%26d%3De%26f%3Dg%26q%3Da%3Eb",
+                   true);
+
+    // As above with 4 modifiers.
+    dict.SetValue("VAR", "http://a.com?b=c&d=e&f=g&q=a>b");
+    tpl = StringToTemplate("{{VAR:u:j:h:h}}",
+                           STRIP_WHITESPACE);
+    AssertExpandIs(tpl, &dict,
+                   "http%3A//a.com%3Fb%3Dc%26d%3De%26f%3Dg%26q%3Da%3Eb",
+                   true);
+
+
   }
 
   static void TestSection() {

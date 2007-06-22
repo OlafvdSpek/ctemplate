@@ -4,7 +4,7 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 0.6, opensource@google.com)
+AC_INIT(ctemplate, 0.6.1, opensource@google.com)
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
@@ -58,6 +58,7 @@ AC_SUBST(ac_google_start_namespace)
 AC_SUBST(ac_google_end_namespace)
 AC_SUBST(ac_cv_cxx_hash_namespace)
 AC_SUBST(ac_cv_cxx_hash_map)
+AC_SUBST(ac_cv_cxx_hash_set)
 if test "$ac_cv___attribute__" == "yes"; then
    AC_SUBST(ac_google_attribute, 1)
 else

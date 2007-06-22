@@ -32,6 +32,75 @@
 <br>
 
 
+<h2> Simple Example </h2>
+
+<p>One reason this example is so simple is that it doesn't even
+require a separate template file, but instead uses
+<code>TemplateFromString</code>.  It also doesn't use sections or
+template-includes.</p>
+
+<pre class=example>
+
+int main() {
+  static const char template_text[] =
+    "ERROR: {{FUNCTION}}({{ARGS}}) returned {{ERROR_CODE}}: {{ERROR_MESSAGE}}\n";
+  Template* tpl = TemplateFromString::GetTemplate("error_msg_tpl", template_text,
+                                                  DO_NOT_STRIP);
+  FILE* fp = fopen(argv[1], "r");
+  if (fp == NULL) {
+    int err_no = errno;   // squirrel this away
+    TemplateDictionary dict("error_msg: fopen()");
+    dict.SetValue("FUNCTION", "fopen");
+    dict.SetValue("ARGS", argv[1]);
+    dict.SetIntValue("ERROR_CODE", err_no);
+    dict.SetValue("ERROR_MESSAGE", strerror(err_no));
+
+    string error_text;
+    tpl->Expand(&error_text, &dict);
+    puts(error_text.c_str());
+  }
+}
+
+</pre>
+
+<p>This example is only slightly more complicated: we only print the
+": &lt;error message&gt;" part when the error message isn't the empty
+string.</p>
+
+<pre class=example>
+
+int main() {
+  static const char template_text[] =
+     "ERROR: {{FUNCTION}}({{ARGS}}) returned {{ERROR_CODE}}"
+     "{{#MSG_SECTION}}: {{ERROR_MESSAGE}}{{/MSG_SECTION}}\n";
+  Template* tpl = TemplateFromString::GetTemplate("error_msg", template_text,
+                                                  DO_NOT_STRIP);
+  FILE* fp = fopen(argv[1], "r");
+  if (fp == NULL) {
+    int err_no = errno;   // squirrel this away
+    TemplateDictionary dict("file_error_message");
+    dict.SetValue("FUNCTION", "fopen");
+    dict.SetValue("ARGS", argv[1]);
+    dict.SetIntValue("ERROR_CODE", err_no);
+    if (err_no > 0)
+      dict.SetValueAndShowSection("ERROR_MESSAGE", strerror(err_no),
+                                  "MSG_SECTION");
+
+    string error_text;
+    tpl->Expand(&error_text, &dict);
+    puts(error_text.c_str());
+  }
+}
+
+</pre>
+
+<p>This maybe-show-text functionality is one way the template
+machinery is more powerful than just using <code>printf</code>.
+Another nice property of templates is you can reuse the same variable
+multiple times in your template string.  You can also define the
+variable values in any order.</p>
+
+
 <h2> Search Results Page </h2>
 
 <p>Here is an example template that could be used to format a Google

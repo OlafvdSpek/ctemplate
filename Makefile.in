@@ -90,7 +90,7 @@ am__DEPENDENCIES_1 =
 libctemplate_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am__objects_1 =
 am_libctemplate_la_OBJECTS = $(am__objects_1) libctemplate_la-arena.lo \
-	libctemplate_la-mutex.lo libctemplate_la-template.lo \
+	libctemplate_la-template.lo \
 	libctemplate_la-template_dictionary.lo \
 	libctemplate_la-template_modifiers.lo \
 	libctemplate_la-template_namelist.lo \
@@ -98,7 +98,6 @@ am_libctemplate_la_OBJECTS = $(am__objects_1) libctemplate_la-arena.lo \
 libctemplate_la_OBJECTS = $(am_libctemplate_la_OBJECTS)
 libctemplate_nothreads_la_LIBADD =
 am__objects_2 = $(am__objects_1) libctemplate_nothreads_la-arena.lo \
-	libctemplate_nothreads_la-mutex.lo \
 	libctemplate_nothreads_la-template.lo \
 	libctemplate_nothreads_la-template_dictionary.lo \
 	libctemplate_nothreads_la-template_modifiers.lo \
@@ -326,6 +325,7 @@ ac_ct_RANLIB = @ac_ct_RANLIB@
 ac_ct_STRIP = @ac_ct_STRIP@
 ac_cv_cxx_hash_map = @ac_cv_cxx_hash_map@
 ac_cv_cxx_hash_namespace = @ac_cv_cxx_hash_namespace@
+ac_cv_cxx_hash_set = @ac_cv_cxx_hash_set@
 ac_google_attribute = @ac_google_attribute@
 ac_google_end_namespace = @ac_google_end_namespace@
 ac_google_namespace = @ac_google_namespace@
@@ -435,7 +435,7 @@ noinst_SCRIPTS = src/tests/make_tpl_varnames_h_unittest.sh
 # These are the symbols (classes, mostly) we want to export from our library
 CTEMPLATE_SYMBOLS = '[^A-Za-z](Template|TemplateDictionary|TemplateNamelist|TemplateFromString|TemplateString|TemplateState|Strip)[^A-Za-z]'
 libctemplate_la_SOURCES = $(googleinclude_HEADERS) src/config.h \
-	src/base/arena.h src/base/arena.cc src/base/mutex.h src/base/mutex.cc \
+	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
 	src/template_namelist.cc src/template_from_string.cc
 
@@ -723,14 +723,12 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-arena.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-mutex.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template_dictionary.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template_from_string.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template_modifiers.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template_namelist.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-arena.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-mutex.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-template.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-template_dictionary.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-template_from_string.Plo@am__quote@
@@ -779,13 +777,6 @@ libctemplate_la-arena.lo: src/base/arena.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_la-arena.lo `test -f 'src/base/arena.cc' || echo '$(srcdir)/'`src/base/arena.cc
 
-libctemplate_la-mutex.lo: src/base/mutex.cc
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_la-mutex.lo -MD -MP -MF "$(DEPDIR)/libctemplate_la-mutex.Tpo" -c -o libctemplate_la-mutex.lo `test -f 'src/base/mutex.cc' || echo '$(srcdir)/'`src/base/mutex.cc; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_la-mutex.Tpo" "$(DEPDIR)/libctemplate_la-mutex.Plo"; else rm -f "$(DEPDIR)/libctemplate_la-mutex.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/base/mutex.cc' object='libctemplate_la-mutex.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_la-mutex.lo `test -f 'src/base/mutex.cc' || echo '$(srcdir)/'`src/base/mutex.cc
-
 libctemplate_la-template.lo: src/template.cc
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_la-template.lo -MD -MP -MF "$(DEPDIR)/libctemplate_la-template.Tpo" -c -o libctemplate_la-template.lo `test -f 'src/template.cc' || echo '$(srcdir)/'`src/template.cc; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_la-template.Tpo" "$(DEPDIR)/libctemplate_la-template.Plo"; else rm -f "$(DEPDIR)/libctemplate_la-template.Tpo"; exit 1; fi
@@ -827,13 +818,6 @@ libctemplate_nothreads_la-arena.lo: src/base/arena.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/base/arena.cc' object='libctemplate_nothreads_la-arena.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_la-arena.lo `test -f 'src/base/arena.cc' || echo '$(srcdir)/'`src/base/arena.cc
-
-libctemplate_nothreads_la-mutex.lo: src/base/mutex.cc
-@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_la-mutex.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_la-mutex.Tpo" -c -o libctemplate_nothreads_la-mutex.lo `test -f 'src/base/mutex.cc' || echo '$(srcdir)/'`src/base/mutex.cc; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_nothreads_la-mutex.Tpo" "$(DEPDIR)/libctemplate_nothreads_la-mutex.Plo"; else rm -f "$(DEPDIR)/libctemplate_nothreads_la-mutex.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/base/mutex.cc' object='libctemplate_nothreads_la-mutex.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_la-mutex.lo `test -f 'src/base/mutex.cc' || echo '$(srcdir)/'`src/base/mutex.cc
 
 libctemplate_nothreads_la-template.lo: src/template.cc
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_la-template.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_la-template.Tpo" -c -o libctemplate_nothreads_la-template.lo `test -f 'src/template.cc' || echo '$(srcdir)/'`src/template.cc; \

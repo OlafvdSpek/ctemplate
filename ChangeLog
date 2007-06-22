@@ -51,3 +51,10 @@ Sat Jun  9 22:34:52 2007  Google Inc. <opensource@google.com>
 	* New modifiers for url-escaping, attribute-cleansing, etc (ribrdb)
 	* Annotations now include modifier information (csilvers)
 	* Support embedded NULs in template names and values (csilvers)
+
+Thu Jun 21 14:02:32 2007  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.6.1 release
+	* Bugfix: data corruption bug with >2 template modifiers (jmacgill)
+	* Bugfix: syntax error in template-namelist: configure-bug (csilvers)
+	* Bugfix: improve lock hygenie to avoid potential deadlock (csilvers)
