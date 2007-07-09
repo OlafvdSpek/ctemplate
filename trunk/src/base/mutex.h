@@ -31,6 +31,7 @@
  * Author: Craig Silverstein.
  *
  * A simple mutex wrapper, supporting locks and read-write locks.
+ * You should assume the locks are *not* re-entrant.
  *
  * To use: you should define the following macros in your configure.ac:
  *   ACX_PTHREAD
@@ -48,11 +49,14 @@
 #include "config.h"           // to figure out pthreads support
 
 #if defined(NO_THREADS)
-  typedef int MutexType;      // some dummy type; it won't be used
+  typedef int MutexType;      // to keep a lock-count
 #elif defined(HAVE_PTHREAD) && defined(HAVE_RWLOCK)
-  // Needed for pthread_rwlock_*.  If it causes problems, you could take
-  // it out, but then you'd have to unset HAVE_RWLOCK (at least on linux).
-# define _XOPEN_SOURCE 500    // needed to get the rwlock calls
+  // Needed for pthread_rwlock_*.  If it causes problems, you could take it
+  // out, but then you'd have to unset HAVE_RWLOCK (at least on linux -- it
+  // *does* cause problems for FreeBSD, but isn't needed for locking there.)
+# ifndef __FreeBSD__
+#   define _XOPEN_SOURCE 500  // may be needed to get the rwlock calls
+# endif
 # include <pthread.h>
   typedef pthread_rwlock_t MutexType;
 #elif defined(HAVE_PTHREAD)
@@ -79,7 +83,6 @@ class Mutex {
 
   inline void Lock();    // Block if needed until free then acquire exclusively
   inline void Unlock();  // Release a lock acquired via Lock()
-
   // Note that on systems that don't support read-write locks, these may
   // be implemented as synonyms to Lock() and Unlock().  So you can use
   // these for efficiency, but don't use them anyplace where being able
@@ -102,12 +105,18 @@ class Mutex {
 // Now the implementation of Mutex for various systems
 #if defined(NO_THREADS)
 
-Mutex::Mutex() {}
-Mutex::~Mutex() {}
-void Mutex::Lock() {}
-void Mutex::Unlock() {}
-void Mutex::ReaderLock() {}
-void Mutex::ReaderUnlock() {}
+// In debug mode, we'll assert some invariants: we don't unlock if we
+// didn't lock first, the lock is not held when Lock() is called
+// (since we're not re-entrant), etc.  In non-debug mode, we do
+// nothing, for efficiency.  That's why we do everything in an assert.
+#include <assert.h>
+
+Mutex::Mutex() : mutex_(0) { }   // mutex_ counts number of current Lock()s
+Mutex::~Mutex()            { assert(mutex_ == 0); }
+void Mutex::Lock()         { assert(mutex_++ == 0); }
+void Mutex::Unlock()       { assert(mutex_-- == 1); }
+void Mutex::ReaderLock()   { Lock(); }
+void Mutex::ReaderUnlock() { Unlock(); }
 
 #elif defined(HAVE_PTHREAD) && defined(HAVE_RWLOCK)
 

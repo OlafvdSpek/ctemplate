@@ -50,10 +50,13 @@
 #include <stdlib.h>      // for NULL
 #include <string.h>      // for the memcmp() in CompareTemplateString()
 #include <stdarg.h>      // for StringAppendV()
+#include <sys/types.h>   // for size_t
 #include <string>
 #include <vector>
 #include @ac_cv_cxx_hash_map@
 #include <google/template_modifiers.h>
+
+@ac_windows_dllexport_defines@
 
 @ac_google_start_namespace@
 
@@ -85,7 +88,7 @@ class TemplateString {
 };
 
 
-class TemplateDictionary {
+class @ac_windows_dllexport@ TemplateDictionary {
  public:
   // name is used only for debugging.
   // arena is used to store all names and values.  It can be NULL (the
@@ -205,10 +208,9 @@ class TemplateDictionary {
 
   // --- ESCAPE FUNCTORS
   // Some commonly-used escape functors.  These just point to the
-  // variable of the same name in template_modifiers.h.  For the full
-  // list of escape functors, and documentation on them, see
-  // template_modifiers.h.
-
+  // variable of the same name in template_modifiers.h, and are kept
+  // here for backwards compatibility.  For new code, and to get access
+  // to escape functors not listed here, use template_modifiers.h.
   static const template_modifiers::HtmlEscape& html_escape;
   static const template_modifiers::PreEscape& pre_escape;
   static const template_modifiers::XmlEscape& xml_escape;
@@ -246,12 +248,27 @@ class TemplateDictionary {
   friend class TemplateSetGlobalsUnittest;
 
   // The dictionary types
+  inline static int TemplateStringCmp(const TemplateString& a,
+                                      const TemplateString& b) {
+    if (a.length_ == b.length_)
+      return memcmp(a.ptr_, b.ptr_, a.length_);
+    else if (a.length_ < b.length_)   // when a is shorter, 0 means <
+      return memcmp(a.ptr_, b.ptr_, a.length_) <= 0 ? -1 : 1;
+    else                              // when a is longer, 0 means >
+      return memcmp(a.ptr_, b.ptr_, b.length_) < 0 ? -1 : 1;
+  }
+  struct TemplateStringEqual {
+    bool operator()(const TemplateString& a, const TemplateString& b) const {
+      return TemplateStringCmp(a, b) == 0;
+    }
+  };
+
   // Normally we'd put this code directly in TemplateStringHash, below, but
   // TemplateString friendship rules require the code to be at this level.
   inline static size_t HashTemplateString(const TemplateString& s) {
     // This is a terrible hash-function
     unsigned long r = 0;
-    for (int i = 0; i < s.length_; i++)
+    for (size_t i = 0; i < s.length_; i++)
       r = 5 * r + s.ptr_[i];
     return static_cast<size_t>(r);
   }
@@ -259,37 +276,37 @@ class TemplateDictionary {
     size_t operator()(const TemplateString& s) const {
       return HashTemplateString(s);
     }
-  };
-
-  inline static bool CompareTemplateString(const TemplateString& a,
-                                           const TemplateString& b) {
-    return (a.length_ == b.length_ && memcmp(a.ptr_, b.ptr_, a.length_) == 0);
-  }
-  struct TemplateStringEqual {
+    // Less operator for MSVC's hash containers.
     bool operator()(const TemplateString& a, const TemplateString& b) const {
-      return CompareTemplateString(a, b);
+      return TemplateStringCmp(a, b) < 0;
     }
+    // These two public members are required by msvc.  4 and 8 are defaults.
+    static const size_t bucket_size = 4;
+    static const size_t min_buckets = 8;
   };
+#ifdef WIN32
+# define TS_HASH_MAP_(value_type) \
+  @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, value_type, TemplateStringHash>
+#else
+# define TS_HASH_MAP_(value_type) \
+  @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, value_type, TemplateStringHash, TemplateStringEqual>
+#endif
 
   // This is a helper function to insert <key,value> into m.  Normally,
   // we'd just use m[key] == value, but hash_map rules require
   // TemplateString::operator== and default constructor to be public for
   // that to compile, and we'd rather now allow that.
   template<typename ValueType>
-  static void HashInsert(@ac_cv_cxx_hash_namespace@::hash_map<TemplateString, ValueType,
-                                  TemplateStringHash, TemplateStringEqual>* m,
+  static void HashInsert(TS_HASH_MAP_(ValueType)* m,
                          TemplateString key, ValueType value);
 
   typedef std::vector<TemplateDictionary *>  DictVector;
-  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, TemplateString,
-                   TemplateStringHash, TemplateStringEqual> VariableDict;
-  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, DictVector*,
-                   TemplateStringHash, TemplateStringEqual> SectionDict;
-  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, DictVector*,
-                   TemplateStringHash, TemplateStringEqual> IncludeDict;
+  typedef TS_HASH_MAP_(TemplateString) VariableDict;
+  typedef TS_HASH_MAP_(DictVector*) SectionDict;
+  typedef TS_HASH_MAP_(DictVector*) IncludeDict;
   // This is used only for global_dict_, which is just like a VariableDict
-  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, TemplateString,
-                   TemplateStringHash, TemplateStringEqual> GlobalDict;
+  typedef TS_HASH_MAP_(TemplateString) GlobalDict;
+#undef TS_HASH_MAP_
 
   // Constructor created for all children dictionaries. This includes
   // both a pointer to the parent dictionary and also the the
@@ -309,7 +326,7 @@ class TemplateDictionary {
   bool is_rootlevel_template() const { return template_global_dict_owner_; }
 
   // Utility functions for copying a string into the arena.
-  TemplateString Memdup(const char* s, int slen);
+  TemplateString Memdup(const char* s, size_t slen);
   TemplateString Memdup(const TemplateString& s) {
     return Memdup(s.ptr_, s.length_);
   }

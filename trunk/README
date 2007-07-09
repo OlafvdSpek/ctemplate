@@ -1,6 +1,19 @@
 See the documentation in the doc/ directory for information about how
 to use the ctemplate library.
 
+COMPILING
+---------
+To compile test applications with these classes, run ./configure
+followed by make.  To install these header files on your system, run
+'make install'.  (On Windows, the instructions are different; see
+README.windows.)  See INSTALL for more details.
+
+This code should work on any modern C++ system.  It has been tested on
+Linux (Ubuntu, Fedora, RedHat), Solaris 10 x86, FreeBSD 6.0, OS X 10.3
+and 10.4, and Windows under both VC++7 and VC++8.
+
+CTEMPLATE AND THREADS
+---------------------
 The ctemplate library has thread support, so it works properly in a
 threaded environment.  For this to work, if you link libraries with
 -lctemplate you may find you also need to add -pthread (or, on some

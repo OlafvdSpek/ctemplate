@@ -51,6 +51,7 @@
 #include <vector>
 #include <utility>          // for pair
 #include HASH_MAP_H         // defined in config.h
+#include <google/template_pathops.h>
 #include <google/template.h>
 #include <google/template_modifiers.h>
 #include <google/template_dictionary.h>
@@ -86,7 +87,7 @@ namespace {
 static Mutex g_static_mutex;
 static Mutex g_cache_mutex;
 static Mutex g_header_mutex;
-const char * const kDefaultTemplateDirectory = "./";
+const char * const kDefaultTemplateDirectory = ctemplate::kCWD;   // "./"
 const char * const kMainSectionName = "__MAIN__";
 static vector<TemplateDictionary*>* g_use_current_dict;  // vector == {NULL}
 
@@ -95,10 +96,21 @@ class TemplateCacheHash {
  public:
   hash<const char *> string_hash_;
   TemplateCacheHash() : string_hash_() {}
-  bool operator()(const pair<string, Strip>& p) const {
+  size_t operator()(const pair<string, Strip>& p) const {
     // Using + here is silly, but should work ok in practice
     return string_hash_(p.first.c_str()) + static_cast<int>(p.second);
   }
+  // Less operator for MSVC's hash containers.  We make Strip be the
+  // primary key, unintuitively, because it's a bit faster.
+  bool operator()(const pair<string, Strip>& a,
+                  const pair<string, Strip>& b) const {
+    return (a.second == b.second
+            ? a.first < b.first
+            : static_cast<int>(a.second) < static_cast<int>(b.second));
+  }
+  // These two public members are required by msvc.  4 and 8 are defaults.
+  static const size_t bucket_size = 4;
+  static const size_t min_buckets = 8;
 };
 typedef hash_map<pair<string, Strip>, Template*, TemplateCacheHash>
   TemplateCache;
@@ -117,23 +129,6 @@ typedef vector< pair<const template_modifiers::TemplateModifier*, string> >
 
 
 // ----------------------------------------------------------------------
-// PathJoin()
-//    Joins a and b together to form a path.  If 'b' starts with '/'
-//    then we just return b, otherwise a + b.  If 'a' does not end in
-//    a slash we put a slash in the middle.  Does *not* resolve ..'s
-//    and stuff like that, for now.  Not very efficient.
-//    Returns a string which is the joining.
-// ----------------------------------------------------------------------
-
-static string PathJoin(const string& a, const string& b) {
-  if (b.empty()) return a;                    // degenerate case 1
-  if (a.empty()) return b;                    // degenerate case 2
-  if (b[0] == '/') return b;                  // absolute path
-  if (a[a.length()-1] == '/') return a + b;   // 'well-formed' case
-  return a + '/' + b;
-}
-
-// ----------------------------------------------------------------------
 // WriteOneHeaderEntry()
 //    This dumps information about a template that is useful to
 //    make_tpl_varnames_h -- information about the variable and
@@ -149,6 +144,13 @@ class HeaderEntryStringHash {   // not all STL implementations define this...
   size_t operator()(const string& s) const {
     return hash_(s.c_str());    // just convert the string to a const char*
   }
+  // Less operator for MSVC's hash containers.
+  bool operator()(const string& a, const string& b) const {
+    return a < b;
+  }
+  // These two public members are required by msvc.  4 and 8 are defaults.
+  static const size_t bucket_size = 4;
+  static const size_t min_buckets = 8;
 };
 
 static void WriteOneHeaderEntry(string *outstring,
@@ -167,13 +169,7 @@ static void WriteOneHeaderEntry(string *outstring,
     current_file = full_pathname;
 
     // remove the path before the filename
-    string filename;
-    string::size_type pos = full_pathname.rfind('/');
-    if (pos == string::npos) {
-      filename = full_pathname;
-    } else {
-      filename = full_pathname.substr(pos + 1);
-    }
+    string filename(ctemplate::Basename(full_pathname));
 
     prefix = "k";
     bool take_next = true;
@@ -248,9 +244,9 @@ enum TemplateTokenType { TOKENTYPE_UNUSED,        TOKENTYPE_TEXT,
 struct TemplateToken {
   TemplateTokenType type;
   const char* text;
-  int textlen;
+  size_t textlen;
   ModifierAndNonces modifier_plus_values;
-  TemplateToken(TemplateTokenType t, const char* txt, int len,
+  TemplateToken(TemplateTokenType t, const char* txt, size_t len,
                 const ModifierAndNonces* modval)
       : type(t), text(txt), textlen(len) {
     if (modval) modifier_plus_values = *modval;
@@ -270,7 +266,7 @@ struct TemplateToken {
 // This applies the modifiers to the string in/inlen, and writes the end
 // result directly to the end of outbuf.  Precondition: |modifiers| > 0.
 static void EmitModifiedString(const ModifierAndNonces& modifiers,
-                               const char* in, int inlen,
+                               const char* in, size_t inlen,
                                ExpandEmitter* outbuf) {
   string result;
   if (modifiers.size() > 1) {
@@ -387,7 +383,7 @@ class TemplateNode {
 
 class TextTemplateNode : public TemplateNode {
  public:
-  explicit TextTemplateNode(const char* text, int textlen)
+  explicit TextTemplateNode(const char* text, size_t textlen)
       : text_(text), textlen_(textlen) {
     VLOG(2) << "Constructing TextTemplateNode: " << string(text_, textlen_)
             << endl;
@@ -422,7 +418,7 @@ class TextTemplateNode : public TemplateNode {
 
  private:
   const char* text_;   // The text held by this node
-  int textlen_;
+  size_t textlen_;
 };
 
 // ----------------------------------------------------------------------
@@ -691,7 +687,7 @@ class SectionTemplateNode : public TemplateNode {
 
   // The specific methods called used by AddSubnode to add the
   // different types of nodes to this section node.
-  void AddTextNode(const char* text, int textlen);
+  void AddTextNode(const char* text, size_t textlen);
   void AddVariableNode(const TemplateToken& token);
   void AddTemplateNode(const TemplateToken& token, Template* my_template);
   void AddSectionNode(const TemplateToken& token, Template* my_template);
@@ -793,7 +789,7 @@ void SectionTemplateNode::Dump(int level) const {
 
 // --- AddSubnode and its sub-routines
 
-void SectionTemplateNode::AddTextNode(const char* text, int textlen) {
+void SectionTemplateNode::AddTextNode(const char* text, size_t textlen) {
   if (textlen > 0) {  // ignore null text sections
     node_list_.push_back(new TextTemplateNode(text, textlen));
   }
@@ -943,7 +939,7 @@ string *Template::template_root_directory_ = NULL;
 // inappropriate characters in a name, not finding the closing curly
 // braces, etc.) an error message is logged, the error state of the
 // template is set, and a NULL token is returned.  Updates parse_state_.
-// You should hold a write-lock on my_template->mutex_ when calling this
+// You should hold a write-lock on my_template->mutex_ when calling this.
 // (unless you're calling it from a constructor).
 TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
   Template::ParseState* ps = &my_template->parse_state_;   // short abbrev.
@@ -1133,11 +1129,9 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
 // Template::~Template()
 // Template::AssureGlobalsInitialized()
 // Template::GetTemplate()
-//   Calls ReloadIfChanged to load the template the first time.  The
-//   constructor is private; GetTemplate() is the factory method
-//   used to actually construct a new template if needed -- it's the
-//   only thing that calls the template constructor -- and where we
-//   actually call ReloadIfChanged() (based on state_ == TS_EMPTY).
+//   Calls ReloadIfChanged to load the template the first time.
+//   The constructor is private; GetTemplate() is the factory
+//   method used to actually construct a new template if needed.
 // ----------------------------------------------------------------------
 
 Template::Template(const string& filename, Strip strip)
@@ -1149,7 +1143,7 @@ Template::Template(const string& filename, Strip strip)
   // of calling Expand() or other Template classes that access globals.
   AssureGlobalsInitialized();
 
-  VLOG(2) << "Constructing Template for " << template_file();
+  VLOG(2) << "Constructing Template for " << template_file() << endl;
 
   // Preserve whitespace in Javascript files because carriage returns
   // can convey meaning for comment termination and closures
@@ -1157,6 +1151,8 @@ Template::Template(const string& filename, Strip strip)
        !strcmp(filename.c_str() + filename.length() - 3, ".js") ) {
     strip = STRIP_BLANK_LINES;
   }
+
+  ReloadIfChangedLocked();
 }
 
 Template::~Template() {
@@ -1181,7 +1177,7 @@ void Template::AssureGlobalsInitialized() {
 
 Template *Template::GetTemplate(const string& filename, Strip strip) {
   // No need to have the cache-mutex acquired for this step
-  string abspath(PathJoin(template_root_directory(), filename));
+  string abspath(ctemplate::PathJoin(template_root_directory(), filename));
 
   Template* tpl = NULL;
   {
@@ -1196,21 +1192,23 @@ Template *Template::GetTemplate(const string& filename, Strip strip) {
     }
   }
 
-  // Even though we only read state() here, not write it, we acquire
-  // the lock in write-mode in case we have to call ReloadIfChanged.
-  WriterMutexLock ml(tpl->mutex_);
+  // TODO(csilvers): acquire a lock here, because we're looking at
+  // state().  The problem is when GetTemplate is called during
+  // Expand(), the expanding template already holds the read-lock,
+  // so if the expanding template tried to include itself, that
+  // would lead to deadlock.
 
   // Note: if the status is TS_ERROR here, we don't attempt to reload
   // the template file, but we don't return the template object
   // either.  If the state is TS_EMPTY, it means tpl was just constructed
   // and doesn't have *any* content yet, so we should certainly reload.
-  if (tpl->state() == TS_RELOAD || tpl->state() == TS_EMPTY) {
+  if (tpl->state() == TS_SHOULD_RELOAD || tpl->state() == TS_EMPTY) {
     tpl->ReloadIfChangedLocked();
   }
 
   // If the state is TS_ERROR, we leave the state as is, but return
   // NULL.  We won't try to load the template file again until the
-  // state gets changed to TS_RELOAD by another call to
+  // state gets changed to TS_SHOULD_RELOAD by another call to
   // ReloadAllIfChanged.
   if (tpl->state() != TS_READY) {
     return NULL;
@@ -1303,22 +1301,20 @@ bool Template::SetTemplateRootDirectory(const string& directory) {
 
   // This is needed since we access/modify template_root_directory_
   MutexLock ml(&g_static_mutex);
+  *template_root_directory_ = directory;
   // make sure it ends with '/'
-  if (directory.length() == 0 || directory[directory.length()-1] != '/') {
-    *template_root_directory_ = directory + '/';
-  } else {
-    *template_root_directory_ = directory;
-  }
+  ctemplate::NormalizeDirectory(template_root_directory_);
   // Make the directory absolute if it isn't already.  This makes code
   // safer if client later does a chdir.
-  if ((*template_root_directory_)[0] != '/') {
+  if (!ctemplate::IsAbspath(*template_root_directory_)) {
     char* cwdbuf = new char[PATH_MAX];   // new to avoid stack overflow
     const char* cwd = getcwd(cwdbuf, PATH_MAX);
     if (!cwd) {   // probably not possible, but best to be defensive
       LOG(WARNING) << "Unable to convert '" << *template_root_directory_
                    << "' to an absolute path, with cwd=" << cwdbuf;
     } else {
-      *template_root_directory_ = PathJoin(cwd, *template_root_directory_);
+      *template_root_directory_ = ctemplate::PathJoin(cwd,
+                                                      *template_root_directory_);
     }
     delete[] cwdbuf;
   }
@@ -1353,14 +1349,17 @@ const char *Template::template_file() const {
 // Template::ReloadIfChangedLocked()
 // Template::ReloadAllIfChanged()
 //    If one template, try immediately to reload it from disk.  If
-//    all templates, just set all their statuses to TS_RELOAD, so
-//    next time GetTemplate() is called on the template, it will
+//    all templates, just set all their statuses to TS_SHOULD_RELOAD,
+//    so next time GetTemplate() is called on the template, it will
 //    be reloaded from disk if the disk version is newer than the
 //    one currently in memory.  ReloadIfChanged() returns true
 //    if the file changed and disk *and* we successfully reloaded
 //    and parsed it.  It never returns true if filename_ is "".
 // ----------------------------------------------------------------------
 
+// Besides being called when locked, it's also ok to call this from
+// the constructor, when you know nobody else will be messing with
+// this object.
 bool Template::ReloadIfChangedLocked() {
   if (filename_.empty()) return false;
 
@@ -1378,7 +1377,7 @@ bool Template::ReloadIfChangedLocked() {
     return false;   // file's timestamp hasn't changed, so no need to reload
   }
 
-  FILE* fp = fopen(filename_.c_str(), "r");
+  FILE* fp = fopen(filename_.c_str(), "rb");
   if (fp == NULL) {
     LOG(ERROR) << "Can't find file " << filename_ << "; skipping" << endl;
     // We keep the old tree if there is one, otherwise we're in error
@@ -1444,7 +1443,7 @@ void Template::ReloadAllIfChanged() {
        iter != templates_in_cache.end();
        ++iter) {
     WriterMutexLock ml((*iter)->mutex_);
-    (*iter)->set_state(TS_RELOAD);
+    (*iter)->set_state(TS_SHOULD_RELOAD);
   }
 }
 
@@ -1553,6 +1552,8 @@ static bool IsBlankOrOnlyHasOneRemovableMarker(const char** line, int* len) {
   return true;
 }
 
+// TODO(csilvers): this should take a size_t as well, but StripWhiteSpace
+// wants an int* argument.  I hope no single template line is >2G!
 int Template::InsertLine(const char *line, int len, char* buffer) {
   bool add_newline = (len > 0 && line[len-1] == '\n');
   if (add_newline)
@@ -1581,7 +1582,7 @@ int Template::InsertLine(const char *line, int len, char* buffer) {
   return len;
 }
 
-int Template::InsertFile(const char *file, int len, char* buffer) {
+int Template::InsertFile(const char *file, size_t len, char* buffer) {
   const char* prev_pos = file;
   const char* next_pos;
   char* write_pos = buffer;
@@ -1593,7 +1594,9 @@ int Template::InsertFile(const char *file, int len, char* buffer) {
     prev_pos = next_pos;
   }
   if (prev_pos < file + len) {          // last line doesn't end in a newline
-    write_pos += InsertLine(prev_pos, file+len - prev_pos, write_pos);
+    // TODO(csilvers): have InsertLine take a size_t
+    write_pos += InsertLine(prev_pos, static_cast<int>(file+len - prev_pos),
+                            write_pos);
     assert(write_pos - buffer <= len);
   }
   return write_pos - buffer;
@@ -1622,7 +1625,7 @@ bool Template::Expand(ExpandEmitter *expand_emitter,
   ReaderMutexLock ml(mutex_);
 
   if (state() != TS_READY) {
-    // We'd like to reload if state_ == TS_RELOAD, but we're a const method
+    // We'd like to reload if state_ == TS_SHOULD_RELOAD, but Expand() is const
     return false;
   }
 

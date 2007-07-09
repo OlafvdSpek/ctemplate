@@ -42,6 +42,11 @@
 // YY should start with 01 (not 00).  XX can be an arbitrary string.
 
 #include "config.h"
+// This is for windows.  Even though we #include config.h, just like
+// the files used to compile the dll, we are actually a *client* of
+// the dll, so we don't get to decl anything.
+#undef CTEMPLATE_DLL_DECL
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,20 +66,29 @@
 #  include <ndir.h>
 # endif
 #endif
+#include <algorithm>   // for sort()
 #include <vector>
 #include <string>
 #include "google/template.h"
+#include "google/template_pathops.h"
 #include "google/template_from_string.h"
 #include "google/template_dictionary.h"
 
 using std::vector;
 using std::string;
+using std::sort;
 using GOOGLE_NAMESPACE::Template;
 using GOOGLE_NAMESPACE::TemplateFromString;
 using GOOGLE_NAMESPACE::TemplateDictionary;
 using GOOGLE_NAMESPACE::DO_NOT_STRIP;
 using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
 using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
+namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;
+
+// This default value is only used when the TEMPLATE_ROOTDIR envvar isn't set
+#ifndef DEFAULT_TEMPLATE_ROOTDIR
+# define DEFAULT_TEMPLATE_ROOTDIR  "."
+#endif
 
 #define PFATAL(s)  do { perror(s); exit(1); } while (0)
 
@@ -94,9 +108,9 @@ using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
 // Then return true iff munged_a == munged_b.
 bool StreqExcept(const char* a, const char* b, const char* except) {
   const char* pa = a, *pb = b;
-  const int exceptlen = strlen(except);
+  const size_t exceptlen = strlen(except);
   while (1) {
-    // Use memchr isntead of strchr because memchr(foo, '\0') always fails
+    // Use memchr instead of strchr because strchr(foo, '\0') always fails
     while (memchr(except, *pa, exceptlen))  pa++;   // ignore "except" chars in a
     while (memchr(except, *pb, exceptlen))  pb++;   // ignore "except" chars in b
     if ((*pa == '\0') && (*pb == '\0'))
@@ -122,8 +136,8 @@ struct Testdata {
 static void ReadToString(const char* filename, string* s) {
   const int bufsize = 8092;
   char buffer[bufsize];
-  int n;
-  FILE* fp = fopen(filename, "r");
+  size_t n;
+  FILE* fp = fopen(filename, "rb");
   if (!fp)  PFATAL(filename);
   while ((n=fread(buffer, 1, bufsize, fp)) > 0) {
     if (ferror(fp))  PFATAL(filename);
@@ -132,24 +146,30 @@ static void ReadToString(const char* filename, string* s) {
   fclose(fp);
 }
 
-// expensive to resize this vector and copy it and all, but that's ok
-static vector<Testdata> ReadDataFiles(const char* testdata_dir) {
-  vector<Testdata> retval;
-  vector<string> namelist;
-
+#ifndef WIN32   /* windows defines its own version in windows/port.cc */
+static void GetNamelist(const char* testdata_dir, vector<string>* namelist) {
   DIR* dir = opendir(testdata_dir);
   struct dirent* dir_entry;
   if (dir == NULL) PFATAL("opendir");
   while ( (dir_entry=readdir(dir)) != NULL ) {
     if (!strncmp(dir_entry->d_name, "template_unittest_test",
                  sizeof("template_unittest_test")-1)) {
-      namelist.push_back(dir_entry->d_name);    // collect test files
+      namelist->push_back(dir_entry->d_name);    // collect test files
     }
   }
   if (closedir(dir) != 0) PFATAL("closedir");
+}
+#endif
+
+// expensive to resize this vector and copy it and all, but that's ok
+static vector<Testdata> ReadDataFiles(const char* testdata_dir) {
+  vector<Testdata> retval;
+  vector<string> namelist;
+
+  GetNamelist(testdata_dir, &namelist);
   sort(namelist.begin(), namelist.end());
 
-  for (int i = 0; i < namelist.size(); ++i) {
+  for (size_t i = 0; i < namelist.size(); ++i) {
     vector<string>* new_output = NULL;
     char fname[PATH_MAX];
     snprintf(fname, sizeof(fname), "%s/%s", testdata_dir, namelist[i].c_str());
@@ -174,7 +194,7 @@ static vector<Testdata> ReadDataFiles(const char* testdata_dir) {
                                  retval.back().input_template_name.length() + 2);
       int dictnum = atoi(dictnum_pos);   // just ignore chars after the YY
       ASSERT(dictnum);                   // dictnums should start with 01
-      for (int i = new_output->size(); i < dictnum; ++i)
+      for (size_t i = new_output->size(); i < dictnum; ++i)
         new_output->push_back(string());
       ReadToString(fname, &((*new_output)[dictnum-1]));
     }
@@ -411,7 +431,7 @@ static void TestExpand(const vector<Testdata>& testdata) {
              one_test->input_template_name.c_str(), dictnum);
 
       TemplateDictionary* dict = MakeDictionary(dictnum);
-      dict->SetAnnotateOutput("/template_unittest_test");
+      dict->SetAnnotateOutput("template_unittest_test");
       string output;
       tpl_lines->Expand(&output, dict);
       ASSERT(*out == output);
@@ -426,9 +446,10 @@ int main(int argc, char** argv) {
   // that's what automake supports most easily.
   const char* template_rootdir = getenv("TEMPLATE_ROOTDIR");
   if (template_rootdir == NULL)
-    template_rootdir = ".";
-  Template::SetTemplateRootDirectory(string(template_rootdir) +
-                                     "/src/tests/");
+    template_rootdir = DEFAULT_TEMPLATE_ROOTDIR;   // probably "."
+  string rootdir = ctemplate::PathJoin(template_rootdir, "src");
+  rootdir = ctemplate::PathJoin(rootdir, "tests");
+  Template::SetTemplateRootDirectory(rootdir);
 
   TestExpand(ReadDataFiles(Template::template_root_directory().c_str()));
 

@@ -44,6 +44,7 @@
 #include <algorithm>             // for binary_search
 #include HASH_SET_H              // (defined in config.h)  for NameListType
 #include <google/template_namelist.h>
+#include <google/template_pathops.h>
 #include <google/template.h>     // for Strip, GetTemplate(), etc.
 
 _START_GOOGLE_NAMESPACE_
@@ -54,21 +55,6 @@ using std::vector;
 TemplateNamelist::NameListType *TemplateNamelist::namelist_ = NULL;
 TemplateNamelist::MissingListType *TemplateNamelist::missing_list_ = NULL;
 TemplateNamelist::SyntaxListType *TemplateNamelist::bad_syntax_list_ = NULL;
-
-// PathJoin
-//    Joins a and b together to form a path.  If 'b' starts with '/'
-//    then we just return b, otherwise a + b.  If 'a' does not end in
-//    a slash we put a slash in the middle.  Does *not* resolve ..'s
-//    and stuff like that, for now.  Not very efficient.
-//    Returns a string which is the joining.
-
-static string PathJoin(const string& a, const string& b) {
-  if (b.empty()) return a;                    // degenerate case 1
-  if (a.empty()) return b;                    // degenerate case 2
-  if (b[0] == '/') return b;                  // absolute path
-  if (a[a.length()-1] == '/') return a + b;   // 'well-formed' case
-  return a + '/' + b;
-}
 
 // Make sure there is a namelist_ and then insert the name onto it
 const char* TemplateNamelist::RegisterTemplate(const char* name) {
@@ -109,9 +95,9 @@ const TemplateNamelist::MissingListType& TemplateNamelist::GetMissingList(
   if (refresh) {
     const string& root_dir = Template::template_root_directory();
 
-    // Make sure the root directory ends with a '/' (which is also required
-    // by the method SetTemplateRootDirectory anyway)
-    assert(root_dir.at(root_dir.length()-1) == '/');
+    // Make sure the root directory ends with a slash (which is also
+    // required by the method SetTemplateRootDirectory anyway).
+    assert(ctemplate::IsDirectory(root_dir));
 
     const NameListType& the_list = TemplateNamelist::GetList();
     missing_list_->clear();
@@ -120,7 +106,7 @@ const TemplateNamelist::MissingListType& TemplateNamelist::GetMissingList(
          iter != the_list.end();
          ++iter) {
       // Only prepend root_dir if *iter isn't an absolute path:
-      string path = PathJoin(root_dir, *iter);
+      string path = ctemplate::PathJoin(root_dir, *iter);
       if (access(path.c_str(), R_OK) != 0) {
         missing_list_->push_back(*iter);
         std::cerr << "ERROR: Template file missing: " << path << std::endl;
@@ -178,13 +164,13 @@ time_t TemplateNamelist::GetLastmodTime() {
   time_t retval = -1;
 
   const string& root_dir = Template::template_root_directory();
-  assert(root_dir.at(root_dir.length()-1) == '/');
+  assert(ctemplate::IsDirectory(root_dir));
   const NameListType& the_list = TemplateNamelist::GetList();
   for (NameListType::const_iterator iter = the_list.begin();
        iter != the_list.end();
        ++iter) {
     // Only prepend root_dir if *iter isn't an absolute path:
-    string path = PathJoin(root_dir, *iter);
+    string path = ctemplate::PathJoin(root_dir, *iter);
     struct stat statbuf;
     if (stat(path.c_str(), &statbuf) != 0)       // ignore files we can't find
       continue;

@@ -62,14 +62,25 @@
 #ifndef _GOOGLE_ARENA_H_
 #define _GOOGLE_ARENA_H_
 
+#include "config.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <vector>
 
-@ac_google_start_namespace@
+// Annoying stuff for windows -- make sure clients (in this case
+// unittests) can import the class definitions and variables.
+#ifndef CTEMPLATE_DLL_DECL
+# ifdef WIN32
+#   define CTEMPLATE_DLL_DECL  __declspec(dllimport)
+# else
+#   define CTEMPLATE_DLL_DECL  /* should be the empty string for non-windows */
+# endif
+#endif
 
-class BaseArena {
+_START_GOOGLE_NAMESPACE_
+
+class CTEMPLATE_DLL_DECL BaseArena {
  protected:         // You can't make an arena directly; only a subclass of one
   BaseArena(char* first_block, const size_t block_size);
  public:
@@ -138,7 +149,7 @@ class BaseArena {
 
   // This is used by Realloc() -- usually we Realloc just by copying to a
   // bigger space, but for the last alloc we can realloc by growing the region.
-  bool AdjustLastAlloc(void* last_alloc, const int newsize);
+  bool AdjustLastAlloc(void* last_alloc, const size_t newsize);
 
   Status status_;
 
@@ -160,7 +171,7 @@ class BaseArena {
   void operator=(const BaseArena&);
 };
 
-class UnsafeArena : public BaseArena {
+class CTEMPLATE_DLL_DECL UnsafeArena : public BaseArena {
  public:
   // Allocates a non-thread-safe arena with the specified block size.
   explicit UnsafeArena(const size_t block_size)
@@ -202,12 +213,12 @@ class UnsafeArena : public BaseArena {
     return Realloc(memory, old_size, new_size);
   }
 
-  char* Memdup(const char* s, int bytes) {
+  char* Memdup(const char* s, size_t bytes) {
     char* newstr = Alloc(bytes);
     memcpy(newstr, s, bytes);
     return newstr;
   }
-  char* MemdupPlusNUL(const char* s, int bytes) {   // like "string(s, len)"
+  char* MemdupPlusNUL(const char* s, size_t bytes) {  // like "string(s, len)"
     char* newstr = Alloc(bytes+1);
     memcpy(newstr, s, bytes);
     newstr[bytes] = '\0';
@@ -218,13 +229,13 @@ class UnsafeArena : public BaseArena {
   }
   // Unlike libc's strncpy, I always NUL-terminate.  libc's semantics are dumb.
   // This will allocate at most n+1 bytes (+1 is for the NULL terminator).
-  char* Strndup(const char* s, int n) {
+  char* Strndup(const char* s, size_t n) {
     // Use memchr so we don't walk past n.
     // We can't use the one in //strings since this is the base library,
     // so we have to reinterpret_cast from the libc void *.
     const char* eos = reinterpret_cast<const char*>(memchr(s, '\0', n));
     // if no null terminator found, use full n
-    const int bytes = (eos == NULL) ? n + 1 : eos - s + 1;
+    const size_t bytes = (eos == NULL) ? n + 1 : eos - s + 1;
     char* ret = Memdup(s, bytes);
     ret[bytes-1] = '\0';           // make sure the string is NUL-terminated
     return ret;
@@ -233,10 +244,10 @@ class UnsafeArena : public BaseArena {
   // You can realloc a previously-allocated string either bigger or smaller.
   // We can be more efficient if you realloc a string right after you allocate
   // it (eg allocate way-too-much space, fill it, realloc to just-big-enough)
-  char* Realloc(char* s, int oldsize, int newsize);
+  char* Realloc(char* s, size_t oldsize, size_t newsize);
   // If you know the new size is smaller (or equal), you don't need to know
   // oldsize.  We don't check that newsize is smaller, so you'd better be sure!
-  char* Shrink(char* s, int newsize) {
+  char* Shrink(char* s, size_t newsize) {
     AdjustLastAlloc(s, newsize);       // reclaim space if we can
     return s;                          // never need to move if we go smaller
   }
@@ -249,6 +260,6 @@ class UnsafeArena : public BaseArena {
   void operator=(const UnsafeArena&);
 };
 
-@ac_google_end_namespace@
+_END_GOOGLE_NAMESPACE_
 
 #endif  /* #ifndef _GOOGLE_ARENA_H_ */

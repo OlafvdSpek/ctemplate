@@ -57,4 +57,12 @@ Thu Jun 21 14:02:32 2007  Google Inc. <opensource@google.com>
 	* ctemplate: version 0.6.1 release
 	* Bugfix: data corruption bug with >2 template modifiers (jmacgill)
 	* Bugfix: syntax error in template-namelist: configure-bug (csilvers)
-	* Bugfix: improve lock hygenie to avoid potential deadlock (csilvers)
+	* Bugfix: improve lock hygiene to avoid potential deadlock (csilvers)
+
+Tue Jul  3 12:46:59 2007  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.7 release
+	* Bugfix: another lock hygiene fix, for recursive includes (csilvers)
+	* Minor type-hygiene improvements: size_t for int, etc. (csilvers)
+	* Porting improvements: tests pass on OS X, FreeBSD, Solaris (csilvers)
+	* Windows port! -- VS solution provided for all unittests (csilvers)

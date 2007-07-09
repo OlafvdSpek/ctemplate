@@ -34,6 +34,11 @@
 #define TEMPLATE_TEMPLATE_TEST_UTIL_H__
 
 #include "config.h"
+// This is for windows.  Even though we #include config.h, just like
+// the files used to compile the dll, we are actually a *client* of
+// the dll, so we don't get to decl anything.
+#undef CTEMPLATE_DLL_DECL
+
 #include <string>
 #include HASH_MAP_H           // defined in config.h
 #include <google/template_namelist.h>

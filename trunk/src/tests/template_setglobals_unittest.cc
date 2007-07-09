@@ -31,10 +31,23 @@
 // Author: Frank H. Jernigan
 
 #include "config.h"
+// This is for windows.  Even though we #include config.h, just like
+// the files used to compile the dll, we are actually a *client* of
+// the dll, so we don't get to decl anything.
+#undef CTEMPLATE_DLL_DECL
+
 #include <assert.h>
 #include <stdio.h>
 #include <google/template.h>
 #include <google/template_dictionary.h>
+
+#define ASSERT(cond)  do {                                      \
+  if (!(cond)) {                                                \
+    printf("ASSERT FAILED, line %d: '" #cond "'\n", __LINE__);  \
+    assert(cond);                                               \
+    exit(1);                                                    \
+  }                                                             \
+} while (0)
 
 #define ASSERT_STREQ(a, b)  do {                                          \
   if (strcmp((a), (b))) {                                                 \
@@ -62,8 +75,12 @@ class TemplateSetGlobalsUnittest {
     // Test to see that the Template static variables get created when you
     // first call the static function Template::SetRootDirectory().
     Template::SetTemplateRootDirectory("/some/directory/path");
-    ASSERT_STREQ(Template::template_root_directory().c_str(),
-                 "/some/directory/path/");
+    // We don't know if we appended a / or a \, so we test indirectly
+    ASSERT(Template::template_root_directory().size() ==
+           strlen("/some/directory/path")+1);   // assert they added a char
+    ASSERT(memcmp(Template::template_root_directory().c_str(),
+                  "/some/directory/path",
+                  strlen("/some/directory/path")) == 0);
   }
 };
 

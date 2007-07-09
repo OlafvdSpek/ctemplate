@@ -44,20 +44,29 @@
 // Exit code is the number of templates we were unable to parse.
 
 #include "config.h"
+// This is for windows.  Even though we #include config.h, just like
+// the files used to compile the dll, we are actually a *client* of
+// the dll, so we don't get to decl anything.
+#undef CTEMPLATE_DLL_DECL
+
 #include <stdlib.h>
 #include <stdio.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
 #include <stdarg.h>
+#ifndef WIN32
 #include <getopt.h>
+#endif
 #include <errno.h>
 #include <string.h>
 #include <string>
+#include <google/template_pathops.h>
 #include <google/template.h>
 
 using std::string;
 using GOOGLE_NAMESPACE::Template;
+namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;   // an interior namespace
 
 enum {LOG_INFO, LOG_WARNING, LOG_ERROR, LOG_FATAL};
 
@@ -113,14 +122,19 @@ static int Version(FILE* outfile) {
 }
 
 int main(int argc, char **argv) {
-  string FLAG_template_dir("./");
-  string FLAG_header_dir("./");
+  string FLAG_template_dir(ctemplate::kCWD);   // "./"
+  string FLAG_header_dir(ctemplate::kCWD);
   string FLAG_outputfile_suffix(".varnames.h");
   bool FLAG_header = true;
   bool FLAG_dump_templates = false;
   bool FLAG_log_info = true;
 
-#ifdef HAVE_GETOPT_LONG
+#if defined(WIN32)
+  // TODO(csilvers): implement something reasonable for windows
+# define GETOPT(argc, argv)  -1
+  int optind = 1;    // first non-opt argument
+  const char* optarg = "";   // not used
+#elif defined(HAVE_GETOPT_LONG)
   static struct option longopts[] = {
     {"help", 1, NULL, 'h'},
     {"version", 1, NULL, 'V'},
@@ -209,14 +223,10 @@ int main(int argc, char **argv) {
 
     // Write the results to disk.  First, figure out the filename, by
     // removing any path before the template_file filename
-    const char* basename = strrchr(argv[i], '/');
-    if (basename == NULL) {
-      basename = argv[i];
-    } else {
-      basename = basename + 1;   // read past /
-    }
-    string header_file(FLAG_header_dir + "/" + basename+FLAG_outputfile_suffix);
-    FILE* header = fopen(header_file.c_str(), "w");
+    string basename = ctemplate::Basename(argv[i]);
+    string header_file(ctemplate::PathJoin(FLAG_header_dir,
+                                           basename + FLAG_outputfile_suffix));
+    FILE* header = fopen(header_file.c_str(), "wb");
     if (!header) {
       LogPrintf(LOG_ERROR, FLAG_log_info, "Can't open %s", header_file.c_str());
       num_errors++;

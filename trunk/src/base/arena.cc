@@ -97,7 +97,8 @@ BaseArena::~BaseArena() {
 // ----------------------------------------------------------------------
 
 int BaseArena::block_count() const {
-  return blocks_alloced_ + (overflow_blocks_ ? overflow_blocks_->size() : 0);
+  return (blocks_alloced_ +
+          (overflow_blocks_ ? static_cast<int>(overflow_blocks_->size()) : 0));
 }
 
 // ----------------------------------------------------------------------
@@ -241,17 +242,17 @@ void BaseArena::FreeBlocks() {
 //    the last alloc or if you tried to grow bigger than we could.
 // ----------------------------------------------------------------------
 
-bool BaseArena::AdjustLastAlloc(void *last_alloc, const int newsize) {
+bool BaseArena::AdjustLastAlloc(void *last_alloc, const size_t newsize) {
   // It's only legal to call this on the last thing you alloced.
   if (last_alloc == NULL || last_alloc != last_alloc_)  return false;
   // last_alloc_ should never point into a "big" block, w/ size >= block_size_
   assert(freestart_ >= last_alloc_ && freestart_ <= last_alloc_ + block_size_);
-  const int delta = newsize - (freestart_-last_alloc_); // newsize - oldsize
-  if (delta > 0 && delta > remaining_)  return false;   // not enough room
-
-  assert(freestart_ && last_alloc_ && last_alloc_ <= freestart_);
-  freestart_ += delta;
-  remaining_ -= delta;
+  assert(remaining_ >= 0);   // should be: it's a size_t!
+  if (newsize > (freestart_ - last_alloc_) + remaining_)
+    return false;  // not enough room, even after we get back last_alloc_ space
+  const char* old_freestart = freestart_;   // where last alloc used to end
+  freestart_ = last_alloc_ + newsize;       // where last alloc ends now
+  remaining_ -= (freestart_ - old_freestart); // how much new space we've taken
   return true;
 }
 
@@ -272,7 +273,7 @@ bool BaseArena::AdjustLastAlloc(void *last_alloc, const int newsize) {
 //    compr_buf = arena->Realloc(compr_buf, uncompr_size, compr_size);
 // ----------------------------------------------------------------------
 
-char* UnsafeArena::Realloc(char* s, int oldsize, int newsize) {
+char* UnsafeArena::Realloc(char* s, size_t oldsize, size_t newsize) {
   assert(oldsize >= 0 && newsize >= 0);
   if ( AdjustLastAlloc(s, newsize) )             // in case s was last alloc
     return s;

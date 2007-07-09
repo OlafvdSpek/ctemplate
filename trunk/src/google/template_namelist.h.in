@@ -42,8 +42,10 @@
 #include <time.h>    // for time_t
 #include <string>
 #include <vector>
-#include HASH_SET_H      // defined in config.h
+#include @ac_cv_cxx_hash_set@
 #include <google/template_enums.h>   // for Strip
+
+@ac_windows_dllexport_defines@
 
 // RegisterTemplateFilename
 //   Used to define a reference variable for the name of a template file. E.g:
@@ -73,7 +75,7 @@
 //   sanity-checking code to make sure all the templates used by a program
 //   exist and are syntactically correct.
 
-class TemplateNamelist {
+class @ac_windows_dllexport@ TemplateNamelist {
   friend class TemporaryRegisterTemplate;
  private:
   // Standard hash libs don't define hash<string>, but do define hash<char*>
@@ -81,6 +83,13 @@ class TemplateNamelist {
     size_t operator()(const std::string& s) const {
       return @ac_cv_cxx_hash_namespace@::hash<const char*>()(s.c_str());
     }
+    // Less operator for MSVC's hash containers.
+    bool operator()(const std::string& a, const std::string& b) const {
+      return a < b;
+    }
+    // These two public members are required by msvc.  4 and 8 are defaults.
+    static const size_t bucket_size = 4;
+    static const size_t min_buckets = 8;
   };
 
  public:

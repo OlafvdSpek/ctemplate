@@ -57,14 +57,14 @@ _START_GOOGLE_NAMESPACE_
 
 namespace template_modifiers {
 
-void NullModifier::Modify(const char* in, int inlen,
+void NullModifier::Modify(const char* in, size_t inlen,
                           ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   out->Emit(in, inlen);
 }
 NullModifier null_modifier;
 
-void HtmlEscape::Modify(const char* in, int inlen,
+void HtmlEscape::Modify(const char* in, size_t inlen,
                         ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   for (int i = 0; i < inlen; ++i) {
@@ -82,7 +82,7 @@ void HtmlEscape::Modify(const char* in, int inlen,
 }
 HtmlEscape html_escape;
 
-void PreEscape::Modify(const char* in, int inlen,
+void PreEscape::Modify(const char* in, size_t inlen,
                        ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   for (int i = 0; i < inlen; ++i) {
@@ -99,7 +99,7 @@ void PreEscape::Modify(const char* in, int inlen,
 }
 PreEscape pre_escape;
 
-void SnippetEscape::Modify(const char* in, int inlen,
+void SnippetEscape::Modify(const char* in, size_t inlen,
                            ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   bool inside_b = false;
@@ -166,7 +166,7 @@ void SnippetEscape::Modify(const char* in, int inlen,
 }
 SnippetEscape snippet_escape;
 
-void CleanseAttribute::Modify(const char* in, int inlen,
+void CleanseAttribute::Modify(const char* in, size_t inlen,
                               ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   for (int i = 0; i < inlen; ++i) {
@@ -194,13 +194,13 @@ void CleanseAttribute::Modify(const char* in, int inlen,
 }
 CleanseAttribute cleanse_attribute;
 
-void ValidateUrl::Modify(const char* in, int inlen,
+void ValidateUrl::Modify(const char* in, size_t inlen,
                          ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   const char* slashpos = (char*)memchr(in, '/', inlen);
   if (slashpos == NULL)
     slashpos = in + inlen;
-  void* colonpos = memchr(in, ':', slashpos - in);
+  const void* colonpos = memchr(in, ':', slashpos - in);
   if (colonpos != NULL) {   // colon before first slash, could be a protocol
     if (inlen > sizeof("http://")-1 &&
         memcmp(in, "http://", sizeof("http://")-1) == 0) {
@@ -219,13 +219,13 @@ void ValidateUrl::Modify(const char* in, int inlen,
 }
 ValidateUrl validate_url_and_html_escape;
 
-void XmlEscape::Modify(const char* in, int inlen,
+void XmlEscape::Modify(const char* in, size_t inlen,
                        ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   const char* end = in + inlen;
   const char* pos = in;
-  for (const char* next_amp = static_cast<char*>(memchr(in, '&', inlen));
-       next_amp;  next_amp = static_cast<char*>(memchr(pos, '&', end-pos))) {
+  for (const char* next_amp = static_cast<const char*>(memchr(in, '&', inlen));
+       next_amp; next_amp = static_cast<const char*>(memchr(pos, '&', end-pos))) {
     out->Emit(pos, next_amp - pos);  // emit everything between the ampersands
     if (next_amp + sizeof("&nbsp;")-1 <= end &&
         memcmp(next_amp, "&nbsp;", sizeof("&nbsp;")-1) == 0) {
@@ -240,7 +240,7 @@ void XmlEscape::Modify(const char* in, int inlen,
 }
 XmlEscape xml_escape;
 
-void JavascriptEscape::Modify(const char* in, int inlen,
+void JavascriptEscape::Modify(const char* in, size_t inlen,
                               ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   for (int i = 0; i < inlen; ++i) {
@@ -261,7 +261,7 @@ void JavascriptEscape::Modify(const char* in, int inlen,
 }
 JavascriptEscape javascript_escape;
 
-void UrlQueryEscape::Modify(const char* in, int inlen,
+void UrlQueryEscape::Modify(const char* in, size_t inlen,
                             ExpandEmitter* out, const string& arg) const {
   // Everything not matching [0-9a-zA-Z.,_*/~!()-] is escaped.
   static unsigned long _safe_characters[8] = {
@@ -285,7 +285,7 @@ void UrlQueryEscape::Modify(const char* in, int inlen,
 }
 UrlQueryEscape url_query_escape;
 
-void JsonEscape::Modify(const char* in, int inlen,
+void JsonEscape::Modify(const char* in, size_t inlen,
                         ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   for (int i = 0; i < inlen; ++i) {
@@ -304,7 +304,7 @@ void JsonEscape::Modify(const char* in, int inlen,
 }
 JsonEscape json_escape;
 
-void HtmlEscapeWithArg::Modify(const char* in, int inlen,
+void HtmlEscapeWithArg::Modify(const char* in, size_t inlen,
                                ExpandEmitter* out, const string& arg) const {
   if (!arg.empty()) {
     switch (arg[1]) {
@@ -341,7 +341,7 @@ static ModifierInfo g_modifiers[] = {
   { "none", '\0', MODVAL_FORBIDDEN, &null_modifier },
 };
 
-const ModifierInfo* FindModifier(const char* modname, int modname_len) {
+const ModifierInfo* FindModifier(const char* modname, size_t modname_len) {
   for (ModifierInfo* mod = g_modifiers;
        mod < g_modifiers + sizeof(g_modifiers)/sizeof(*g_modifiers);
        ++mod) {

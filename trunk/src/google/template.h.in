@@ -51,21 +51,23 @@
 @ac_google_start_namespace@ class TemplateDictionary; @ac_google_end_namespace@
 #endif
 
+@ac_windows_dllexport_defines@
+
 @ac_google_start_namespace@
 
 // TemplateState of a template is:
 // - TS_EMPTY before parsing is complete,
 // - TS_ERROR if a syntax error was found during parsing, and
 // - TS_READY if parsing has completed successfully
-// - TS_RELOAD if marked to reload next time it is called for
+// - TS_SHOULD_RELOAD if marked to reload next time it is called for
 // (TS_UNUSED is not used)
-enum TemplateState { TS_UNUSED, TS_EMPTY, TS_ERROR, TS_READY, TS_RELOAD };
+enum TemplateState { TS_UNUSED, TS_EMPTY, TS_ERROR, TS_READY, TS_SHOULD_RELOAD };
 
 
 // Template
 //   The object which reads and parses the template file and then is used to
 //   expand the parsed structure to a string.
-class Template {
+class @ac_windows_dllexport@ Template {
  public:
   // GetTemplate (static Template factory method)
   //   Attempts to retrieve the template object from the cache, stored
@@ -217,7 +219,7 @@ class Template {
   //   that the output size is no bigger than the input size.
   //   Used by ReloadIfChanged()
   int InsertLine(const char *line, int len, char* buffer);
-  int InsertFile(const char *file, int len, char* buffer);
+  int InsertFile(const char *file, size_t len, char* buffer);
 
 
   // The file we read the template from

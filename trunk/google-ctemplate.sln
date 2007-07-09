@@ -1,0 +1,94 @@
+Microsoft Visual Studio Solution File, Format Version 8.00
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libctemplate", "vsprojects\libctemplate\libctemplate.vcproj", "{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_dictionary_unittest", "vsprojects\template_dictionary_unittest\template_dictionary_unittest.vcproj", "{9160CC7F-3BC6-49F1-A158-70DF579376CA}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_from_string_unittest", "vsprojects\template_from_string_unittest\template_from_string_unittest.vcproj", "{3EFCA2F1-1F2F-4143-AE6C-8F5E0D09EF9F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_modifiers_unittest", "vsprojects\template_modifiers_unittest\template_modifiers_unittest.vcproj", "{D9E45FD2-07AC-4EE8-9DA4-26E0427D619E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_regtest", "vsprojects\template_regtest\template_regtest.vcproj", "{0072B37E-DCDA-4128-BC12-7C0A7EF59016}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_setglobals_unittest", "vsprojects\template_setglobals_unittest\template_setglobals_unittest.vcproj", "{686099C0-A778-4D27-80B5-A7E051658D2F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_unittest", "vsprojects\template_unittest\template_unittest.vcproj", "{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_unittest_static", "vsprojects\template_unittest_static\template_unittest_static.vcproj", "{ED69C82B-F593-418A-8D17-C64CBB11E603}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "make_tpl_varname_h", "vsprojects\make_tpl_varname_h\make_tpl_varname_h.vcproj", "{CFD560F2-1B16-4CEE-985D-B19FDE74513F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfiguration) = preSolution
+		Debug = Debug
+		Release = Release
+	EndGlobalSection
+	GlobalSection(ProjectDependencies) = postSolution
+	EndGlobalSection
+	GlobalSection(ProjectConfiguration) = postSolution
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}.Debug.ActiveCfg = Debug|Win32
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}.Debug.Build.0 = Debug|Win32
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}.Release.ActiveCfg = Release|Win32
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}.Release.Build.0 = Release|Win32
+		{9160CC7F-3BC6-49F1-A158-70DF579376CA}.Debug.ActiveCfg = Debug|Win32
+		{9160CC7F-3BC6-49F1-A158-70DF579376CA}.Debug.Build.0 = Debug|Win32
+		{9160CC7F-3BC6-49F1-A158-70DF579376CA}.Release.ActiveCfg = Release|Win32
+		{9160CC7F-3BC6-49F1-A158-70DF579376CA}.Release.Build.0 = Release|Win32
+		{3EFCA2F1-1F2F-4143-AE6C-8F5E0D09EF9F}.Debug.ActiveCfg = Debug|Win32
+		{3EFCA2F1-1F2F-4143-AE6C-8F5E0D09EF9F}.Debug.Build.0 = Debug|Win32
+		{3EFCA2F1-1F2F-4143-AE6C-8F5E0D09EF9F}.Release.ActiveCfg = Release|Win32
+		{3EFCA2F1-1F2F-4143-AE6C-8F5E0D09EF9F}.Release.Build.0 = Release|Win32
+		{D9E45FD2-07AC-4EE8-9DA4-26E0427D619E}.Debug.ActiveCfg = Debug|Win32
+		{D9E45FD2-07AC-4EE8-9DA4-26E0427D619E}.Debug.Build.0 = Debug|Win32
+		{D9E45FD2-07AC-4EE8-9DA4-26E0427D619E}.Release.ActiveCfg = Release|Win32
+		{D9E45FD2-07AC-4EE8-9DA4-26E0427D619E}.Release.Build.0 = Release|Win32
+		{0072B37E-DCDA-4128-BC12-7C0A7EF59016}.Debug.ActiveCfg = Debug|Win32
+		{0072B37E-DCDA-4128-BC12-7C0A7EF59016}.Debug.Build.0 = Debug|Win32
+		{0072B37E-DCDA-4128-BC12-7C0A7EF59016}.Release.ActiveCfg = Release|Win32
+		{0072B37E-DCDA-4128-BC12-7C0A7EF59016}.Release.Build.0 = Release|Win32
+		{686099C0-A778-4D27-80B5-A7E051658D2F}.Debug.ActiveCfg = Debug|Win32
+		{686099C0-A778-4D27-80B5-A7E051658D2F}.Debug.Build.0 = Debug|Win32
+		{686099C0-A778-4D27-80B5-A7E051658D2F}.Release.ActiveCfg = Release|Win32
+		{686099C0-A778-4D27-80B5-A7E051658D2F}.Release.Build.0 = Release|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.ActiveCfg = Debug|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.Build.0 = Debug|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.ActiveCfg = Release|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.Build.0 = Release|Win32
+		{ED69C82B-F593-418A-8D17-C64CBB11E603}.Debug.ActiveCfg = Debug|Win32
+		{ED69C82B-F593-418A-8D17-C64CBB11E603}.Debug.Build.0 = Debug|Win32
+		{ED69C82B-F593-418A-8D17-C64CBB11E603}.Release.ActiveCfg = Release|Win32
+		{ED69C82B-F593-418A-8D17-C64CBB11E603}.Release.Build.0 = Release|Win32
+		{CFD560F2-1B16-4CEE-985D-B19FDE74513F}.Debug.ActiveCfg = Debug|Win32
+		{CFD560F2-1B16-4CEE-985D-B19FDE74513F}.Debug.Build.0 = Debug|Win32
+		{CFD560F2-1B16-4CEE-985D-B19FDE74513F}.Release.ActiveCfg = Release|Win32
+		{CFD560F2-1B16-4CEE-985D-B19FDE74513F}.Release.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+	EndGlobalSection
+	GlobalSection(ExtensibilityAddIns) = postSolution
+	EndGlobalSection
+EndGlobal

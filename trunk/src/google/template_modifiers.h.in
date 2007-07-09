@@ -72,33 +72,36 @@
 #ifndef TEMPLATE_TEMPLATE_MODIFIERS_H__
 #define TEMPLATE_TEMPLATE_MODIFIERS_H__
 
+#include <sys/types.h>   // for size_t
 #include <string>
 #include <google/template_emitter.h>   // so we can inline operator()
+
+@ac_windows_dllexport_defines@
 
 @ac_google_start_namespace@
 
 namespace template_modifiers {
 
-#define MODIFY_SIGNATURE_                                               \
- public:                                                                \
-  virtual void Modify(const char* in, int inlen, ExpandEmitter* outbuf, \
+#define MODIFY_SIGNATURE_                                                    \
+ public:                                                                     \
+  virtual void Modify(const char* in, size_t inlen, ExpandEmitter* outbuf,   \
                       const std::string& arg) const
 
 // If you wish to write your own modifier, it should subclass this
 // method.  Your subclass should only define Modify(); for efficiency,
 // we do not make operator() virtual.
-class TemplateModifier {
+class @ac_windows_dllexport@ TemplateModifier {
  public:
-  // This function takes a string as input, a char*/int pair, and
+  // This function takes a string as input, a char*/size_t pair, and
   // appends the modified version to the end of outbuf.  "arg" is
   // used for modifiers that take a modifier-value argument; for
   // modifiers that take no argument, arg will always be "".
-  virtual void Modify(const char* in, int inlen, ExpandEmitter* outbuf, \
+  virtual void Modify(const char* in, size_t inlen, ExpandEmitter* outbuf,
                       const std::string& arg) const = 0;
 
   // We support both modifiers that take an argument, and those that don't.
   // We also support passing in a string, or a char*/int pair.
-  std::string operator()(const char* in, int inlen, const std::string& arg="") const {
+  std::string operator()(const char* in, size_t inlen, const std::string& arg="") const {
     std::string out;
     // we'll reserve some space to account for minimal escaping: say 12%
     out.reserve(inlen + inlen/8 + 16);
@@ -113,58 +116,58 @@ class TemplateModifier {
 
 
 // Returns the input verbatim (for testing)
-class NullModifier : public TemplateModifier { MODIFY_SIGNATURE_; };
-extern NullModifier null_modifier;
+class @ac_windows_dllexport@ NullModifier : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern @ac_windows_dllexport@ NullModifier null_modifier;
 
 // Escapes < > " ' & <non-space whitespace> to &lt; &gt; &quot;
 // &#39; &amp; <space>
-class HtmlEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
-extern HtmlEscape html_escape;
+class @ac_windows_dllexport@ HtmlEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern @ac_windows_dllexport@ HtmlEscape html_escape;
 
 // Same as HtmlEscape but leaves all whitespace alone. Eg. for <pre>..</pre>
-class PreEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
-extern PreEscape pre_escape;
+class @ac_windows_dllexport@ PreEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern @ac_windows_dllexport@ PreEscape pre_escape;
 
 // Like HtmlEscape but allows HTML entities, <br> tags, <wbr> tags, and
 // matched <b> and </b> tags.
-class SnippetEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
-extern SnippetEscape snippet_escape;
+class @ac_windows_dllexport@ SnippetEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern @ac_windows_dllexport@ SnippetEscape snippet_escape;
 
 // Replaces characters not safe for an unquoted attribute with underscore.
 // Safe characters are alphanumeric, underscore, dash, period, and colon.
-class CleanseAttribute : public TemplateModifier { MODIFY_SIGNATURE_; };
-extern CleanseAttribute cleanse_attribute;
+class @ac_windows_dllexport@ CleanseAttribute : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern @ac_windows_dllexport@ CleanseAttribute cleanse_attribute;
 
 // Like HtmlEscape but also checks that a url is either an absolute
 // http(s) URL or a relative url that doesn't have a protocol hidden
 // in it (ie [foo.html] is fine, but not [javascript:foo]).  Returns
 // the url html escaped if good, otherwise returns "#".
-class ValidateUrl : public TemplateModifier { MODIFY_SIGNATURE_; };
-extern ValidateUrl validate_url_and_html_escape;
+class @ac_windows_dllexport@ ValidateUrl : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern @ac_windows_dllexport@ ValidateUrl validate_url_and_html_escape;
 
 // Escapes &nbsp; to &#160;
 // TODO(csilvers): have this do something more useful, once all callers have
 //                 been fixed.  Dunno what 'more useful' might be, yet.
-class XmlEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
-extern XmlEscape xml_escape;
+class @ac_windows_dllexport@ XmlEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern @ac_windows_dllexport@ XmlEscape xml_escape;
 
 // Escapes " ' \ <CR> <LF> <BS> to \" \' \\ \r \n \b
-class JavascriptEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
-extern JavascriptEscape javascript_escape;
+class @ac_windows_dllexport@ JavascriptEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern @ac_windows_dllexport@ JavascriptEscape javascript_escape;
 
 // Escapes characters not in [0-9a-zA-Z.,_:*/~!()-] as %-prefixed hex.
 // Space is encoded as a +.
-class UrlQueryEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
-extern UrlQueryEscape url_query_escape;
+class @ac_windows_dllexport@ UrlQueryEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern @ac_windows_dllexport@ UrlQueryEscape url_query_escape;
 
 // Escapes " \ / <FF> <CR> <LF> <BS> <TAB> to \" \\ \/ \f \r \n \b \t
-class JsonEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
-extern JsonEscape json_escape;
+class @ac_windows_dllexport@ JsonEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern @ac_windows_dllexport@ JsonEscape json_escape;
 
 // A dispatch routine that calls pre_escape, snippet_escape,
 // cleanse_attribute, or validate_url, depending on the value of the arg.
-class HtmlEscapeWithArg : public TemplateModifier { MODIFY_SIGNATURE_; };
-extern HtmlEscapeWithArg html_escape_with_arg;
+class @ac_windows_dllexport@ HtmlEscapeWithArg : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern @ac_windows_dllexport@ HtmlEscapeWithArg html_escape_with_arg;
 
 
 #undef MODIFY_SIGNATURE_
@@ -188,7 +191,7 @@ struct ModifierInfo {
 
 // modname is the name of the modifier (shortname or longname).
 // Returns a pointer into g_modifiers, or NULL if not found.
-const ModifierInfo* FindModifier(const char* modname, int modname_len);
+const ModifierInfo* FindModifier(const char* modname, size_t modname_len);
 
 // Given a ModifierFunctor, return its longname, or NULL if not found
 // in g_modifiers.

@@ -77,6 +77,14 @@ static Mutex g_static_mutex;
 /*static*/ const template_modifiers::JsonEscape&
   TemplateDictionary::json_escape = template_modifiers::json_escape;
 
+// We use this to declare that the hashtable we construct should be
+// small: it should have few buckets (because we expect few items to
+// be inserted).  It's a macro with an #ifdef guard so we can easily
+// change it for different hash_map implementations.
+#ifndef CTEMPLATE_SMALL_HASHTABLE
+# define CTEMPLATE_SMALL_HASHTABLE  3   // 3 buckets by default
+#endif
+
 
 // ----------------------------------------------------------------------
 // TemplateDictionary::HashInsert()
@@ -85,18 +93,23 @@ static Mutex g_static_mutex;
 //    does.
 // ----------------------------------------------------------------------
 
+#ifdef WIN32
+# define TS_HASH_MAP \
+  hash_map<TemplateString, ValueType, TemplateStringHash>
+#else
+# define TS_HASH_MAP \
+  hash_map<TemplateString, ValueType, TemplateStringHash, TemplateStringEqual>
+#endif
+
 template<typename ValueType>   // ValueType should be small (pointer, int)
-void TemplateDictionary::HashInsert(
-    hash_map<TemplateString, ValueType,
-             TemplateStringHash, TemplateStringEqual>* m,
-    TemplateString key, ValueType value) {
+void TemplateDictionary::HashInsert(TS_HASH_MAP* m,
+                                    TemplateString key, ValueType value) {
   // Unfortunately, insert() doesn't actually replace if key is already
   // in the map.  Thus, in that case (insert().second == false), we need
   // to overwrite the old value.  Since we don't define operator=, the
   // easiest legal way to overwrite is to use the copy-constructor with
   // placement-new.
-  pair<typename hash_map<TemplateString, ValueType,
-                         TemplateStringHash, TemplateStringEqual>::iterator,
+  pair<typename TS_HASH_MAP::iterator,
        bool> r = m->insert(pair<TemplateString,ValueType>(key, value));
   if (r.second == false) {   // key already exists, so overwrite
     new (&r.first->second) ValueType(value);
@@ -119,7 +132,7 @@ void TemplateDictionary::HashInsert(
 // caller must hold g_static_mutex
 TemplateDictionary::GlobalDict* TemplateDictionary::SetupGlobalDictUnlocked() {
   TemplateDictionary::GlobalDict* retval =
-    new TemplateDictionary::GlobalDict(3);
+    new TemplateDictionary::GlobalDict(CTEMPLATE_SMALL_HASHTABLE);
   // Initialize the built-ins
   HashInsert(retval, TemplateString("BI_SPACE"), TemplateString(" "));
   HashInsert(retval, TemplateString("BI_NEWLINE"), TemplateString("\n"));
@@ -132,10 +145,10 @@ TemplateDictionary::TemplateDictionary(const string& name, UnsafeArena* arena)
       should_delete_arena_(arena ? false : true),   // true if we called new
       // dicts are initialized to have 3 buckets (that's small).
       // TODO(csilvers): use the arena for these instead
-      variable_dict_(new VariableDict(3)),
-      section_dict_(new SectionDict(3)),
-      include_dict_(new IncludeDict(3)),
-      template_global_dict_(new VariableDict(3)),
+      variable_dict_(new VariableDict(CTEMPLATE_SMALL_HASHTABLE)),
+      section_dict_(new SectionDict(CTEMPLATE_SMALL_HASHTABLE)),
+      include_dict_(new IncludeDict(CTEMPLATE_SMALL_HASHTABLE)),
+      template_global_dict_(new VariableDict(CTEMPLATE_SMALL_HASHTABLE)),
       template_global_dict_owner_(true),
       parent_dict_(NULL),
       filename_(NULL),
@@ -152,9 +165,9 @@ TemplateDictionary::TemplateDictionary(const string& name, UnsafeArena* arena,
       arena_(arena), should_delete_arena_(false),  // parents own it
       // dicts are initialized to have 3 buckets (that's small).
       // TODO(csilvers): use the arena for these instead
-      variable_dict_(new VariableDict(3)),
-      section_dict_(new SectionDict(3)),
-      include_dict_(new IncludeDict(3)),
+      variable_dict_(new VariableDict(CTEMPLATE_SMALL_HASHTABLE)),
+      section_dict_(new SectionDict(CTEMPLATE_SMALL_HASHTABLE)),
+      include_dict_(new IncludeDict(CTEMPLATE_SMALL_HASHTABLE)),
       template_global_dict_(template_global_dict),
       template_global_dict_owner_(false),
       parent_dict_(parent_dict),
@@ -745,7 +758,7 @@ const char* TemplateDictionary::GetTemplatePathStart() const {
 //    (in case the input has internal NULs).
 //    ----------------------------------------------------------------------
 
-TemplateString TemplateDictionary::Memdup(const char* s, int slen) {
+TemplateString TemplateDictionary::Memdup(const char* s, size_t slen) {
   return TemplateString(arena_->MemdupPlusNUL(s, slen), slen);  // add a \0 too
 }
 

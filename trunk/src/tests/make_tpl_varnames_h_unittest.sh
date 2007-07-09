@@ -65,10 +65,9 @@ echo '<a href={{QCHAR}}{{HREF}}{{QC' > $TMPDIR/bad1.tpl
 echo '<img {{#ATTRIBUTES}}{{ATTRIBUTE}}>' > $TMPDIR/bad2.tpl
 echo '<html><head><title>{{TITLE?}}</title></head></html>' > $TMPDIR/bad3.tpl
 
-# The "by <program>" line is messed up when using libtool.  Thus, we just
-# strip it out when doing the comparisons.
-
-expected_ok1=`cat <<EOF
+# Some weird (broken) shells leave the ending EOF in the here-document,
+# hence the grep.
+expected_ok1=`cat <<EOF | grep -v '^EOF$'
 //
 // This header file auto-generated for the template
 //    $TMPDIR/ok1.tpl
@@ -79,7 +78,7 @@ const char * const ko_HREF = "HREF";
 const char * const ko_PARAMS = "PARAMS";
 EOF`
 
-expected_ok2=`cat <<EOF
+expected_ok2=`cat <<EOF | grep -v '^EOF$'
 //
 // This header file auto-generated for the template
 //    $TMPDIR/ok2.tpl
@@ -89,7 +88,7 @@ const char * const ko_ATTRIBUTES = "ATTRIBUTES";
 const char * const ko_ATTRIBUTE = "ATTRIBUTE";
 EOF`
 
-expected_ok3=`cat <<EOF
+expected_ok3=`cat <<EOF | grep -v '^EOF$'
 //
 // This header file auto-generated for the template
 //    $TMPDIR/ok3.tpl
@@ -98,8 +97,10 @@ expected_ok3=`cat <<EOF
 const char * const ko_TITLE = "TITLE";
 EOF`
 
-Actual() {
-    grep -v '^// by ' "$1"
+# The "by <program>" line is messed up when using libtool.  Thus, we just
+# strip it out when doing the comparisons.
+Cleanse() {
+  grep -v '^// by ' "$1" > "$1.cleansed"
 }
 
 # syntax-check these templates
@@ -117,21 +118,25 @@ $MAKETPL -n --template_root=$TMPDIR ok1.tpl ok2.tpl ok3.tpl >/dev/null 2>&1 \
 # Parse the templates.  Bad one in the middle should be ignored.
 $MAKETPL --header_dir=$TMPDIR $TMPDIR/ok1.tpl $TMPDIR/bad2.tpl $TMPDIR/ok3.tpl >/dev/null 2>&1
 [ $? = 1 ] || die "$LINENO: $MAKETPL gave wrong error-code parsing 1 bad template: $?"
-[ "$(Actual $TMPDIR/ok1.tpl.varnames.h)" = "$expected_ok1" ] \
+Cleanse "$TMPDIR/ok1.tpl.varnames.h"
+echo "$expected_ok1" | diff - "$TMPDIR/ok1.tpl.varnames.h.cleansed" \
    || die "$LINENO: $MAKETPL didn't make ok1 output correctly"
-[ -e $TMPDIR/bad2.tpl.varnames.h ] \
+[ -f "$TMPDIR/bad2.tpl.varnames.h" ] \
    && die "$LINENO: $MAKETPL >did< make bad2 output"
-[ "$(Actual $TMPDIR/ok3.tpl.varnames.h)" = "$expected_ok3" ] \
+Cleanse "$TMPDIR/ok3.tpl.varnames.h"
+echo "$expected_ok3" | diff - "$TMPDIR/ok3.tpl.varnames.h.cleansed" \
    || die "$LINENO: $MAKETPL didn't make ok3 output correctly"
 
 # Now try the same but with a different suffix.  Try an alternate -t/-o form too.
 # Also test not being able to output the file for some reason.
 $MAKETPL -t$TMPDIR -o$TMPDIR -s.out ok1.tpl bad2.tpl ok3.tpl >/dev/null 2>&1
 [ $? = 1 ] || die "$LINENO: $MAKETPL gave wrong error-code parsing 1 bad template: $?"
-[ "$(Actual $TMPDIR/ok1.tpl.out)" = "$expected_ok1" ] \
+Cleanse "$TMPDIR/ok1.tpl.out"
+echo "$expected_ok1" | diff - "$TMPDIR/ok1.tpl.out.cleansed" \
    || die "$LINENO: $MAKETPL didn't make ok1 output correctly"
-[ -e $TMPDIR/bad2.tpl.out ] && die "$LINENO: $MAKETPL >did< make bad2 output"
-[ "$(Actual $TMPDIR/ok3.tpl.out)" = "$expected_ok3" ] \
+[ -f "$TMPDIR/bad2.tpl.out" ] && die "$LINENO: $MAKETPL >did< make bad2 output"
+Cleanse "$TMPDIR/ok3.tpl.out"
+echo "$expected_ok3" | diff - "$TMPDIR/ok3.tpl.out.cleansed" \
    || die "$LINENO: $MAKETPL didn't make ok3 output correctly"
 
 # Verify we don't give any output iff everything works, with -q flag.
@@ -139,17 +144,20 @@ $MAKETPL -t$TMPDIR -o$TMPDIR -s.out ok1.tpl bad2.tpl ok3.tpl >/dev/null 2>&1
 mkdir $TMPDIR/output
 out=`$MAKETPL -q -t$TMPDIR -o$TMPDIR/output -s"#" ok1.tpl ok2.tpl ok3.tpl 2>&1`
 [ -z "$out" ] || die "$LINENO: $MAKETPL -q wasn't so quiet"
-[ "$(Actual $TMPDIR/output/ok1.tpl#)" = "$expected_ok1" ] \
+Cleanse "$TMPDIR/output/ok1.tpl#"
+echo "$expected_ok1" | diff - "$TMPDIR/output/ok1.tpl#.cleansed" \
    || die "$LINENO: $MAKETPL didn't make ok1 output correctly"
-[ "$(Actual $TMPDIR/output/ok2.tpl#)" = "$expected_ok2" ] \
+Cleanse "$TMPDIR/output/ok2.tpl#"
+echo "$expected_ok2" | diff - "$TMPDIR/output/ok2.tpl#.cleansed" \
    || die "$LINENO: $MAKETPL didn't make ok2 output correctly"
-[ "$(Actual $TMPDIR/output/ok3.tpl#)" = "$expected_ok3" ] \
+Cleanse "$TMPDIR/output/ok3.tpl#"
+echo "$expected_ok3" | diff - "$TMPDIR/output/ok3.tpl#.cleansed" \
    || die "$LINENO: $MAKETPL didn't make ok3 output correctly"
 
 out=`$MAKETPL -q --outputfile_suffix=2 $TMPDIR/bad1.tpl $TMPDIR/bad2.tpl $TMPDIR/bad3.tpl 2>&1`
 [ -z "$out" ] && die "$LINENO: $MAKETPL -q was too quiet"
-[ -e $TMPDIR/output/bad1.tpl2 ] && die "$LINENO: $MAKETPL did make bad1 output"
-[ -e $TMPDIR/output/bad2.tpl2 ] && die "$LINENO: $MAKETPL did make bad2 output"
-[ -e $TMPDIR/output/bad3.tpl2 ] && die "$LINENO: $MAKETPL did make bad3 output"
+[ -f "$TMPDIR/output/bad1.tpl2" ] && die "$LINENO: $MAKETPL did make bad1 output"
+[ -f "$TMPDIR/output/bad2.tpl2" ] && die "$LINENO: $MAKETPL did make bad2 output"
+[ -f "$TMPDIR/output/bad3.tpl2" ] && die "$LINENO: $MAKETPL did make bad3 output"
 
 echo "PASSED"

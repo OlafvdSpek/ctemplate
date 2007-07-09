@@ -59,9 +59,11 @@
 #include <string>
 #include <google/template.h>
 
+@ac_windows_dllexport_defines@
+
 @ac_google_start_namespace@
 
-class TemplateFromString : public Template {
+class @ac_windows_dllexport@ TemplateFromString : public Template {
 
  public:
   /* GetTemplate
