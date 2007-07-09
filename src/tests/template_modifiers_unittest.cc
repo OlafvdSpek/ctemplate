@@ -30,6 +30,12 @@
 // ---
 // Author: Craig Silverstein
 
+#include "config.h"
+// This is for windows.  Even though we #include config.h, just like
+// the files used to compile the dll, we are actually a *client* of
+// the dll, so we don't get to decl anything.
+#undef CTEMPLATE_DLL_DECL
+
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>

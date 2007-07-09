@@ -81,10 +81,21 @@ class TemplateCacheHash {
  public:
   HASH_NAMESPACE::hash<const char *> string_hash_;
   TemplateCacheHash() : string_hash_() {}
-  bool operator()(const pair<string, Strip>& p) const {
+  size_t operator()(const pair<string, Strip>& p) const {
     // Using + here is silly, but should work ok in practice
     return string_hash_(p.first.c_str()) + static_cast<int>(p.second);
   }
+  // Less operator for MSVC's hash containers.  We make Strip be the
+  // primary key, unintuitively, because it's a bit faster.
+  bool operator()(const pair<string, Strip>& a,
+                  const pair<string, Strip>& b) const {
+    return (a.second == b.second
+            ? a.first < b.first
+            : static_cast<int>(a.second) < static_cast<int>(b.second));
+  }
+  // These two public members are required by msvc.  4 and 8 are defaults.
+  static const size_t bucket_size = 4;
+  static const size_t min_buckets = 8;
 };
 
 // The template cache.  Note that we don't define a ClearCache() in this
@@ -120,11 +131,12 @@ TemplateFromString *TemplateFromString::GetTemplate(const string& cache_key,
     }
   }
 
-  WriterMutexLock ml(tpl->mutex_);   // to access state()
+  // TODO(csilvers): make sure this is safe and can never deadlock
+  //WriterMutexLock ml(tpl->mutex_);   // to access state()
 
-  // state_ can be TS_RELOAD if ReloadAllIfChanged() touched this file.
-  // That's fine; we'll just ignore the reload directive for this guy.
-  if (tpl->state() == TS_RELOAD)
+  // state_ can be TS_SHOULD_RELOAD if ReloadAllIfChanged() touched this
+  // file That's fine; we'll just ignore the reload directive for this guy.
+  if (tpl->state() == TS_SHOULD_RELOAD)
     tpl->set_state(TS_READY);
 
   // if the statis is not TS_READY, then it is TS_ERROR at this

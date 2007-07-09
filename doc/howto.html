@@ -396,7 +396,7 @@ template-file (which is what include-template would do), we stop the
 lookup.</p>
 
 <p>For instance, for a template that says
-<code>{{#RESULTS}}{{RESULTNUM}}. {{>ONE_RESULT}}{{#RESULTS}}</code>,
+<code>{{#RESULTS}}{{RESULTNUM}}. {{>ONE_RESULT}}{{/RESULTS}}</code>,
 <code>"ONE_RESULT"</code> is looked for in the "RESULTS" dictionary,
 and if not found there, is looked for in the main, top-level
 dictionary.  Likewise, the variable <code>"RESULTNUM"</code> is looked

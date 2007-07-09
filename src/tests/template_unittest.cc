@@ -31,10 +31,17 @@
 // Author: Craig Silverstein
 
 #include "config.h"
+// This is for windows.  Even though we #include config.h, just like
+// the files used to compile the dll, we are actually a *client* of
+// the dll, so we don't get to decl anything.
+#undef CTEMPLATE_DLL_DECL
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <assert.h>
 #include <time.h>
 #include <errno.h>
@@ -57,6 +64,7 @@
 #include <vector>         // for MissingListType, SyntaxListType
 #include HASH_SET_H       // (defined in config.h)  for NameListType
 #include "google/template.h"
+#include "google/template_pathops.h"
 #include "google/template_dictionary.h"
 #include "google/template_namelist.h"
 
@@ -70,8 +78,7 @@ using GOOGLE_NAMESPACE::Strip;
 using GOOGLE_NAMESPACE::DO_NOT_STRIP;
 using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
 using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
-
-static const string FLAGS_test_tmpdir("/tmp/template_unittest_dir");
+namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;   // an interior namespace
 
 // How many threads to use for our threading test.
 // This is a #define instead of a const int so we can use it in array-sizes
@@ -96,7 +103,7 @@ static const string FLAGS_test_tmpdir("/tmp/template_unittest_dir");
 // Then return true iff munged_a == munged_b.
 bool StreqExcept(const char* a, const char* b, const char* except) {
   const char* pa = a, *pb = b;
-  const int exceptlen = strlen(except);
+  const size_t exceptlen = strlen(except);
   while (1) {
     // Use memchr isntead of strchr because memchr(foo, '\0') always fails
     while (memchr(except, *pa, exceptlen))  pa++;   // ignore "except" chars in a
@@ -115,6 +122,7 @@ RegisterTemplateFilename(INVALID2_FN, "template_unittest_test_invalid2.in");
 RegisterTemplateFilename(NONEXISTENT_FN, "nonexistent__file.tpl");
 
 // deletes all files named *template* in dir
+#ifndef WIN32   // windows will define its own version, in src/windows/port.cc
 static void CleanTestDir(const string& dirname) {
   DIR* dir = opendir(dirname.c_str());
   if (!dir) {  // directory doesn't exist or something like that.
@@ -124,16 +132,24 @@ static void CleanTestDir(const string& dirname) {
   }
   while (struct dirent* d = readdir(dir)) {
     if (strstr(d->d_name, "template"))
-      unlink((dirname + "/" + d->d_name).c_str());
+      unlink(ctemplate::PathJoin(dirname, d->d_name).c_str());
   }
   closedir(dir);
 }
 
+static string TmpFile(const char* basename) {
+  return string("/tmp/") + basename;
+}
+#endif
+
+static const string FLAGS_test_tmpdir(TmpFile("template_unittest_dir"));
+
+
 // This writes s to the given file
 static void StringToFile(const string& s, const string& filename) {
-  FILE* fp = fopen(filename.c_str(), "w");
+  FILE* fp = fopen(filename.c_str(), "wb");
   ASSERT(fp);
-  int r = fwrite(s.data(), 1, s.length(), fp);
+  size_t r = fwrite(s.data(), 1, s.length(), fp);
   ASSERT(r == s.length());
   fclose(fp);
 }
@@ -143,7 +159,8 @@ static string StringToTemplateFile(const string& s) {
   static int filenum = 0;
   char buf[16];
   snprintf(buf, sizeof(buf), "%03d", ++filenum);
-  string filename = FLAGS_test_tmpdir + "/template." + buf;
+  string filename = ctemplate::PathJoin(FLAGS_test_tmpdir,
+                                        string("template.") + buf);
   StringToFile(s, filename);
   return filename;
 }
@@ -395,6 +412,15 @@ class TemplateUnittest {
     // Don't test modifier syntax here; that's in TestVariableWithModifiers()
   }
 
+  // Make sure we don't deadlock when a template includes itself.
+  static void TestRecursiveInclude() {
+    string incname = StringToTemplateFile("hi {{>INC}} bar\n");
+    Template* tpl = Template::GetTemplate(incname, STRIP_WHITESPACE);
+    TemplateDictionary dict("dict");
+    dict.AddIncludeDictionary("INC")->SetFilename(incname);
+    AssertExpandIs(tpl, &dict, "hi hi  bar bar", true);
+  }
+
   // Tests that vars inherit/override their parents properly
   static void TestInheritence() {
     Template* tpl = StringToTemplate("{{FOO}}{{#SEC}}{{FOO}}{{#SEC}}{{FOO}}{{/SEC}}{{/SEC}}",
@@ -456,29 +482,36 @@ class TemplateUnittest {
     incdict->ShowSection("ISEC");
     dict.AddIncludeDictionary("INC")->SetFilename(incname2);
 
+    // This string is equivalent to "/template." (at least on unix)
+    string slash_tpl(ctemplate::PathJoin(ctemplate::kRootdir, "template."));
     dict.SetAnnotateOutput("");
     char expected[10240];           // 10k should be big enough!
     snprintf(expected, sizeof(expected),
-             "{{#FILE=%s/template.003}}{{#SEC=__MAIN__}}boo!\n"
-             "{{#INC=INC}}{{#FILE=%s/template.001}}"
+             "{{#FILE=%s003}}{{#SEC=__MAIN__}}boo!\n"
+             "{{#INC=INC}}{{#FILE=%s001}}"
              "{{#SEC=__MAIN__}}include {{#SEC=ISEC}}file{{/SEC}}\n"
              "{{/SEC}}{{/FILE}}{{/INC}}"
-             "{{#INC=INC}}{{#FILE=%s/template.002}}"
+             "{{#INC=INC}}{{#FILE=%s002}}"
              "{{#SEC=__MAIN__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
              "\nhi {{#SEC=SEC}}lo{{/SEC}} bar{{/SEC}}{{/FILE}}",
-             FLAGS_test_tmpdir.c_str(), FLAGS_test_tmpdir.c_str(),
-             FLAGS_test_tmpdir.c_str());
+             (FLAGS_test_tmpdir + slash_tpl).c_str(),
+             (FLAGS_test_tmpdir + slash_tpl).c_str(),
+             (FLAGS_test_tmpdir + slash_tpl).c_str());
     AssertExpandIs(tpl, &dict, expected, true);
 
-    dict.SetAnnotateOutput("/template.");
-    AssertExpandIs(tpl, &dict,
-                   "{{#FILE=/template.003}}{{#SEC=__MAIN__}}boo!\n"
-                   "{{#INC=INC}}{{#FILE=/template.001}}"
-                   "{{#SEC=__MAIN__}}include {{#SEC=ISEC}}file{{/SEC}}\n"
-                   "{{/SEC}}{{/FILE}}{{/INC}}"
-                   "{{#INC=INC}}{{#FILE=/template.002}}"
-                   "{{#SEC=__MAIN__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
-                   "\nhi {{#SEC=SEC}}lo{{/SEC}} bar{{/SEC}}{{/FILE}}", true);
+    dict.SetAnnotateOutput(slash_tpl.c_str());
+    snprintf(expected, sizeof(expected),
+             "{{#FILE=%s003}}{{#SEC=__MAIN__}}boo!\n"
+             "{{#INC=INC}}{{#FILE=%s001}}"
+             "{{#SEC=__MAIN__}}include {{#SEC=ISEC}}file{{/SEC}}\n"
+             "{{/SEC}}{{/FILE}}{{/INC}}"
+             "{{#INC=INC}}{{#FILE=%s002}}"
+             "{{#SEC=__MAIN__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
+             "\nhi {{#SEC=SEC}}lo{{/SEC}} bar{{/SEC}}{{/FILE}}",
+             (slash_tpl).c_str(),
+             (slash_tpl).c_str(),
+             (slash_tpl).c_str());
+    AssertExpandIs(tpl, &dict, expected, true);
 
     dict.SetAnnotateOutput(NULL);   // should turn off annotations
     AssertExpandIs(tpl, &dict, "boo!\ninclude file\ninclude #2\n\nhi lo bar",
@@ -607,9 +640,9 @@ class TemplateUnittest {
 
   static void TestTemplateRootDirectory() {
     string filename = StringToTemplateFile("Test template");
-    ASSERT(filename[0] == '/');    // absolute filename
+    ASSERT(ctemplate::IsAbspath(filename));
     Template* tpl1 = Template::GetTemplate(filename, DO_NOT_STRIP);
-    Template::SetTemplateRootDirectory("/");
+    Template::SetTemplateRootDirectory(ctemplate::kRootdir);  // "/"
     // template-root shouldn't matter for absolute directories
     Template* tpl2 = Template::GetTemplate(filename, DO_NOT_STRIP);
     Template::SetTemplateRootDirectory("/sadfadsf/waerfsa/safdg");
@@ -618,11 +651,19 @@ class TemplateUnittest {
     ASSERT(tpl1 == tpl2);
     ASSERT(tpl1 == tpl3);
 
-    // Now test it actually works by breaking the abspath in various places
-    for (int s = 0; s != string::npos; s = filename.find('/', s+1)) {
-      Template::SetTemplateRootDirectory(filename.substr(0, s+1));
-      Template* tpl = Template::GetTemplate(filename.substr(s+1), DO_NOT_STRIP);
-      ASSERT(tpl == tpl1);
+    // Now test it actually works by breaking the abspath in various places.
+    // We do it twice, since we don't know if the path-sep is "/" or "\".
+    // NOTE: this depends on filename not using "/" or "\" except as a
+    //       directory separator (so nothing like "/var/tmp/foo\a/weirdfile").
+    const char* const kPathSeps = "/\\";
+    for (const char* path_sep = kPathSeps; *path_sep; path_sep++) {
+      for (string::size_type sep_pos = 0;  sep_pos != string::npos;
+           sep_pos = filename.find(*path_sep, sep_pos + 1)) {
+        Template::SetTemplateRootDirectory(filename.substr(0, sep_pos + 1));
+        Template* tpl = Template::GetTemplate(filename.substr(sep_pos + 1),
+                                              DO_NOT_STRIP);
+        ASSERT(tpl == tpl1);
+      }
     }
   }
 
@@ -665,6 +706,10 @@ class TemplateUnittest {
     string f1 = StringToTemplateFile("{{This has spaces in it}}");
     string f2 = StringToTemplateFile("{{#SEC}}foo");
     string f3 = StringToTemplateFile("{This is ok");
+    // Where we'll copy f1 - f3 to: these are names known at compile-time
+    string f1_copy = ctemplate::PathJoin(FLAGS_test_tmpdir, INVALID1_FN);
+    string f2_copy = ctemplate::PathJoin(FLAGS_test_tmpdir, INVALID2_FN);
+    string f3_copy = ctemplate::PathJoin(FLAGS_test_tmpdir, VALID1_FN);
     Template::SetTemplateRootDirectory(FLAGS_test_tmpdir);
     time_t after_time = time(NULL);   // f1, f2, f3 all written by now
 
@@ -686,9 +731,9 @@ class TemplateUnittest {
     ASSERT(TemplateNamelist::IsAllSyntaxOkay(DO_NOT_STRIP));
 
     // Now create those files
-    link(f1.c_str(), (FLAGS_test_tmpdir + "/" + INVALID1_FN).c_str());
-    link(f2.c_str(), (FLAGS_test_tmpdir + "/" + INVALID2_FN).c_str());
-    link(f3.c_str(), (FLAGS_test_tmpdir + "/" + VALID1_FN).c_str());
+    link(f1.c_str(), f1_copy.c_str());
+    link(f2.c_str(), f2_copy.c_str());
+    link(f3.c_str(), f3_copy.c_str());
     // We also have to clear the template cache, since we created a new file.
     // ReloadAllIfChanged() would probably work, too.
     Template::ClearCache();
@@ -724,7 +769,7 @@ class TemplateUnittest {
     ASSERT(modtime >= before_time && modtime <= after_time);
     // Now update a file and make sure lastmod time is updated
     sleep(1);
-    FILE* fp = fopen(f1.c_str(), "a");
+    FILE* fp = fopen(f1_copy.c_str(), "ab");
     ASSERT(fp);
     fwrite("\n", 1, 1, fp);
     fclose(fp);
@@ -770,6 +815,7 @@ int main(int argc, char** argv) {
   TemplateUnittest::TestSection();
   TemplateUnittest::TestInclude();
   TemplateUnittest::TestIncludeWithModifiers();
+  TemplateUnittest::TestRecursiveInclude();
   TemplateUnittest::TestInheritence();
   TemplateUnittest::TestExpand();
 

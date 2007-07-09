@@ -31,6 +31,11 @@
 // Author: Craig Silverstein
 
 #include "config.h"
+// This is for windows.  Even though we #include config.h, just like
+// the files used to compile the dll, we are actually a *client* of
+// the dll, so we don't get to decl anything.
+#undef CTEMPLATE_DLL_DECL
+
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -75,7 +80,7 @@ _START_GOOGLE_NAMESPACE_
 // test escape-functor that replaces all input with "foo"
 class FooEscaper : public template_modifiers::TemplateModifier {
  public:
-  void Modify(const char* in, int inlen, ExpandEmitter* outbuf,
+  void Modify(const char* in, size_t inlen, ExpandEmitter* outbuf,
               const string& arg) const {
     assert(arg.empty());    // we don't take an argument
     outbuf->Emit("foo");
@@ -85,7 +90,7 @@ class FooEscaper : public template_modifiers::TemplateModifier {
 // test escape-functor that replaces all input with ""
 class NullEscaper : public template_modifiers::TemplateModifier {
  public:
-  void Modify(const char* in, int inlen, ExpandEmitter* outbuf,
+  void Modify(const char* in, size_t inlen, ExpandEmitter* outbuf,
               const string& arg) const {
     assert(arg.empty());    // we don't take an argument
   }
@@ -94,11 +99,11 @@ class NullEscaper : public template_modifiers::TemplateModifier {
 // first does javascript-escaping, then html-escaping
 class DoubleEscaper : public template_modifiers::TemplateModifier {
  public:
-  void Modify(const char* in, int inlen, ExpandEmitter* outbuf,
+  void Modify(const char* in, size_t inlen, ExpandEmitter* outbuf,
               const string& arg) const {
     assert(arg.empty());    // we don't take an argument
-    string tmp = TemplateDictionary::javascript_escape(in, inlen);
-    TemplateDictionary::html_escape.Modify(tmp.data(), tmp.size(), outbuf, "");
+    string tmp = template_modifiers::javascript_escape(in, inlen);
+    template_modifiers::html_escape.Modify(tmp.data(), tmp.size(), outbuf, "");
   }
 };
 

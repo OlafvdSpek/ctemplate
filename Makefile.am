@@ -11,18 +11,19 @@ googleincludedir = $(includedir)/google
 ## who install this package can include in their own applications.)
 ## We have to include both the .h and .h.in forms.  The latter we
 ## put in noinst_HEADERS.
-googleinclude_HEADERS = \
+nodist_googleinclude_HEADERS = \
 	src/google/template.h \
 	src/google/template_enums.h \
+	src/google/template_pathops.h \
 	src/google/template_modifiers.h \
 	src/google/template_dictionary.h \
 	src/google/template_emitter.h \
 	src/google/template_namelist.h \
 	src/google/template_from_string.h
 noinst_HEADERS = \
-	src/base/arena.h.in \
 	src/google/template.h.in \
 	src/google/template_enums.h.in \
+	src/google/template_pathops.h.in \
 	src/google/template_modifiers.h.in \
 	src/google/template_dictionary.h.in \
 	src/google/template_emitter.h.in \
@@ -33,7 +34,7 @@ docdir = $(prefix)/share/doc/$(PACKAGE)-$(VERSION)
 ## This is for HTML and other documentation you want to install.
 ## Add your documentation files (in doc/) in addition to these
 ## top-level boilerplate files.  Also add a TODO file if you have one.
-dist_doc_DATA = AUTHORS COPYING ChangeLog INSTALL NEWS README \
+dist_doc_DATA = AUTHORS COPYING ChangeLog INSTALL NEWS README README.windows \
 	doc/designstyle.css doc/index.html \
 	doc/howto.html doc/tips.html doc/example.html \
 	doc/xss_resources.html
@@ -45,6 +46,9 @@ noinst_LTLIBRARIES =
 ## The binaries you want to install
 bin_PROGRAMS =
 bin_SCRIPTS =
+## The location of the windows project file for each binary we make
+WINDOWS_PROJECTS = google-ctemplate.sln
+
 
 ## unittests you want to run when people type 'make check'.
 ## TESTS is for binary unittests, check_SCRIPTS for script-based unittests.
@@ -59,14 +63,20 @@ noinst_SCRIPTS = src/tests/make_tpl_varnames_h_unittest.sh
 
 ## vvvv RULES TO MAKE THE LIBRARIES, BINARIES, AND UNITTESTS
 
-# These are the symbols (classes, mostly) we want to export from our library
-CTEMPLATE_SYMBOLS = '[^A-Za-z](Template|TemplateDictionary|TemplateNamelist|TemplateFromString|TemplateString|TemplateState|Strip)[^A-Za-z]'
+# These are the symbols (classes, mostly) we want to export from our library.
+# Note this regexp applies to the *mangled* name, which is why we have to
+# be careful where we want to assert [^A-Za-z].  (Particularly bad on Darwin.)
+# template_modifiers and BaseArena and UnsafeArena perhaps shouldn't be
+# exported, but they're needed -- at least -- for some unittests.
+CTEMPLATE_SYMBOLS = '(ctemplate|template_modifiers|BaseArena|UnsafeArena|[^A-Za-z]Template[^A-Za-z]|TemplateDictionary|TemplateNamelist|TemplateFromString|TemplateString|TemplateState|[^A-Za-z]Strip[^A-Za-z])'
 
 lib_LTLIBRARIES += libctemplate.la
-libctemplate_la_SOURCES = $(googleinclude_HEADERS) src/config.h \
+WINDOWS_PROJECTS += vsprojects/libctemplate/libctemplate.vcproj
+libctemplate_la_SOURCES = $(googleinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
-	src/template_namelist.cc src/template_from_string.cc
+	src/template_namelist.cc src/template_pathops.cc \
+	src/template_from_string.cc
 libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG
 libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) -export-symbols-regex $(CTEMPLATE_SYMBOLS)
 libctemplate_la_LIBADD = $(PTHREAD_LIBS)
@@ -103,7 +113,8 @@ libctemplate_testing_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMB
 
 # Helper apps
 bin_PROGRAMS += make_tpl_varnames_h
-make_tpl_varnames_h_SOURCES = $(googleinclude_HEADERS) src/config.h \
+WINDOWS_PROJECTS += vsprojects/make_tpl_varname_h/make_tpl_varname_h.vcproj
+make_tpl_varnames_h_SOURCES = $(googleinclude_HEADERS) \
 	src/make_tpl_varnames_h.cc
 make_tpl_varnames_h_LDADD = libctemplate_nothreads.la
 
@@ -112,7 +123,9 @@ bin_SCRIPTS += src/template-converter
 # For each of the tests, we test with and without threads
 
 TESTS += template_dictionary_unittest template_dictionary_nothreads_unittest
-template_dictionary_unittest_SOURCES = src/tests/template_dictionary_unittest.cc
+WINDOWS_PROJECTS += vsprojects/template_dictionary_unittest/template_dictionary_unittest.vcproj
+template_dictionary_unittest_SOURCES = src/base/arena.h \
+                                       src/tests/template_dictionary_unittest.cc
 template_dictionary_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
 template_dictionary_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_dictionary_unittest_LDADD = libctemplate.la libctemplate_testing.la \
@@ -123,6 +136,7 @@ template_dictionary_nothreads_unittest_LDADD = libctemplate_nothreads.la \
                                                libctemplate_testing.la
 
 TESTS += template_modifiers_unittest template_modifiers_nothreads_unittest
+WINDOWS_PROJECTS += vsprojects/template_modifiers_unittest/template_modifiers_unittest.vcproj
 template_modifiers_unittest_SOURCES = src/tests/template_modifiers_unittest.cc
 template_modifiers_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
 template_modifiers_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
@@ -134,6 +148,7 @@ template_modifiers_nothreads_unittest_LDADD = libctemplate_nothreads.la \
                                               libctemplate_testing.la
 
 TESTS += template_setglobals_unittest template_setglobals_nothreads_unittest
+WINDOWS_PROJECTS += vsprojects/template_setglobals_unittest/template_setglobals_unittest.vcproj
 template_setglobals_unittest_SOURCES = src/tests/template_setglobals_unittest.cc
 template_setglobals_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
 template_setglobals_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
@@ -143,6 +158,7 @@ template_setglobals_nothreads_unittest_CXXFLAGS = -DNO_THREADS
 template_setglobals_nothreads_unittest_LDADD = libctemplate_nothreads.la
 
 TESTS += template_from_string_unittest template_from_string_nothreads_unittest
+WINDOWS_PROJECTS += vsprojects/template_from_string_unittest/template_from_string_unittest.vcproj
 template_from_string_unittest_SOURCES = src/tests/template_from_string_unittest.cc
 template_from_string_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
 template_from_string_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
@@ -152,6 +168,8 @@ template_from_string_nothreads_unittest_CXXFLAGS = -DNO_THREADS
 template_from_string_nothreads_unittest_LDADD = libctemplate_nothreads.la
 
 TESTS += template_unittest template_nothreads_unittest
+WINDOWS_PROJECTS += vsprojects/template_unittest/template_unittest.vcproj
+WINDOWS_PROJECTS += vsprojects/template_unittest_static/template_unittest_static.vcproj
 template_unittest_SOURCES = src/tests/template_unittest.cc
 template_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
 template_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
@@ -161,6 +179,7 @@ template_nothreads_unittest_CXXFLAGS = -DNO_THREADS
 template_nothreads_unittest_LDADD = libctemplate_nothreads.la
 
 TESTS += template_regtest template_nothreads_regtest
+WINDOWS_PROJECTS += vsprojects/template_regtest/template_regtest.vcproj
 template_regtest_SOURCES = src/tests/template_regtest.cc
 template_regtest_CXXFLAGS = $(PTHREAD_CFLAGS)
 template_regtest_LDFLAGS = $(PTHREAD_CFLAGS)
@@ -171,7 +190,8 @@ template_nothreads_regtest_LDADD = libctemplate_nothreads.la
 
 make_tpl_varnames_h_unittest_sh: $(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
                                  make_tpl_varnames_h
-	$< $(top_builddir)/make_tpl_varnames_h /tmp/$@_dir
+	$(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
+	   $(top_builddir)/make_tpl_varnames_h /tmp/$@_dir
 
 ## ^^^^ END OF RULES TO MAKE THE LIBRARIES, BINARIES, AND UNITTESTS
 
@@ -191,4 +211,4 @@ libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
 EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb \
 	$(SCRIPTS) libtool \
-	contrib
+	src/windows $(WINDOWS_PROJECTS) src/solaris/libstdc++.la contrib

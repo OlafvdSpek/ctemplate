@@ -43,19 +43,18 @@ host_triplet = @host@
 bin_PROGRAMS = make_tpl_varnames_h$(EXEEXT)
 noinst_PROGRAMS = $(am__EXEEXT_1)
 DIST_COMMON = README $(am__configure_deps) $(dist_doc_DATA) \
-	$(googleinclude_HEADERS) $(noinst_HEADERS) \
-	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
-	$(top_srcdir)/configure $(top_srcdir)/src/base/arena.h.in \
-	$(top_srcdir)/src/config.h.in \
+	$(noinst_HEADERS) $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
+	$(top_srcdir)/configure $(top_srcdir)/src/config.h.in \
 	$(top_srcdir)/src/google/template.h.in \
 	$(top_srcdir)/src/google/template_dictionary.h.in \
 	$(top_srcdir)/src/google/template_emitter.h.in \
 	$(top_srcdir)/src/google/template_enums.h.in \
 	$(top_srcdir)/src/google/template_from_string.h.in \
 	$(top_srcdir)/src/google/template_modifiers.h.in \
-	$(top_srcdir)/src/google/template_namelist.h.in AUTHORS \
-	COPYING ChangeLog INSTALL NEWS compile config.guess config.sub \
-	depcomp install-sh ltmain.sh missing mkinstalldirs
+	$(top_srcdir)/src/google/template_namelist.h.in \
+	$(top_srcdir)/src/google/template_pathops.h.in AUTHORS COPYING \
+	ChangeLog INSTALL NEWS compile config.guess config.sub depcomp \
+	install-sh ltmain.sh missing mkinstalldirs
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ac_have_attribute.m4 \
@@ -70,11 +69,11 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno configure.status.lineno
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/src/config.h
-CONFIG_CLEAN_FILES = src/base/arena.h src/google/template_enums.h \
-	src/google/template.h src/google/template_from_string.h \
+CONFIG_CLEAN_FILES = src/google/template_enums.h \
+	src/google/template_namelist.h src/google/template.h \
+	src/google/template_from_string.h \
 	src/google/template_modifiers.h src/google/template_emitter.h \
-	src/google/template_dictionary.h \
-	src/google/template_namelist.h
+	src/google/template_dictionary.h src/google/template_pathops.h
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -88,26 +87,27 @@ libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES) $(noinst_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 libctemplate_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
-am__objects_1 =
-am_libctemplate_la_OBJECTS = $(am__objects_1) libctemplate_la-arena.lo \
+am_libctemplate_la_OBJECTS = libctemplate_la-arena.lo \
 	libctemplate_la-template.lo \
 	libctemplate_la-template_dictionary.lo \
 	libctemplate_la-template_modifiers.lo \
 	libctemplate_la-template_namelist.lo \
+	libctemplate_la-template_pathops.lo \
 	libctemplate_la-template_from_string.lo
 libctemplate_la_OBJECTS = $(am_libctemplate_la_OBJECTS)
 libctemplate_nothreads_la_LIBADD =
-am__objects_2 = $(am__objects_1) libctemplate_nothreads_la-arena.lo \
+am__objects_1 = libctemplate_nothreads_la-arena.lo \
 	libctemplate_nothreads_la-template.lo \
 	libctemplate_nothreads_la-template_dictionary.lo \
 	libctemplate_nothreads_la-template_modifiers.lo \
 	libctemplate_nothreads_la-template_namelist.lo \
+	libctemplate_nothreads_la-template_pathops.lo \
 	libctemplate_nothreads_la-template_from_string.lo
-am_libctemplate_nothreads_la_OBJECTS = $(am__objects_2)
+am_libctemplate_nothreads_la_OBJECTS = $(am__objects_1)
 libctemplate_nothreads_la_OBJECTS =  \
 	$(am_libctemplate_nothreads_la_OBJECTS)
 libctemplate_testing_la_LIBADD =
-am_libctemplate_testing_la_OBJECTS = $(am__objects_1) \
+am_libctemplate_testing_la_OBJECTS =  \
 	libctemplate_testing_la-template_test_util.lo
 libctemplate_testing_la_OBJECTS =  \
 	$(am_libctemplate_testing_la_OBJECTS)
@@ -124,12 +124,11 @@ am__EXEEXT_1 = template_dictionary_unittest$(EXEEXT) \
 	template_nothreads_unittest$(EXEEXT) template_regtest$(EXEEXT) \
 	template_nothreads_regtest$(EXEEXT)
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
-am_make_tpl_varnames_h_OBJECTS = $(am__objects_1) \
-	make_tpl_varnames_h.$(OBJEXT)
+am_make_tpl_varnames_h_OBJECTS = make_tpl_varnames_h.$(OBJEXT)
 make_tpl_varnames_h_OBJECTS = $(am_make_tpl_varnames_h_OBJECTS)
 make_tpl_varnames_h_DEPENDENCIES = libctemplate_nothreads.la
-am__objects_3 = template_dictionary_nothreads_unittest-template_dictionary_unittest.$(OBJEXT)
-am_template_dictionary_nothreads_unittest_OBJECTS = $(am__objects_3)
+am__objects_2 = template_dictionary_nothreads_unittest-template_dictionary_unittest.$(OBJEXT)
+am_template_dictionary_nothreads_unittest_OBJECTS = $(am__objects_2)
 template_dictionary_nothreads_unittest_OBJECTS =  \
 	$(am_template_dictionary_nothreads_unittest_OBJECTS)
 template_dictionary_nothreads_unittest_DEPENDENCIES =  \
@@ -139,8 +138,8 @@ template_dictionary_unittest_OBJECTS =  \
 	$(am_template_dictionary_unittest_OBJECTS)
 template_dictionary_unittest_DEPENDENCIES = libctemplate.la \
 	libctemplate_testing.la $(am__DEPENDENCIES_1)
-am__objects_4 = template_from_string_nothreads_unittest-template_from_string_unittest.$(OBJEXT)
-am_template_from_string_nothreads_unittest_OBJECTS = $(am__objects_4)
+am__objects_3 = template_from_string_nothreads_unittest-template_from_string_unittest.$(OBJEXT)
+am_template_from_string_nothreads_unittest_OBJECTS = $(am__objects_3)
 template_from_string_nothreads_unittest_OBJECTS =  \
 	$(am_template_from_string_nothreads_unittest_OBJECTS)
 template_from_string_nothreads_unittest_DEPENDENCIES =  \
@@ -150,8 +149,8 @@ template_from_string_unittest_OBJECTS =  \
 	$(am_template_from_string_unittest_OBJECTS)
 template_from_string_unittest_DEPENDENCIES = libctemplate.la \
 	$(am__DEPENDENCIES_1)
-am__objects_5 = template_modifiers_nothreads_unittest-template_modifiers_unittest.$(OBJEXT)
-am_template_modifiers_nothreads_unittest_OBJECTS = $(am__objects_5)
+am__objects_4 = template_modifiers_nothreads_unittest-template_modifiers_unittest.$(OBJEXT)
+am_template_modifiers_nothreads_unittest_OBJECTS = $(am__objects_4)
 template_modifiers_nothreads_unittest_OBJECTS =  \
 	$(am_template_modifiers_nothreads_unittest_OBJECTS)
 template_modifiers_nothreads_unittest_DEPENDENCIES =  \
@@ -161,8 +160,8 @@ template_modifiers_unittest_OBJECTS =  \
 	$(am_template_modifiers_unittest_OBJECTS)
 template_modifiers_unittest_DEPENDENCIES = libctemplate.la \
 	libctemplate_testing.la $(am__DEPENDENCIES_1)
-am__objects_6 = template_nothreads_regtest-template_regtest.$(OBJEXT)
-am_template_nothreads_regtest_OBJECTS = $(am__objects_6)
+am__objects_5 = template_nothreads_regtest-template_regtest.$(OBJEXT)
+am_template_nothreads_regtest_OBJECTS = $(am__objects_5)
 template_nothreads_regtest_OBJECTS =  \
 	$(am_template_nothreads_regtest_OBJECTS)
 template_nothreads_regtest_DEPENDENCIES = libctemplate_nothreads.la
@@ -175,8 +174,8 @@ am_template_regtest_OBJECTS =  \
 	template_regtest-template_regtest.$(OBJEXT)
 template_regtest_OBJECTS = $(am_template_regtest_OBJECTS)
 template_regtest_DEPENDENCIES = libctemplate.la $(am__DEPENDENCIES_1)
-am__objects_7 = template_setglobals_nothreads_unittest-template_setglobals_unittest.$(OBJEXT)
-am_template_setglobals_nothreads_unittest_OBJECTS = $(am__objects_7)
+am__objects_6 = template_setglobals_nothreads_unittest-template_setglobals_unittest.$(OBJEXT)
+am_template_setglobals_nothreads_unittest_OBJECTS = $(am__objects_6)
 template_setglobals_nothreads_unittest_OBJECTS =  \
 	$(am_template_setglobals_nothreads_unittest_OBJECTS)
 template_setglobals_nothreads_unittest_DEPENDENCIES =  \
@@ -245,8 +244,8 @@ DIST_SOURCES = $(libctemplate_la_SOURCES) \
 	$(template_unittest_SOURCES)
 dist_docDATA_INSTALL = $(INSTALL_DATA)
 DATA = $(dist_doc_DATA)
-googleincludeHEADERS_INSTALL = $(INSTALL_HEADER)
-HEADERS = $(googleinclude_HEADERS) $(noinst_HEADERS)
+nodist_googleincludeHEADERS_INSTALL = $(INSTALL_HEADER)
+HEADERS = $(nodist_googleinclude_HEADERS) $(noinst_HEADERS)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -256,7 +255,7 @@ am__remove_distdir = \
   { test ! -d $(distdir) \
     || { find $(distdir) -type d ! -perm -200 -exec chmod u+w {} ';' \
          && rm -fr $(distdir); }; }
-DIST_ARCHIVES = $(distdir).tar.gz
+DIST_ARCHIVES = $(distdir).tar.gz $(distdir).zip
 GZIP_ENV = --best
 distuninstallcheck_listfiles = find . -type f -print
 distcleancheck_listfiles = find . -type f -print
@@ -330,6 +329,8 @@ ac_google_attribute = @ac_google_attribute@
 ac_google_end_namespace = @ac_google_end_namespace@
 ac_google_namespace = @ac_google_namespace@
 ac_google_start_namespace = @ac_google_start_namespace@
+ac_windows_dllexport = @ac_windows_dllexport@
+ac_windows_dllexport_defines = @ac_windows_dllexport_defines@
 acx_pthread_config = @acx_pthread_config@
 am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
 am__fastdepCC_TRUE = @am__fastdepCC_TRUE@
@@ -375,9 +376,10 @@ ACLOCAL_AMFLAGS = -I m4
 # This is so we can #include <google/foo>
 AM_CPPFLAGS = -I$(top_srcdir)/src
 googleincludedir = $(includedir)/google
-googleinclude_HEADERS = \
+nodist_googleinclude_HEADERS = \
 	src/google/template.h \
 	src/google/template_enums.h \
+	src/google/template_pathops.h \
 	src/google/template_modifiers.h \
 	src/google/template_dictionary.h \
 	src/google/template_emitter.h \
@@ -385,9 +387,9 @@ googleinclude_HEADERS = \
 	src/google/template_from_string.h
 
 noinst_HEADERS = \
-	src/base/arena.h.in \
 	src/google/template.h.in \
 	src/google/template_enums.h.in \
+	src/google/template_pathops.h.in \
 	src/google/template_modifiers.h.in \
 	src/google/template_dictionary.h.in \
 	src/google/template_emitter.h.in \
@@ -395,7 +397,7 @@ noinst_HEADERS = \
 	src/google/template_from_string.h.in
 
 docdir = $(prefix)/share/doc/$(PACKAGE)-$(VERSION)
-dist_doc_DATA = AUTHORS COPYING ChangeLog INSTALL NEWS README \
+dist_doc_DATA = AUTHORS COPYING ChangeLog INSTALL NEWS README README.windows \
 	doc/designstyle.css doc/index.html \
 	doc/howto.html doc/tips.html doc/example.html \
 	doc/xss_resources.html
@@ -415,6 +417,16 @@ lib_LTLIBRARIES = libctemplate.la libctemplate_nothreads.la
 # mail to google-ctemplate@googlegroups.com!
 noinst_LTLIBRARIES = libctemplate_testing.la
 bin_SCRIPTS = src/template-converter
+WINDOWS_PROJECTS = google-ctemplate.sln \
+	vsprojects/libctemplate/libctemplate.vcproj \
+	vsprojects/make_tpl_varname_h/make_tpl_varname_h.vcproj \
+	vsprojects/template_dictionary_unittest/template_dictionary_unittest.vcproj \
+	vsprojects/template_modifiers_unittest/template_modifiers_unittest.vcproj \
+	vsprojects/template_setglobals_unittest/template_setglobals_unittest.vcproj \
+	vsprojects/template_from_string_unittest/template_from_string_unittest.vcproj \
+	vsprojects/template_unittest/template_unittest.vcproj \
+	vsprojects/template_unittest_static/template_unittest_static.vcproj \
+	vsprojects/template_regtest/template_regtest.vcproj
 
 # For each of the tests, we test with and without threads
 TESTS = template_dictionary_unittest \
@@ -432,12 +444,17 @@ TESTS_ENVIRONMENT = TEMPLATE_ROOTDIR=$(top_srcdir)
 # Every time you add a unittest to check_SCRIPTS, add it here too
 noinst_SCRIPTS = src/tests/make_tpl_varnames_h_unittest.sh
 
-# These are the symbols (classes, mostly) we want to export from our library
-CTEMPLATE_SYMBOLS = '[^A-Za-z](Template|TemplateDictionary|TemplateNamelist|TemplateFromString|TemplateString|TemplateState|Strip)[^A-Za-z]'
-libctemplate_la_SOURCES = $(googleinclude_HEADERS) src/config.h \
+# These are the symbols (classes, mostly) we want to export from our library.
+# Note this regexp applies to the *mangled* name, which is why we have to
+# be careful where we want to assert [^A-Za-z].  (Particularly bad on Darwin.)
+# template_modifiers and BaseArena and UnsafeArena perhaps shouldn't be
+# exported, but they're needed -- at least -- for some unittests.
+CTEMPLATE_SYMBOLS = '(ctemplate|template_modifiers|BaseArena|UnsafeArena|[^A-Za-z]Template[^A-Za-z]|TemplateDictionary|TemplateNamelist|TemplateFromString|TemplateString|TemplateState|[^A-Za-z]Strip[^A-Za-z])'
+libctemplate_la_SOURCES = $(googleinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
-	src/template_namelist.cc src/template_from_string.cc
+	src/template_namelist.cc src/template_pathops.cc \
+	src/template_from_string.cc
 
 libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG
 libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) -export-symbols-regex $(CTEMPLATE_SYMBOLS)
@@ -452,11 +469,13 @@ libctemplate_testing_la_SOURCES = $(googleinclude_HEADERS) \
 libctemplate_testing_la_CXXFLAGS = -DNDEBUG
 CTEMPLATE_TESTING_SYMBOLS = 'TemporaryRegisterTemplate|TemplateDictionaryPeer'
 libctemplate_testing_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS)
-make_tpl_varnames_h_SOURCES = $(googleinclude_HEADERS) src/config.h \
+make_tpl_varnames_h_SOURCES = $(googleinclude_HEADERS) \
 	src/make_tpl_varnames_h.cc
 
 make_tpl_varnames_h_LDADD = libctemplate_nothreads.la
-template_dictionary_unittest_SOURCES = src/tests/template_dictionary_unittest.cc
+template_dictionary_unittest_SOURCES = src/base/arena.h \
+                                       src/tests/template_dictionary_unittest.cc
+
 template_dictionary_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
 template_dictionary_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_dictionary_unittest_LDADD = libctemplate.la libctemplate_testing.la \
@@ -508,7 +527,7 @@ template_nothreads_regtest_CXXFLAGS = -DNO_THREADS
 template_nothreads_regtest_LDADD = libctemplate_nothreads.la
 EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb \
 	$(SCRIPTS) libtool \
-	contrib
+	src/windows $(WINDOWS_PROJECTS) src/solaris/libstdc++.la contrib
 
 all: all-am
 
@@ -564,9 +583,9 @@ $(top_srcdir)/src/config.h.in:  $(am__configure_deps)
 
 distclean-hdr:
 	-rm -f src/config.h src/stamp-h1
-src/base/arena.h: $(top_builddir)/config.status $(top_srcdir)/src/base/arena.h.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
 src/google/template_enums.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_enums.h.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+src/google/template_namelist.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_namelist.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 src/google/template.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
@@ -578,7 +597,7 @@ src/google/template_emitter.h: $(top_builddir)/config.status $(top_srcdir)/src/g
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 src/google/template_dictionary.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_dictionary.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-src/google/template_namelist.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_namelist.h.in
+src/google/template_pathops.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_pathops.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 install-libLTLIBRARIES: $(lib_LTLIBRARIES)
 	@$(NORMAL_INSTALL)
@@ -728,12 +747,14 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template_from_string.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template_modifiers.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template_namelist.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template_pathops.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-arena.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-template.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-template_dictionary.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-template_from_string.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-template_modifiers.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-template_namelist.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-template_pathops.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_testing_la-template_test_util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/make_tpl_varnames_h.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/template_dictionary_nothreads_unittest-template_dictionary_unittest.Po@am__quote@
@@ -805,6 +826,13 @@ libctemplate_la-template_namelist.lo: src/template_namelist.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_la-template_namelist.lo `test -f 'src/template_namelist.cc' || echo '$(srcdir)/'`src/template_namelist.cc
 
+libctemplate_la-template_pathops.lo: src/template_pathops.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_la-template_pathops.lo -MD -MP -MF "$(DEPDIR)/libctemplate_la-template_pathops.Tpo" -c -o libctemplate_la-template_pathops.lo `test -f 'src/template_pathops.cc' || echo '$(srcdir)/'`src/template_pathops.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_la-template_pathops.Tpo" "$(DEPDIR)/libctemplate_la-template_pathops.Plo"; else rm -f "$(DEPDIR)/libctemplate_la-template_pathops.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_pathops.cc' object='libctemplate_la-template_pathops.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_la-template_pathops.lo `test -f 'src/template_pathops.cc' || echo '$(srcdir)/'`src/template_pathops.cc
+
 libctemplate_la-template_from_string.lo: src/template_from_string.cc
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_la-template_from_string.lo -MD -MP -MF "$(DEPDIR)/libctemplate_la-template_from_string.Tpo" -c -o libctemplate_la-template_from_string.lo `test -f 'src/template_from_string.cc' || echo '$(srcdir)/'`src/template_from_string.cc; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_la-template_from_string.Tpo" "$(DEPDIR)/libctemplate_la-template_from_string.Plo"; else rm -f "$(DEPDIR)/libctemplate_la-template_from_string.Tpo"; exit 1; fi
@@ -846,6 +874,13 @@ libctemplate_nothreads_la-template_namelist.lo: src/template_namelist.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_namelist.cc' object='libctemplate_nothreads_la-template_namelist.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_la-template_namelist.lo `test -f 'src/template_namelist.cc' || echo '$(srcdir)/'`src/template_namelist.cc
+
+libctemplate_nothreads_la-template_pathops.lo: src/template_pathops.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_la-template_pathops.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_la-template_pathops.Tpo" -c -o libctemplate_nothreads_la-template_pathops.lo `test -f 'src/template_pathops.cc' || echo '$(srcdir)/'`src/template_pathops.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_nothreads_la-template_pathops.Tpo" "$(DEPDIR)/libctemplate_nothreads_la-template_pathops.Plo"; else rm -f "$(DEPDIR)/libctemplate_nothreads_la-template_pathops.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_pathops.cc' object='libctemplate_nothreads_la-template_pathops.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_la-template_pathops.lo `test -f 'src/template_pathops.cc' || echo '$(srcdir)/'`src/template_pathops.cc
 
 libctemplate_nothreads_la-template_from_string.lo: src/template_from_string.cc
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_la-template_from_string.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_la-template_from_string.Tpo" -c -o libctemplate_nothreads_la-template_from_string.lo `test -f 'src/template_from_string.cc' || echo '$(srcdir)/'`src/template_from_string.cc; \
@@ -1069,19 +1104,19 @@ uninstall-dist_docDATA:
 	  echo " rm -f '$(DESTDIR)$(docdir)/$$f'"; \
 	  rm -f "$(DESTDIR)$(docdir)/$$f"; \
 	done
-install-googleincludeHEADERS: $(googleinclude_HEADERS)
+install-nodist_googleincludeHEADERS: $(nodist_googleinclude_HEADERS)
 	@$(NORMAL_INSTALL)
 	test -z "$(googleincludedir)" || $(mkdir_p) "$(DESTDIR)$(googleincludedir)"
-	@list='$(googleinclude_HEADERS)'; for p in $$list; do \
+	@list='$(nodist_googleinclude_HEADERS)'; for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  f=$(am__strip_dir) \
-	  echo " $(googleincludeHEADERS_INSTALL) '$$d$$p' '$(DESTDIR)$(googleincludedir)/$$f'"; \
-	  $(googleincludeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(googleincludedir)/$$f"; \
+	  echo " $(nodist_googleincludeHEADERS_INSTALL) '$$d$$p' '$(DESTDIR)$(googleincludedir)/$$f'"; \
+	  $(nodist_googleincludeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(googleincludedir)/$$f"; \
 	done
 
-uninstall-googleincludeHEADERS:
+uninstall-nodist_googleincludeHEADERS:
 	@$(NORMAL_UNINSTALL)
-	@list='$(googleinclude_HEADERS)'; for p in $$list; do \
+	@list='$(nodist_googleinclude_HEADERS)'; for p in $$list; do \
 	  f=$(am__strip_dir) \
 	  echo " rm -f '$(DESTDIR)$(googleincludedir)/$$f'"; \
 	  rm -f "$(DESTDIR)$(googleincludedir)/$$f"; \
@@ -1211,7 +1246,7 @@ check-TESTS: $(TESTS)
 distdir: $(DISTFILES)
 	$(am__remove_distdir)
 	mkdir $(distdir)
-	$(mkdir_p) $(distdir)/doc $(distdir)/m4 $(distdir)/packages $(distdir)/packages/rpm $(distdir)/src $(distdir)/src/base $(distdir)/src/google $(distdir)/src/tests
+	$(mkdir_p) $(distdir)/doc $(distdir)/m4 $(distdir)/packages $(distdir)/packages/rpm $(distdir)/src $(distdir)/src/google $(distdir)/src/solaris $(distdir)/src/tests $(distdir)/vsprojects/libctemplate $(distdir)/vsprojects/make_tpl_varname_h $(distdir)/vsprojects/template_dictionary_unittest $(distdir)/vsprojects/template_from_string_unittest $(distdir)/vsprojects/template_modifiers_unittest $(distdir)/vsprojects/template_regtest $(distdir)/vsprojects/template_setglobals_unittest $(distdir)/vsprojects/template_unittest $(distdir)/vsprojects/template_unittest_static
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \
@@ -1258,7 +1293,6 @@ dist-tarZ: distdir
 dist-shar: distdir
 	shar $(distdir) | GZIP=$(GZIP_ENV) gzip -c >$(distdir).shar.gz
 	$(am__remove_distdir)
-
 dist-zip: distdir
 	-rm -f $(distdir).zip
 	zip -rq $(distdir).zip $(distdir)
@@ -1266,6 +1300,8 @@ dist-zip: distdir
 
 dist dist-all: distdir
 	tardir=$(distdir) && $(am__tar) | GZIP=$(GZIP_ENV) gzip -c >$(distdir).tar.gz
+	-rm -f $(distdir).zip
+	zip -rq $(distdir).zip $(distdir)
 	$(am__remove_distdir)
 
 # This target untars the dist file and tries a VPATH configuration.  Then
@@ -1394,7 +1430,8 @@ info: info-am
 
 info-am:
 
-install-data-am: install-dist_docDATA install-googleincludeHEADERS
+install-data-am: install-dist_docDATA \
+	install-nodist_googleincludeHEADERS
 
 install-exec-am: install-binPROGRAMS install-binSCRIPTS \
 	install-libLTLIBRARIES
@@ -1426,8 +1463,8 @@ ps: ps-am
 ps-am:
 
 uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
-	uninstall-dist_docDATA uninstall-googleincludeHEADERS \
-	uninstall-info-am uninstall-libLTLIBRARIES
+	uninstall-dist_docDATA uninstall-info-am \
+	uninstall-libLTLIBRARIES uninstall-nodist_googleincludeHEADERS
 
 .PHONY: CTAGS GTAGS all all-am am--refresh check check-TESTS check-am \
 	clean clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
@@ -1439,20 +1476,21 @@ uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
 	dvi-am html html-am info info-am install install-am \
 	install-binPROGRAMS install-binSCRIPTS install-data \
 	install-data-am install-dist_docDATA install-exec \
-	install-exec-am install-googleincludeHEADERS install-info \
-	install-info-am install-libLTLIBRARIES install-man \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags uninstall uninstall-am \
-	uninstall-binPROGRAMS uninstall-binSCRIPTS \
-	uninstall-dist_docDATA uninstall-googleincludeHEADERS \
-	uninstall-info-am uninstall-libLTLIBRARIES
+	install-exec-am install-info install-info-am \
+	install-libLTLIBRARIES install-man \
+	install-nodist_googleincludeHEADERS install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags uninstall uninstall-am uninstall-binPROGRAMS \
+	uninstall-binSCRIPTS uninstall-dist_docDATA uninstall-info-am \
+	uninstall-libLTLIBRARIES uninstall-nodist_googleincludeHEADERS
 
 
 make_tpl_varnames_h_unittest_sh: $(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
                                  make_tpl_varnames_h
-	$< $(top_builddir)/make_tpl_varnames_h /tmp/$@_dir
+	$(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
+	   $(top_builddir)/make_tpl_varnames_h /tmp/$@_dir
 
 rpm: dist-gzip packages/rpm.sh packages/rpm/rpm.spec
 	@cd packages && ./rpm.sh ${PACKAGE} ${VERSION}

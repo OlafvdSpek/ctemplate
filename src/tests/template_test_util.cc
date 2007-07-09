@@ -31,6 +31,11 @@
 // Author: Jim Morrison
 
 #include "config.h"
+// This is for windows.  Even though we #include config.h, just like
+// the files used to compile the dll, we are actually a *client* of
+// the dll, so we don't get to decl anything.
+#undef CTEMPLATE_DLL_DECL
+
 #include "tests/template_test_util.h"
 #include <google/template_dictionary.h>
 #include <google/template_namelist.h>

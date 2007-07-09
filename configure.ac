@@ -4,11 +4,11 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 0.6.1, opensource@google.com)
+AC_INIT(ctemplate, 0.7, opensource@google.com)
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([dist-zip])
 AM_CONFIG_HEADER(src/config.h)
 
 # Checks for programs.
@@ -65,11 +65,20 @@ else
    AC_SUBST(ac_google_attribute, 0)
 fi
 
+# In unix (that is, using this script), this dll-export stuff will always
+# be the empty string.  In windows, we'll replace it with windows-specific
+# text.
+ac_windows_dllexport_defines=
+ac_windows_dllexport=
+AC_SUBST(ac_windows_dllexport_defines)
+AC_SUBST(ac_windows_dllexport)
+
+
 # Write generated configuration file, and also .h files
 AC_CONFIG_FILES([Makefile \
-                 src/base/arena.h src/google/template_enums.h \
+                 src/google/template_enums.h src/google/template_namelist.h \
 		 src/google/template.h src/google/template_from_string.h \
 		 src/google/template_modifiers.h src/google/template_emitter.h \
-		 src/google/template_dictionary.h \
-		 src/google/template_namelist.h])
+		 src/google/template_dictionary.h src/google/template_pathops.h \
+		 ])
 AC_OUTPUT
