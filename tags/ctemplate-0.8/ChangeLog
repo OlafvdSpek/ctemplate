@@ -1,0 +1,77 @@
+Mon Mar 13 22:20:46 2006  Google Inc. <opensource@google.com>
+
+	* ctemplate: initial release:
+	  The ctemplate package contains a library implementing a simple
+	  but powerful template language for C++.  It emphasizes
+	  separating logic from presentation.
+
+Wed Jun 14 14:56:04 2006  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.2 release
+	* API CHANGE: new typedefs (and types) for namelist functions (csilvers)
+	* carry annotation status through to child templates/sections (ehamon)
+	* Support registering templates after global construct time (njain)
+	* Add pthread-rwlock support for darwin (csilvers)
+	* SetTemplateGlobalValue(): new variable type with new scoping (ehamon)
+	* Export a nothreads version of the ctemplate library (csilvers)
+	* Got rid of scandir call, which should improve portability (csilvers)
+
+Mon Aug 21 17:44:32 2006  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.3 release
+	* New contrib/ directory entry: vi syntax highlighting (patlac)
+	* New contrib/ directory entry: emacs syntax highlighting (tonyg)
+	* Allow escape-modifiers to affect includes, not just vars (csilvers)
+	* Add JSON escape-functor (majewski)
+
+Mon Jan 15 14:10:42 2007  Google Inc. <opensource@google.com>
+	
+	* ctemplate: version 0.4 release
+	* Improve html-escaping by adding single-quote (bdangelo)
+	* Improve javascript-escaping by adding more characters too (smknappy)
+	* Add url-escaping, for url query parameters (dcoker)
+	* Add support for "pre" escaping, which preserves whitespace (dboswell)
+	* Typo fixes in documentation (csilvers)
+	* Expand() returns false if a template file failed to load (jmittleman)
+
+Mon May 14 17:27:10 2007  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.5 release
+	* Add new MakeCopy() method to copy template dictionaries (csilvers)
+	* Add JSON-escaping (mikepurvis)
+	* Internal change that should ease thread-handling a bit (csilvers)
+	* Fix url_query_escape to avoid stack overflow (csilvers)
+
+Sat Jun  9 22:34:52 2007  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.6 release
+	* Use computed includes for hash_map/set: easier config (csilvers)
+	* Added all used .m4 templates to the distribution (csilvers)
+	* Beefed-up and revamped modifier code (csilvers)
+	* New modifiers for url-escaping, attribute-cleansing, etc (ribrdb)
+	* Annotations now include modifier information (csilvers)
+	* Support embedded NULs in template names and values (csilvers)
+
+Thu Jun 21 14:02:32 2007  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.6.1 release
+	* Bugfix: data corruption bug with >2 template modifiers (jmacgill)
+	* Bugfix: syntax error in template-namelist: configure-bug (csilvers)
+	* Bugfix: improve lock hygiene to avoid potential deadlock (csilvers)
+
+Tue Jul  3 12:46:59 2007  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.7 release
+	* Bugfix: another lock hygiene fix, for recursive includes (csilvers)
+	* Minor type-hygiene improvements: size_t for int, etc. (csilvers)
+	* Porting improvements: tests pass on OS X, FreeBSD, Solaris (csilvers)
+	* Windows port! -- VS solution provided for all unittests (csilvers)
+
+Thu Aug 16 21:42:55 2007  Google Inc. <opensource@google.com>
+	
+	* ctemplate: version 0.8 release
+	* Add the ability to dynamically add modifiers (ribrdb)
+	* Support per-Expand() data for template modifiers (ribrdb)
+	* New commandline flag -f for make_tpl_varnames_h (herbertc)
+	* Windows: give debug dll and release dll different names (csilvers)
+	* A few fixups of Windows includes, based on user reports (csilvers)

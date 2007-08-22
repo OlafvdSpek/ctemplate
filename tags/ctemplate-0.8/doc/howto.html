@@ -1,0 +1,1271 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+
+<html>
+<head>
+<title>How To Use the Google Template System</title>
+
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="http://www.google.com/favicon.ico" type="image/x-icon"
+      rel="shortcut icon">
+<link href="designstyle.css" type="text/css" rel="stylesheet">
+<style type="text/css">
+<!--
+  ol.bluelist li {
+    color: #3366ff;
+    font-family: sans-serif;
+  }
+  ol.bluelist li p {
+    color: #000;
+    font-family: "Times Roman", times, serif;
+  }
+  ul.blacklist li {  
+    color: #000;
+    font-family: "Times Roman", times, serif;
+  }
+//-->
+</style>
+</head>
+
+<body>
+
+<h1>How To Use the Google Template System</h1>
+<br>
+
+
+<h2> Motivation </h2>
+
+<p>A template system can be used to separate output formatting
+specifications, which govern the appearance and location of output
+text and data elements, from the executable logic which prepares the
+data and makes decisions about what appears in the output.</p>
+
+<p>Template systems lie along a continuum of power versus separation.
+"Powerful" constructs like variable assignment or conditional
+statements make it easy to modify the look of an application within
+the template system exclusively, without having to modify any of the
+underlying "application logic".  They do so, however, at the cost of
+separation, turning the templates themselves into part of the
+application logic.</p>
+
+<p>This template system leans strongly towards preserving the
+separation of logic and presentation.  It is intentionally constrained
+in the features it supports and, as a result, applications tend to
+require quite a bit of code to instantiate a template.  This may not
+be to everybody's tastes.  However, while this design limits the power
+of the template <i>language</i>, it does not limit the power or
+flexibility of the template <i>system</i>.  This system supports
+arbitrarily complex text formatting.  Many Google applications,
+including the "main" Google web search, use this system exclusively
+for formatting output.</p>
+
+<p>Finally, this system is designed with an eye towards efficiency.
+Template instantiation is very quick, with an eye towards minimizing
+both memory use and memory fragmentation.</p>
+
+
+<h2> Overview </h2>
+
+<p>There are two parts to the Google Template System:</p>
+
+<ul>
+  <li> Templates
+  <li> Data dictionaries
+</ul>
+
+<p>The templates are text files that contain the format specification
+for the formatted output, i.e, the template language.  The data
+dictionaries contain the mappings from the template elements (markers)
+embedded in the templates to the data that they will format.  Here's
+a simple template:</p>
+<pre>
+   &lt;html>&lt;head>&lt;title>{{TITLE}}&lt;/title>{{META_TAGS}}&lt;/head>
+   &lt;body>{{BODY}}&lt;/body>&lt;/html>
+</pre>
+
+<p>Here's a dictionary that one could use to instantiate the template:</p>
+<pre>
+   {"TITLE": "Template example",
+    "BODY": "This is a simple template example.\nIt's boring",
+    "DATE": "11/20/2005"}
+</pre>
+
+<p>If we instantiated the template with this dictionary, here's the
+output we would get:</p>
+<pre>
+   &lt;html>&lt;head>&lt;title>Template example&lt;/title>&lt;/head>
+   &lt;body>This is a simple template example.
+It's boring&lt;/body>&lt;/html>
+</pre>
+
+<p><code>{{TITLE}}</code> and <code>{{{BODY}}</code> are <b>template
+elements</b>, also called <b>markers</b>.  In the dictionary,
+<code>TITLE</code>, <code>BODY</code>, and <code>DATE</code> are
+<b>dictionary names</b>, and the values associated with each one, such
+as <code>11/20/2005</code>, are <b>dictionary values</b>.</p>
+
+<p>A few points are clear even from this simple example:</p>
+<ol>
+  <li> Dictionary keys and values are strings; the Google template
+       system is not typed. </li>
+  <li> Dictionary values come already formatted.  It was up to the
+       application code to decide how to format the value for
+       <code>DATE</code>, and to insert the date into the dictionary
+       already formatted. </li>
+  <li> Not all dictionary values must be used by a templete.
+       <code>DATE</code> is entirely ignored. </li>
+  <li> Not all template elements may exist in the dictionary.  In this
+       example, <code>{{META_TAGS}}</code> is not found in the
+       dictionary.  This is perfectly legal; missing variable markers
+       evaluate to the empty string. </li>
+</ol>
+
+
+<h3> Templates </h3>
+
+<p> The template language has four types of markers:</p>
+<ol>
+  <li> VARIABLE markers, which are replaced by text based on
+       dictionary values.  All markers in the above example are
+       variable markers.  Variable markers look like this:
+       <code>{{VARIABLE}}</code></li>
+       
+  <li> START SECTION and END SECTION markers, which delimit
+       sections which may appear zero, one, or N times in
+       the output.  The number of times a section appears is
+       determined by the data dictionaries, as explained below.
+       Each time a section is expanded, it uses a different
+       dictionary, so that the output values may be different from one
+       iteration of a section expansion to another.  Note that the
+       specification of how sections expand is entirely dependent on
+       the dictionary, as set up by the application; there is no way
+       to specify a repeat rate in the template language itself.
+       Section markers look like this:
+       <code>{{#SECTION_NAME}}...{{/SECTION_NAME}}</code></li>
+       
+  <li> TEMPLATE-INCLUDE markers, which designate other templates to be
+       expanded and inserted at the location where the marker appears.
+       These are treated much like sections -- one may think of them
+       as sections whose content is specified in a
+       different file instead of inline -- and just like sections, can
+       be expanded zero, one or N times in the output, each with a
+       different dictionary.  Template-include markers look like this:
+       <code>{{&gt;FILENAME}}</code></li>
+
+  <li> COMMENT markers, which may annotate the template
+       structure but drop completely out of the expanded
+       output.  Comment markers look like this:
+       <code>{{!&nbsp;comment&nbsp;lives&nbsp;here -- cool, no?}}</code></li>
+</ol>
+
+<p>These marker types each have their own namespace.  For readability,
+however, it is best to not overuse a single name.</p>
+
+<p>Anything found in a template of the form <code>{{...}}</code> is
+interpreted as a template marker.  All other text is considered
+formatting text and is output verbatim at template expansion time.
+Formatting text may consist of HTML tags, XML tags, linefeeds and
+other spacing characters, constant text, etc.</p>
+
+
+<h3> Data Dictionaries </h3>
+
+<p>A data dictionary is a map from keys to values.  The keys are
+always strings, each string representing either a variable, a section,
+or a template-include file.  (Comments are not stored in the data
+dictionary!)  These values correspond to the name of the associated
+template marker: a section <code>{{#FOO}}</code> in the template text
+is matched to the key <code>"FOO"</code> in the dictionary, if it
+exists.  Note the case must match as well.</p>
+
+<p>The value associated with a key differs according to key type.  The
+value associated with a <i>variable</i> is simple: it's the value for
+that variable.  Both keys and values can be any 8-bit
+character-string, and may include internal NULs (\0).</p>
+
+<p>The value associated with a <i>section</i> is more complicated, and
+somewhat recursive: it's a list of data dictionaries.  Come
+template-expansion time, the section is expanded once for each
+dictionary in the list, so if there are two dictionaries in the list,
+then the section text will occur in the output twice.  The first time,
+all variables/etc. in the section will be evaluated taking into
+account the first dictionary.  The second time, all
+variables/etc. will be evaluated taking into account the second
+dictionary.  (See <A HREF="#inheritence">below</A> for a definition of
+"taking into account.")</p>
+
+<p>A <i>template-include</i> is a special type of section, so the
+associated value is the same: a list of dictionaries.
+Template-includes also have one other, mandatory associated piece of
+information: the filename of the template to include.  This filename
+may be specified either as an absolute path, or as a relative path.
+(In the latter case, the path is taken relative to the
+<i>template_root</i>, as <A HREF="#managing">set by the
+application</A>.)</p>
+
+<p>The application program is responsible for building this data
+dictionary, including all nesting.  It then applies this dictionary to
+a single template to produce formatted output.</p>
+
+
+<h3>Expanding a Template</h3>
+
+<p>A program using Google Templates typically reads in templates at
+load time.  During the course of program execution, the program will
+repeatedly perform the following two steps: first, instantiate a data
+dictionary, and second, apply the dictionary to the template to
+produce output.</p>
+
+<p>The template system applies a dictionary to a template by finding
+all template markers in the template, and replacing them with the
+appropriate dictionary values.  It matches template markers to
+dictionary keys in the obvious way.  For instance, a template marker
+<code>{{FOO}}</code> matches the dictionary key <code>FOO</code>.
+<code>{{FOO:html_escape}}</code> matches <code>FOO</code> as well.  The
+marker <code>{{#BAR}}</code> matches the dictionary key
+<code>BAR</code>, as does the marker <code>{{/BAR}}</code>.  The
+marker <code>{{&gt;BAZ}}</code> matches the dictionary key
+<code>BAZ</code>.  (And of course, the marker <code>{{!
+comment}}</code> doesn't match any dictionary key at all.)</p>
+
+<p>Template-variables can also have <A
+HREF="#modifiers">modifiers</A>.  In that case, the template-system
+starts by finding the appropriate value for that variable in the
+dictionary, just like normal.  Then it applies each modifier to the
+variable, left to right.  Finally, it emits the modified value to the
+output.  Template-includes can have modifiers in a similar way.  In
+such cases, after the sub-template is expanded, but before its content
+is injected into the current template, it has the modifiers
+applied.</p>
+
+<p>If no dictionary key is found for a given template marker, then the
+template marker is ignored: if a variable, it expands to the empty
+string; if a section or include-template, the section or
+include-template is expanded zero times.</p>
+
+<p>All names are case sensitive.  Names -- that is, variable keys and,
+as a result, template markers -- must be made of (7-bit ascii)
+alphanumeric characters and the underscore.  The commment marker,
+which does not map to dictionary keys, may contain any chararacters
+whatsoever except <code>}</code>, the close-curly brace.  It's a
+syntax error for any template marker to violate this rule.</p>
+
+<p>Outside of the template markers, templates may contain any text
+whatsoever, including (single) curly braces and NUL characters.</p>
+
+
+<h3><A NAME="modifiers">Modifiers</A></h3>
+
+<p>Recall that variables look like this: <code>{{VARNAME}}</code>.  We
+actually allow a more generic form: the variable name may be followed
+by one or more <b>modifiers</b>.  A modifier is a filter that's
+applied at template-expand time, that munges the value of the variable
+before it's output.  For instance, consider a template that looks like
+this:</p>
+<pre>
+   &lt;html>&lt;body>{{NAME:html_escape}}&lt;/body>&lt;/html>
+</pre>
+
+<p>This asks the template system to apply the built-in
+<code>html_escape</code> modifier when expanding
+<code>{{NAME}}</code>.  If you set <code>NAME</code> in your
+dictionary to be <code>Jim &amp; Bob</code>, what will actually be
+emitted in the template is <code>Jim &amp;amp; Bob</code>.</p>
+
+<p>Modifiers work for variable names and also for template-includes:
+<code>{{>SUB_TEMPLATE:html_escape}}</code> means that when you expand
+<code>SUB_TEMPLATE</code>, html-escape the expanded text before
+inserting it into the current template.</p>
+
+<p>You can chain modifiers together.  This template first html-escapes
+<code>NAME</code>, and then javascript-escapes that result:</p>
+<pre>
+   &lt;html>&lt;body>{{NAME:html_escape:javascript_escape}}&lt;/body>&lt;/html>
+</pre>
+
+<p>Modifiers typically have a long, descriptive name and also a
+one-letter abbreviation.  So this example is equivalent to the
+previous one:</p>
+<pre>
+   &lt;html>&lt;body>{{NAME:h:j}}&lt;/body>&lt;/html>
+</pre>
+
+<p>Here are the modifiers that are built in to the template system:</p>
+<table border=1 cellpadding=3>
+<tr><th>long name</th><th>short name</th><th>description</th></tr>
+
+<tr><td><code>:html_escape</code></td><td><code>:h</code></td>
+    <td>html-escapes the variable before output
+        (eg <code>&amp;</code> -> <code>&amp;amp;</code>)</td>
+</tr>
+
+<tr><td><code>:pre_escape</code></td><td><code>:p</code></td>
+    <td>pre-escapes the variable before output (same as html_escape but
+      whitespace is preserved; useful for &lt;pre&gt;...&lt;/pre&gt;)</td>
+</tr>
+
+<tr><td><code>:url_query_escape</code></td><td><code>:u</code></td>
+    <td>performs URL escaping on the variable before output.  
+        space is turned into +, and everything other than [0-9a-zA-Z.,_:*/~!()-], is
+        transformed into %-style escapes.  Use this when you are building
+        URLs with variables as parameters: 
+        <pre>&lt;a href="http://google.com/search?q={{QUERY:u}}"&gt;{{QUERY:h}}&lt;/a&gt;</pre>
+    </td> 
+</tr>
+
+<tr><td><code>:javascript_escape</code></td><td><code>:j</code></td>
+    <td>javascript-escapes the variable before output
+        (eg <code>"</code> -> <code>\"</code>)</td>
+</tr>
+
+<tr><td><code>:cleanse_css</code></td><td><code>:c</code></td>
+    <td>Removes characters not safe for a CSS value. Safe characters
+      are alphanumeric, space, underscore, period, coma, exclamation
+      mark, pound, percent, and dash.</td>
+</tr>
+
+<tr><td><code>:json_escape</code></td><td><code>:o</code></td>
+    <td>json-escapes a variable before output as a string in json;
+        similar to javascript escaping, but ignores characters such
+        as <code>=</code> and <code>&</code>.</td>
+</tr>
+
+<tr><td><code>:html_escape_with_arg</code></td><td><code>:H</code></td>
+    <td>special purpose html escaping. See below for details</td>
+</tr>
+
+<tr><td><code>:url_escape_with_arg</code></td><td><code>:U</code></td>
+    <td>special purpose url escaping. See below for details</td>
+</tr>
+
+<tr><td><code>:none</code></td><td></td>
+    <td>leaves the variable  as is</td>
+</tr>
+
+</table>
+
+<p>The <code>html_escape_with_arg</code>
+and <code>url_escape_with_arg</code> modifiers are a bit different
+because they requires a value to specify the type of escaping to use.
+For example, this template is equivalent to using
+the <code>pre_escape</code> modifier:</p>
+<pre>
+   &lt;html>&lt;body>&lt;pre>{{BODY:H=pre}}&lt/pre>&lt;/body>&lt;/html>
+</pre>
+
+<p>Here are the values that are supported by
+the <code>html_escape_with_arg</code> modifier:</p>
+<table border=1 cellpadding=3>
+<tr><th>value</th><th>description</th></tr>
+
+<tr><td><code>=snippet</code></td>
+    <td>like <code>html_escape</code>, but allows HTML entities and
+        some tags to pass through unchanged. The allowed tags
+        are <code>&lt;br></code>, <code>&lt;wbr></code>, <code>&lt;b></code>,
+        and <code>&lt;/b></code>.</td>
+</tr>
+
+<tr><td><code>=pre</code></td>
+    <td>same as <code>pre_escape</code></td>
+</tr>
+
+<tr><td><code>=url</code></td>
+    <td>same as <code>:U=html</code> below. For backwards compatibility.</td>
+</tr>
+
+<tr><td><code>=attribute</code></td>
+    <td>replaces characters not safe for an use in an unquoted
+        attribute with underscore. Safe characters are alphanumeric,
+        underscore, dash, period, and colon.</td>
+</tr>
+
+</table>
+
+<p>Here are the values that are supported by
+the <code>url_escape_with_arg</code> modifier:</p>
+<table border=1 cellpadding=3>
+<tr><th>value</th><th>description</th></tr>
+
+<tr><td><code>=html</code></td>
+    <td>Ensures that a variable contains a safe URL. Safe means that
+        it is either a http or https URL, or else it has no protocol
+        specified.  If the URL is safe it is html-escaped, otherwise
+        it is replaced with <code>#</code>.</td>
+</tr>
+
+<tr><td><code>=javascript</code></td>
+    <td>Same as <code>=html</code>, but using javascript escaping
+    instead of html escaping.</td>
+</tr>
+
+<tr><td><code>=query</code></td>
+    <td>Same as <code>url_query_escape</code>.</td>
+</tr>
+
+</table>
+
+<p><strong>NOTE:</strong> At the moment, there are no filters for handling XML
+attributes and text nodes. For HTML snippets, use the html filter; in other
+situations, it may be appropriate to use CDATA blocks.</p>
+
+<p>In addition to the built-in modifiers, you can write your own
+modifier. Custom modifiers must have a name starting with "x-", and
+the name can contain alphanumeric characters plus dashes and
+underscores. Custom modifiers can also accept values with any
+character except for <code>:</code> and <code>}</code>. For example this
+template could be a valid use of a custom modifier:</p>
+
+<pre>
+{{VAR:x-my_modifier:value1,value2,value3 has spaces,etc}}
+</pre>
+
+<p>See <code>&lt;template_modifiers.h&gt;</code>
+for details on how to write a modifier and how to register it (there's
+also an example of a custom
+modifier <A HREF="#variables">below</A>).</p>
+
+<h3> <A NAME="inheritence">Details on Dictionary Lookup</A> </h3>
+
+<p>The dictionary structure is a tree: there's a 'main' dictionary,
+and then sub-dictionaries for each section or include-template.  Even
+with all this complexity, the lookup rules are mostly straightforward:
+when looking up a marker -- be it a variable, section, or
+include-template marker -- the system looks in the currently
+applicable dictionary.  If it's found there, great.  If not, and the
+parent dictionary is not an include-template, it continues the look in
+the parent dictionary, and possibly the grandparent, etc.  That is,
+lookup has <i>static scoping</i>: you look in your dictionary and any
+parent dictionary that is associated with the same template-file.  As
+soon as continuing the lookup would require you to jump to a new
+template-file (which is what include-template would do), we stop the
+lookup.</p>
+
+<p>For instance, for a template that says
+<code>{{#RESULTS}}{{RESULTNUM}}. {{>ONE_RESULT}}{{/RESULTS}}</code>,
+<code>"ONE_RESULT"</code> is looked for in the "RESULTS" dictionary,
+and if not found there, is looked for in the main, top-level
+dictionary.  Likewise, the variable <code>"RESULTNUM"</code> is looked
+for first in the "RESULTS" dictionary, then in the main dictionary if
+necessary.  However, "ONE_RESULT" will not do equivalent cascading
+lookups.  In fact, it will have no parent dictionaries at all, because
+it's a different template file and thus in a different scope.</p>
+
+<p>Because of these scoping rules, it's perfectly reasonable to set
+all variables that are needed in a given template file, in the
+top-level dictionary for that template.  In fact, the <code><A
+HREF="#sections">ShowSection()</A></code> function is provided to
+support just this idiom.  To avoid confusion in such a usage mode,
+it's strongly encouraged that you give unique names to all sections
+and include-templates in a single template file.  (It's no problem,
+given the template scoping rules, for a single section or
+include-template name to be repeated across different template
+files.)</p>
+
+<p>There's a single special case: the <b>global variable
+dictionary</b>.  Every dictionary inherits its initial set of values
+from the global dictionary.  Clients can <A HREF="#variables">set
+variables in the global dictionary</A> just like they can in normal
+template dictionaries they create.</p>
+
+<p>The system initializes the global dictionary with a few useful
+values for your convenience.  All system variables are prefixed with
+<code>BI</code>, to emphasize they are "built in" variables.</p>
+<ul>
+  <li> <code>BI_SPACE</code>, which has the value
+       <code>&lt;space&gt;</code>.  It is used to force a space
+       at the beginning or end of a line in the template,
+       where it would normally be suppressed.  (See below.) </li>
+
+  <li><code>BI_NEWLINE</code>, which has the value
+       <code>&lt;newline&gt;</code> It is used to force a
+       newline at the end of a line, where it would normally
+       be suppressed.  (See below.) </li>
+</ul>
+
+<p>As is usual for inheritence, if a user explicitly assigns a value
+to these variable-names in its own dictionary, this overrides the
+inherited value.  So, <code>dict->SetValue("BI_SPACE",
+"&amp;nbsp;")</code> causes <code>BI_SPACE</code> to have the value
+<code>&amp;nbsp;</code>, rather than <code>&lt;space&gt;</code>, when
+expanding <code>dict</code>.</p>
+
+<p>Note that only variables can be inherited from the global
+dictionary, not section dictionaries or include-file dictionaries.</p>
+
+<p>A couple of small implementation notes: global inheritence is "last
+chance", so if a section's parent dictionary redefined
+<code>BI_SPACE</code>, say, the section dictionary inherits the
+parent-dict value, not the global-dict value.  Second, variable
+inheritence happens at expand time, not at dictionary-create time.  So
+if you create a section dictionary, and then afterwards set a variable
+in its parent dictionary (or in the global dictionary), the section
+<i>will</i> inherit that variable value, if it doesn't define the
+value itself.</p>
+
+
+<h2> Writing Application Code To Use Templates </h2>
+
+<p>Most application code concerns filling a template dictionary, but
+there is also code for loading templates themselves from disk.  A
+final category of code lets you inspect and control the template
+system.</p>
+
+<p>The code below assumes the default configuration option of putting
+all template code in namespace <code>google</code>.
+
+
+<h3> Loading A Template </h3>
+
+<p>The main routine to load a template is
+<code>google::Template::GetTemplate()</code>, defined in
+<code>template.h</code>.  This is a static, factory method, that loads
+a template from either disk or from an internal template cache, and
+returns a pointer to a <code>Template</code> object.  Besides a
+filename to load from, this routine takes a 'strip' argument which
+defines how to expand whitespace found in a template file.  It can
+have one of the following values:</p>
+
+<ul>
+  <li> <code>google::DO_NOT_STRIP</code>: do nothing.  This expands the
+       template file verbatim.
+
+  <li> <code>google::STRIP_BLANK_LINES</code>: remove all blank
+       lines when expanding.  This ignores any blank lines found in
+       the template file when expanding.  When the template is html,
+       this reduces the size of the output text without requiring a
+       sacrifice of readability for the input file.
+
+  <li> <code>google::STRIP_WHITESPACE</code>: remove not only blank lines when
+       expanding, but also whitespace at the beginning and end of each
+       line.  It also removes any linefeed (possibly following
+       whitespace) that follows a closing '}}' of any kind of template
+       marker <i>except</i> a template variable.  (This means a
+       linefeed may be removed anywhere by simply placing a comment
+       marker as the last element on the line.)  When the template is
+       html, this reduces the size of the output html without changing
+       the way it renders (except in a few special cases).  When using
+       this flag, the built-in template variables
+       <code>BI_NEWLINE</code> and <code>BI_SPACE</code> can be useful
+       to force a space or newline in a particular situation.
+</ul>
+
+<p>This factory method returns NULL if the template cannot be found,
+or if there is a syntax error trying to load it.</p>
+
+<p>Besides loading templates, the application can also ask the
+template system to <i>reload</i> a template, via
+<code>template->ReloadIfChanged()</code>.  (You can also reload all
+templates at once via <code>google::Template::ReloadAllIfChanged()</code>.)
+<code>ReloadIfChanged()</code> looks on disk, and if it notices the
+template file has changed since the last load, it will reload the
+template from disk, replacing the old contents.  Actually, the reload
+is done lazily: <code>ReloadIfChanged</code> just sets a bit that
+causes the template to be reloaded next time <code>GetTemplate</code>
+is called.</p>
+
+
+<h3> Creating A Template Dictionary </h3>
+
+<p>The class <code>google::TemplateDictionary</code> is used for all template
+dictionary operations.  <code>new google::TemplateDictionary(name)</code> is
+used to create a new top-level dictionary.
+<code>dict->AddSectionDictionary(name)</code> and
+<code>dict->AddIncludeDictionary(name)</code> are used to create
+sub-dictionaries for sections or include-files.  After
+creating a dictionary, the application should call one or more
+functions for each marker in the template.  As an example, consider
+the following template:
+<pre>
+&lt;html>&lt;body> {{! This page has no head section.}}
+{{#CHANGE_USER}}
+&lt;A HREF="/login">Click here&lt;/A> if you are not {{USERNAME}}&lt;br>
+{{/CHANGE_USER}}
+
+Last five searches:&lt;ol>
+{{#PREV_SEARCHES}
+&lt;li> {{PREV_SEARCH}}
+{{/PREV_SEARCHES}}
+&lt;/ol>
+
+{{>RESULT_TEMPLATE}}
+
+{{FOOTER}}
+&lt;/body>&lt;/html>
+</pre>
+
+<p>To instantiate the template, the user should call a function to set
+up <code>FOOTER</code>, and a function to say what to do for the
+sections <code>CHANGE_USER</code> and <code>PREV_SEARCHES</code>, and
+for the include-template <code>RESULT_TEMPLATE</code>.  Quite likely,
+the application will also want to create a sub-dictionary for
+<code>CHANGE_USER</code>, and in that sub-dictionary call a function
+to set up <code>USERNAME</code>.  There will also be sub-dictionaries
+for <code>PREV_SEARCHES</code>, each of which will need to set
+<code>PREV_SEARCH</code>.  Only when this is all set up will the
+application be able to apply the dictionary to the template to get
+output.</p>
+
+<p>The appropriate function to call for a given template marker
+depends on its type.</p>
+
+<h4> <A NAME="variables">Variables</A> </h4>
+
+<p>For variables, the only interesting action is to set the variable's
+value.  For most variables, the right method to call is
+<code>dict->SetValue(name, value)</code>.  (The name and value
+can be specified as strings in a variety of ways: C++ strings, char
+*'s, or char *'s plus length.)</p>
+
+<p>There are two other ways to set a variable's value as well, each
+with a different scoping rule.  You can call
+<code>google::TemplateDictionary::SetGlobalValue(name, value)</code>
+-- no <code>TemplateDictionary</code> instance needed here -- to set a
+variable that can be used by all templates in an application.  This
+is quite rare.</p>
+
+<p>You can also call <code>dict->SetTemplateGlobalValue(name,
+value)</code>.  This sets a variable that is seen by all child
+dictionaries of this dictionary: sub-sections you create via
+<code>AddSectionDictionary</code>, and included templates you create
+via <code>AddIncludeDictionary</code> (both described below).  This
+differs from <code>SetValue()</code>, because <code>SetValue()</code>
+values are never inherited across template-includes.  Almost always,
+<code>SetValue</code> is what you want;
+<code>SetTemplateGlobalValue</code> is intended for variables
+that are "global" to a particular template but not all templates, such
+as a color scheme to use, a language code, etc.</p>
+
+<p>To make it easier to use <code>SetValue()</code>, there are a few
+helper routines to help setting values of a few special forms.</p>
+
+<ul>
+  <li> <code>SetIntValue(name, int)</code>: takes an int as the value. </li>
+  <li> <code>SetEscapedValue(name, value, escape_functor)</code>:
+       escapes the value, using the escape-functor, which takes a
+       string as input and gives a "munged" string as output.
+       <code>TemplateDictionary</code> has a few escape-functors built
+       in, including <code>html_escape</code>, which replaces
+       <code>&lt;</code>, <code>&gt;</code>, <code>&amp;</code>, and
+       <code>&quot;</code> with the appropriate html entity;
+       <code>xml_escape</code>, which deals with the
+       <code>&amp;nbsp;</code> entity; and
+       <code>javascript_escape</code>, which escapes quotes and other
+       characters that are meaningful to javascript.  These are
+       helpful in avoiding security holes when the template is
+       html/xml/javascript.  You can also define your own functor; see
+       the example below. </li>
+  <li> <code>SetFormattedValue(name, fmt, ...)</code>: the
+       <code>fmt</code> and <code>...</code> work just like in
+       <code>printf</code>: <code>SetFormattedValue("HOMEPAGE",
+       "http://%s/", hostname)</code>. </li>
+  <li> <code>SetEscapedFormattedValue(name, escape_functor, fmt,
+       ...)</code>: formats the value just like <code>printf</code>,
+       and then escapes the result using the given functor. </li>
+</ul>
+
+<p>Example:</p>
+<pre>
+   google::TemplateDictionary* dict = new google::TemplateDictionary("var example");
+   dict->SetValue("FOOTER", "Aren't these great results?");
+   class StarEscape : public template_modifiers::TemplateModifier {
+     void Modify(const char* in, size_t inlen,
+                 const template_modifiers::ModifierData* per_expand_data,
+                 ExpandEmitter* outbuf, const string& arg) const {
+       outbuf->Emit(string("*") + string(in, inlen) + string("*"));
+     }
+   };
+   dict->SetEscapedValue("USERNAME", username, StarEscape());
+</pre>
+
+<p>Note that the template itself can also specify escaping via <A
+HREF="#modifiers">variable modifiers</A>!  It's very possible for you
+to escape the value when setting it in the dictionary, and then have
+the template escape it again when outputting, so be careful you escape
+only as much as you need to.</p>
+
+<h4> <A NAME="sections">Sections</A> </h4>
+
+<p>Sections are used in two ways in templates.  One is to expand some
+text multiple times.  This is how <code>PREV_SEARCHES</code> is used
+in the example above.  In this case we'll have one small
+sub-dictionary for each of the five previous searches the user did.
+To do this, call <code>AddSectionDictionary(section_name)</code>
+to create the sub-dictionary.  It returns a
+<code>TemplateDictionary*</code> that you can use to fill the
+sub-dictionary.
+
+<p>The other use of sections is to conditionally show or hide a block
+of text at template-expand time.  This is how <code>CHANGE_USER</code>
+is used in the example template: if the user is logged in, we show the
+section with the user's username, otherwise we choose not to show the
+section.</p>
+
+<p>This second case is a special case of the first, and the "standard"
+way to show a section is to expand it exactly one time, by calling
+<code>AddSectionDictionary()</code> once, and then setting
+<code>USERNAME</code> in the sub-dictionary.</p>
+
+<p>However, the hide/show idiom is so common there are a few
+convenience methods to make it simpler.  The first takes advantage of
+the fact sections inherit variables from their parent: you set
+<code>USERNAME</code> in the parent dictionary, rather than a section
+sub-dictionary, and then call <code>ShowSection()</code>, which adds a
+single, empty dictionary for that section.  This causes the section to
+be shown once, and to inherit <i>all</i> its variable values from its
+parent.</p>
+
+<p>A second convenience method is written for the particular case we
+have with <code>USERNAME</code>: if the user's username is non-empty,
+we wish to
+show the section with <code>USERNAME</code> set to the username,
+otherwise we wish to hide the section and show neither
+<code>USERNAME</code> nor the text around it.  The method
+<code>SetValueAndShowSection(name, value, section_name)</code> does
+exactly that: if value is non-empty, add a single single dictionary to
+<code>section_name</code> and call <code>section_dict->AddValue(name,
+value)</code>.  There's also <code>SetEscapedValueAndShowSection(name,
+value, escape_functor, section_name)</code>, which lets you escape
+<code>value</code>.</p>
+
+<p>Example:</p>
+<pre>
+   using google::TemplateDictionary;
+   TemplateDictionary* dict = new TemplateDictionary("section example");   
+   const char* username = GetUsername();   // returns "" for no user
+   if (username[0] != '\0') {
+      TemplateDictionary* sub_dict = dict->AddSectionDictionary("CHANGE_USER");
+      sub_dict->SetValue("USERNAME", username);
+   } else {
+      // don't need to do anything; we want a hidden section, which is the default
+   }
+
+   // Instead of the above 'if' statement, we could have done this:
+   if (username[0] != '\0') {
+      dict->ShowSection("CHANGE_USER");       // adds a single, empty dictionary
+      dict->SetValue("USERNAME", username);   // take advantage of inheritence
+   } else {
+      // don't need to do anything; we want a hidden section, which is the default
+   }
+
+   // Or we could have done this:
+   dict->SetValueAndShowSection("USERNAME", username, "CHANGE_USER");
+
+   // Moving on...
+   GetPrevSearches(prev_searches, &amp;num_prev_searches);
+   if (num_prev_searches > 0) {
+      for (int i = 0; i < num_prev_searches; ++i) {
+         TemplateDictionary* sub_dict = dict->AddSectionDictionary("PREV_SEARCHES");
+         sub_dict->SetEscapedValue("PREV_SEARCH", prev_searches[i],
+                                   TemplateDictionary::html_escape);
+      }
+   }
+</pre>
+
+<h4> Template-includes </h4>
+
+<p>Template-include markers are much like section markers, so
+<code>SetIncludeDictionary(name)</code> acts, not surprisingly,
+exactly like <code>SetSectionDictionary(name)</code>.  However, since
+variable inheritence doesn't work across include boundaries, there is
+no template-include equivalent to <code>ShowSection()</code> or
+<code>SetValueAndShowSection()</code>.</p>
+
+<p>One difference bewteen template-includes and sections is that for a
+sub-dictionary that you create via
+<code>SetIncludeDictionary()</code>, you <i>must</i> call
+<code>subdict->SetFilename()</code> to indicate the name of the
+template to include.  If you do not set this, the sub-dictionary will
+be ignored.  The filename may be absolute, or relative, in which case
+it's relative to <A HREF="#managing">template_root</A>.</p>
+
+<p>Example:</p>
+<pre>
+   using google::TemplateDictionary;
+   TemplateDictionary* dict = new TemplateDictionary("include example");   
+   GetResults(results, &amp;num_results);
+   for (int i = 0; i < num_results; ++i) {
+      TemplateDictionary* sub_dict = dict->AddIncludeDictionary("RESULT_TEMPLATE");
+      sub_dict->SetFilename("results.tpl");
+      FillResultsTemplate(sub_dict, results[i]);
+   }
+</pre>
+
+<p>In practice, it's much more likely that
+<code>FillResultsTemplate()</code> will be the one to call
+<code>SetFilename()</code>.  Note that it's not an error to call
+<code>SetFilename()</code> on a dictionary even if the dictionary is
+not being used for a template-include; in that case, the function is a
+no-op, but is perhaps still useful as self-documenting code.</p>
+
+<h4> Modifier data </h4>
+
+<p>This last category is a bit esoteric: if you write your own <A
+HREF="#modifiers">modifier</A>, you can pass data to that modifier
+when you call <code>Expand()</code>.  The intended use of this
+functionality is to allow a modifier to work one way when you expand a
+template with dictionary A, and another way when you expand a template
+with dictionary B.  For instance, you might have a modifier that
+encrypts part of a webpage using a user's secret-key, and the
+secret-key is of course different every time you expand the
+webpage.</p>
+
+<p>To set data that the modifier can use, you call
+<code>SetModifierData()<code> on a <code>TemplateDictionary</code>.
+For instance:</p>
+<pre>
+   TemplateDictionary* dict = new TemplateDictionary("modifier example");
+   dict->SetValue("USERNAME", thisuser->username);  // regular var-setting
+   dict->SetModifierData("encrypt key", (void*)thisuser->secret_key);
+   ...
+</pre>
+
+<p>Your custom modifier is passed all the ModifierData as one of the
+arguments to <code>Modify</code>: see
+<code>&lt;google/template_modifiers.h&gt;<code> for more details.</p>
+
+
+<h3> <A name="expand">Expanding a Template</A> </h3>
+
+<p>Once you have a template and a template dictionary, it's simplicity
+itself to expand the template with those dictionary values, putting
+the output in a string:</p>
+<pre>
+   google::Template* tpl = google::Template::GetTemplate(&lt;filename&gt;, google::STRIP_WHITESPACE);
+   google::TemplateDictionary dict("debug-name");
+   FillDictionary(&amp;dict, ...);
+   string output;
+   bool error_free = <font color=red>tpl->Expand(&amp;output, &amp;dict);</font>
+   // output now holds the expanded template
+   // Expand returns false if the system cannot load any of the template files 
+   // referenced by the TemplateDictionary.
+</pre>
+
+<p>The expanded template is written to the string <code>output</code>.
+If <code>output</code> was not empty before calling
+<code>Expand()</code>, the expanded template is appended to the end of
+<code>output</code>.
+
+
+<h3> Getting a Template From a String Rather Than a File </h3>
+
+<p>The <code>TemplateFromString</code> class, in
+<code>template_from_string.h</code>, is an alternative to the
+<code>Template</code> class when you really want your template to be
+built in to the executable rather than read from a file.  It's a
+drop-in replacement, that takes an extra argument which is the
+template contents.</p>
+
+<p>Prefer <code>Template</code> to <code>TemplateFromString</code>,
+for several reasons.  For one, updating the template requires merely a
+data push, rather than pushing the new executable.  Also, you can load
+the new template without needing to restart the binary.  It also makes
+it easier for non-programmers to modify the template.  Finally,
+string-templates cannot be included by other
+templates, since <code>{{>include}}</code> takes a filename.</p>
+
+<p>One reason to use <code>TemplateFromString</code> is if you are in
+an environment where having data files could be dangerous -- for
+instance, you work on a disk that is usually full, or need the
+template to work even in the face of disk I/O errors.</p>
+
+<p>This package comes with a script, <A
+HREF="#converter">template-converter</A>, that takes a template file
+as input and emits a C++ code snippet (an .h file) that defines a
+string with those template contents.  This makes it easy to start by
+using a normal, file-based template, and then switch to
+template-from-string later if you so desire.</p>
+
+
+<h3> Copying a Template Dictionary </h3>
+
+<p>You can use the <code>MakeCopy()</code> method on a template
+dictionary to make a "deep" copy of the template.  This can be useful
+for situations like the following: you want to fill a template several
+times, each time with 90% of the values the same, but the last 10%
+different.  Computing the values is slow.  Here's how you can use
+<code>MakeCopy()</code> to do it:</p>
+<ol>
+  <li> fill dict with 90%
+  <li> <code>newdict1 = dict->MakeCopy();</code>
+  <li> fill newdict1 with last 10%
+  <li> <code>newdict2 = dict->MakeCopy();</code>
+  <li> fill newdict2 with last 10%
+  <li> etc.
+</ol>
+
+
+<h2>Security Considerations</h2>
+
+<p>Like all web applications, programs that use the Google Template System
+to create HTML documents can be vulnerable to Cross-Site-Scripting (XSS)
+attacks unless data inserted into a template is appropriately sanitized
+and/or escaped.  Which specific form of escaping or sanitization is
+required depends on the context in which the template variable appears
+within a HTML document (such as, regular "inner text", within a
+<code>&lt;script&gt;</code> tag, or within an <code>onClick</code>
+handler).  The remainder of this section provides a brief summary of
+techniques to prevent XSS vulnerabilities due to template variables in
+various HTML contexts.  Note that while escaping is typically required,
+escaping alone is often not enough!  You also may need to sanitize or
+validate the input, as for instance with URL attributes.  For further
+information, refer to additional <a
+  href="xss_resources.html">resources</a> on Cross-Site-Scripting
+issues.</p>
+
+<ol class=bluelist>
+<li>Regular text (outside of tags and other special situations).
+
+  <p>Use the <code>:html_escape</code> or <code>:h</code> modifier to
+  HTML-escape the variable:</p>
+  <pre>
+    &lt;h1&gt;{{HEADING:h}}&lt;/h1&gt;
+  </pre>
+</li>
+
+<li>HTML tag attributes.
+
+  <p>Ensure that the attribute is enclosed in double quotes in the template, and
+  use the <code>:html_escape</code> or <code>:h</code> modifier to escape the
+  variable:</p>
+  <pre>
+    &lt;form ...
+      &lt;input name=q value=&quot;{{QUERY:h}}&quot;&gt;
+    &lt;/form&gt;
+  </pre>
+</li>
+
+<li>URL attributes (eg., href/src).
+
+  <p>Validate that the URL is a well-formed URL with an appropriate
+  scheme (e.g., http(s), ftp, mailto).  Then enclose the URL in quotes
+  in the template and use the <code>:html_escape</code> or
+  <code>:h</code> modifier to escape the variable:</p>
+  <pre>
+    &lt;img src="{{IMAGE_URL:h}}"&gt;
+  </pre>
+</li>
+
+<li>Beware of inserting variables containing data from untrusted sources
+into the context of a <code>style</code> tag or attribute.
+
+  <p>Certain CSS style-sheet constructs can result in the invocation of
+  javascript. To prevent XSS, the variable must be carefully validated and
+  sanitized.
+  </p>
+</li>
+
+<li>Populating javascript variables.
+
+  <p>For string literals: Ensure that the literal is enclosed in quotes
+  and apply the <code>:javascript_escape</code> or <code>:j</code>
+  modifier to escape the variable:</p>
+  <pre>
+  &lt;script&gt;
+    // ...
+    var msg_text  = '{{MESSAGE:j}}';
+    // ...
+  &lt;/script&gt;
+  </pre>
+
+  <p>Literals of non-string types cannot be quoted and escaped.
+  Instead, ensure that the variable's value is set such that it is
+  guaranteed that the resulting string corresponds to a javascript
+  literal of the expected type. For example, use</p>
+  <pre>
+    dict->SetValueInt("NUM_ITEMS", num_items);
+  </pre>
+  <p>to populate an integer javascript variable in the template
+  fragment</p>
+  <pre>
+  &lt;script&gt;
+    // ...
+    var num_items = {{NUM_ITEMS}};
+    // ...
+  &lt;/script&gt;
+  </pre>
+
+</li>
+
+<li>Populating javascript variables within event handlers such as
+<code>onClick</code>.
+
+  <p>Tag attributes whose values are evaluated as a javascript
+  expression (such as <code>on{Click,Load,etc}</code> handlers) require an
+  additional consideration, since the attribute's value is HTML-unescaped
+  by the browser before it is passed to the javascript interpreter.
+
+  <p>To avoid XSS vulnerabilities, it is in generally necessary to 
+  HTML-escape after javascript-escaping:</p>
+  <pre>
+    &lt;button ...
+                 onclick='GotoUrl(&quot;{{TARGET_URL:j:h}}&quot;);'&gt;
+  </pre>
+</li>
+
+<li>Consider other potential sources of XSS.
+
+  <p>There are a number of scenarios in which XSS can arise that are
+  unrelated to the insertion of values into HTML templates,
+  including,</p>
+
+  <ul class=blacklist>
+    <li>injection into HTTP headers such as <code>Location</code>,</li>
+
+    <li>incorrect browser-side guess of the content-encoding of a HTML
+    document without explicitly specified <code>charset</code>,</li>
+
+    <li>incorrect browser-side guess of a non-HTML document's
+    content-type that overrides the document's specified
+    <code>Content-Type</code>,</li>
+
+    <li>browser-side handling of documents served for download-to-disk
+    (<code>Content-Disposition: attachment</code>).</li>
+
+  </ul>
+
+  <p>Please consult additional <a
+    href="xss_resources.html">documentation</a> on Cross-Site-Scripting
+  for more detailed discussion of such issues.</p>
+</li>
+
+</ol>
+
+
+<h2> Working Effectively with Templates </h2>
+
+<h3> <A name="register">Registering Template Strings</A> </h3>
+
+<p>Both dictionary keys and template filenames are strings.  Instead
+of using raw strings, we encourage you to use a bit of machinery to
+help protect against various types of errors.</p>
+
+<p>For dictionary keys, you can use the <A
+HREF="#make_tpl_varnames_h">make_tpl_varnames_h</A> tool to create
+static string variables to use instead of a string constant.  This
+will protect against typos, as the <A
+HREF="#make_tpl_varnames_h">make_tpl_varnames_h</A> documentation
+describes.</p>
+
+<p>For template filenames that a program uses -- including
+sub-templates -- we suggest the following idiom:</p>
+
+<pre>
+   #include "example.tpl.varnames.h"   // defines 1 string per dictionary key
+   RegisterTemplateFilename(EXAMPLE_FN, "example.tpl");   // defines template
+   ...
+   google::Template* tpl = google::Template::GetTemplate(EXAMPLE_FN, ...);
+   ...
+   include_dict->SetFilename(EXAMPLE_FN);
+</pre>
+
+<p>By registering the filename, you can <A HREF="#managing">query</A>
+the template system to detect syntax errors, reload-status, and so
+forth.</p>
+
+
+<h3> <A NAME="managing">Managing Templates</A> </h3>
+
+<p>The following functions affect the global state of the template
+system.</p>
+
+<ul>
+  <li> <code>google::Template::SetTemplateRootDirectory(root)</code>: when
+       <code>GetTemplate()</code> is called with a relative filename,
+       the template system will try to load the template from
+       <code>root/file</code>.  This defaults to <code>./</code>. </li>
+</ul>
+
+<p>There are some administrative tools that can help with tweaking
+template performance and debugging template problems.  The following
+functions work on <A HREF="#register">registered</A> templates.</p>
+
+<ul>
+  <li> <code>google::TemplateNameList::GetMissingList()</code>: returns a list
+       of all registered templates where the file could not be found
+       on disk. </li>
+  <li> <code>google::TemplateNameList::AllDoExist()</code>: true iff the
+       missing-list is empty. </li>
+  <li> <code>google::TemplateNameList::GetBadSyntaxList()</code>: returns a
+       list of all registered templates where the template contains a
+       syntax error, and thus cannot be used. </li>
+  <li> <code>google::TemplateNameList::IsAllSyntaxOkay()</code>: true iff the
+       bad-syntax list is emtpy. </li>
+  <li> <code>google::TemplateNameList::GetLastmodTime()</code>: the latest
+       last-modified time for any registered template-file. </li>
+</ul>
+
+<p>The following functions help with debugging, by allowing you to
+examine the template dictionaries and expanded templates in
+more detail.</p>
+
+<ul>
+  <li> <code>dict->Dump()</code>: dumps the contents of the dictionary
+       (and any sub-dictionaries) to stderr. </li>
+  <li> <code>dict->DumpToString()</code>: dumps the contents of the
+       dictionary (and sub-dictionaries) to the given string. </li>
+  <li> <code>dict->SetAnnotateOutput()</code>: when applying this
+       dictionary to a template, add marker-strings to the output to
+       indicate what template-substitutions the system was making.
+       This takes a string argument which can be used to shorten the
+       filenames printed in the annotations: if the filename contains
+       the string you give, everything before that string is elided
+       from the filename before printing.  It's confusing, but fear
+       not: it's safe to just always pass in the empty string. </li>
+</ul>
+
+<p>Finally, <code>ClearCache()</code> removes all template objects
+from the cache used by <code>GetTemplate()</code>.  Typically, this is
+only used in environments that check for memory leaks: calling this at
+the end of the program will clean up all memory that the template
+system uses.</p>
+
+
+<h3> Template and Threads </h3>
+
+<p>All static methods on <code>Template</code> and
+<code>TemplateDictionary</code> objects are threadsafe: you can safely
+call <code>google::TemplateDictionary::SetGlobalValue()</code> without needing
+to worry about locking.</p>
+
+<p>Non-static methods are not thread-safe.  It is not safe for two
+threads to assign values to the same template-dictionary without doing
+their own locking.  Note that this is expected to be quite rare:
+usually only one thread will care about a given
+template-dictionary.</p>
+
+<p>For <code>Template</code> objects, the most common idiom is that a
+template is loaded via <code>GetTemplate()</code>, and after that only
+const methods like <code>Expand()</code> are called on the template.
+With such usage, it's safe to use the same <code>Template</code>
+object in multiple threads without locking.  Be careful, however, if
+you also call functions like <code>ReloadIfChanged()</code>.</p>
+
+
+<h2> Development Tools </h2>
+
+<p>This package includes several tools to make it easier to use write
+and use templates.</p>
+
+
+<h3> <A name="make_tpl_varnames_h">make_tpl_varnames_h:
+     Template Syntax Checker and Header File Generator</A> </h3>
+
+<p><code>make_tpl_varnames_h</code> is a "lint" style syntax checker
+and header file generator.  It takes the names of template files as
+command line arguments and loads each file into a Template object by
+retrieving the file via the Template factory method.  The loading of
+the file does pure syntax checking and reports such errors as
+mis-matched section start/end markers, mis-matched open/close
+double-curly braces, such as <code>"{{VAR}"</code>, or invalid characters
+in template variables/names/comments.</p>
+
+<p>If the template passes the syntax check, by default the utility
+then creates a header file for use in the executable code that fills
+the dictionary for the template.  If the developer includes this
+header file, then constants in the header file may be referenced in
+the dictionary building function, rather than hard-coding strings as
+variable and section names.  By using these constants, the compiler
+can notify the developer of spelling errors and mismatched names.
+Here's an example of how this is used, and how it helps prevent
+errors:</p>
+
+<pre>
+   const char * const kosr_RESULT_NUMBER = "RESULT_NUMBER";  // script output
+   dict.SetValue("RESSULT_NUMBER", "4");    // typo is silently missed
+   dict.SetValue(kosr_RESSULT_NUMBER, "4");   // compiler catches typo
+</pre>
+
+<p>Each constant is named as follows:</p>
+
+<ul>
+  <li> The initial letter 'k', indicating a defined constant. </li>
+
+  <li> One or more prefix letters which are derived from the
+       template file name.  These prefix letters consist of the first
+       letter of the file name, followed by the first letter following
+       each underscore in the name, with the exception of the letter
+       'p' when it is followed by the letters "ost", as is a <A
+       HREF="tips.html#versioning">recommended convention</A> for
+       template versioning. For example, the prefix letters for the
+       file <code>one_search_result_post20020815.tpl</code> are
+       <code>osr</code>. </li>
+
+  <li> An underscore. </li>
+
+  <li> The varible or section name itself, same casing. </li>
+</ul>
+
+<p>As an example, the section name "RESULT_NUMBER" in the file
+one_search_result_post20020815.tpl would be given the constant name
+<code>kosr_RESULT_NUMBER</code> and would appear in the header file as
+<code>const char * const kosr_RESULT_NUMBER = "RESULT_NUMBER";</code>
+-- as in the example above.</p>
+
+<p>By default, the header file is produced in the current directory.
+An alternate output directory may be specified
+by the command line flag <code>--header_dir</code>.
+
+<p>The name of the generated header file is the same as the name of
+the template file with an extension added to the name.  By default,
+that extension is <code>.varnames.h</code>.  In the above example, the
+header file containing the constant declarations would be named
+<code>one_search_result_post20020815.tpl.varnames.h</code>. An
+alternate extension may be provided via the command line flag
+<code>--outputfile_suffix</code>.
+
+<p>Important command line flags:</p>
+
+<ul>
+  <li> <code>--noheader</code> -- Indicates that a header file
+       should not be generated; only syntax checking should be done. </li>
+
+  <li> <code>--header_dir</code> -- sets the directory where the header
+       is written.  Default: "./" </li>
+
+  <li> <code>--template_dir</code> -- sets the template root
+       directory.  Default: <code>./</code> which is the correct
+       specification when it is run from the directory where the templates
+       are located.  This is only used if the input template filenames
+       are specified as relative paths rather than absolute
+       paths. </li>
+
+  <li> <code>--outputfile_suffix</code> -- the extension added to the
+       name of the template file to create the name of the generated
+       header file.  Default: <code>.varnames.h</code>.
+</ul>
+
+<p>For a full list of command line flags, run
+<code>make_tpl_varnames_h --help</code>.</p>
+	
+
+<h3> <A name="converter">template-converter: convert a template to a C++ string</A> </h3>
+
+<p>The <code>TemplateFromString</code> class lets you load a template
+from a string instead of a file.  Applications may prefer this option
+to reduce the dependencies of the executable, or use it in
+environments where data files are not practical.  In such cases,
+<code>template-converter</code> can be used as a template "compiler",
+letting the developer write a template file as a data file in the
+normal way, and then "compiling" it to a C++ string to be included in
+the executable.</p>
+
+<p>Usage is <code>template-converter &lt;template filename&gt;</code>.
+C++ code is output is to stdout; it can be stored in a .h file or
+included directly into a C++ file.  Perl must be installed to use this
+script.</p>
+
+<hr>
+<ul>
+<!--
+  <li> <A HREF="howto.html">Howto</A> </li>
+-->
+  <li> <A HREF="tips.html">Tips</A> </li>
+  <li> <A HREF="example.html">Example</A> </li>
+</ul>
+
+<hr>
+<address>
+Craig Silverstein<br>
+</address>
+
+</body>
+</html>
