@@ -30,12 +30,7 @@
 // ---
 // Author: Craig Silverstein
 
-#include "config.h"
-// This is for windows.  Even though we #include config.h, just like
-// the files used to compile the dll, we are actually a *client* of
-// the dll, so we don't get to decl anything.
-#undef CTEMPLATE_DLL_DECL
-
+#include "config_for_unittests.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -49,9 +44,19 @@ using std::string;
 _START_GOOGLE_NAMESPACE_
 
 // This works in both debug mode and NDEBUG mode.
+#define ASSERT(cond)  do {                                      \
+  if (!(cond)) {                                                \
+    printf("%s: %d: ASSERT FAILED: %s\n", __FILE__, __LINE__,   \
+           #cond);                                              \
+    assert(cond);                                               \
+    exit(1);                                                    \
+  }                                                             \
+} while (0)
+
 #define ASSERT_STREQ(a, b)  do {                                          \
   if (strcmp((a), (b))) {                                                 \
-    printf("ASSERT FAILED, line %d: '%s' != '%s'\n", __LINE__, (a), (b)); \
+    printf("%s: %d: ASSERT FAILED: '%s' != '%s'\n", __FILE__, __LINE__,   \
+           (a), (b));                                                     \
     assert(!strcmp((a), (b)));                                            \
     exit(1);                                                              \
   }                                                                       \
@@ -133,8 +138,8 @@ class TemplateModifiersUnittest {
                  "&#160;xoo &#160;&#160; x&#160;x &nbsp");
   }
 
-  static void TestValidateUrlEscape() {
-    TemplateDictionary dict("TestValidateUrlEscape", NULL);
+  static void TestValidateUrlHtmlEscape() {
+    TemplateDictionary dict("TestValidateUrlHtmlEscape", NULL);
     dict.SetEscapedValue("easy http URL", "http://www.google.com",
                          template_modifiers::validate_url_and_html_escape);
     dict.SetEscapedValue("harder https URL",
@@ -168,6 +173,72 @@ class TemplateModifiersUnittest {
                  "/search?q=green flowers&amp;hl=en");
   }
 
+  static void TestValidateUrlJavascriptEscape() {
+    TemplateDictionary dict("TestValidateUrlJavascriptEscape", NULL);
+    dict.SetEscapedValue(
+        "easy http URL", "http://www.google.com",
+        template_modifiers::validate_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "harder https URL",
+        "https://www.google.com/search?q=f&hl=en",
+        template_modifiers::validate_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "mangled http URL", "HTTP://www.google.com",
+        template_modifiers::validate_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "easy javascript URL",
+        "javascript:alert(document.cookie)",
+        template_modifiers::validate_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "harder javascript URL",
+        "javascript:alert(10/5)",
+        template_modifiers::validate_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "easy relative URL",
+        "foobar.html",
+        template_modifiers::validate_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "harder relative URL",
+        "/search?q=green flowers&hl=en",
+        template_modifiers::validate_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "data URL",
+        "data: text/html",
+        template_modifiers::validate_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "mangled javascript URL",
+        "javaSCRIPT:alert(5)",
+        template_modifiers::validate_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "harder mangled javascript URL",
+        "java\nSCRIPT:alert(5)",
+        template_modifiers::validate_url_and_javascript_escape);
+
+
+
+    TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
+    ASSERT_STREQ(peer.GetSectionValue("easy http URL"),
+                 "http://www.google.com");
+    ASSERT_STREQ(peer.GetSectionValue("harder https URL"),
+                 "https://www.google.com/search?q\\x3df\\x26hl\\x3den");
+    ASSERT_STREQ(peer.GetSectionValue("mangled http URL"),
+                 "HTTP://www.google.com");
+    ASSERT_STREQ(peer.GetSectionValue("easy javascript URL"),
+                 "#");
+    ASSERT_STREQ(peer.GetSectionValue("harder javascript URL"),
+                 "#");
+    ASSERT_STREQ(peer.GetSectionValue("easy relative URL"),
+                 "foobar.html");
+    ASSERT_STREQ(peer.GetSectionValue("harder relative URL"),
+                 "/search?q\\x3dgreen flowers\\x26hl\\x3den");
+    ASSERT_STREQ(peer.GetSectionValue("data URL"),
+                 "#");
+    ASSERT_STREQ(peer.GetSectionValue("mangled javascript URL"),
+                 "#");
+    ASSERT_STREQ(peer.GetSectionValue("harder mangled javascript URL"),
+                 "#");
+  }
+
   static void TestCleanseAttribute() {
     TemplateDictionary dict("TestCleanseAttribute", NULL);
     dict.SetEscapedValue("easy attribute", "top",
@@ -187,6 +258,25 @@ class TemplateModifiersUnittest {
                  "top_onclick__alert_document.cookie__");
   }
 
+  static void TestCleanseCss() {
+    TemplateDictionary dict("TestCleanseCss", NULL);
+    dict.SetEscapedValue("easy css", "top",
+                         template_modifiers::cleanse_css);
+    dict.SetEscapedValue("harder css", "foo & bar",
+                         template_modifiers::cleanse_css);
+    dict.SetEscapedValue("hardest css",
+                         ";width:expression(document.cookie)",
+                         template_modifiers::cleanse_css);
+
+    TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
+    ASSERT_STREQ(peer.GetSectionValue("easy css"),
+                  "top");
+    ASSERT_STREQ(peer.GetSectionValue("harder css"),
+                  "foo  bar");
+    ASSERT_STREQ(peer.GetSectionValue("hardest css"),
+                 "widthexpressiondocument.cookie");
+  }
+
   static void TestJavascriptEscape() {
     TemplateDictionary dict("TestJavascriptEscape", NULL);
     dict.SetEscapedValue("easy JS", "joo",
@@ -202,10 +292,10 @@ class TemplateModifiersUnittest {
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy JS"), "joo");
-    ASSERT_STREQ(peer.GetSectionValue("harder JS"), "f \\x3d \\'joo\\';");
+    ASSERT_STREQ(peer.GetSectionValue("harder JS"), "f \\x3d \\x27joo\\x27;");
     ASSERT_STREQ(peer.GetSectionValue("hardest JS"),
-                 "f \\x3d \\'foo\\';\\r\\n\tprint \\\"\\\\\\x26foo \\x3d "
-                 "\\b\\\", \\\"foo\\\"");
+                 "f \\x3d \\x27foo\\x27;\\r\\n\\tprint \\x22\\\\\\x26foo "
+                 "\\x3d \\b\\x22, \\x22foo\\x22");
     ASSERT_STREQ(peer.GetSectionValue("close script JS"),
                  "//--\\x3e\\x3c/script\\x3e\\x3cscript\\x3e"
                  "alert(123);\\x3c/script\\x3e");
@@ -263,6 +353,66 @@ class TemplateModifiersUnittest {
     ASSERT_STREQ(peer.GetSectionValue("query escape 6"), "%22%27%3A");
   }
 
+  static void TestAddModifier() {
+    ASSERT(template_modifiers::AddModifier(
+               "x-test",
+               template_modifiers::MODVAL_FORBIDDEN,
+               &template_modifiers::html_escape));
+    ASSERT(template_modifiers::AddModifier(
+               "x-test-arg",
+               template_modifiers::MODVAL_REQUIRED,
+               &template_modifiers::html_escape_with_arg));
+
+    // Make sure AddModifier fails with an invalid name.
+    ASSERT(!template_modifiers::AddModifier(
+               "test",
+               template_modifiers::MODVAL_FORBIDDEN,
+               &template_modifiers::html_escape));
+
+    // Make sure AddModifier fails with a duplicate name.
+    ASSERT(!template_modifiers::AddModifier(
+               "x-test",
+               template_modifiers::MODVAL_FORBIDDEN,
+               &template_modifiers::html_escape));
+
+    const template_modifiers::ModifierInfo* info;
+    ASSERT(info = template_modifiers::FindModifier("x-test", 6));
+    ASSERT(info->value_status == template_modifiers::MODVAL_FORBIDDEN);
+
+    // Make sure we can still add a modifier after having already
+    // searched for it.
+    ASSERT(info = template_modifiers::FindModifier("x-foo", 5));
+    ASSERT(info->value_status == template_modifiers::MODVAL_UNKNOWN);
+
+    template_modifiers::NullModifier foo_modifier;
+    ASSERT(template_modifiers::AddModifier(
+               "x-foo",
+               template_modifiers::MODVAL_FORBIDDEN,
+               &foo_modifier));
+    ASSERT(info = template_modifiers::FindModifier("x-foo", 5));
+    ASSERT(info->value_status == template_modifiers::MODVAL_FORBIDDEN);
+    ASSERT(info->modifier == &foo_modifier);
+  }
+
+  static void TestModifierData() {
+    const char* data_a = "data for a";
+    const char* data_b = "data for b";
+
+    template_modifiers::ModifierData data;
+    data.Insert("a", data_a);
+    data.Insert("b", data_b);
+
+    ASSERT(data_a == data.Lookup("a"));
+    ASSERT(data_b == data.Lookup("b"));
+    ASSERT_STREQ(data_a, data.LookupAsString("a"));
+    ASSERT_STREQ(data_b, data.LookupAsString("b"));
+
+    template_modifiers::ModifierData data_copy;
+    data_copy.CopyFrom(data);
+    ASSERT(data_a == data_copy.Lookup("a"));
+    ASSERT(data_b == data_copy.Lookup("b"));
+  }
+
 };
 
 _END_GOOGLE_NAMESPACE_
@@ -274,11 +424,15 @@ int main(int argc, char** argv) {
   TemplateModifiersUnittest::TestSnippetEscape();
   TemplateModifiersUnittest::TestPreEscape();
   TemplateModifiersUnittest::TestXmlEscape();
-  TemplateModifiersUnittest::TestValidateUrlEscape();
+  TemplateModifiersUnittest::TestValidateUrlHtmlEscape();
+  TemplateModifiersUnittest::TestValidateUrlJavascriptEscape();
   TemplateModifiersUnittest::TestCleanseAttribute();
+  TemplateModifiersUnittest::TestCleanseCss();
   TemplateModifiersUnittest::TestJavascriptEscape();
   TemplateModifiersUnittest::TestJsonEscape();
   TemplateModifiersUnittest::TestUrlQueryEscape();
+  TemplateModifiersUnittest::TestAddModifier();
+  TemplateModifiersUnittest::TestModifierData();
 
   printf("DONE\n");
   return 0;

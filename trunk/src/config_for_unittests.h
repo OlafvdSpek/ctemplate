@@ -1,10 +1,10 @@
 // Copyright (c) 2007, Google Inc.
 // All rights reserved.
-//
+// 
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-//
+// 
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -14,7 +14,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-//
+// 
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -28,38 +28,37 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Jim Morrison
+// All Rights Reserved.
+//
+// Author: Craig Silverstein
+//
+// This file is needed for windows -- unittests are not part of the
+// ctemplate dll, but still want to include config.h just like the
+// dll does, so they can use internal tools and APIs for testing.
+//
+// The problem is that config.h declares CTEMPLATE_DLL_DECL to be
+// for exporting symbols, but the unittest needs to *import* symbols
+// (since it's not the dll).
+//
+// The solution is to have this file, which is just like config.h but
+// sets CTEMPLATE_DLL_DECL to do a dllimport instead of a dllexport.
+//
+// The reason we need this extra CTEMPLATE_DLL_DECL_FOR_UNITTESTS
+// variable is in case people want to set CTEMPLATE_DLL_DECL explicitly
+// to something other than __declspec(dllexport).  In that case, they
+// may want to use something other than __declspec(dllimport) for the
+// unittest case.  For that, we allow folks to define both
+// CTEMPLATE_DLL_DECL and CTEMPLATE_DLL_DECL_FOR_UNITTESTS explicitly.
+//
+// NOTE: This file is equivalent to config.h on non-windows systems,
+// which never defined CTEMPLATE_DLL_DECL_FOR_UNITTESTS and always
+// define CTEMPLATE_DLL_DECL to the empty string.
 
-#include "config_for_unittests.h"
-#include "tests/template_test_util.h"
-#include <google/template_dictionary.h>
-#include <google/template_namelist.h>
+#include "config.h"
 
-using std::string;
-
-_START_GOOGLE_NAMESPACE_
-
-TemporaryRegisterTemplate::TemporaryRegisterTemplate(const char* name) {
-  old_namelist_ = TemplateNamelist::namelist_;
-  if (old_namelist_) {
-    namelist_ = *old_namelist_;
-  }
-
-  namelist_.insert(name);
-  TemplateNamelist::namelist_ = &namelist_;
-}
-
-TemporaryRegisterTemplate::~TemporaryRegisterTemplate() {
-  TemplateNamelist::namelist_ = old_namelist_;
-}
-
-const char* TemplateDictionaryPeer::GetSectionValue(const string& variable)
-    const {
-  return dict_->GetSectionValue(variable);
-}
-
-bool TemplateDictionaryPeer::IsHiddenSection(const string& name) const {
-  return dict_->IsHiddenSection(name);
-}
-
-_END_GOOGLE_NAMESPACE_
+#undef CTEMPLATE_DLL_DECL
+#ifdef CTEMPLATE_DLL_DECL_FOR_UNITTESTS
+# define CTEMPLATE_DLL_DECL  CTEMPLATE_DLL_DECL_FOR_UNITTESTS
+#else
+# define CTEMPLATE_DLL_DECL  // if DLL_DECL_FOR_UNITTESTS isn't defined, use ""
+#endif

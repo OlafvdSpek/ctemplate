@@ -77,6 +77,8 @@ static Mutex g_static_mutex;
 /*static*/ const template_modifiers::JsonEscape&
   TemplateDictionary::json_escape = template_modifiers::json_escape;
 
+static const char* const kAnnotateOutput = "__ctemplate_annotate_output__";
+
 // We use this to declare that the hashtable we construct should be
 // small: it should have few buckets (because we expect few items to
 // be inserted).  It's a macro with an #ifdef guard so we can easily
@@ -151,8 +153,7 @@ TemplateDictionary::TemplateDictionary(const string& name, UnsafeArena* arena)
       template_global_dict_(new VariableDict(CTEMPLATE_SMALL_HASHTABLE)),
       template_global_dict_owner_(true),
       parent_dict_(NULL),
-      filename_(NULL),
-      template_path_start_for_annotations_(NULL) {
+      filename_(NULL) {
   MutexLock ml(&g_static_mutex);
   if (global_dict_ == NULL)
     global_dict_ = SetupGlobalDictUnlocked();
@@ -171,8 +172,7 @@ TemplateDictionary::TemplateDictionary(const string& name, UnsafeArena* arena,
       template_global_dict_(template_global_dict),
       template_global_dict_owner_(false),
       parent_dict_(parent_dict),
-      filename_(NULL),
-      template_path_start_for_annotations_(NULL) {
+      filename_(NULL) {
   MutexLock ml(&g_static_mutex);
   if (global_dict_ == NULL)
     global_dict_ = SetupGlobalDictUnlocked();
@@ -269,10 +269,11 @@ TemplateDictionary* TemplateDictionary::InternalMakeCopy(
     }
   }
 
+  // Copy the Expand data
+  newdict->modifier_data_.CopyFrom(modifier_data_);
+
   // Finally, copy everything else not set properly by the constructor
   newdict->filename_ = newdict->Memdup(filename_).ptr_;
-  newdict->template_path_start_for_annotations_ =
-      newdict->Memdup(template_path_start_for_annotations_).ptr_;
 
   return newdict;
 }
@@ -738,17 +739,17 @@ void TemplateDictionary::Dump(int indent) const {
 
 void TemplateDictionary::SetAnnotateOutput(const char* template_path_start) {
   if (template_path_start)
-    template_path_start_for_annotations_ = Memdup(template_path_start).ptr_;
+    SetModifierData(kAnnotateOutput, Memdup(template_path_start).ptr_);
   else
-    template_path_start_for_annotations_ = NULL;
+    SetModifierData(kAnnotateOutput, NULL);
 }
 
 bool TemplateDictionary::ShouldAnnotateOutput() const {
-  return template_path_start_for_annotations_ != NULL;
+  return modifier_data_.Lookup(kAnnotateOutput) != NULL;
 }
 
 const char* TemplateDictionary::GetTemplatePathStart() const {
-  return template_path_start_for_annotations_;
+  return modifier_data_.LookupAsString(kAnnotateOutput);
 }
 
 // ----------------------------------------------------------------------
@@ -852,6 +853,10 @@ const char *TemplateDictionary::GetIncludeTemplateName(const string& variable,
   }
   assert("Call IsHiddenTemplate before GetIncludeTemplateName" == NULL);
   abort();
+}
+
+void TemplateDictionary::SetModifierData(const char* key, const void* data) {
+  modifier_data_.Insert(Memdup(key).ptr_, data);
 }
 
 _END_GOOGLE_NAMESPACE_

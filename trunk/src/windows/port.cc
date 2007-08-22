@@ -38,6 +38,7 @@
 #include "config.h"
 #include <stdarg.h>    // for va_list, va_start, va_end
 #include <string.h>    // for strstr()
+#include <assert.h>
 #include <string>
 #include <vector>
 #include "port.h"
@@ -70,9 +71,8 @@ string TmpFile(const char* basename) {
   if (tmppath_len <= 0 || tmppath_len >= sizeof(tmppath_buffer)) {
     return basename;           // an error, so just bail on tmppath
   }
-  snprintf(tmppath_buffer + tmppath_len, sizeof(tmppath_buffer) - tmppath_len,
-           "\\%s", basename);
-  return tmppath_buffer;
+  assert(tmppath_buffer[tmppath_len - 1] == '\\');   // API guarantees it
+  return string(tmppath_buffer) + basename;
 }
 
 // A replacement for template_unittest.cc:CleanTestDir()

@@ -47,6 +47,14 @@ TMPDIR=${2-"$TEST_TMPDIR/maketpl"}
 rm -rf $TMPDIR
 mkdir $TMPDIR || die "$LINENO: Can't make $TMPDIR"
 
+# Let's make some templates: three that are ok, and three that are not
+echo '<a href={{QCHAR}}{{HREF}}{{QCHAR}} {{PARAMS}}>' > $TMPDIR/ok1.tpl
+echo '<img {{#ATTRIBUTES}}{{ATTRIBUTE}}{{/ATTRIBUTES}}>' > $TMPDIR/ok2.tpl
+echo '<html><head><title>{{TITLE}}</title></head></html>' > $TMPDIR/ok3.tpl
+echo '<a href={{QCHAR}}{{HREF}}{{QC' > $TMPDIR/bad1.tpl
+echo '<img {{#ATTRIBUTES}}{{ATTRIBUTE}}>' > $TMPDIR/bad2.tpl
+echo '<html><head><title>{{TITLE?}}</title></head></html>' > $TMPDIR/bad3.tpl
+
 # First, test commandline flags
 $MAKETPL >/dev/null 2>&1 \
    && die "$LINENO: $MAKETPL with no args didn't give an error"
@@ -56,14 +64,8 @@ $MAKETPL -h >/dev/null 2>&1 \
    || die "$LINENO: $MAKETPL -h failed"
 $MAKETPL --help >/dev/null 2>&1 \
    || die "$LINENO: $MAKETPL --help failed"
-
-# Let's make some templates: three that are ok, and three that are not
-echo '<a href={{QCHAR}}{{HREF}}{{QCHAR}} {{PARAMS}}>' > $TMPDIR/ok1.tpl
-echo '<img {{#ATTRIBUTES}}{{ATTRIBUTE}}{{/ATTRIBUTES}}>' > $TMPDIR/ok2.tpl
-echo '<html><head><title>{{TITLE}}</title></head></html>' > $TMPDIR/ok3.tpl
-echo '<a href={{QCHAR}}{{HREF}}{{QC' > $TMPDIR/bad1.tpl
-echo '<img {{#ATTRIBUTES}}{{ATTRIBUTE}}>' > $TMPDIR/bad2.tpl
-echo '<html><head><title>{{TITLE?}}</title></head></html>' > $TMPDIR/bad3.tpl
+$MAKETPL -f/var/tmp/bar.h $TMPDIR/ok1.tpl $TMPDIR/ok2.tpl >/dev/null 2>&1 \
+   || die "$LINENO: $MAKETPL -f with multiple input files didn't give an error"
 
 # Some weird (broken) shells leave the ending EOF in the here-document,
 # hence the grep.
@@ -138,6 +140,12 @@ echo "$expected_ok1" | diff - "$TMPDIR/ok1.tpl.out.cleansed" \
 Cleanse "$TMPDIR/ok3.tpl.out"
 echo "$expected_ok3" | diff - "$TMPDIR/ok3.tpl.out.cleansed" \
    || die "$LINENO: $MAKETPL didn't make ok3 output correctly"
+
+# Verify that -f generates the requested output file
+$MAKETPL -t$TMPDIR -f$TMPDIR/ok1.h ok1.tpl >/dev/null 2>&1
+Cleanse "$TMPDIR/ok1.h"
+echo "$expected_ok1" | diff - "$TMPDIR/ok1.h.cleansed" \
+   || die "$LINENO: $MAKETPL didn't make ok1.h output correctly"
 
 # Verify we don't give any output iff everything works, with -q flag.
 # Also test using a different output dir.

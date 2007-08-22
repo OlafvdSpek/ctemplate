@@ -289,9 +289,7 @@ previous one:</p>
    &lt;html>&lt;body>{{NAME:h:j}}&lt;/body>&lt;/html>
 </pre>
 
-<p>Only the modifiers built in to the template system may be used:
-It is not possible at the time for users to register modifiers.  Here
-are the modifiers that are supported:</p>
+<p>Here are the modifiers that are built in to the template system:</p>
 <table border=1 cellpadding=3>
 <tr><th>long name</th><th>short name</th><th>description</th></tr>
 
@@ -319,6 +317,12 @@ are the modifiers that are supported:</p>
         (eg <code>"</code> -> <code>\"</code>)</td>
 </tr>
 
+<tr><td><code>:cleanse_css</code></td><td><code>:c</code></td>
+    <td>Removes characters not safe for a CSS value. Safe characters
+      are alphanumeric, space, underscore, period, coma, exclamation
+      mark, pound, percent, and dash.</td>
+</tr>
+
 <tr><td><code>:json_escape</code></td><td><code>:o</code></td>
     <td>json-escapes a variable before output as a string in json;
         similar to javascript escaping, but ignores characters such
@@ -329,14 +333,19 @@ are the modifiers that are supported:</p>
     <td>special purpose html escaping. See below for details</td>
 </tr>
 
+<tr><td><code>:url_escape_with_arg</code></td><td><code>:U</code></td>
+    <td>special purpose url escaping. See below for details</td>
+</tr>
+
 <tr><td><code>:none</code></td><td></td>
     <td>leaves the variable  as is</td>
 </tr>
 
 </table>
 
-<p>The <code>html_escape_with_arg</code> modifier is a bit different
-because it requires a value to specify the type of escaping to use.
+<p>The <code>html_escape_with_arg</code>
+and <code>url_escape_with_arg</code> modifiers are a bit different
+because they requires a value to specify the type of escaping to use.
 For example, this template is equivalent to using
 the <code>pre_escape</code> modifier:</p>
 <pre>
@@ -355,15 +364,12 @@ the <code>html_escape_with_arg</code> modifier:</p>
         and <code>&lt;/b></code>.</td>
 </tr>
 
-<tr><td><code>=pre</code></td><td>
+<tr><td><code>=pre</code></td>
     <td>same as <code>pre_escape</code></td>
 </tr>
 
-<tr><td><code>=url</code></td><td>
-    <td>ensures that a variable contains a safe URL. Safe means that
-        it is either a http or https URL, or else it has no protocol
-        specified.  If the URL is safe it is html-escaped, otherwise
-        it is replaced with <code>#</code>.</td>
+<tr><td><code>=url</code></td>
+    <td>same as <code>:U=html</code> below. For backwards compatibility.</td>
 </tr>
 
 <tr><td><code>=attribute</code></td>
@@ -374,10 +380,48 @@ the <code>html_escape_with_arg</code> modifier:</p>
 
 </table>
 
+<p>Here are the values that are supported by
+the <code>url_escape_with_arg</code> modifier:</p>
+<table border=1 cellpadding=3>
+<tr><th>value</th><th>description</th></tr>
+
+<tr><td><code>=html</code></td>
+    <td>Ensures that a variable contains a safe URL. Safe means that
+        it is either a http or https URL, or else it has no protocol
+        specified.  If the URL is safe it is html-escaped, otherwise
+        it is replaced with <code>#</code>.</td>
+</tr>
+
+<tr><td><code>=javascript</code></td>
+    <td>Same as <code>=html</code>, but using javascript escaping
+    instead of html escaping.</td>
+</tr>
+
+<tr><td><code>=query</code></td>
+    <td>Same as <code>url_query_escape</code>.</td>
+</tr>
+
+</table>
+
 <p><strong>NOTE:</strong> At the moment, there are no filters for handling XML
 attributes and text nodes. For HTML snippets, use the html filter; in other
 situations, it may be appropriate to use CDATA blocks.</p>
 
+<p>In addition to the built-in modifiers, you can write your own
+modifier. Custom modifiers must have a name starting with "x-", and
+the name can contain alphanumeric characters plus dashes and
+underscores. Custom modifiers can also accept values with any
+character except for <code>:</code> and <code>}</code>. For example this
+template could be a valid use of a custom modifier:</p>
+
+<pre>
+{{VAR:x-my_modifier:value1,value2,value3 has spaces,etc}}
+</pre>
+
+<p>See <code>&lt;template_modifiers.h&gt;</code>
+for details on how to write a modifier and how to register it (there's
+also an example of a custom
+modifier <A HREF="#variables">below</A>).</p>
 
 <h3> <A NAME="inheritence">Details on Dictionary Lookup</A> </h3>
 
@@ -575,7 +619,7 @@ can be specified as strings in a variety of ways: C++ strings, char
 with a different scoping rule.  You can call
 <code>google::TemplateDictionary::SetGlobalValue(name, value)</code>
 -- no <code>TemplateDictionary</code> instance needed here -- to set a
-variable that can be used by all templates in an applications.  This
+variable that can be used by all templates in an application.  This
 is quite rare.</p>
 
 <p>You can also call <code>dict->SetTemplateGlobalValue(name,
@@ -601,7 +645,7 @@ helper routines to help setting values of a few special forms.</p>
        <code>TemplateDictionary</code> has a few escape-functors built
        in, including <code>html_escape</code>, which replaces
        <code>&lt;</code>, <code>&gt;</code>, <code>&amp;</code>, and
-       <code>"</code> with the appropriate html entity;
+       <code>&quot;</code> with the appropriate html entity;
        <code>xml_escape</code>, which deals with the
        <code>&amp;nbsp;</code> entity; and
        <code>javascript_escape</code>, which escapes quotes and other
@@ -622,7 +666,13 @@ helper routines to help setting values of a few special forms.</p>
 <pre>
    google::TemplateDictionary* dict = new google::TemplateDictionary("var example");
    dict->SetValue("FOOTER", "Aren't these great results?");
-   class StarEscape { string operator()(const string&amp; in) const { return string("*") + in + string("*"); } };
+   class StarEscape : public template_modifiers::TemplateModifier {
+     void Modify(const char* in, size_t inlen,
+                 const template_modifiers::ModifierData* per_expand_data,
+                 ExpandEmitter* outbuf, const string& arg) const {
+       outbuf->Emit(string("*") + string(in, inlen) + string("*"));
+     }
+   };
    dict->SetEscapedValue("USERNAME", username, StarEscape());
 </pre>
 
@@ -745,6 +795,32 @@ it's relative to <A HREF="#managing">template_root</A>.</p>
 <code>SetFilename()</code> on a dictionary even if the dictionary is
 not being used for a template-include; in that case, the function is a
 no-op, but is perhaps still useful as self-documenting code.</p>
+
+<h4> Modifier data </h4>
+
+<p>This last category is a bit esoteric: if you write your own <A
+HREF="#modifiers">modifier</A>, you can pass data to that modifier
+when you call <code>Expand()</code>.  The intended use of this
+functionality is to allow a modifier to work one way when you expand a
+template with dictionary A, and another way when you expand a template
+with dictionary B.  For instance, you might have a modifier that
+encrypts part of a webpage using a user's secret-key, and the
+secret-key is of course different every time you expand the
+webpage.</p>
+
+<p>To set data that the modifier can use, you call
+<code>SetModifierData()<code> on a <code>TemplateDictionary</code>.
+For instance:</p>
+<pre>
+   TemplateDictionary* dict = new TemplateDictionary("modifier example");
+   dict->SetValue("USERNAME", thisuser->username);  // regular var-setting
+   dict->SetModifierData("encrypt key", (void*)thisuser->secret_key);
+   ...
+</pre>
+
+<p>Your custom modifier is passed all the ModifierData as one of the
+arguments to <code>Modify</code>: see
+<code>&lt;google/template_modifiers.h&gt;<code> for more details.</p>
 
 
 <h3> <A name="expand">Expanding a Template</A> </h3>

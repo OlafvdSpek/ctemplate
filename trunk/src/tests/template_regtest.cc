@@ -41,12 +41,7 @@
 //    template_unittest_testXX_dictYY.out
 // YY should start with 01 (not 00).  XX can be an arbitrary string.
 
-#include "config.h"
-// This is for windows.  Even though we #include config.h, just like
-// the files used to compile the dll, we are actually a *client* of
-// the dll, so we don't get to decl anything.
-#undef CTEMPLATE_DLL_DECL
-
+#include "config_for_unittests.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -94,11 +89,29 @@ namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;
 
 #define ASSERT(cond)  do {                                      \
   if (!(cond)) {                                                \
-    printf("ASSERT FAILED, line %d: %s\n", __LINE__, #cond);    \
+    printf("%s: %d: ASSERT FAILED: %s\n", __FILE__, __LINE__,   \
+           #cond);                                              \
     assert(cond);                                               \
     exit(1);                                                    \
   }                                                             \
 } while (0)
+
+#define ASSERT_STRING_EQ(a, b)   do {                   \
+    assert(StringEq(a, b, __FILE__, __LINE__, #a, #b)); \
+} while (0)
+
+bool StringEq(const string&a, const string& b,
+                    const char* filename, int lineno,
+                    const char* namea, const char* nameb) {
+  if (a != b) {
+    printf("%s: %d: ASSERT FAILED: %s == %s:\n", filename, lineno,
+           namea, nameb);
+    printf("EXPECTED:\n%s\n", a.c_str());
+    printf("ACTUAL:\n%s\n", b.c_str());
+    return false;
+  }
+  return true;
+}
 
 #define ASSERT_STREQ_EXCEPT(a, b, except)  ASSERT(StreqExcept(a, b, except))
 #define ASSERT_STREQ(a, b)                 ASSERT(strcmp(a, b) == 0)
@@ -402,7 +415,8 @@ static void TestExpand(const vector<Testdata>& testdata) {
       delete dict;   // it's our responsibility
 
       // "out" is the output for STRIP_WHITESPACE mode.
-      ASSERT(*out == output_ws);
+      ASSERT_STRING_EQ(*out, output_ws);
+
       // Now compare the variants against each other
       // NONE and STRIP_LINES may actually be the same on simple inputs
       //ASSERT(output_none != output_lines);
@@ -434,7 +448,7 @@ static void TestExpand(const vector<Testdata>& testdata) {
       dict->SetAnnotateOutput("template_unittest_test");
       string output;
       tpl_lines->Expand(&output, dict);
-      ASSERT(*out == output);
+      ASSERT_STRING_EQ(*out, output);
       delete dict;   // it's our responsibility
     }
   }

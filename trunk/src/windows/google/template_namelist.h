@@ -83,12 +83,12 @@ namespace google {
 class CTEMPLATE_DLL_DECL TemplateNamelist {
   friend class TemporaryRegisterTemplate;
  private:
-  // Standard hash libs don't define hash<string>, but do define hash<char*>
+  // Standard hash_compare libs don't define hash_compare<string>, but do define hash_compare<char*>
   struct TemplateHasher {
     size_t operator()(const std::string& s) const {
-      return stdext::hash<const char*>()(s.c_str());
+      return stdext::hash_compare<const char*>()(s.c_str());
     }
-    // Less operator for MSVC's hash containers.
+    // Less operator for MSVC's hash_compare containers.
     bool operator()(const std::string& a, const std::string& b) const {
       return a < b;
     }

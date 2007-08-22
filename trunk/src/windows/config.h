@@ -143,6 +143,7 @@
 // before anything else.
 #ifndef CTEMPLATE_DLL_DECL
 # define CTEMPLATE_DLL_DECL  __declspec(dllexport)
+# define CTEMPLATE_DLL_DECL_FOR_UNITTESTS  __declspec(dllimport)
 #endif
 
 // TODO(csilvers): include windows/port.h in every relevant source file instead?
