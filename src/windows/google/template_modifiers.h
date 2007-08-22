@@ -43,12 +43,9 @@
 // may be \0 if you don't want a shortname), and a functor that's
 // applied to the variable.
 //
-// The list of modifiers supported by the template system is
-// hard-coded in the source code here.  We've considered a
-// registration scheme, but prefer to be able to say whether a given
-// template has legal syntax, for a given version of the template
-// library, without having to depend on the necessary modifiers being
-// registered.
+// In addition to the list of modifiers hard-coded in the source code
+// here, it is possible to dynamicly register modifiers using a long
+// name starting with "x-".
 //
 // In addition to using a modifier within a template, you can also
 // pass a modifier object to TemplateDictionary::SetEscapedValue() and
@@ -73,6 +70,7 @@
 #define TEMPLATE_TEMPLATE_MODIFIERS_H__
 
 #include <sys/types.h>   // for size_t
+#include <hash_map>
 #include <string>
 #include <google/template_emitter.h>   // so we can inline operator()
 
@@ -85,11 +83,16 @@
 
 namespace google {
 
+class Template;
+
 namespace template_modifiers {
+
+class ModifierData;
 
 #define MODIFY_SIGNATURE_                                                    \
  public:                                                                     \
-  virtual void Modify(const char* in, size_t inlen, ExpandEmitter* outbuf,   \
+  virtual void Modify(const char* in, size_t inlen,                          \
+                      const ModifierData*, ExpandEmitter* outbuf,            \
                       const std::string& arg) const
 
 // If you wish to write your own modifier, it should subclass this
@@ -101,7 +104,9 @@ class CTEMPLATE_DLL_DECL TemplateModifier {
   // appends the modified version to the end of outbuf.  "arg" is
   // used for modifiers that take a modifier-value argument; for
   // modifiers that take no argument, arg will always be "".
-  virtual void Modify(const char* in, size_t inlen, ExpandEmitter* outbuf,
+  virtual void Modify(const char* in, size_t inlen,
+                      const ModifierData* per_expand_data,
+                      ExpandEmitter* outbuf,
                       const std::string& arg) const = 0;
 
   // We support both modifiers that take an argument, and those that don't.
@@ -111,12 +116,14 @@ class CTEMPLATE_DLL_DECL TemplateModifier {
     // we'll reserve some space to account for minimal escaping: say 12%
     out.reserve(inlen + inlen/8 + 16);
     StringEmitter outbuf(&out);
-    Modify(in, inlen, &outbuf, arg);
+    Modify(in, inlen, NULL, &outbuf, arg);
     return out;
   }
   std::string operator()(const std::string& in, const std::string& arg="") const {
     return operator()(in.data(), in.size(), arg);
   }
+
+  virtual ~TemplateModifier();   // always need a virtual destructor!
 };
 
 
@@ -143,12 +150,27 @@ extern CTEMPLATE_DLL_DECL SnippetEscape snippet_escape;
 class CTEMPLATE_DLL_DECL CleanseAttribute : public TemplateModifier { MODIFY_SIGNATURE_; };
 extern CTEMPLATE_DLL_DECL CleanseAttribute cleanse_attribute;
 
-// Like HtmlEscape but also checks that a url is either an absolute
-// http(s) URL or a relative url that doesn't have a protocol hidden
-// in it (ie [foo.html] is fine, but not [javascript:foo]).  Returns
-// the url html escaped if good, otherwise returns "#".
-class CTEMPLATE_DLL_DECL ValidateUrl : public TemplateModifier { MODIFY_SIGNATURE_; };
+// Removes characters not safe for a CSS value. Safe characters are
+// alphanumeric, space, underscore, period, coma, exclamation mark,
+// pound, percent, and dash.
+class CTEMPLATE_DLL_DECL CleanseCss : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern CTEMPLATE_DLL_DECL CleanseCss cleanse_css;
+
+// Checks that a url is either an absolute http(s) URL or a relative
+// url that doesn't have a protocol hidden in it (ie [foo.html] is
+// fine, but not [javascript:foo]) and then performs another type of
+// escaping. Returns the url escaped with the specified modifier if
+// good, otherwise returns "#".
+class CTEMPLATE_DLL_DECL ValidateUrl : public TemplateModifier {
+ public:
+  explicit ValidateUrl(const TemplateModifier& chained_modifier)
+      : chained_modifier_(chained_modifier) { }
+  MODIFY_SIGNATURE_;
+ private:
+  const TemplateModifier& chained_modifier_;
+};
 extern CTEMPLATE_DLL_DECL ValidateUrl validate_url_and_html_escape;
+extern CTEMPLATE_DLL_DECL ValidateUrl validate_url_and_javascript_escape;
 
 // Escapes &nbsp; to &#160;
 // TODO(csilvers): have this do something more useful, once all callers have
@@ -174,33 +196,104 @@ extern CTEMPLATE_DLL_DECL JsonEscape json_escape;
 class CTEMPLATE_DLL_DECL HtmlEscapeWithArg : public TemplateModifier { MODIFY_SIGNATURE_; };
 extern CTEMPLATE_DLL_DECL HtmlEscapeWithArg html_escape_with_arg;
 
+// A similar dispatch routine for URLS.
+// Calls validate_url_and_javascript_escape, validate_url_and_html_escape,
+// or url_query_escape depending on the value of the argument..
+class CTEMPLATE_DLL_DECL UrlEscapeWithArg : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern CTEMPLATE_DLL_DECL UrlEscapeWithArg url_escape_with_arg;
+
 
 #undef MODIFY_SIGNATURE_
 
 // -----------------------------------------------------------------
-// These are used by template.cc.  They are not intended for
-// any other users.
+// These are used by template.cc and when registering new modifiers.
+// They are not intended for any other users.
 
 // Does this modifier take an argument?  Note we do not have
 // MODVAL_OPTIONAL: we prefer the clarity of an arg either always
 // taking an argument, or never (ie, no "default arguments").
-enum ModvalStatus { MODVAL_FORBIDDEN, MODVAL_REQUIRED };
+// MODVAL_UNKNOWN is only for internal use and cannot be used when
+// registering a new modifier.
+enum ModvalStatus { MODVAL_FORBIDDEN, MODVAL_REQUIRED, MODVAL_UNKNOWN };
 
 // TODO(csilvers): collapse this into the TemplateModifier class?
 struct ModifierInfo {
-  const char* long_name;
+  ModifierInfo(std::string ln, char sn, ModvalStatus vs,
+               const TemplateModifier *m)
+      : long_name(ln), short_name(sn),
+        value_status(vs), modifier(m) { }
+  std::string long_name;
   char short_name;
   ModvalStatus value_status;
   const TemplateModifier* modifier;
 };
 
+// Registers a new template modifier.
+// long_name must start with "x-".
+extern CTEMPLATE_DLL_DECL bool AddModifier(const char* long_name,
+                         ModvalStatus value_status,
+                         const TemplateModifier* modifier);
+
 // modname is the name of the modifier (shortname or longname).
 // Returns a pointer into g_modifiers, or NULL if not found.
-const ModifierInfo* FindModifier(const char* modname, size_t modname_len);
+extern CTEMPLATE_DLL_DECL const ModifierInfo* FindModifier(const char* modname,
+                                         size_t modname_len);
 
-// Given a ModifierFunctor, return its longname, or NULL if not found
-// in g_modifiers.
-const char* FindModifierName(const TemplateModifier* modifier);
+// This class holds per-expand data which is available to
+// custom modifiers.
+class CTEMPLATE_DLL_DECL ModifierData  {
+ public:
+  ModifierData() { }
+
+  // Retrieve data specific to this Expand call. Returns NULL if key
+  // is not found.
+  // This should only be used by modifiers.
+  const void* Lookup(const char* key) const;
+
+  // Same as Lookup, but casts the result to a c string.
+  const char* LookupAsString(const char* key) const {
+    return static_cast<const char*>(Lookup(key));
+  }
+
+  // Store data for a later call to expand. Call with value set to
+  // NULL to clear any value previously set.  Caller is responsible
+  // for ensuring key and value point to valid data for the lifetime
+  // of 'this'.  This should only be used by TemplateDictionary.
+  void Insert(const char* key, const void* value);
+
+  // Copy another ModifierData.  Only used by TemplateDictionary.
+  void CopyFrom(const ModifierData& other);
+
+ private:
+#ifdef WIN32
+  struct DataHash {
+    size_t operator()(const char* s1) const {
+      return stdext::hash_compare<const char*>()(s1);
+    }
+    bool operator()(const char* s1, const char* s2) const {  // less-than
+      return (s2 == 0 ? false : s1 == 0 ? true : strcmp(s1, s2) < 0);
+    }
+    // These two public members are required by msvc.  4 and 8 are defaults.
+    static const size_t bucket_size = 4;
+    static const size_t min_buckets = 8;
+  };
+
+  typedef stdext::hash_map<const char*, const void*, DataHash> DataMap;
+#else
+  struct DataEq {
+    bool operator()(const char* s1, const char* s2) const {
+      return ((s1 == 0 && s2 == 0) ||
+              (s1 && s2 && *s1 == *s2 && strcmp(s1, s2) == 0));
+    }
+  };
+  typedef stdext::hash_map<const char*, const void*, stdext::hash_compare<const char*>, DataEq>
+    DataMap;
+#endif
+  DataMap map_;
+
+  ModifierData(const ModifierData&);    // disallow evil copy constructor
+  void operator=(const ModifierData&);  // disallow evil operator=
+};
 
 }  // namespace template_modifiers
 

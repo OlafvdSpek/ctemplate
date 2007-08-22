@@ -30,12 +30,7 @@
 // ---
 // Author: Craig Silverstein
 
-#include "config.h"
-// This is for windows.  Even though we #include config.h, just like
-// the files used to compile the dll, we are actually a *client* of
-// the dll, so we don't get to decl anything.
-#undef CTEMPLATE_DLL_DECL
-
+#include "config_for_unittests.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -51,7 +46,8 @@ using std::vector;
 // This works in both debug mode and NDEBUG mode.
 #define ASSERT(cond)  do {                                      \
   if (!(cond)) {                                                \
-    printf("ASSERT FAILED, line %d: %s\n", __LINE__, #cond);    \
+    printf("%s: %d: ASSERT FAILED: %s\n", __FILE__, __LINE__,   \
+           #cond);                                              \
     assert(cond);                                               \
     exit(1);                                                    \
   }                                                             \
@@ -59,7 +55,8 @@ using std::vector;
 
 #define ASSERT_STREQ(a, b)  do {                                          \
   if (strcmp((a), (b))) {                                                 \
-    printf("ASSERT FAILED, line %d: '%s' != '%s'\n", __LINE__, (a), (b)); \
+    printf("%s: %d: ASSERT FAILED: '%s' != '%s'\n", __FILE__, __LINE__,   \
+           (a), (b));                                                     \
     assert(!strcmp((a), (b)));                                            \
     exit(1);                                                              \
   }                                                                       \
@@ -67,8 +64,8 @@ using std::vector;
 
 #define ASSERT_STRSTR(text, substr)  do {                       \
   if (!strstr((text), (substr))) {                              \
-    printf("ASSERT FAILED, line %d: '%s' not in '%s'\n",        \
-           __LINE__, (substr), (text));                         \
+    printf("%s: %d: ASSERT FAILED: '%s' not in '%s'\n",         \
+           __FILE__, __LINE__, (substr), (text));               \
     assert(strstr((text), (substr)));                           \
     exit(1);                                                    \
   }                                                             \
@@ -80,8 +77,9 @@ _START_GOOGLE_NAMESPACE_
 // test escape-functor that replaces all input with "foo"
 class FooEscaper : public template_modifiers::TemplateModifier {
  public:
-  void Modify(const char* in, size_t inlen, ExpandEmitter* outbuf,
-              const string& arg) const {
+  void Modify(const char* in, size_t inlen,
+              const template_modifiers::ModifierData*,
+              ExpandEmitter* outbuf, const string& arg) const {
     assert(arg.empty());    // we don't take an argument
     outbuf->Emit("foo");
   }
@@ -90,8 +88,9 @@ class FooEscaper : public template_modifiers::TemplateModifier {
 // test escape-functor that replaces all input with ""
 class NullEscaper : public template_modifiers::TemplateModifier {
  public:
-  void Modify(const char* in, size_t inlen, ExpandEmitter* outbuf,
-              const string& arg) const {
+  void Modify(const char* in, size_t inlen,
+              const template_modifiers::ModifierData*,
+              ExpandEmitter* outbuf, const string& arg) const {
     assert(arg.empty());    // we don't take an argument
   }
 };
@@ -99,11 +98,13 @@ class NullEscaper : public template_modifiers::TemplateModifier {
 // first does javascript-escaping, then html-escaping
 class DoubleEscaper : public template_modifiers::TemplateModifier {
  public:
-  void Modify(const char* in, size_t inlen, ExpandEmitter* outbuf,
-              const string& arg) const {
+  void Modify(const char* in, size_t inlen,
+              const template_modifiers::ModifierData* data,
+              ExpandEmitter* outbuf, const string& arg) const {
     assert(arg.empty());    // we don't take an argument
     string tmp = template_modifiers::javascript_escape(in, inlen);
-    template_modifiers::html_escape.Modify(tmp.data(), tmp.size(), outbuf, "");
+    template_modifiers::html_escape.Modify(tmp.data(), tmp.size(),
+                                           data, outbuf, "");
   }
 };
 
@@ -255,8 +256,8 @@ class TemplateDictionaryUnittest {
                  "&lt;A HREF=&#39;foo&#39; id=&quot;bar  &amp;&amp; "
                  "baz&quot;&gt;");
     ASSERT_STREQ(dict.GetSectionValue("hardest JS"),
-                 "f \\x3d \\'foo\\';\\r\\n\tprint \\\"\\\\\\x26foo \\x3d "
-                 "\\b\\\", \\\"foo\\\"");
+                 "f \\x3d \\x27foo\\x27;\\r\\n\\tprint \\x22\\\\\\x26foo "
+                 "\\x3d \\b\\x22, \\x22foo\\x22");
     ASSERT_STREQ(dict.GetSectionValue("query escape 0"), "");
 
     // Test using hand-made modifiers.
@@ -278,9 +279,9 @@ class TemplateDictionaryUnittest {
     ASSERT_STREQ(dict.GetSectionValue("harder foo"), "foo");
     ASSERT_STREQ(dict.GetSectionValue("easy double"), "doo");
     ASSERT_STREQ(dict.GetSectionValue("harder double"),
-                 "\\x3cA HREF\\x3d\\&#39;foo\\&#39;\\x3e\\n");
+                 "\\x3cA HREF\\x3d\\x27foo\\x27\\x3e\\n");
     ASSERT_STREQ(dict.GetSectionValue("hardest double"),
-                 "print \\&quot;\\x3cA HREF\\x3d\\&#39;foo\\&#39;\\x3e\\&quot;;"
+                 "print \\x22\\x3cA HREF\\x3d\\x27foo\\x27\\x3e\\x22;"
                  "\\r\\n\\\\1;");
   }
 
@@ -799,6 +800,13 @@ class TemplateDictionaryUnittest {
     ASSERT_STREQ(orig.c_str(), copy.c_str());
   }
 
+  static void TestSetModifierData() {
+    TemplateDictionary dict("test_SetModifierData", NULL);
+    const void* data = "test";
+    dict.SetModifierData("a", data);
+    ASSERT(data == dict.modifier_data()->Lookup("a"));
+  }
+
 };
 
 _END_GOOGLE_NAMESPACE_
@@ -822,6 +830,8 @@ int main(int argc, char** argv) {
 
   TemplateDictionaryUnittest::TestMakeCopy(true);    // use our own arena
   TemplateDictionaryUnittest::TestMakeCopy(false);   // use fake arena
+
+  TemplateDictionaryUnittest::TestSetModifierData();
 
   // We do this test last, because the NULs it inserts mess up all
   // the c-string-based tests that use strstr() and the like.

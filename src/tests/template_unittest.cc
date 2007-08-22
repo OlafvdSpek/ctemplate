@@ -30,12 +30,7 @@
 // ---
 // Author: Craig Silverstein
 
-#include "config.h"
-// This is for windows.  Even though we #include config.h, just like
-// the files used to compile the dll, we are actually a *client* of
-// the dll, so we don't get to decl anything.
-#undef CTEMPLATE_DLL_DECL
-
+#include "config_for_unittests.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -65,12 +60,15 @@
 #include HASH_SET_H       // (defined in config.h)  for NameListType
 #include "google/template.h"
 #include "google/template_pathops.h"
+#include "google/template_emitter.h"
 #include "google/template_dictionary.h"
+#include "google/template_modifiers.h"
 #include "google/template_namelist.h"
 
 using std::vector;
 using std::string;
 using HASH_NAMESPACE::hash_set;
+using GOOGLE_NAMESPACE::ExpandEmitter;
 using GOOGLE_NAMESPACE::Template;
 using GOOGLE_NAMESPACE::TemplateDictionary;
 using GOOGLE_NAMESPACE::TemplateNamelist;
@@ -79,6 +77,7 @@ using GOOGLE_NAMESPACE::DO_NOT_STRIP;
 using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
 using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
 namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;   // an interior namespace
+namespace template_modifiers = GOOGLE_NAMESPACE::template_modifiers;
 
 // How many threads to use for our threading test.
 // This is a #define instead of a const int so we can use it in array-sizes
@@ -194,6 +193,19 @@ static void AssertExpandIs(Template* tpl, TemplateDictionary *dict,
   delete [] buf;
 }
 
+class DynamicModifier : public template_modifiers::TemplateModifier {
+ public:
+  void Modify(const char* in, size_t inlen,
+              const template_modifiers::ModifierData* per_expand_data,
+              ExpandEmitter* outbuf, const string& arg) const {
+    assert(arg.empty());    // we don't take an argument
+    assert(per_expand_data);
+    const char* value = per_expand_data->LookupAsString("value");
+    if (value)
+      outbuf->Emit(value);
+  }
+};
+
 // This is all in a single class just to make friendship easier:
 // the TemplateUnittest class can be listed as a friend
 // once, and access all the internals of Template.
@@ -252,6 +264,40 @@ class TemplateUnittest {
     tpl = StringToTemplate("hi {{VAR:H=attribute}} {{URL_VAR:H=url}} "
                            "{{SNIPPET_VAR:H=snippet}} lo", STRIP_WHITESPACE);
     AssertExpandIs(tpl, &dict, "hi yo_yo # <b>foo & bar</b> lo", true);
+
+    // Test with custom modifier
+    ASSERT(template_modifiers::AddModifier(
+               "x-test",
+               template_modifiers::MODVAL_FORBIDDEN,
+               &template_modifiers::html_escape));
+    ASSERT(template_modifiers::AddModifier(
+               "x-test-arg",
+               template_modifiers::MODVAL_REQUIRED,
+               &template_modifiers::html_escape_with_arg));
+
+    tpl = StringToTemplate("hi {{VAR:x-test}} lo", STRIP_WHITESPACE);
+    AssertExpandIs(tpl, &dict, "hi yo&amp;yo lo", true);
+    tpl = StringToTemplate("hi {{SNIPPET_VAR:x-test-arg=snippet}} lo",
+                           STRIP_WHITESPACE);
+    AssertExpandIs(tpl, &dict, "hi <b>foo & bar</b> lo", true);
+    tpl = StringToTemplate("hi {{VAR:x-unknown}} lo", STRIP_WHITESPACE);
+    AssertExpandIs(tpl, &dict, "hi yo&yo lo", true);
+
+    // Test with a modifier taking per-expand data
+    DynamicModifier dynamic_modifier;
+    ASSERT(template_modifiers::AddModifier(
+               "x-dynamic",
+               template_modifiers::MODVAL_FORBIDDEN,
+               &dynamic_modifier));
+    tpl = StringToTemplate("hi {{VAR:x-dynamic}} lo", STRIP_WHITESPACE);
+    AssertExpandIs(tpl, &dict, "hi  lo", true);
+    dict.SetModifierData("value", "foo");
+    AssertExpandIs(tpl, &dict, "hi foo lo", true);
+    dict.SetModifierData("value", "bar");
+    AssertExpandIs(tpl, &dict, "hi bar lo", true);
+    dict.SetModifierData("value", NULL);
+    AssertExpandIs(tpl, &dict, "hi  lo", true);
+
 
     // Test with no modifiers.
     tpl = StringToTemplate("hi {{VAR}} lo", STRIP_WHITESPACE);
@@ -473,7 +519,8 @@ class TemplateUnittest {
     string incname = StringToTemplateFile("include {{#ISEC}}file{{/ISEC}}\n");
     string incname2 = StringToTemplateFile("include #2\n");
     Template* tpl = StringToTemplate(
-        "boo!\n{{>INC}}\nhi {{#SEC}}lo{{#SUBSEC}}jo{{/SUBSEC}}{{/SEC}} bar",
+        "boo!\n{{>INC}}\nhi {{#SEC}}lo{{#SUBSEC}}jo{{/SUBSEC}}{{/SEC}} bar "
+        "{{VAR:x-foo}}",
         DO_NOT_STRIP);
     TemplateDictionary dict("dict");
     dict.ShowSection("SEC");
@@ -481,6 +528,7 @@ class TemplateUnittest {
     incdict->SetFilename(incname);
     incdict->ShowSection("ISEC");
     dict.AddIncludeDictionary("INC")->SetFilename(incname2);
+    dict.SetValue("VAR", "var");
 
     // This string is equivalent to "/template." (at least on unix)
     string slash_tpl(ctemplate::PathJoin(ctemplate::kRootdir, "template."));
@@ -493,7 +541,8 @@ class TemplateUnittest {
              "{{/SEC}}{{/FILE}}{{/INC}}"
              "{{#INC=INC}}{{#FILE=%s002}}"
              "{{#SEC=__MAIN__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
-             "\nhi {{#SEC=SEC}}lo{{/SEC}} bar{{/SEC}}{{/FILE}}",
+             "\nhi {{#SEC=SEC}}lo{{/SEC}} bar "
+             "{{#VAR=VAR:x-foo<not registered>}}var{{/VAR}}{{/SEC}}{{/FILE}}",
              (FLAGS_test_tmpdir + slash_tpl).c_str(),
              (FLAGS_test_tmpdir + slash_tpl).c_str(),
              (FLAGS_test_tmpdir + slash_tpl).c_str());
@@ -507,14 +556,16 @@ class TemplateUnittest {
              "{{/SEC}}{{/FILE}}{{/INC}}"
              "{{#INC=INC}}{{#FILE=%s002}}"
              "{{#SEC=__MAIN__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
-             "\nhi {{#SEC=SEC}}lo{{/SEC}} bar{{/SEC}}{{/FILE}}",
+             "\nhi {{#SEC=SEC}}lo{{/SEC}} bar "
+             "{{#VAR=VAR:x-foo<not registered>}}var{{/VAR}}{{/SEC}}{{/FILE}}",
              (slash_tpl).c_str(),
              (slash_tpl).c_str(),
              (slash_tpl).c_str());
     AssertExpandIs(tpl, &dict, expected, true);
 
     dict.SetAnnotateOutput(NULL);   // should turn off annotations
-    AssertExpandIs(tpl, &dict, "boo!\ninclude file\ninclude #2\n\nhi lo bar",
+    AssertExpandIs(tpl, &dict,
+                   "boo!\ninclude file\ninclude #2\n\nhi lo bar var",
                    true);
   }
 
@@ -657,7 +708,8 @@ class TemplateUnittest {
     //       directory separator (so nothing like "/var/tmp/foo\a/weirdfile").
     const char* const kPathSeps = "/\\";
     for (const char* path_sep = kPathSeps; *path_sep; path_sep++) {
-      for (string::size_type sep_pos = 0;  sep_pos != string::npos;
+      for (string::size_type sep_pos = filename.find(*path_sep, 0);
+           sep_pos != string::npos;
            sep_pos = filename.find(*path_sep, sep_pos + 1)) {
         Template::SetTemplateRootDirectory(filename.substr(0, sep_pos + 1));
         Template* tpl = Template::GetTemplate(filename.substr(sep_pos + 1),

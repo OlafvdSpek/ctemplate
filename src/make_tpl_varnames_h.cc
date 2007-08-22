@@ -86,13 +86,16 @@ static void LogPrintf(int severity, int should_log_info, const char* pat, ...) {
 
 // prints to outfile -- usually stdout or stderr -- and then exits
 static int Usage(const char* argv0, FILE* outfile) {
-  fprintf(outfile, "USAGE: %s [-t<dir>] [-h<dir>] [-s<suffix>] [-n] [-d] [-q]"
-          " <template_filename> ...\n", argv0);
+  fprintf(outfile, "USAGE: %s [-t<dir>] [-h<dir>] [-s<suffix>] [-f<filename>]"
+          " [-n] [-d] [-q] <template_filename> ...\n", argv0);
   fprintf(outfile,
           "       -t<dir> --template_dir=<dir>  Root directory of templates\n"
           "       -o<dir> --header_dir=<dir>    Where to place output files\n"
           "       -s<suffix> --outputfile_suffix=<suffix>\n"
           "                                     outname = inname + suffix\n"
+          "       -f<filename> --outputfile=<filename>\n"
+          "                                     outname = filename (Only allowed\n"
+          "                                     when processing a single input file)\n"
           "       -n --noheader                 Just check syntax, no output\n"
           "       -d --dump_templates           Cause templates dump contents\n"
           "       -q --nolog_info               Only log on error\n"
@@ -125,6 +128,7 @@ int main(int argc, char **argv) {
   string FLAG_template_dir(ctemplate::kCWD);   // "./"
   string FLAG_header_dir(ctemplate::kCWD);
   string FLAG_outputfile_suffix(".varnames.h");
+  string FLAG_outputfile("");
   bool FLAG_header = true;
   bool FLAG_dump_templates = false;
   bool FLAG_log_info = true;
@@ -141,6 +145,7 @@ int main(int argc, char **argv) {
     {"template_dir", 1, NULL, 't'},
     {"header_dir", 1, NULL, 'o'},
     {"outputfile_suffix", 1, NULL, 's'},
+    {"outputfile", 1, NULL, 'f'},
     {"noheader", 0, NULL, 'n'},
     {"dump_templates", 0, NULL, 'd'},
     {"nolog_info", 0, NULL, 'q'},
@@ -148,10 +153,10 @@ int main(int argc, char **argv) {
     {0, 0, 0, 0}
   };
   int option_index;
-# define GETOPT(argc, argv)  getopt_long(argc, argv, "t:o:s:ndqhV", \
+# define GETOPT(argc, argv)  getopt_long(argc, argv, "t:o:s:f:ndqhV", \
                                          longopts, &option_index)
 #else
-# define GETOPT(argc, argv)  getopt(argc, argv, "t:o:s:ndqhV")
+# define GETOPT(argc, argv)  getopt(argc, argv, "t:o:s:f:ndqhV")
 #endif
 
   int r = 0;
@@ -161,6 +166,7 @@ int main(int argc, char **argv) {
       case 't': FLAG_template_dir.assign(optarg); break;
       case 'o': FLAG_header_dir.assign(optarg); break;
       case 's': FLAG_outputfile_suffix.assign(optarg); break;
+      case 'f': FLAG_outputfile.assign(optarg); break;
       case 'n': FLAG_header = false; break;
       case 'd': FLAG_dump_templates = true; break;
       case 'q': FLAG_log_info = false; break;
@@ -173,6 +179,15 @@ int main(int argc, char **argv) {
   if (optind >= argc) {
     LogPrintf(LOG_FATAL, FLAG_log_info,
               "Must specify at least one template file on the command line.");
+  }
+
+  // If --outputfile option is being used then --outputfile_suffix as well as
+  // --header_dir will be ignored. If there are multiple input files then an
+  // error needs to be reported.
+  if (!FLAG_outputfile.empty() && optind + 1 > argc) {
+    LogPrintf(LOG_FATAL, FLAG_log_info,
+              "Only one template file allowed when specifying an explicit "
+              "output filename.");
   }
 
   Template::SetTemplateRootDirectory(FLAG_template_dir);
@@ -221,11 +236,18 @@ int main(int argc, char **argv) {
     // Now append the header-entry info to the intro above
     tpl->WriteHeaderEntries(&contents);
 
-    // Write the results to disk.  First, figure out the filename, by
-    // removing any path before the template_file filename
-    string basename = ctemplate::Basename(argv[i]);
-    string header_file(ctemplate::PathJoin(FLAG_header_dir,
-                                           basename + FLAG_outputfile_suffix));
+    // If there is no explicit output filename set, figure out the
+    // filename by removing any path before the template_file filename
+    string header_file;
+    if (!FLAG_outputfile.empty()) {
+      header_file = FLAG_outputfile;
+    } else {
+      string basename = ctemplate::Basename(argv[i]);
+      header_file = ctemplate::PathJoin(FLAG_header_dir,
+                                        basename + FLAG_outputfile_suffix);
+    }
+
+    // Write the results to disk.
     FILE* header = fopen(header_file.c_str(), "wb");
     if (!header) {
       LogPrintf(LOG_ERROR, FLAG_log_info, "Can't open %s", header_file.c_str());

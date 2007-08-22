@@ -124,7 +124,7 @@ static int kVerbosity = 0;   // you can change this by hand to get vlogs
 #define LOG_TEMPLATE_NAME(severity, template) \
    LOG(severity) << "Template " << template->template_file() << ": "
 
-typedef vector< pair<const template_modifiers::TemplateModifier*, string> >
+typedef vector< pair<const template_modifiers::ModifierInfo*, string> >
   ModifierAndNonces;
 
 
@@ -256,8 +256,11 @@ struct TemplateToken {
     string retval(text, textlen);
     for (ModifierAndNonces::const_iterator it = modifier_plus_values.begin();
          it != modifier_plus_values.end();  ++it) {
-      const char* modname = template_modifiers::FindModifierName(it->first);
-      retval += string(":") + (modname ? modname : "<unknown>");
+      const string& modname = it->first->long_name;
+      retval += string(":") + modname;
+      if (it->first->value_status == template_modifiers::MODVAL_UNKNOWN) {
+        retval += "<not registered>";
+      }
     }
     return retval;
   }
@@ -267,6 +270,7 @@ struct TemplateToken {
 // result directly to the end of outbuf.  Precondition: |modifiers| > 0.
 static void EmitModifiedString(const ModifierAndNonces& modifiers,
                                const char* in, size_t inlen,
+                               const ModifierData* data,
                                ExpandEmitter* outbuf) {
   string result;
   if (modifiers.size() > 1) {
@@ -276,16 +280,17 @@ static void EmitModifiedString(const ModifierAndNonces& modifiers,
     // size.
     result.reserve((inlen + inlen/8) + 16);
     StringEmitter scratchbuf(&result);
-    modifiers.front().first->Modify(in, inlen, &scratchbuf,
-                                    modifiers.front().second);
+    modifiers.front().first->modifier->Modify(in, inlen, data,
+                                              &scratchbuf,
+                                              modifiers.front().second);
     // Only used when modifiers.size() > 2
     for (ModifierAndNonces::const_iterator it = modifiers.begin()+1;
          it != modifiers.end()-1;  ++it) {
       string output_of_this_modifier;
       output_of_this_modifier.reserve(result.size() + result.size()/8 + 16);
       StringEmitter scratchbuf2(&output_of_this_modifier);
-      it->first->Modify(result.c_str(), result.size(),
-                        &scratchbuf2, it->second);
+      it->first->modifier->Modify(result.c_str(), result.size(), data,
+                                  &scratchbuf2, it->second);
       result.swap(output_of_this_modifier);
     }
     in = result.data();
@@ -293,7 +298,8 @@ static void EmitModifiedString(const ModifierAndNonces& modifiers,
   }
   // For the last modifier, we can write directly into outbuf
   assert(!modifiers.empty());
-  modifiers.back().first->Modify(in, inlen, outbuf, modifiers.back().second);
+  modifiers.back().first->modifier->Modify(in, inlen, data, outbuf,
+                                           modifiers.back().second);
 }
 
 // ----------------------------------------------------------------------
@@ -332,22 +338,6 @@ class TemplateNode {
   // In addition to the pure-virtual API (above), we also define some
   // useful helper functions, as static methods.  These could have
   // been global methods, but what the hey, we'll put them here.
-
-  // Returns the dictionary that thinks we should annotate, or NULL
-  // if nobody does.  That is, returns dict if dict->ShouldAnnotateOutput()
-  // is true, force_annotate if force_annotate->ShouldAnnotateOutput() is
-  // true, and NULL else.  force_annotate is usually a dict's parent
-  // dictionary, and is used with child nodes to annotate when their
-  // parents do.  It can be NULL.
-  static const TemplateDictionary* ShouldAnnotateOutput(
-      const TemplateDictionary* dict,
-      const TemplateDictionary* force_annotate) {
-    if (dict->ShouldAnnotateOutput())
-      return dict;
-    if (force_annotate && force_annotate->ShouldAnnotateOutput())
-      return force_annotate;
-    return NULL;
-  }
 
   // Return an opening template annotation, that can be emitted
   // in the Expanded template output.  Used for generating template
@@ -468,7 +458,7 @@ bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
                                   const TemplateDictionary *dictionary,
                                   const TemplateDictionary *force_annotate)
     const {
-  if (ShouldAnnotateOutput(dictionary, force_annotate)) {
+  if (force_annotate->ShouldAnnotateOutput()) {
     output_buffer->Emit(OpenAnnotation("VAR", token_.ToString()));
   }
 
@@ -478,10 +468,10 @@ bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
     output_buffer->Emit(value);               // so just emit it
   } else {
     EmitModifiedString(token_.modifier_plus_values, value, strlen(value),
-                       output_buffer);
+                       force_annotate->modifier_data(), output_buffer);
   }
 
-  if (ShouldAnnotateOutput(dictionary, force_annotate)) {
+  if (force_annotate->ShouldAnnotateOutput()) {
     output_buffer->Emit(CloseAnnotation("VAR"));
   }
 
@@ -580,7 +570,7 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
     // possible to supply a list of more than one sub-dictionary and
     // then the template explansion will be iterative, just as though
     // the included template were an iterated section.
-    if (ShouldAnnotateOutput(dictionary, force_annotate)) {
+    if (force_annotate->ShouldAnnotateOutput()) {
       output_buffer->Emit(OpenAnnotation("INC", token_.ToString()));
     }
 
@@ -593,19 +583,19 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
       error_free &= included_template->Expand(
           output_buffer,
           *dv_iter ? *dv_iter : dictionary,
-          ShouldAnnotateOutput(dictionary, force_annotate));
+          force_annotate);
     } else {
       string sub_template;
       StringEmitter subtemplate_buffer(&sub_template);
       error_free &= included_template->Expand(
           &subtemplate_buffer,
           *dv_iter ? *dv_iter : dictionary,
-          ShouldAnnotateOutput(dictionary, force_annotate));
+          force_annotate);
       EmitModifiedString(token_.modifier_plus_values,
                          sub_template.data(), sub_template.size(),
-                         output_buffer);
+                         force_annotate->modifier_data(), output_buffer);
     }
-    if (ShouldAnnotateOutput(dictionary, force_annotate)) {
+    if (force_annotate->ShouldAnnotateOutput()) {
       output_buffer->Emit(CloseAnnotation("INC"));
     }
   }
@@ -741,7 +731,7 @@ bool SectionTemplateNode::Expand(ExpandEmitter *output_buffer,
 
   vector<TemplateDictionary*>::const_iterator dv_iter = dv->begin();
   for (; dv_iter != dv->end(); ++dv_iter) {
-    if (ShouldAnnotateOutput(dictionary, force_annotate)) {
+    if (force_annotate->ShouldAnnotateOutput()) {
       output_buffer->Emit(OpenAnnotation("SEC", token_.ToString()));
     }
 
@@ -753,10 +743,10 @@ bool SectionTemplateNode::Expand(ExpandEmitter *output_buffer,
       error_free &=
         (*iter)->Expand(output_buffer,
                         *dv_iter ? *dv_iter : dictionary,
-                        ShouldAnnotateOutput(dictionary, force_annotate));
+                        force_annotate);
     }
 
-    if (ShouldAnnotateOutput(dictionary, force_annotate)) {
+    if (force_annotate->ShouldAnnotateOutput()) {
       output_buffer->Emit(CloseAnnotation("SEC"));
     }
   }
@@ -1085,8 +1075,8 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
         }
 
         modifiers.push_back(
-            pair<const template_modifiers::TemplateModifier*, string>(
-                modstruct->modifier, value_string));
+            pair<const template_modifiers::ModifierInfo*, string>(
+                modstruct, value_string));
       }
 
       // For now, we only allow variable and include nodes to have
@@ -1660,7 +1650,7 @@ bool Template::Expand(ExpandEmitter *expand_emitter,
 bool Template::Expand(string *output_buffer,
                       const TemplateDictionary *dict) const {
   StringEmitter e(output_buffer);
-  return Expand(&e, dict, NULL);
+  return Expand(&e, dict, dict);
 }
 
 _END_GOOGLE_NAMESPACE_

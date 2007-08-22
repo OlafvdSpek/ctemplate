@@ -44,9 +44,11 @@
 #include <assert.h>
 #include <string.h>
 #include <string>
+#include <vector>
 #include <google/template_modifiers.h>
 
 using std::string;
+using std::vector;
 
 
 // A most-efficient way to append a string literal to the var named 'out'.
@@ -57,7 +59,11 @@ _START_GOOGLE_NAMESPACE_
 
 namespace template_modifiers {
 
+TemplateModifier::~TemplateModifier() {}
+
+
 void NullModifier::Modify(const char* in, size_t inlen,
+                          const ModifierData*,
                           ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   out->Emit(in, inlen);
@@ -65,6 +71,7 @@ void NullModifier::Modify(const char* in, size_t inlen,
 NullModifier null_modifier;
 
 void HtmlEscape::Modify(const char* in, size_t inlen,
+                        const ModifierData*,
                         ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   for (int i = 0; i < inlen; ++i) {
@@ -83,6 +90,7 @@ void HtmlEscape::Modify(const char* in, size_t inlen,
 HtmlEscape html_escape;
 
 void PreEscape::Modify(const char* in, size_t inlen,
+                       const ModifierData*,
                        ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   for (int i = 0; i < inlen; ++i) {
@@ -100,6 +108,7 @@ void PreEscape::Modify(const char* in, size_t inlen,
 PreEscape pre_escape;
 
 void SnippetEscape::Modify(const char* in, size_t inlen,
+                           const ModifierData*,
                            ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   bool inside_b = false;
@@ -167,6 +176,7 @@ void SnippetEscape::Modify(const char* in, size_t inlen,
 SnippetEscape snippet_escape;
 
 void CleanseAttribute::Modify(const char* in, size_t inlen,
+                              const ModifierData*,
                               ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   for (int i = 0; i < inlen; ++i) {
@@ -194,7 +204,39 @@ void CleanseAttribute::Modify(const char* in, size_t inlen,
 }
 CleanseAttribute cleanse_attribute;
 
+void CleanseCss::Modify(const char* in, size_t inlen,
+                              const ModifierData*,
+                              ExpandEmitter* out, const string& arg) const {
+  assert(arg.empty());  // We're a no-arg modifier
+  for (int i = 0; i < inlen; ++i) {
+    char c = in[i];
+    switch (c) {
+      case ' ':
+      case '_':
+      case '.':
+      case ',':
+      case '!':
+      case '#':
+      case '%':
+      case '-': {
+        out->Emit(c);
+        break;
+      }
+      default: {
+        if ((c >= 'a' && c <= 'z') ||
+            (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9')) {
+          out->Emit(c);
+        }
+        break;
+      }
+    }
+  }
+}
+CleanseCss cleanse_css;
+
 void ValidateUrl::Modify(const char* in, size_t inlen,
+                         const ModifierData* per_expand_data,
                          ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   const char* slashpos = (char*)memchr(in, '/', inlen);
@@ -203,23 +245,25 @@ void ValidateUrl::Modify(const char* in, size_t inlen,
   const void* colonpos = memchr(in, ':', slashpos - in);
   if (colonpos != NULL) {   // colon before first slash, could be a protocol
     if (inlen > sizeof("http://")-1 &&
-        memcmp(in, "http://", sizeof("http://")-1) == 0) {
+        strncasecmp(in, "http://", sizeof("http://")-1) == 0) {
       // We're ok, it's an http protocol
     } else if (inlen > sizeof("https://")-1 &&
-               memcmp(in, "https://", sizeof("https://")-1) == 0) {
+               strncasecmp(in, "https://", sizeof("https://")-1) == 0) {
       // https is ok as well
     } else {
       // It's a bad protocol, so return something safe
-      out->Emit("#");
+      chained_modifier_.Modify("#", 1, per_expand_data, out, "");
       return;
     }
   }
   // If we get here, it's a valid url, so just escape it
-  html_escape.Modify(in, inlen, out, "");
+  chained_modifier_.Modify(in, inlen, per_expand_data, out, "");
 }
-ValidateUrl validate_url_and_html_escape;
+ValidateUrl validate_url_and_html_escape(html_escape);
+ValidateUrl validate_url_and_javascript_escape(javascript_escape);
 
 void XmlEscape::Modify(const char* in, size_t inlen,
+                       const ModifierData*,
                        ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   const char* end = in + inlen;
@@ -241,13 +285,15 @@ void XmlEscape::Modify(const char* in, size_t inlen,
 XmlEscape xml_escape;
 
 void JavascriptEscape::Modify(const char* in, size_t inlen,
+                              const ModifierData*,
                               ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   for (int i = 0; i < inlen; ++i) {
     switch (in[i]) {
-      case '"': APPEND("\\\""); break;
-      case '\'': APPEND("\\'"); break;
+      case '"': APPEND("\\x22"); break;
+      case '\'': APPEND("\\x27"); break;
       case '\\': APPEND("\\\\"); break;
+      case '\t': APPEND("\\t"); break;
       case '\r': APPEND("\\r"); break;
       case '\n': APPEND("\\n"); break;
       case '\b': APPEND("\\b"); break;
@@ -262,6 +308,7 @@ void JavascriptEscape::Modify(const char* in, size_t inlen,
 JavascriptEscape javascript_escape;
 
 void UrlQueryEscape::Modify(const char* in, size_t inlen,
+                            const ModifierData*,
                             ExpandEmitter* out, const string& arg) const {
   // Everything not matching [0-9a-zA-Z.,_*/~!()-] is escaped.
   static unsigned long _safe_characters[8] = {
@@ -286,6 +333,7 @@ void UrlQueryEscape::Modify(const char* in, size_t inlen,
 UrlQueryEscape url_query_escape;
 
 void JsonEscape::Modify(const char* in, size_t inlen,
+                        const ModifierData*,
                         ExpandEmitter* out, const string& arg) const {
   assert(arg.empty());  // We're a no-arg modifier
   for (int i = 0; i < inlen; ++i) {
@@ -305,25 +353,74 @@ void JsonEscape::Modify(const char* in, size_t inlen,
 JsonEscape json_escape;
 
 void HtmlEscapeWithArg::Modify(const char* in, size_t inlen,
+                               const ModifierData* per_expand_data,
                                ExpandEmitter* out, const string& arg) const {
   if (!arg.empty()) {
     switch (arg[1]) {
       case 's':
-        return snippet_escape.Modify(in, inlen, out, "");
+        return snippet_escape.Modify(in, inlen, per_expand_data, out, "");
       case 'p':
-        return pre_escape.Modify(in, inlen, out, "");
+        return pre_escape.Modify(in, inlen, per_expand_data, out, "");
       case 'a':
-        return cleanse_attribute.Modify(in, inlen, out, "");
+        return cleanse_attribute.Modify(in, inlen, per_expand_data, out, "");
       case 'u':
-        return validate_url_and_html_escape.Modify(in, inlen, out, "");
+        return validate_url_and_html_escape.Modify(in, inlen,
+                                                   per_expand_data, out, "");
       default:
         break;
     }
   }
-  return html_escape.Modify(in, inlen, out, "");
+  return html_escape.Modify(in, inlen, per_expand_data, out, "");
 }
 HtmlEscapeWithArg html_escape_with_arg;
 
+void UrlEscapeWithArg::Modify(const char* in, size_t inlen,
+                                     const ModifierData* per_expand_data,
+                                     ExpandEmitter* out,
+                                     const string& arg) const {
+  if (!arg.empty()) {
+    switch (arg[1]) {
+      case 'j':
+        return validate_url_and_javascript_escape.Modify(in, inlen,
+                                                         per_expand_data,
+                                                         out, "");
+      case 'h':
+        return validate_url_and_html_escape.Modify(in, inlen,
+                                                   per_expand_data,
+                                                   out, "");
+      default:
+        break;
+    }
+  }
+  return url_query_escape.Modify(in, inlen, per_expand_data, out, "");
+}
+UrlEscapeWithArg url_escape_with_arg;
+
+static vector<ModifierInfo> g_extension_modifiers;
+static vector<ModifierInfo> g_unknown_modifiers;
+
+static inline bool IsExtensionModifier(const char* long_name) {
+  return memcmp(long_name, "x-", 2) == 0;
+}
+
+bool AddModifier(const char* long_name,
+                 ModvalStatus value_status,
+                 const TemplateModifier* modifier) {
+  if (!IsExtensionModifier(long_name) ||
+      (value_status != MODVAL_FORBIDDEN && value_status != MODVAL_REQUIRED)) {
+    return false;
+  }
+  const ModifierInfo *existing_modifier = FindModifier(long_name,
+                                                       strlen(long_name));
+  if (!existing_modifier || existing_modifier->value_status == MODVAL_UNKNOWN) {
+    g_extension_modifiers.push_back(ModifierInfo(long_name, '\0',
+                                                 value_status, modifier));
+    return true;
+  } else {
+    // A modifier has already been registered with this name.
+    return false;
+  }
+}
 
 // Use the empty string if you want a modifier not to have a long-name.
 // Use '\0' if you want a modifier not to have a short-name.
@@ -332,37 +429,70 @@ HtmlEscapeWithArg html_escape_with_arg;
 // 2) CleanseAttribute: use html_escape_with_arg=attribute to get this
 // 3) ValidateUrl: use html_escape_with_arg=url to get this
 static ModifierInfo g_modifiers[] = {
-  { "html_escape", 'h', MODVAL_FORBIDDEN, &html_escape },
-  { "html_escape_with_arg", 'H', MODVAL_REQUIRED, &html_escape_with_arg },
-  { "javascript_escape", 'j', MODVAL_FORBIDDEN, &javascript_escape },
-  { "json_escape", 'o', MODVAL_FORBIDDEN, &json_escape },
-  { "pre_escape", 'p', MODVAL_FORBIDDEN, &pre_escape },
-  { "url_query_escape", 'u', MODVAL_FORBIDDEN, &url_query_escape },
-  { "none", '\0', MODVAL_FORBIDDEN, &null_modifier },
+  ModifierInfo("html_escape", 'h', MODVAL_FORBIDDEN, &html_escape),
+  ModifierInfo("html_escape_with_arg", 'H', MODVAL_REQUIRED,
+               &html_escape_with_arg),
+  ModifierInfo("javascript_escape", 'j', MODVAL_FORBIDDEN, &javascript_escape),
+  ModifierInfo("json_escape", 'o', MODVAL_FORBIDDEN, &json_escape),
+  ModifierInfo("pre_escape", 'p', MODVAL_FORBIDDEN, &pre_escape),
+  ModifierInfo("url_query_escape", 'u', MODVAL_FORBIDDEN, &url_query_escape),
+  ModifierInfo("url_escape_with_arg", 'U', MODVAL_REQUIRED,
+               &url_escape_with_arg),
+  ModifierInfo("cleanse_css", 'c', MODVAL_FORBIDDEN, &cleanse_css),
+  ModifierInfo("none", '\0', MODVAL_FORBIDDEN, &null_modifier),
 };
 
 const ModifierInfo* FindModifier(const char* modname, size_t modname_len) {
-  for (ModifierInfo* mod = g_modifiers;
-       mod < g_modifiers + sizeof(g_modifiers)/sizeof(*g_modifiers);
-       ++mod) {
-    if ((modname_len == 1 && *modname == mod->short_name) ||
-        (modname_len == strlen(mod->long_name) &&
-         !memcmp(modname, mod->long_name, modname_len))) {
-      return mod;
+  if (modname_len >= 2 && IsExtensionModifier(modname)) {
+    for (vector<ModifierInfo>::iterator mod = g_extension_modifiers.begin();
+         mod != g_extension_modifiers.end();
+         ++mod) {
+      if (modname_len == mod->long_name.size() &&
+          !memcmp(modname, mod->long_name.data(), modname_len)) {
+        return &*mod;
+      }
+    }
+    for (vector<ModifierInfo>::iterator mod = g_unknown_modifiers.begin();
+         mod != g_unknown_modifiers.end();
+         ++mod) {
+      if (modname_len == mod->long_name.size() &&
+          !memcmp(modname, mod->long_name.data(), modname_len)) {
+        return &*mod;
+      }
+    }
+    static NullModifier unknown_modifier;
+    g_unknown_modifiers.push_back(ModifierInfo(string(modname, modname_len),
+                                               '\0', MODVAL_UNKNOWN,
+                                               &unknown_modifier));
+    return &g_unknown_modifiers.back();
+  } else {
+    for (ModifierInfo* mod = g_modifiers;
+         mod < g_modifiers + sizeof(g_modifiers)/sizeof(*g_modifiers);
+         ++mod) {
+      if ((modname_len == 1 && *modname == mod->short_name) ||
+          (modname_len == mod->long_name.size() &&
+           !memcmp(modname, mod->long_name.data(), modname_len))) {
+        return mod;
+      }
     }
   }
   return NULL;
 }
 
-// Find the long-name associated with a given modifier, or NULL if not found.
-const char* FindModifierName(const TemplateModifier* modifier) {
-  for (ModifierInfo* mod = g_modifiers;
-       mod < g_modifiers + sizeof(g_modifiers)/sizeof(*g_modifiers);
-       ++mod) {
-    if (mod->modifier == modifier)
-      return mod->long_name;
+const void* ModifierData::Lookup(const char* key) const {
+  DataMap::const_iterator it = map_.find(key);
+  if (it != map_.end()) {
+    return it->second;
   }
   return NULL;
+}
+
+void ModifierData::Insert(const char* key, const void* data) {
+  map_[key] = data;
+}
+
+void ModifierData::CopyFrom(const ModifierData& other) {
+  map_.insert(other.map_.begin(), other.map_.end());
 }
 
 }  // namespace template_modifiers

@@ -288,6 +288,8 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 F77 = @F77@
 FFLAGS = @FFLAGS@
+GCC_FALSE = @GCC_FALSE@
+GCC_TRUE = @GCC_TRUE@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
@@ -375,6 +377,9 @@ ACLOCAL_AMFLAGS = -I m4
 
 # This is so we can #include <google/foo>
 AM_CPPFLAGS = -I$(top_srcdir)/src
+
+# These are good warnings to turn on by default
+@GCC_TRUE@AM_CXXFLAGS = -Wall -Wwrite-strings -Woverloaded-virtual -Wno-sign-compare
 googleincludedir = $(includedir)/google
 nodist_googleinclude_HEADERS = \
 	src/google/template.h \
@@ -456,74 +461,83 @@ libctemplate_la_SOURCES = $(googleinclude_HEADERS) \
 	src/template_namelist.cc src/template_pathops.cc \
 	src/template_from_string.cc
 
-libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG
+libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG $(AM_CXXFLAGS)
 libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) -export-symbols-regex $(CTEMPLATE_SYMBOLS)
 libctemplate_la_LIBADD = $(PTHREAD_LIBS)
 libctemplate_nothreads_la_SOURCES = $(libctemplate_la_SOURCES)
-libctemplate_nothreads_la_CXXFLAGS = -DNDEBUG -DNO_THREADS
+libctemplate_nothreads_la_CXXFLAGS = -DNDEBUG -DNO_THREADS $(AM_CXXFLAGS)
 libctemplate_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_SYMBOLS)
 libctemplate_testing_la_SOURCES = $(googleinclude_HEADERS) \
                                   src/tests/template_test_util.h \
                                   src/tests/template_test_util.cc
 
-libctemplate_testing_la_CXXFLAGS = -DNDEBUG
+libctemplate_testing_la_CXXFLAGS = -DNDEBUG $(AM_CXXFLAGS)
 CTEMPLATE_TESTING_SYMBOLS = 'TemporaryRegisterTemplate|TemplateDictionaryPeer'
 libctemplate_testing_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS)
 make_tpl_varnames_h_SOURCES = $(googleinclude_HEADERS) \
 	src/make_tpl_varnames_h.cc
 
 make_tpl_varnames_h_LDADD = libctemplate_nothreads.la
-template_dictionary_unittest_SOURCES = src/base/arena.h \
+template_dictionary_unittest_SOURCES = src/config_for_unittests.h \
+                                       src/base/arena.h \
                                        src/tests/template_dictionary_unittest.cc
 
-template_dictionary_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
+template_dictionary_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_dictionary_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_dictionary_unittest_LDADD = libctemplate.la libctemplate_testing.la \
                                      $(PTHREAD_LIBS)
 
 template_dictionary_nothreads_unittest_SOURCES = $(template_dictionary_unittest_SOURCES)
-template_dictionary_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_dictionary_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_dictionary_nothreads_unittest_LDADD = libctemplate_nothreads.la \
                                                libctemplate_testing.la
 
-template_modifiers_unittest_SOURCES = src/tests/template_modifiers_unittest.cc
-template_modifiers_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
+template_modifiers_unittest_SOURCES = src/config_for_unittests.h \
+                                      src/tests/template_modifiers_unittest.cc
+
+template_modifiers_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_modifiers_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_modifiers_unittest_LDADD = libctemplate.la libctemplate_testing.la \
                                     $(PTHREAD_LIBS)
 
 template_modifiers_nothreads_unittest_SOURCES = $(template_modifiers_unittest_SOURCES)
-template_modifiers_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_modifiers_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_modifiers_nothreads_unittest_LDADD = libctemplate_nothreads.la \
                                               libctemplate_testing.la
 
-template_setglobals_unittest_SOURCES = src/tests/template_setglobals_unittest.cc
-template_setglobals_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
+template_setglobals_unittest_SOURCES = src/config_for_unittests.h \
+                                       src/tests/template_setglobals_unittest.cc
+
+template_setglobals_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_setglobals_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_setglobals_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
 template_setglobals_nothreads_unittest_SOURCES = $(template_setglobals_unittest_SOURCES)
-template_setglobals_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_setglobals_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_setglobals_nothreads_unittest_LDADD = libctemplate_nothreads.la
-template_from_string_unittest_SOURCES = src/tests/template_from_string_unittest.cc
-template_from_string_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
+template_from_string_unittest_SOURCES = src/config_for_unittests.h \
+                                        src/tests/template_from_string_unittest.cc
+
+template_from_string_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_from_string_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_from_string_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
 template_from_string_nothreads_unittest_SOURCES = $(template_from_string_unittest_SOURCES)
-template_from_string_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_from_string_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_from_string_nothreads_unittest_LDADD = libctemplate_nothreads.la
-template_unittest_SOURCES = src/tests/template_unittest.cc
-template_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
+template_unittest_SOURCES = src/config_for_unittests.h \
+                            src/tests/template_unittest.cc
+
+template_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
 template_nothreads_unittest_SOURCES = src/tests/template_unittest.cc
-template_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_nothreads_unittest_LDADD = libctemplate_nothreads.la
 template_regtest_SOURCES = src/tests/template_regtest.cc
-template_regtest_CXXFLAGS = $(PTHREAD_CFLAGS)
+template_regtest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_regtest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_regtest_LDADD = libctemplate.la $(PTHREAD_LIBS)
 template_nothreads_regtest_SOURCES = $(template_regtest_SOURCES)
-template_nothreads_regtest_CXXFLAGS = -DNO_THREADS
+template_nothreads_regtest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_nothreads_regtest_LDADD = libctemplate_nothreads.la
 EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb \
 	$(SCRIPTS) libtool \
@@ -1273,6 +1287,9 @@ distdir: $(DISTFILES)
 	    || exit 1; \
 	  fi; \
 	done
+	$(MAKE) $(AM_MAKEFLAGS) \
+	  top_distdir="$(top_distdir)" distdir="$(distdir)" \
+	  dist-hook
 	-find $(distdir) -type d ! -perm -777 -exec chmod a+rwx {} \; -o \
 	  ! -type d ! -perm -444 -links 1 -exec chmod a+r {} \; -o \
 	  ! -type d ! -perm -400 -exec chmod a+r {} \; -o \
@@ -1469,8 +1486,8 @@ uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
 .PHONY: CTAGS GTAGS all all-am am--refresh check check-TESTS check-am \
 	clean clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
 	clean-libtool clean-noinstLTLIBRARIES clean-noinstPROGRAMS \
-	ctags dist dist-all dist-bzip2 dist-gzip dist-shar dist-tarZ \
-	dist-zip distcheck distclean distclean-compile \
+	ctags dist dist-all dist-bzip2 dist-gzip dist-hook dist-shar \
+	dist-tarZ dist-zip distcheck distclean distclean-compile \
 	distclean-generic distclean-hdr distclean-libtool \
 	distclean-tags distcleancheck distdir distuninstallcheck dvi \
 	dvi-am html html-am info info-am install install-am \
@@ -1497,6 +1514,11 @@ rpm: dist-gzip packages/rpm.sh packages/rpm/rpm.spec
 
 deb: dist-gzip packages/deb.sh packages/deb/*
 	@cd packages && ./deb.sh ${PACKAGE} ${VERSION}
+
+# Windows wants write permission to .vcproj files and maybe even sln files.
+dist-hook:
+	test -e "$(distdir)/vsprojects" \
+	   && chmod -R u+w $(distdir)/*.sln $(distdir)/vsprojects/
 
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck

@@ -6,6 +6,11 @@ ACLOCAL_AMFLAGS = -I m4
 # This is so we can #include <google/foo>
 AM_CPPFLAGS = -I$(top_srcdir)/src
 
+# These are good warnings to turn on by default
+if GCC
+AM_CXXFLAGS = -Wall -Wwrite-strings -Woverloaded-virtual -Wno-sign-compare
+endif
+
 googleincludedir = $(includedir)/google
 ## The .h files you want to install (that is, .h files that people
 ## who install this package can include in their own applications.)
@@ -77,7 +82,7 @@ libctemplate_la_SOURCES = $(googleinclude_HEADERS) \
 	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
 	src/template_namelist.cc src/template_pathops.cc \
 	src/template_from_string.cc
-libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG
+libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG $(AM_CXXFLAGS)
 libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) -export-symbols-regex $(CTEMPLATE_SYMBOLS)
 libctemplate_la_LIBADD = $(PTHREAD_LIBS)
 
@@ -85,7 +90,7 @@ libctemplate_la_LIBADD = $(PTHREAD_LIBS)
 # because we use an extra compiler flag.
 lib_LTLIBRARIES += libctemplate_nothreads.la
 libctemplate_nothreads_la_SOURCES = $(libctemplate_la_SOURCES)
-libctemplate_nothreads_la_CXXFLAGS = -DNDEBUG -DNO_THREADS
+libctemplate_nothreads_la_CXXFLAGS = -DNDEBUG -DNO_THREADS $(AM_CXXFLAGS)
 libctemplate_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_SYMBOLS)
 
 # We could also make a library that has the TemplateDictionaryPeer
@@ -101,7 +106,7 @@ noinst_LTLIBRARIES += libctemplate_testing.la
 libctemplate_testing_la_SOURCES = $(googleinclude_HEADERS) \
                                   src/tests/template_test_util.h \
                                   src/tests/template_test_util.cc
-libctemplate_testing_la_CXXFLAGS = -DNDEBUG
+libctemplate_testing_la_CXXFLAGS = -DNDEBUG $(AM_CXXFLAGS)
 CTEMPLATE_TESTING_SYMBOLS = 'TemporaryRegisterTemplate|TemplateDictionaryPeer'
 libctemplate_testing_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS)
 # This library depends on libctemplate, but it can use either libctemplate
@@ -124,68 +129,73 @@ bin_SCRIPTS += src/template-converter
 
 TESTS += template_dictionary_unittest template_dictionary_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_dictionary_unittest/template_dictionary_unittest.vcproj
-template_dictionary_unittest_SOURCES = src/base/arena.h \
+template_dictionary_unittest_SOURCES = src/config_for_unittests.h \
+                                       src/base/arena.h \
                                        src/tests/template_dictionary_unittest.cc
-template_dictionary_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
+template_dictionary_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_dictionary_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_dictionary_unittest_LDADD = libctemplate.la libctemplate_testing.la \
                                      $(PTHREAD_LIBS)
 template_dictionary_nothreads_unittest_SOURCES = $(template_dictionary_unittest_SOURCES)
-template_dictionary_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_dictionary_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_dictionary_nothreads_unittest_LDADD = libctemplate_nothreads.la \
                                                libctemplate_testing.la
 
 TESTS += template_modifiers_unittest template_modifiers_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_modifiers_unittest/template_modifiers_unittest.vcproj
-template_modifiers_unittest_SOURCES = src/tests/template_modifiers_unittest.cc
-template_modifiers_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
+template_modifiers_unittest_SOURCES = src/config_for_unittests.h \
+                                      src/tests/template_modifiers_unittest.cc
+template_modifiers_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_modifiers_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_modifiers_unittest_LDADD = libctemplate.la libctemplate_testing.la \
                                     $(PTHREAD_LIBS)
 template_modifiers_nothreads_unittest_SOURCES = $(template_modifiers_unittest_SOURCES)
-template_modifiers_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_modifiers_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_modifiers_nothreads_unittest_LDADD = libctemplate_nothreads.la \
                                               libctemplate_testing.la
 
 TESTS += template_setglobals_unittest template_setglobals_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_setglobals_unittest/template_setglobals_unittest.vcproj
-template_setglobals_unittest_SOURCES = src/tests/template_setglobals_unittest.cc
-template_setglobals_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
+template_setglobals_unittest_SOURCES = src/config_for_unittests.h \
+                                       src/tests/template_setglobals_unittest.cc
+template_setglobals_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_setglobals_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_setglobals_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
 template_setglobals_nothreads_unittest_SOURCES = $(template_setglobals_unittest_SOURCES)
-template_setglobals_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_setglobals_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_setglobals_nothreads_unittest_LDADD = libctemplate_nothreads.la
 
 TESTS += template_from_string_unittest template_from_string_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_from_string_unittest/template_from_string_unittest.vcproj
-template_from_string_unittest_SOURCES = src/tests/template_from_string_unittest.cc
-template_from_string_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
+template_from_string_unittest_SOURCES = src/config_for_unittests.h \
+                                        src/tests/template_from_string_unittest.cc
+template_from_string_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_from_string_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_from_string_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
 template_from_string_nothreads_unittest_SOURCES = $(template_from_string_unittest_SOURCES)
-template_from_string_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_from_string_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_from_string_nothreads_unittest_LDADD = libctemplate_nothreads.la
 
 TESTS += template_unittest template_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_unittest/template_unittest.vcproj
 WINDOWS_PROJECTS += vsprojects/template_unittest_static/template_unittest_static.vcproj
-template_unittest_SOURCES = src/tests/template_unittest.cc
-template_unittest_CXXFLAGS = $(PTHREAD_CFLAGS)
+template_unittest_SOURCES = src/config_for_unittests.h \
+                            src/tests/template_unittest.cc
+template_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
 template_nothreads_unittest_SOURCES = src/tests/template_unittest.cc
-template_nothreads_unittest_CXXFLAGS = -DNO_THREADS
+template_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_nothreads_unittest_LDADD = libctemplate_nothreads.la
 
 TESTS += template_regtest template_nothreads_regtest
 WINDOWS_PROJECTS += vsprojects/template_regtest/template_regtest.vcproj
 template_regtest_SOURCES = src/tests/template_regtest.cc
-template_regtest_CXXFLAGS = $(PTHREAD_CFLAGS)
+template_regtest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_regtest_LDFLAGS = $(PTHREAD_CFLAGS)
 template_regtest_LDADD = libctemplate.la $(PTHREAD_LIBS)
 template_nothreads_regtest_SOURCES = $(template_regtest_SOURCES)
-template_nothreads_regtest_CXXFLAGS = -DNO_THREADS
+template_nothreads_regtest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_nothreads_regtest_LDADD = libctemplate_nothreads.la
 
 make_tpl_varnames_h_unittest_sh: $(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
@@ -205,6 +215,11 @@ rpm: dist-gzip packages/rpm.sh packages/rpm/rpm.spec
 
 deb: dist-gzip packages/deb.sh packages/deb/*
 	@cd packages && ./deb.sh ${PACKAGE} ${VERSION}
+
+# Windows wants write permission to .vcproj files and maybe even sln files.
+dist-hook:
+	test -e "$(distdir)/vsprojects" \
+	   && chmod -R u+w $(distdir)/*.sln $(distdir)/vsprojects/
 
 ## If you're using libtool, add 'libtool' here.  Also add this rule:
 libtool: $(LIBTOOL_DEPS)

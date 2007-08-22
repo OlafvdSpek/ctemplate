@@ -66,6 +66,7 @@
 namespace google {
 
 class UnsafeArena;
+using template_modifiers::ModifierData;
 
 // Most methods below take a TemplateString rather than a C++ string.
 // This is for efficiency: it can avoid extra string copies.
@@ -210,6 +211,11 @@ class CTEMPLATE_DLL_DECL TemplateDictionary {
   // document what template-file the dictionary is intended to go with.
   void SetFilename(const TemplateString filename);
 
+  // SetModifierData
+  //   Stores data which will be accessible by modifiers when
+  //   expanding this dictionary. Call with value set to NULL
+  //   to clear any value previously set.
+  void SetModifierData(const char* key, const void* value);
 
   // --- ESCAPE FUNCTORS
   // Some commonly-used escape functors.  These just point to the
@@ -271,7 +277,7 @@ class CTEMPLATE_DLL_DECL TemplateDictionary {
   // Normally we'd put this code directly in TemplateStringHash, below, but
   // TemplateString friendship rules require the code to be at this level.
   inline static size_t HashTemplateString(const TemplateString& s) {
-    // This is a terrible hash-function
+    // This is a terrible hash_compare-function
     unsigned long r = 0;
     for (size_t i = 0; i < s.length_; i++)
       r = 5 * r + s.ptr_[i];
@@ -281,7 +287,7 @@ class CTEMPLATE_DLL_DECL TemplateDictionary {
     size_t operator()(const TemplateString& s) const {
       return HashTemplateString(s);
     }
-    // Less operator for MSVC's hash containers.
+    // Less operator for MSVC's hash_compare containers.
     bool operator()(const TemplateString& a, const TemplateString& b) const {
       return TemplateStringCmp(a, b) < 0;
     }
@@ -358,6 +364,8 @@ class CTEMPLATE_DLL_DECL TemplateDictionary {
   const char *GetIncludeTemplateName(const std::string& variable, int dictnum) const;
   const DictVector& GetTemplateDictionaries(const std::string& include_name) const;
 
+  const ModifierData* modifier_data() const { return &modifier_data_; }
+
 
   // The "name" of the dictionary for debugging output (Dump, etc.)
   // The arena, also set at construction time
@@ -387,10 +395,9 @@ class CTEMPLATE_DLL_DECL TemplateDictionary {
   // for template-includes, optional (but useful) for 'normal' dicts.
   const char* filename_;
 
-  // If non-NULL, we want to annotate template vars at expand time (to debug).
-  // If set to something other than the empty string, this string indicates
-  // the end of the prefix to cut off when printing template-include filenames.
-  const char* template_path_start_for_annotations_;
+  // Data used by the modifiers and the template library during
+  // Expand (ie: should we annotate the output?).
+  ModifierData modifier_data_;
 
  private:
   // Can't invoke copy constructor or assignment operator
