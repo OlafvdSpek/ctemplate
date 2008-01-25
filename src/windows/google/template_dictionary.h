@@ -126,25 +126,6 @@ class CTEMPLATE_DLL_DECL TemplateDictionary {
 #endif
       ;  // starts at 3 because of implicit 1st arg 'this'
 
-  // TemplateModifier is defined in template_modifier.h, which also provides
-  // some functors to use (particularly useful ones are also defined below).
-  // NOTE: This method is provided for convenience, but it's better to call
-  //       SetValue() and do the escaping in the template itself when possible:
-  //            "...{{MYVAR:html_escape}}..."
-  void SetEscapedValue(const TemplateString variable, const TemplateString value,
-                       const template_modifiers::TemplateModifier& escfn);
-
-  // NOTE: This method is provided for convenience, but it's better to call
-  //       SetFormattedValue() and do the escaping in the template itself:
-  //            "...{{MYVAR:html_escape}}..."
-  void SetEscapedFormattedValue(const TemplateString variable,
-                                const template_modifiers::TemplateModifier& escfn,
-                                const char* format, ...)
-#if 0
-       __attribute__((__format__ (__printf__, 4, 5)))
-#endif
-      ;  // starts at 4 because of implicit 1st arg 'this'
-
   // We also let you set values in the 'global' dictionary which is
   // referenced when all other dictionaries fail.  Note this is a
   // static method: no TemplateDictionary instance needed.  Since
@@ -189,16 +170,6 @@ class CTEMPLATE_DLL_DECL TemplateDictionary {
                               const TemplateString value,
                               const TemplateString section_name);
 
-  // In this case, we hide the section if the *escaped* value of the variable
-  // is the empty string.
-  // NOTE: This method is provided for convenience, but it's better to call
-  //       SetValueAndShowSection() and do the escaping in the template itself:
-  //            "...{{MYVAR:html_escape}}..."
-  void SetEscapedValueAndShowSection(const TemplateString variable,
-                                     const TemplateString value,
-                                     const template_modifiers::TemplateModifier& escfn,
-                                     const TemplateString section_name);
-
 
   // --- Routines for TEMPLATE-INCLUDES
   // Included templates are treated like sections, but they require
@@ -217,18 +188,6 @@ class CTEMPLATE_DLL_DECL TemplateDictionary {
   //   to clear any value previously set.
   void SetModifierData(const char* key, const void* value);
 
-  // --- ESCAPE FUNCTORS
-  // Some commonly-used escape functors.  These just point to the
-  // variable of the same name in template_modifiers.h, and are kept
-  // here for backwards compatibility.  For new code, and to get access
-  // to escape functors not listed here, use template_modifiers.h.
-  static const template_modifiers::HtmlEscape& html_escape;
-  static const template_modifiers::PreEscape& pre_escape;
-  static const template_modifiers::XmlEscape& xml_escape;
-  static const template_modifiers::JavascriptEscape& javascript_escape;
-  static const template_modifiers::UrlQueryEscape& url_query_escape;
-  static const template_modifiers::JsonEscape& json_escape;
-
 
   // --- DEBUGGING TOOLS
 
@@ -244,6 +203,32 @@ class CTEMPLATE_DLL_DECL TemplateDictionary {
   // including template_path_start is elided.  This can make the
   // output less dependent on filesystem location for template files.
   void SetAnnotateOutput(const char* template_path_start);
+
+
+  // --- DEPRECATED ESCAPING FUNCTIONALITY
+
+  // Escaping in the binary has been deprecated in favor of using modifiers
+  // to do the escaping in the template:
+  //            "...{{MYVAR:html_escape}}..."
+  void SetEscapedValue(const TemplateString variable, const TemplateString value,
+                       const template_modifiers::TemplateModifier& escfn);
+  void SetEscapedFormattedValue(const TemplateString variable,
+                                const template_modifiers::TemplateModifier& escfn,
+                                const char* format, ...)
+#if 0
+       __attribute__((__format__ (__printf__, 4, 5)))
+#endif
+      ;  // starts at 4 because of implicit 1st arg 'this'
+  void SetEscapedValueAndShowSection(const TemplateString variable,
+                                     const TemplateString value,
+                                     const template_modifiers::TemplateModifier& escfn,
+                                     const TemplateString section_name);
+  static const template_modifiers::HtmlEscape& html_escape;
+  static const template_modifiers::PreEscape& pre_escape;
+  static const template_modifiers::XmlEscape& xml_escape;
+  static const template_modifiers::JavascriptEscape& javascript_escape;
+  static const template_modifiers::UrlQueryEscape& url_query_escape;
+  static const template_modifiers::JsonEscape& json_escape;
 
 
  private:

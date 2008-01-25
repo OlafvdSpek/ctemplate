@@ -182,14 +182,15 @@ static vector<Testdata> ReadDataFiles(const char* testdata_dir) {
   GetNamelist(testdata_dir, &namelist);
   sort(namelist.begin(), namelist.end());
 
-  for (size_t i = 0; i < namelist.size(); ++i) {
+  for (vector<string>::const_iterator it = namelist.begin();
+       it != namelist.end(); ++it) {
     vector<string>* new_output = NULL;
     char fname[PATH_MAX];
-    snprintf(fname, sizeof(fname), "%s/%s", testdata_dir, namelist[i].c_str());
+    snprintf(fname, sizeof(fname), "%s/%s", testdata_dir, it->c_str());
     // happily, due to strncmp above, we know namelist[i] is bigger than 20
     if (!strcmp(fname + strlen(fname) - 3, ".in")) {
       retval.push_back(Testdata());
-      retval.back().input_template_name = namelist[i];
+      retval.back().input_template_name = *it;
       ReadToString(fname, &retval.back().input_template);
     } else if (!strcmp(fname + strlen(fname) - 4, ".out")) {
       new_output = &retval.back().output;
@@ -200,14 +201,14 @@ static vector<Testdata> ReadDataFiles(const char* testdata_dir) {
     }
     if (new_output) {            // the .out and .anno_out cases
       ASSERT(!retval.empty());   // an .out without any corresponding .in?
-      ASSERT(namelist[i].length() >
-             retval.back().input_template_name.length() + 4);
+      ASSERT(it->length() > retval.back().input_template_name.length() + 4);
       // input file is foo.in, and output is foo_dictYY.out.  This gets to YY.
-      const char* dictnum_pos = (namelist[i].c_str() +
+      const char* dictnum_pos = (it->c_str() +
                                  retval.back().input_template_name.length() + 2);
       int dictnum = atoi(dictnum_pos);   // just ignore chars after the YY
       ASSERT(dictnum);                   // dictnums should start with 01
-      for (size_t i = new_output->size(); i < dictnum; ++i)
+      while (new_output->size() <
+             static_cast<vector<string>::size_type>(dictnum))
         new_output->push_back(string());
       ReadToString(fname, &((*new_output)[dictnum-1]));
     }

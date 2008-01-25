@@ -35,9 +35,9 @@
 				OutputFile="$(OutDir)/libctemplate-debug.dll"
 				LinkIncremental="2"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile="$(OutDir)/libctemplate.pdb"
+				ProgramDatabaseFile="$(OutDir)/libctemplate-debug.pdb"
 				SubSystem="2"
-				ImportLibrary="$(OutDir)/libctemplate.lib"
+				ImportLibrary="$(OutDir)/libctemplate-debug.lib"
 				TargetMachine="1"/>
 			<Tool
 				Name="VCMIDLTool"/>

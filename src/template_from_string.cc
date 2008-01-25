@@ -65,8 +65,8 @@ TemplateFromString::TemplateFromString(const string& cache_key,
   // We know that InsertFile never writes more output than it gets input.
   // While we allocate buffer here, BuildTree takes ownership and deletes it.
   char* buffer = new char[template_text.size()];
-  const int buflen = InsertFile(template_text.data(), template_text.size(),
-                                buffer);
+  const size_t buflen = InsertFile(template_text.data(), template_text.size(),
+                                   buffer);
   if ( BuildTree(buffer, buffer + buflen) ) {
     assert(state() == TS_READY);
   } else {

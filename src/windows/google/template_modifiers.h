@@ -45,15 +45,9 @@
 //
 // In addition to the list of modifiers hard-coded in the source code
 // here, it is possible to dynamicly register modifiers using a long
-// name starting with "x-".
-//
-// In addition to using a modifier within a template, you can also
-// pass a modifier object to TemplateDictionary::SetEscapedValue() and
-// similar methods.  The built-in modifier objects are defined in this
-// file (some are also exported in template_dictionary.h for backwards
-// compatibility).  If you wish to define your own modifier class, in
-// your own source code, just subclass TemplateModifier -- see
-// template_modifiers.cc for details of how to do that.
+// name starting with "x-".  If you wish to define your own modifier
+// class, in your own source code, just subclass TemplateModifier --
+// see template_modifiers.cc for details of how to do that.
 //
 // Adding a new built-in modifier, to this file, takes several steps,
 // both in this .h file and in the corresponding .cc file:
@@ -101,9 +95,18 @@ class ModifierData;
 class CTEMPLATE_DLL_DECL TemplateModifier {
  public:
   // This function takes a string as input, a char*/size_t pair, and
-  // appends the modified version to the end of outbuf.  "arg" is
-  // used for modifiers that take a modifier-value argument; for
-  // modifiers that take no argument, arg will always be "".
+  // appends the modified version to the end of outbuf.  In addition
+  // to the variable-value to modify (specified via in/inlen), each
+  // Modify passes in two pieces of user-supplied data:
+  // 1) arg: this is the modifier-value, for modifiers that take a
+  //         value (e.g. "{{VAR:modifier=value}}").  This value
+  //         comes from the template file.  For modifiers that take
+  //         no modval argument, arg will always be "".  For modifiers
+  //         that do take such an argument, arg will always start with "=".
+  // 2) per_expand_data: this is a set of data that the application can
+  //         associate with a TemplateDictionary, and is passed in to
+  //         every variable expanded using that dictionary.  This value
+  //         comes from the source code.
   virtual void Modify(const char* in, size_t inlen,
                       const ModifierData* per_expand_data,
                       ExpandEmitter* outbuf,
@@ -191,53 +194,78 @@ extern CTEMPLATE_DLL_DECL UrlQueryEscape url_query_escape;
 class CTEMPLATE_DLL_DECL JsonEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
 extern CTEMPLATE_DLL_DECL JsonEscape json_escape;
 
-// A dispatch routine that calls pre_escape, snippet_escape,
-// cleanse_attribute, or validate_url, depending on the value of the arg.
-class CTEMPLATE_DLL_DECL HtmlEscapeWithArg : public TemplateModifier { MODIFY_SIGNATURE_; };
-extern CTEMPLATE_DLL_DECL HtmlEscapeWithArg html_escape_with_arg;
-
-// A similar dispatch routine for URLS.
-// Calls validate_url_and_javascript_escape, validate_url_and_html_escape,
-// or url_query_escape depending on the value of the argument..
-class CTEMPLATE_DLL_DECL UrlEscapeWithArg : public TemplateModifier { MODIFY_SIGNATURE_; };
-extern CTEMPLATE_DLL_DECL UrlEscapeWithArg url_escape_with_arg;
+// Inserts the given prefix (given as the argument to this modifier)
+// after every newline in the text.  Note that it does *not* insert
+// prefix at the very beginning of the text -- in its expected use,
+// that prefix will already be present before this text, in the
+// template.  This is meant to be used internally, and is not exported
+// via the g_modifiers list.
+class CTEMPLATE_DLL_DECL PrefixLine : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern CTEMPLATE_DLL_DECL PrefixLine prefix_line;
 
 
 #undef MODIFY_SIGNATURE_
 
 // -----------------------------------------------------------------
 // These are used by template.cc and when registering new modifiers.
+// (Or more exactly, registering new modifier/value pairs.)
 // They are not intended for any other users.
-
-// Does this modifier take an argument?  Note we do not have
-// MODVAL_OPTIONAL: we prefer the clarity of an arg either always
-// taking an argument, or never (ie, no "default arguments").
-// MODVAL_UNKNOWN is only for internal use and cannot be used when
-// registering a new modifier.
-enum ModvalStatus { MODVAL_FORBIDDEN, MODVAL_REQUIRED, MODVAL_UNKNOWN };
 
 // TODO(csilvers): collapse this into the TemplateModifier class?
 struct ModifierInfo {
-  ModifierInfo(std::string ln, char sn, ModvalStatus vs,
-               const TemplateModifier *m)
+
+  // longname should end in an '=' iff the modifier takes a value
+  //   (same as in getopt(3)).
+  // To specialize -- add a modifier that applies only when we see the name
+  //   with a particular value -- specify longname like so: "longname=value".
+  //   (See example in the comment-doc below, for AddModifier.)
+  // sn can be '\0' if there is no associated shortname.
+  // m should be NULL *only if* default-registering a user-defined longname
+  //   that the user neglected to register themselves.  In this case, we
+  //   use the null modifier as the actual modifier.
+  ModifierInfo(std::string ln, char sn, const TemplateModifier *m)
       : long_name(ln), short_name(sn),
-        value_status(vs), modifier(m) { }
+        modval_required(strchr(ln.c_str(), '=') != NULL),
+        is_registered(m != NULL),
+        modifier(m ? m : &null_modifier) { }
   std::string long_name;
   char short_name;
-  ModvalStatus value_status;
+  bool modval_required;           // true iff ln has an '=' in it
+  bool is_registered;             // true for built-in and AddModifier mods
   const TemplateModifier* modifier;
 };
 
+// Returns whether or not candidate can be safely (w.r.t XSS)
+// used in lieu of our ModifierInfo. This is true iff:
+//   1. Both have the same modifier function OR
+//   2. Candidate's modifier function is in our ModifierInfo's
+//      list (vector) of safe alternative modifier functions.
+// Note that this function is not commutative therefore
+// IsSafeXSSAlternative(a, b) may not be equal to IsSafeXSSAlternative(b, a).
+bool CTEMPLATE_DLL_DECL IsSafeXSSAlternative(const ModifierInfo& our,
+                          const ModifierInfo& candidate);
+
 // Registers a new template modifier.
 // long_name must start with "x-".
-extern CTEMPLATE_DLL_DECL bool AddModifier(const char* long_name,
-                         ModvalStatus value_status,
-                         const TemplateModifier* modifier);
+// If the modifier takes a value (eg "{{VAR:x-name=value}}"), then
+// long_name should end with "=".  This is similar to getopt(3) syntax.
+// We also allow value-specializations, with specific values specified
+// as part of long-name.  For instance:
+//    AddModifier("x-mod=", &my_modifierA);
+//    AddModifier("x-mod=bar", &my_modifierB);
+//    AddModifier("x-mod2", &my_modifierC);
+// For the template
+//    {{VAR1:x-mod=foo}} {{VAR2:x-mod=bar}} {{VAR3:x-mod=baz}} {{VAR4:x-mod2}}
+// VAR1 and VAR3 would get modified by my_modifierA, VAR2 by my_modifierB,
+// and VAR4 by my_modifierC.  The order of the AddModifier calls is not
+// significant.
+extern CTEMPLATE_DLL_DECL bool AddModifier(const char* long_name, const TemplateModifier* modifier);
 
 // modname is the name of the modifier (shortname or longname).
+// value is the modifier-value (empty string if there is no modval).
 // Returns a pointer into g_modifiers, or NULL if not found.
-extern CTEMPLATE_DLL_DECL const ModifierInfo* FindModifier(const char* modname,
-                                         size_t modname_len);
+extern CTEMPLATE_DLL_DECL const ModifierInfo* FindModifier(const char* modname, size_t modname_len,
+                                 const char* modval, size_t modval_len);
 
 // This class holds per-expand data which is available to
 // custom modifiers.

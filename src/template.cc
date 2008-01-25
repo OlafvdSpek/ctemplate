@@ -37,6 +37,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <ctype.h>
 #include <time.h>
 #include <ctype.h>          // for isspace()
 #include <sys/stat.h>
@@ -87,8 +88,18 @@ namespace {
 static Mutex g_static_mutex;
 static Mutex g_cache_mutex;
 static Mutex g_header_mutex;
+
+// It's not great to have a global variable with a constructor, but
+// it's safe in this case: the constructor is trivial and does not
+// depend on any other global constructors running first, and the
+// variable is used in only one place below, always after main() has
+// started.
+static const template_modifiers::ModifierInfo g_prefix_line_info(
+    "", '\0', &template_modifiers::prefix_line);
+
 const char * const kDefaultTemplateDirectory = ctemplate::kCWD;   // "./"
-const char * const kMainSectionName = "__MAIN__";
+// Note this name is syntactically impossible for a user to accidentally use.
+const char * const kMainSectionName = "__{{MAIN}}__";
 static vector<TemplateDictionary*>* g_use_current_dict;  // vector == {NULL}
 
 // Type, var, and mutex used to store template objects in the internal cache
@@ -174,7 +185,7 @@ static void WriteOneHeaderEntry(string *outstring,
     prefix = "k";
     bool take_next = true;
 
-    for (int i=0; i < filename.length(); i++) {
+    for (string::size_type i = 0; i < filename.length(); i++) {
       if (filename[i] == '.') {
         // stop when we find the dot
         break;
@@ -258,9 +269,8 @@ struct TemplateToken {
          it != modifier_plus_values.end();  ++it) {
       const string& modname = it->first->long_name;
       retval += string(":") + modname;
-      if (it->first->value_status == template_modifiers::MODVAL_UNKNOWN) {
+      if (!it->first->is_registered)
         retval += "<not registered>";
-      }
     }
     return retval;
   }
@@ -654,6 +664,12 @@ class SectionTemplateNode : public TemplateNode {
  protected:
   const TemplateToken token_;   // text is the name of the section
   NodeList node_list_;  // The list of subnodes in the section
+  // When the last node read was literal text that ends with "\n? +"
+  // (that is, leading whitespace on a line), this stores the leading
+  // whitespace.  This is used to properly indent included
+  // sub-templates.
+  string indentation_;
+
 
   // A protected method used in parsing the template file
   // Finds the next token in the file and return it. Anything not inside
@@ -686,7 +702,7 @@ class SectionTemplateNode : public TemplateNode {
 // --- constructor and destructor, Expand, Dump, and WriteHeaderEntries
 
 SectionTemplateNode::SectionTemplateNode(const TemplateToken& token)
-    : token_(token) {
+    : token_(token), indentation_("\n") {
   VLOG(2) << "Constructing SectionTemplateNode: "
           << string(token_.text, token_.textlen) << endl;
 }
@@ -716,8 +732,8 @@ bool SectionTemplateNode::Expand(ExpandEmitter *output_buffer,
 
   const string variable(token_.text, token_.textlen);
 
-  // The section named __MAIN__ is special: you always expand it exactly
-  // once using the containing (main) dictionary.
+  // The section named __{{MAIN}}__ is special: you always expand it
+  // exactly once using the containing (main) dictionary.
   if (token_.text == kMainSectionName) {
     dv = g_use_current_dict;   // 'expand once, using the passed in dictionary'
   } else {
@@ -809,6 +825,33 @@ void SectionTemplateNode::AddTemplateNode(const TemplateToken& token,
   node_list_.push_back(new TemplateTemplateNode(token, my_template->strip_));
 }
 
+// If "text" ends with a newline followed by whitspace, returns a
+// string holding that whitespace.  Otherwise, returns the empty
+// string.  If implicit_newline is true, also consider the text to be
+// an indentation if it consists entirely of whitespace; this is set
+// when we know that right before this text there was a newline, or
+// this text is the beginning of a document.
+static string GetIndentation(const char* text, size_t textlen,
+                             bool implicit_newline) {
+  const char* nextline;    // points to one char past the last newline
+  for (nextline = text + textlen; nextline > text; --nextline)
+    if (nextline[-1] == '\n') break;
+  if (nextline == text && !implicit_newline)
+    return "";                // no newline found, so no indentation
+
+  bool prefix_is_whitespace = true;
+  for (const char* p = nextline; p < text + textlen; ++p) {
+    if (*p != ' ' && *p != '\t') {
+      prefix_is_whitespace = false;
+      break;
+    }
+  }
+  if (prefix_is_whitespace && text + textlen > nextline)
+    return string(nextline, text + textlen - nextline);
+  else
+    return "";
+}
+
 bool SectionTemplateNode::AddSubnode(Template *my_template) {
   // Don't proceed if we already found an error
   if (my_template->state() == TS_ERROR) {
@@ -832,12 +875,17 @@ bool SectionTemplateNode::AddSubnode(Template *my_template) {
   switch (token.type) {
     case TOKENTYPE_TEXT:
       this->AddTextNode(token.text, token.textlen);
+      // Store the indentation (trailing whitespace after a newline), if any.
+      this->indentation_ = GetIndentation(token.text, token.textlen,
+                                          indentation_ == "\n");
       break;
     case TOKENTYPE_VARIABLE:
       this->AddVariableNode(token);
+      this->indentation_.clear(); // clear whenever last read wasn't whitespace
       break;
     case TOKENTYPE_SECTION_START:
       this->AddSectionNode(token, my_template);
+      this->indentation_.clear(); // clear whenever last read wasn't whitespace
       break;
     case TOKENTYPE_SECTION_END:
       // Don't add a node. Just make sure we are ending the right section
@@ -850,10 +898,21 @@ bool SectionTemplateNode::AddSubnode(Template *my_template) {
                    << "\nIn: " << string(token_.text, token_.textlen) << endl;
         my_template->set_state(TS_ERROR);
       }
+      this->indentation_.clear(); // clear whenever last read wasn't whitespace
       return false;
       break;
     case TOKENTYPE_TEMPLATE:
+      // If this template is indented (eg, " {{>SUBTPL}}"), make sure
+      // every line of the expanded template is indented, not just the
+      // first one.  We do this by adding a modifier that applies to
+      // the entire template node, that inserts spaces after newlines.
+      if (!this->indentation_.empty()) {
+        token.modifier_plus_values.push_back(
+            pair<const template_modifiers::ModifierInfo*, string>(
+                &g_prefix_line_info, this->indentation_));
+      }
       this->AddTemplateNode(token, my_template);
+      this->indentation_.clear(); // clear whenever last read wasn't whitespace
       break;
     case TOKENTYPE_COMMENT:
       // Do nothing. Comments just drop out of the file altogether.
@@ -1052,22 +1111,19 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
         string value_string(value, mod_end - value);
         // Convert the string to a functor, and error out if we can't.
         const template_modifiers::ModifierInfo* modstruct =
-            template_modifiers::FindModifier(mod, value - mod);
+            template_modifiers::FindModifier(mod, value - mod,
+                                             value, mod_end - value);
         // There are various ways a modifier syntax can be illegal.
         if (modstruct == NULL) {
           FAIL("Unknown modifier for variable "
                << string(token_start, mod_start - token_start) << ": "
                << "'" << string(mod, value - mod) << "'");
-        } else if ((modstruct->value_status
-                    == template_modifiers::MODVAL_FORBIDDEN) &&
-                   value < mod_end) {
+        } else if (!modstruct->modval_required && value < mod_end) {
           FAIL("Modifier for variable "
                << string(token_start, mod_start - token_start) << ":"
                << string(mod, value - mod) << " "
                << "has illegal mod-value '" << value_string << "'");
-        } else if ((modstruct->value_status
-                    == template_modifiers::MODVAL_REQUIRED) &&
-                   value == mod_end) {
+        } else if (modstruct->modval_required && value == mod_end) {
           FAIL("Modifier for variable "
                << string(token_start, mod_start - token_start) << ":"
                << string(mod, value - mod) << " "
@@ -1137,9 +1193,9 @@ Template::Template(const string& filename, Strip strip)
 
   // Preserve whitespace in Javascript files because carriage returns
   // can convey meaning for comment termination and closures
-  if ( strip == STRIP_WHITESPACE && filename.length() >= 3 &&
+  if ( strip_ == STRIP_WHITESPACE && filename.length() >= 3 &&
        !strcmp(filename.c_str() + filename.length() - 3, ".js") ) {
-    strip = STRIP_BLANK_LINES;
+    strip_ = STRIP_BLANK_LINES;
   }
 
   ReloadIfChangedLocked();
@@ -1392,7 +1448,7 @@ bool Template::ReloadIfChangedLocked() {
   // Parse the input one line at a time to get the "stripped" input.
   // Note stripping only makes smaller, so st_size is a safe upper bound.
   char* input_buffer = new char[statbuf.st_size];
-  const int buflen = InsertFile(file_buffer, statbuf.st_size, input_buffer);
+  const size_t buflen = InsertFile(file_buffer, statbuf.st_size, input_buffer);
   delete[] file_buffer;
 
   // Now parse the template we just read.  BuildTree takes over ownership
@@ -1485,13 +1541,15 @@ void Template::ClearCache() {
 //    of bytes they wrote to the output buffer.
 // ----------------------------------------------------------------------
 
-static void StripWhiteSpace(const char** str, int* len) {
-  // strip off trailing whitespace
+// We define our own version rather than using the one in strtuil, mostly
+// so we can take a size_t instead of an int.  The code is simple enough.
+static void StripTemplateWhiteSpace(const char** str, size_t* len) {
+  // Strip off trailing whitespace.
   while ((*len) > 0 && isspace((*str)[(*len)-1])) {
     (*len)--;
   }
 
-  // strip off leading whitespace
+  // Strip off leading whitespace.
   while ((*len) > 0 && isspace((*str)[0])) {
     (*len)--;
     (*str)++;
@@ -1499,16 +1557,16 @@ static void StripWhiteSpace(const char** str, int* len) {
 }
 
 // Adjusts line and length iff condition is met, and RETURNS true.
-static bool IsBlankOrOnlyHasOneRemovableMarker(const char** line, int* len) {
+static bool IsBlankOrOnlyHasOneRemovableMarker(const char** line, size_t* len) {
   const char *clean_line = *line;
-  int new_len = *len;
-  StripWhiteSpace(&clean_line, &new_len);
+  size_t new_len = *len;
+  StripTemplateWhiteSpace(&clean_line, &new_len);
 
   // If there was only white space on the line, new_len will now be zero.
   // In that case the line should be removed, so return true.
   if (new_len == 0) {
-    (*line) = clean_line;
-    (*len) = new_len;
+    *line = clean_line;
+    *len = new_len;
     return true;
   }
 
@@ -1518,13 +1576,13 @@ static bool IsBlankOrOnlyHasOneRemovableMarker(const char** line, int* len) {
     return false;
   }
 
-  if (clean_line[0] != '{'               // if first two chars are not "{{"
+  if (clean_line[0] != '{'            // if first two chars are not "{{"
       || clean_line[1] != '{'
-      || (clean_line[2] != '#'           // or next char marks neither section start
-          && clean_line[2] != '/'        // nor section end
-          && clean_line[2] != '>'        // nor template include
-          && clean_line[2] != '!')) {    // nor comment
-    return false;                  // then not what we are looking for.
+      || (clean_line[2] != '#'        // or next char marks not section start
+          && clean_line[2] != '/'     // nor section end
+          && clean_line[2] != '>'     // nor template include
+          && clean_line[2] != '!')) { // nor comment
+    return false;                     // then not what we are looking for.
   }
 
   const char *end_marker = strstr(clean_line, "}}");
@@ -1537,20 +1595,18 @@ static bool IsBlankOrOnlyHasOneRemovableMarker(const char** line, int* len) {
   // else return the line stripped of its white space chars so when the
   // marker is removed in expansion, no white space is left from the line
   // that has now been removed
-  (*line) = clean_line;
-  (*len) = new_len;
+  *line = clean_line;
+  *len = new_len;
   return true;
 }
 
-// TODO(csilvers): this should take a size_t as well, but StripWhiteSpace
-// wants an int* argument.  I hope no single template line is >2G!
-int Template::InsertLine(const char *line, int len, char* buffer) {
+size_t Template::InsertLine(const char *line, size_t len, char* buffer) {
   bool add_newline = (len > 0 && line[len-1] == '\n');
   if (add_newline)
     len--;                 // so we ignore the newline from now on
 
   if (strip_ >= STRIP_WHITESPACE) {
-    StripWhiteSpace(&line, &len);
+    StripTemplateWhiteSpace(&line, &len);
     add_newline = false;
   }
 
@@ -1572,7 +1628,7 @@ int Template::InsertLine(const char *line, int len, char* buffer) {
   return len;
 }
 
-int Template::InsertFile(const char *file, size_t len, char* buffer) {
+size_t Template::InsertFile(const char *file, size_t len, char* buffer) {
   const char* prev_pos = file;
   const char* next_pos;
   char* write_pos = buffer;
@@ -1580,16 +1636,15 @@ int Template::InsertFile(const char *file, size_t len, char* buffer) {
   while ( (next_pos=(char*)memchr(prev_pos, '\n', file+len - prev_pos)) ) {
     next_pos++;      // include the newline
     write_pos += InsertLine(prev_pos, next_pos - prev_pos, write_pos);
-    assert(write_pos - buffer <= len);  // an invariant we guarantee
+    assert(write_pos >= buffer && static_cast<size_t>(write_pos-buffer) <= len);
     prev_pos = next_pos;
   }
   if (prev_pos < file + len) {          // last line doesn't end in a newline
-    // TODO(csilvers): have InsertLine take a size_t
-    write_pos += InsertLine(prev_pos, static_cast<int>(file+len - prev_pos),
-                            write_pos);
-    assert(write_pos - buffer <= len);
+    write_pos += InsertLine(prev_pos, file+len - prev_pos, write_pos);
+    assert(write_pos >= buffer && static_cast<size_t>(write_pos-buffer) <= len);
   }
-  return write_pos - buffer;
+  assert(write_pos >= buffer);
+  return static_cast<size_t>(write_pos - buffer);
 }
 
 // ----------------------------------------------------------------------

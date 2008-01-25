@@ -180,7 +180,7 @@ class CTEMPLATE_DLL_DECL Template {
   // Template constructor
   //   Reads the template file and parses it into a parse tree of TemplateNodes
   //   by calling the method ReloadIfChanged
-  //   The top node is a section node with the arbitrary name "__MAIN__"
+  //   The top node is a section node with the arbitrary name "__{{MAIN}}__"
   //   'Strip' indicates how to handle whitespace when expanding the
   //   template.  DO_NOT_STRIP keeps the template exactly as-is.
   //   STRIP_BLANK_LINES elides all blank lines in the template.
@@ -223,8 +223,8 @@ class CTEMPLATE_DLL_DECL Template {
   //   buffer must be big enough to hold the output.  It's guaranteed
   //   that the output size is no bigger than the input size.
   //   Used by ReloadIfChanged()
-  int InsertLine(const char *line, int len, char* buffer);
-  int InsertFile(const char *file, size_t len, char* buffer);
+  size_t InsertLine(const char *line, size_t len, char* buffer);
+  size_t InsertFile(const char *file, size_t len, char* buffer);
 
 
   // The file we read the template from
@@ -232,7 +232,7 @@ class CTEMPLATE_DLL_DECL Template {
   time_t filename_mtime_;   // lastmod time for filename last time we loaded it
 
   // What to do with whitespace at template-expand time
-  const Strip strip_;
+  Strip strip_;
 
   // Keeps track of where we are in reloading, or if there was an error loading
   TemplateState state_;
