@@ -326,7 +326,7 @@ previous one:</p>
 <tr><td><code>:json_escape</code></td><td><code>:o</code></td>
     <td>json-escapes a variable before output as a string in json;
         similar to javascript escaping, but ignores characters such
-        as <code>=</code> and <code>&</code>.</td>
+        as <code>=</code> and <code>&amp;</code>.</td>
 </tr>
 
 <tr><td><code>:html_escape_with_arg</code></td><td><code>:H</code></td>
@@ -345,11 +345,11 @@ previous one:</p>
 
 <p>The <code>html_escape_with_arg</code>
 and <code>url_escape_with_arg</code> modifiers are a bit different
-because they requires a value to specify the type of escaping to use.
+because they require a value to specify the type of escaping to use.
 For example, this template is equivalent to using
 the <code>pre_escape</code> modifier:</p>
 <pre>
-   &lt;html>&lt;body>&lt;pre>{{BODY:H=pre}}&lt/pre>&lt;/body>&lt;/html>
+   &lt;html>&lt;body>&lt;pre>{{BODY:H=pre}}&lt;/pre>&lt;/body>&lt;/html>
 </pre>
 
 <p>Here are the values that are supported by
@@ -418,10 +418,18 @@ template could be a valid use of a custom modifier:</p>
 {{VAR:x-my_modifier:value1,value2,value3 has spaces,etc}}
 </pre>
 
-<p>See <code>&lt;template_modifiers.h&gt;</code>
-for details on how to write a modifier and how to register it (there's
-also an example of a custom
-modifier <A HREF="#variables">below</A>).</p>
+<p>See <code>&lt;template_modifiers.h&gt;</code> for details on how to
+write a modifier and how to register it. Here is an example of the
+code for a custom modifier:</p>
+<pre>
+   class StarEscape : public template_modifiers::TemplateModifier {
+     void Modify(const char* in, size_t inlen,
+                 const template_modifiers::ModifierData* per_expand_data,
+                 ExpandEmitter* outbuf, const string&amp; arg) const {
+       outbuf->Emit(string("*") + string(in, inlen) + string("*"));
+     }
+   };
+</pre>
 
 <h3> <A NAME="inheritence">Details on Dictionary Lookup</A> </h3>
 
@@ -639,48 +647,17 @@ helper routines to help setting values of a few special forms.</p>
 
 <ul>
   <li> <code>SetIntValue(name, int)</code>: takes an int as the value. </li>
-  <li> <code>SetEscapedValue(name, value, escape_functor)</code>:
-       escapes the value, using the escape-functor, which takes a
-       string as input and gives a "munged" string as output.
-       <code>TemplateDictionary</code> has a few escape-functors built
-       in, including <code>html_escape</code>, which replaces
-       <code>&lt;</code>, <code>&gt;</code>, <code>&amp;</code>, and
-       <code>&quot;</code> with the appropriate html entity;
-       <code>xml_escape</code>, which deals with the
-       <code>&amp;nbsp;</code> entity; and
-       <code>javascript_escape</code>, which escapes quotes and other
-       characters that are meaningful to javascript.  These are
-       helpful in avoiding security holes when the template is
-       html/xml/javascript.  You can also define your own functor; see
-       the example below. </li>
   <li> <code>SetFormattedValue(name, fmt, ...)</code>: the
        <code>fmt</code> and <code>...</code> work just like in
        <code>printf</code>: <code>SetFormattedValue("HOMEPAGE",
        "http://%s/", hostname)</code>. </li>
-  <li> <code>SetEscapedFormattedValue(name, escape_functor, fmt,
-       ...)</code>: formats the value just like <code>printf</code>,
-       and then escapes the result using the given functor. </li>
 </ul>
 
 <p>Example:</p>
 <pre>
    google::TemplateDictionary* dict = new google::TemplateDictionary("var example");
    dict->SetValue("FOOTER", "Aren't these great results?");
-   class StarEscape : public template_modifiers::TemplateModifier {
-     void Modify(const char* in, size_t inlen,
-                 const template_modifiers::ModifierData* per_expand_data,
-                 ExpandEmitter* outbuf, const string& arg) const {
-       outbuf->Emit(string("*") + string(in, inlen) + string("*"));
-     }
-   };
-   dict->SetEscapedValue("USERNAME", username, StarEscape());
 </pre>
-
-<p>Note that the template itself can also specify escaping via <A
-HREF="#modifiers">variable modifiers</A>!  It's very possible for you
-to escape the value when setting it in the dictionary, and then have
-the template escape it again when outputting, so be careful you escape
-only as much as you need to.</p>
 
 <h4> <A NAME="sections">Sections</A> </h4>
 
@@ -722,9 +699,7 @@ otherwise we wish to hide the section and show neither
 <code>SetValueAndShowSection(name, value, section_name)</code> does
 exactly that: if value is non-empty, add a single single dictionary to
 <code>section_name</code> and call <code>section_dict->AddValue(name,
-value)</code>.  There's also <code>SetEscapedValueAndShowSection(name,
-value, escape_functor, section_name)</code>, which lets you escape
-<code>value</code>.</p>
+value)</code>.</p>
 
 <p>Example:</p>
 <pre>
@@ -754,8 +729,7 @@ value, escape_functor, section_name)</code>, which lets you escape
    if (num_prev_searches > 0) {
       for (int i = 0; i < num_prev_searches; ++i) {
          TemplateDictionary* sub_dict = dict->AddSectionDictionary("PREV_SEARCHES");
-         sub_dict->SetEscapedValue("PREV_SEARCH", prev_searches[i],
-                                   TemplateDictionary::html_escape);
+         sub_dict->SetValue("PREV_SEARCH", prev_searches[i]);
       }
    }
 </pre>
@@ -809,7 +783,7 @@ secret-key is of course different every time you expand the
 webpage.</p>
 
 <p>To set data that the modifier can use, you call
-<code>SetModifierData()<code> on a <code>TemplateDictionary</code>.
+<code>SetModifierData()</code> on a <code>TemplateDictionary</code>.
 For instance:</p>
 <pre>
    TemplateDictionary* dict = new TemplateDictionary("modifier example");
@@ -820,7 +794,7 @@ For instance:</p>
 
 <p>Your custom modifier is passed all the ModifierData as one of the
 arguments to <code>Modify</code>: see
-<code>&lt;google/template_modifiers.h&gt;<code> for more details.</p>
+<code>&lt;google/template_modifiers.h&gt;</code> for more details.</p>
 
 
 <h3> <A name="expand">Expanding a Template</A> </h3>

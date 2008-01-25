@@ -1,4 +1,4 @@
-{{#FILE=template_unittest_test_html.in}}{{#SEC=__MAIN__}}<html>
+{{#FILE=template_unittest_test_html.in}}{{#SEC=__{{MAIN}}__}}<html>
 <head>
 <script>{{#VAR=BI_NEWLINE}}
 {{/VAR}}
@@ -51,7 +51,7 @@
     </td>
   </tr>
 </table>
-{{/SEC}}{{#INC=FOOTER}}{{#FILE=template_unittest_test_footer.in}}{{#SEC=__MAIN__}}<center><p><hr class=z>
+{{/SEC}}{{#INC=FOOTER}}{{#FILE=template_unittest_test_footer.in}}{{#SEC=__{{MAIN}}__}}<center><p><hr class=z>
     <table width=100% cellpadding=2 cellspacing=0 border=0>
         <tr>
         <td align=center{{#VAR=FOOTER_BAR_ATTRIBUTES}}{{/VAR}}><font size=-1>

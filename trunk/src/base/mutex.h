@@ -105,18 +105,23 @@ class Mutex {
 // Now the implementation of Mutex for various systems
 #if defined(NO_THREADS)
 
-// In debug mode, we'll assert some invariants: we don't unlock if we
-// didn't lock first, the lock is not held when Lock() is called
-// (since we're not re-entrant), etc.  In non-debug mode, we do
-// nothing, for efficiency.  That's why we do everything in an assert.
+// When we don't have threads, we can be either reading or writing,
+// but not both.  We can have lots of readers at once (in no-threads
+// mode, that's most likely to happen in recursive function calls),
+// but only one writer.  We represent this by having mutex_ be -1 when
+// writing and a number > 0 when reading (and 0 when no lock is held).
+//
+// In debug mode, we assert these invariants, while in non-debug mode
+// we do nothing, for efficiency.  That's why everything is in an
+// assert.
 #include <assert.h>
 
-Mutex::Mutex() : mutex_(0) { }   // mutex_ counts number of current Lock()s
+Mutex::Mutex() : mutex_(0) { }
 Mutex::~Mutex()            { assert(mutex_ == 0); }
-void Mutex::Lock()         { assert(mutex_++ == 0); }
-void Mutex::Unlock()       { assert(mutex_-- == 1); }
-void Mutex::ReaderLock()   { Lock(); }
-void Mutex::ReaderUnlock() { Unlock(); }
+void Mutex::Lock()         { assert(--mutex_ == -1); }
+void Mutex::Unlock()       { assert(mutex_++ == -1); }
+void Mutex::ReaderLock()   { assert(++mutex_ > 0); }
+void Mutex::ReaderUnlock() { assert(mutex_-- > 0); }
 
 #elif defined(HAVE_PTHREAD) && defined(HAVE_RWLOCK)
 

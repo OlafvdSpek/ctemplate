@@ -687,12 +687,13 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
     for (map<string, const DictVector*>::const_iterator it =
              sorted_include_dict.begin();
          it != sorted_include_dict.end();  ++it) {
-      for (int i = 0; i < it->second->size(); ++i) {
+      for (vector<TemplateDictionary*>::size_type i = 0;
+           i < it->second->size();  ++i) {
         TemplateDictionary* dict = (*it->second)[i];
         IndentLine(out, indent + kIndent);
         char dictnum[128];  // enough for two ints
         snprintf(dictnum, sizeof(dictnum), "dict %d of %"PRIuS,
-                 i + 1, it->second->size());
+                 static_cast<int>(i + 1), it->second->size());
         out->append("include-template ");
         out->append(it->first);
         out->append(" (");

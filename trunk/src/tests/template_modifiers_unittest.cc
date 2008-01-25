@@ -353,44 +353,155 @@ class TemplateModifiersUnittest {
     ASSERT_STREQ(peer.GetSectionValue("query escape 6"), "%22%27%3A");
   }
 
+  static void TestPrefixLine() {
+    TemplateDictionary dict("TestPrefixLine", NULL);
+    // These don't escape: we don't put the prefix before the first line
+    ASSERT_STREQ(template_modifiers::prefix_line("pt 1", "   ").c_str(),
+                 "pt 1");
+    ASSERT_STREQ(template_modifiers::prefix_line("pt 1", "::").c_str(),
+                 "pt 1");
+
+    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\npt 2", ":").c_str(),
+                 "pt 1\n:pt 2");
+    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\npt 2", " ").c_str(),
+                 "pt 1\n pt 2");
+    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\npt 2", "\n").c_str(),
+                 "pt 1\n\npt 2");
+    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\npt 2\n", "  ").c_str(),
+                 "pt 1\n  pt 2\n  ");
+
+    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\rpt 2\n", ":").c_str(),
+                 "pt 1\r:pt 2\n:");
+    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\npt 2\r", ":").c_str(),
+                 "pt 1\n:pt 2\r:");
+    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\r\npt 2\r", ":").c_str(),
+                 "pt 1\r\n:pt 2\r:");
+  }
+
+  static void TestFindModifier() {
+    const template_modifiers::ModifierInfo* info;
+    ASSERT(info = template_modifiers::FindModifier("html_escape", 11, "", 0));
+    ASSERT(info->modifier == &template_modifiers::html_escape);
+    ASSERT(info = template_modifiers::FindModifier("h", 1, "", 0));
+    ASSERT(info->modifier == &template_modifiers::html_escape);
+
+    ASSERT(info = template_modifiers::FindModifier("html_escape_with_arg", 20,
+                                                   "=pre", 4));
+    ASSERT(info->modifier == &template_modifiers::pre_escape);
+    ASSERT(info = template_modifiers::FindModifier("H", 1, "=pre", 4));
+    ASSERT(info->modifier == &template_modifiers::pre_escape);
+    // html_escape_with_arg doesn't have a default value, so these should fail.
+    ASSERT(!template_modifiers::FindModifier("H", 1, "=pre", 2));  // "=p"
+    ASSERT(!template_modifiers::FindModifier("H", 1, "=pree", 5));
+    ASSERT(!template_modifiers::FindModifier("H", 1, "=notpresent", 11));
+
+    // If we don't have a modifier-value when we ought, we should fail.
+    ASSERT(!template_modifiers::FindModifier("html_escape", 11, "=p", 2));
+    ASSERT(!template_modifiers::FindModifier("h", 1, "=p", 2));
+
+    ASSERT(!template_modifiers::FindModifier("html_escape_with_arg", 20,
+                                             "", 0));
+    ASSERT(!template_modifiers::FindModifier("H", 1, "", 0));
+
+    // Test with added modifiers as well.
+    template_modifiers::NullModifier foo_modifier1;
+    template_modifiers::NullModifier foo_modifier2;
+    template_modifiers::NullModifier foo_modifier3;
+    template_modifiers::NullModifier foo_modifier4;
+    ASSERT(template_modifiers::AddModifier("x-test", &foo_modifier1));
+    ASSERT(template_modifiers::AddModifier("x-test-arg=", &foo_modifier2));
+    ASSERT(template_modifiers::AddModifier("x-test-arg=h", &foo_modifier3));
+    ASSERT(template_modifiers::AddModifier("x-test-arg=json", &foo_modifier4));
+
+    ASSERT(info = template_modifiers::FindModifier("x-test", 6, "", 0));
+    ASSERT(info->is_registered);
+    ASSERT(info->modifier == &foo_modifier1);
+    ASSERT(info = template_modifiers::FindModifier("x-test", 6, "=h", 2));
+    ASSERT(!info->is_registered);
+    // This tests default values
+    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10, "=p", 2));
+    ASSERT(info->is_registered);
+    ASSERT(info->modifier == &foo_modifier2);
+    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10, "=h", 2));
+    ASSERT(info->is_registered);
+    ASSERT(info->modifier == &foo_modifier3);
+    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10,
+                                                   "=html", 5));
+    ASSERT(info->is_registered);
+    ASSERT(info->modifier == &foo_modifier2);
+    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10,
+                                                   "=json", 5));
+    ASSERT(info->is_registered);
+    ASSERT(info->modifier == &foo_modifier4);
+    // The value is required to start with an '=' to match the
+    // specialization.  If it doesn't, it will match the default.
+    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10,
+                                                   "json", 4));
+    ASSERT(info->is_registered);
+    ASSERT(info->modifier == &foo_modifier2);
+    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10,
+                                                   "=jsonnabbe", 5));
+    ASSERT(info->is_registered);
+    ASSERT(info->modifier == &foo_modifier4);
+    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10,
+                                                   "=jsonnabbe", 6));
+    ASSERT(info->is_registered);
+    ASSERT(info->modifier == &foo_modifier2);
+    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10,
+                                                   "=jsonnabbe", 4));
+    ASSERT(info->is_registered);
+    ASSERT(info->modifier == &foo_modifier2);
+
+    // If we try to find an x- modifier that wasn't added, we should get
+    // a legit but "unknown" modifier back.
+    ASSERT(info = template_modifiers::FindModifier("x-foo", 5, "", 0));
+    ASSERT(!info->is_registered);
+    ASSERT(info = template_modifiers::FindModifier("x-bar", 5, "=p", 2));
+    ASSERT(!info->is_registered);
+  }
+
   static void TestAddModifier() {
-    ASSERT(template_modifiers::AddModifier(
-               "x-test",
-               template_modifiers::MODVAL_FORBIDDEN,
-               &template_modifiers::html_escape));
-    ASSERT(template_modifiers::AddModifier(
-               "x-test-arg",
-               template_modifiers::MODVAL_REQUIRED,
-               &template_modifiers::html_escape_with_arg));
+    ASSERT(template_modifiers::AddModifier("x-atest",
+                                           &template_modifiers::html_escape));
+    ASSERT(template_modifiers::AddModifier("x-atest-arg=",
+                                           &template_modifiers::html_escape));
+    ASSERT(template_modifiers::AddModifier("x-atest-arg=h",
+                                           &template_modifiers::html_escape));
+    ASSERT(template_modifiers::AddModifier("x-atest-arg=html",
+                                           &template_modifiers::html_escape));
+    ASSERT(template_modifiers::AddModifier("x-atest-arg=json",
+                                           &template_modifiers::json_escape));
+    ASSERT(template_modifiers::AddModifier("x-atest-arg=j",
+                                           &template_modifiers::json_escape));
+    ASSERT(template_modifiers::AddModifier("x-atest-arg=J",
+                                           &template_modifiers::json_escape));
 
     // Make sure AddModifier fails with an invalid name.
-    ASSERT(!template_modifiers::AddModifier(
-               "test",
-               template_modifiers::MODVAL_FORBIDDEN,
-               &template_modifiers::html_escape));
+    ASSERT(!template_modifiers::AddModifier("test",
+                                            &template_modifiers::html_escape));
 
     // Make sure AddModifier fails with a duplicate name.
-    ASSERT(!template_modifiers::AddModifier(
-               "x-test",
-               template_modifiers::MODVAL_FORBIDDEN,
-               &template_modifiers::html_escape));
+    ASSERT(!template_modifiers::AddModifier("x-atest",
+                                            &template_modifiers::html_escape));
+    ASSERT(!template_modifiers::AddModifier("x-atest-arg=",
+                                            &template_modifiers::html_escape));
+    ASSERT(!template_modifiers::AddModifier("x-atest-arg=h",
+                                            &template_modifiers::html_escape));
+    ASSERT(!template_modifiers::AddModifier("x-atest-arg=html",
+                                            &template_modifiers::html_escape));
 
     const template_modifiers::ModifierInfo* info;
-    ASSERT(info = template_modifiers::FindModifier("x-test", 6));
-    ASSERT(info->value_status == template_modifiers::MODVAL_FORBIDDEN);
+    ASSERT(info = template_modifiers::FindModifier("x-atest", 7, "", 0));
+    ASSERT(info->modval_required == false);
 
     // Make sure we can still add a modifier after having already
     // searched for it.
-    ASSERT(info = template_modifiers::FindModifier("x-foo", 5));
-    ASSERT(info->value_status == template_modifiers::MODVAL_UNKNOWN);
+    ASSERT(info = template_modifiers::FindModifier("x-foo", 5, "", 0));
+    ASSERT(!info->is_registered);
 
     template_modifiers::NullModifier foo_modifier;
-    ASSERT(template_modifiers::AddModifier(
-               "x-foo",
-               template_modifiers::MODVAL_FORBIDDEN,
-               &foo_modifier));
-    ASSERT(info = template_modifiers::FindModifier("x-foo", 5));
-    ASSERT(info->value_status == template_modifiers::MODVAL_FORBIDDEN);
+    ASSERT(template_modifiers::AddModifier("x-foo", &foo_modifier));
+    ASSERT(info = template_modifiers::FindModifier("x-foo", 5, "", 0));
     ASSERT(info->modifier == &foo_modifier);
   }
 
@@ -413,6 +524,62 @@ class TemplateModifiersUnittest {
     ASSERT(data_b == data_copy.Lookup("b"));
   }
 
+  // Helper function. Determines whether the Modifier specified by
+  // alt_modname/alt_modval is a safe XSS alternative to
+  // the Modifier specified by modname/modval.
+  static bool CheckXSSAlternative(const string& modname, const string& modval,
+                                  const string& alt_modname,
+                                  const string& alt_modval) {
+    const template_modifiers::ModifierInfo *mod, *alt_mod;
+    mod = template_modifiers::FindModifier(modname.c_str(), modname.length(),
+                                           modval.c_str(), modval.length());
+    alt_mod = template_modifiers::FindModifier(alt_modname.c_str(),
+                                               alt_modname.length(),
+                                               alt_modval.c_str(),
+                                               alt_modval.length());
+    ASSERT(mod != NULL && alt_mod != NULL);
+    return IsSafeXSSAlternative(*mod, *alt_mod);
+  }
+
+  static void TestXSSAlternatives() {
+
+    // A modifier is always a safe replacement to itself, even non built-in.
+    ASSERT(CheckXSSAlternative("h", "", "h", ""));
+    ASSERT(CheckXSSAlternative("url_escape_with_arg", "=javascript",
+                               "url_escape_with_arg", "=javascript"));
+    ASSERT(CheckXSSAlternative("x-bla", "", "x-bla", ""));
+
+    // A built-in modifier is always a safe replacement to
+    // another with the same function.
+    ASSERT(CheckXSSAlternative("H", "=pre", "p", ""));
+    ASSERT(CheckXSSAlternative("url_query_escape", "",
+                               "url_escape_with_arg", "=query"));
+
+    // H=pre, H=snippet, H=attribute and p are all alternatives to h.
+    ASSERT(CheckXSSAlternative("h", "", "H", "=pre"));
+    ASSERT(CheckXSSAlternative("h", "", "H", "=snippet"));
+    ASSERT(CheckXSSAlternative("h", "", "H", "=attribute"));
+    ASSERT(CheckXSSAlternative("h", "", "p", ""));
+
+    // But h is not an alternative to H=attribute
+    // nor are u or json_escape alternatives to h.
+    ASSERT(!CheckXSSAlternative("H", "=attribute", "h", ""));
+    ASSERT(!CheckXSSAlternative("h", "", "u", ""));
+    ASSERT(!CheckXSSAlternative("h", "", "json_escape", ""));
+
+    // H=snippet and H=attribute are alternatives to H=pre
+    // But H=pre is not an alternative to H=attribute.
+    ASSERT(CheckXSSAlternative("H", "=pre", "H", "=snippet"));
+    ASSERT(CheckXSSAlternative("H", "=pre", "H", "=attribute"));
+    ASSERT(!CheckXSSAlternative("H", "=attribute", "H", "=pre"));
+
+    // javascript_escape is an alternative to json_escape but not the opposite.
+    ASSERT(CheckXSSAlternative("json_escape", "", "javascript_escape", ""));
+    ASSERT(!CheckXSSAlternative("javascript_escape", "", "json_escape", ""));
+
+    // Extended modifier should not match any other except itself.
+    ASSERT(!CheckXSSAlternative("x-bla", "", "x-foo", ""));
+  }
 };
 
 _END_GOOGLE_NAMESPACE_
@@ -431,8 +598,11 @@ int main(int argc, char** argv) {
   TemplateModifiersUnittest::TestJavascriptEscape();
   TemplateModifiersUnittest::TestJsonEscape();
   TemplateModifiersUnittest::TestUrlQueryEscape();
+  TemplateModifiersUnittest::TestPrefixLine();
+  TemplateModifiersUnittest::TestFindModifier();
   TemplateModifiersUnittest::TestAddModifier();
   TemplateModifiersUnittest::TestModifierData();
+  TemplateModifiersUnittest::TestXSSAlternatives();
 
   printf("DONE\n");
   return 0;

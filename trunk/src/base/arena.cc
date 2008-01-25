@@ -156,12 +156,14 @@ void BaseArena::MakeNewBlock() {
 //    allocation -- this is equivalent to not using the arena at all.
 // ----------------------------------------------------------------------
 
-void* BaseArena::GetMemoryFallback(const size_t size, const int align) {
+void* BaseArena::GetMemoryFallback(const size_t size, const int align_as_int) {
   if (0 == size) {
     return NULL;             // stl/stl_alloc.h says this is okay
   }
+  // This makes the type-checker happy.
+  const size_t align = static_cast<size_t>(align_as_int);
 
-  assert (align > 0 && 0 == (align & (align - 1))); // must be power of 2
+  assert(align_as_int > 0 && 0 == (align & (align - 1))); // must be power of 2
 
   // If the object is more than a quarter of the block size, allocate
   // it separately to avoid wasting too much space in leftover bytes
@@ -181,10 +183,10 @@ void* BaseArena::GetMemoryFallback(const size_t size, const int align) {
     return ret;
   }
 
-  const int overage =
+  const size_t overage =
     (reinterpret_cast<uintptr_t>(freestart_) & (align-1));
   if (overage) {
-    const int waste = align - overage;
+    const size_t waste = align - overage;
     freestart_ += waste;
     if (waste < remaining_) {
       remaining_ -= waste;

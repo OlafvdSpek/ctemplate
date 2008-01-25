@@ -95,17 +95,40 @@ am_libctemplate_la_OBJECTS = libctemplate_la-arena.lo \
 	libctemplate_la-template_pathops.lo \
 	libctemplate_la-template_from_string.lo
 libctemplate_la_OBJECTS = $(am_libctemplate_la_OBJECTS)
+am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
+libctemplate_debug_la_DEPENDENCIES = $(am__DEPENDENCIES_2)
+am__objects_1 = libctemplate_debug_la-arena.lo \
+	libctemplate_debug_la-template.lo \
+	libctemplate_debug_la-template_dictionary.lo \
+	libctemplate_debug_la-template_modifiers.lo \
+	libctemplate_debug_la-template_namelist.lo \
+	libctemplate_debug_la-template_pathops.lo \
+	libctemplate_debug_la-template_from_string.lo
+am_libctemplate_debug_la_OBJECTS = $(am__objects_1)
+libctemplate_debug_la_OBJECTS = $(am_libctemplate_debug_la_OBJECTS)
 libctemplate_nothreads_la_LIBADD =
-am__objects_1 = libctemplate_nothreads_la-arena.lo \
+am__objects_2 = libctemplate_nothreads_la-arena.lo \
 	libctemplate_nothreads_la-template.lo \
 	libctemplate_nothreads_la-template_dictionary.lo \
 	libctemplate_nothreads_la-template_modifiers.lo \
 	libctemplate_nothreads_la-template_namelist.lo \
 	libctemplate_nothreads_la-template_pathops.lo \
 	libctemplate_nothreads_la-template_from_string.lo
-am_libctemplate_nothreads_la_OBJECTS = $(am__objects_1)
+am_libctemplate_nothreads_la_OBJECTS = $(am__objects_2)
 libctemplate_nothreads_la_OBJECTS =  \
 	$(am_libctemplate_nothreads_la_OBJECTS)
+libctemplate_nothreads_debug_la_LIBADD =
+am__objects_3 = libctemplate_nothreads_debug_la-arena.lo \
+	libctemplate_nothreads_debug_la-template.lo \
+	libctemplate_nothreads_debug_la-template_dictionary.lo \
+	libctemplate_nothreads_debug_la-template_modifiers.lo \
+	libctemplate_nothreads_debug_la-template_namelist.lo \
+	libctemplate_nothreads_debug_la-template_pathops.lo \
+	libctemplate_nothreads_debug_la-template_from_string.lo
+am__objects_4 = $(am__objects_3)
+am_libctemplate_nothreads_debug_la_OBJECTS = $(am__objects_4)
+libctemplate_nothreads_debug_la_OBJECTS =  \
+	$(am_libctemplate_nothreads_debug_la_OBJECTS)
 libctemplate_testing_la_LIBADD =
 am_libctemplate_testing_la_OBJECTS =  \
 	libctemplate_testing_la-template_test_util.lo
@@ -127,68 +150,72 @@ PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
 am_make_tpl_varnames_h_OBJECTS = make_tpl_varnames_h.$(OBJEXT)
 make_tpl_varnames_h_OBJECTS = $(am_make_tpl_varnames_h_OBJECTS)
 make_tpl_varnames_h_DEPENDENCIES = libctemplate_nothreads.la
-am__objects_2 = template_dictionary_nothreads_unittest-template_dictionary_unittest.$(OBJEXT)
-am_template_dictionary_nothreads_unittest_OBJECTS = $(am__objects_2)
+am__objects_5 = template_dictionary_nothreads_unittest-template_dictionary_unittest.$(OBJEXT)
+am_template_dictionary_nothreads_unittest_OBJECTS = $(am__objects_5)
 template_dictionary_nothreads_unittest_OBJECTS =  \
 	$(am_template_dictionary_nothreads_unittest_OBJECTS)
 template_dictionary_nothreads_unittest_DEPENDENCIES =  \
-	libctemplate_nothreads.la libctemplate_testing.la
+	libctemplate_testing.la libctemplate_nothreads_debug.la
 am_template_dictionary_unittest_OBJECTS = template_dictionary_unittest-template_dictionary_unittest.$(OBJEXT)
 template_dictionary_unittest_OBJECTS =  \
 	$(am_template_dictionary_unittest_OBJECTS)
-template_dictionary_unittest_DEPENDENCIES = libctemplate.la \
-	libctemplate_testing.la $(am__DEPENDENCIES_1)
-am__objects_3 = template_from_string_nothreads_unittest-template_from_string_unittest.$(OBJEXT)
-am_template_from_string_nothreads_unittest_OBJECTS = $(am__objects_3)
+template_dictionary_unittest_DEPENDENCIES = libctemplate_testing.la \
+	libctemplate_debug.la $(am__DEPENDENCIES_1)
+am__objects_6 = template_from_string_nothreads_unittest-template_from_string_unittest.$(OBJEXT)
+am_template_from_string_nothreads_unittest_OBJECTS = $(am__objects_6)
 template_from_string_nothreads_unittest_OBJECTS =  \
 	$(am_template_from_string_nothreads_unittest_OBJECTS)
 template_from_string_nothreads_unittest_DEPENDENCIES =  \
-	libctemplate_nothreads.la
+	libctemplate_nothreads_debug.la
 am_template_from_string_unittest_OBJECTS = template_from_string_unittest-template_from_string_unittest.$(OBJEXT)
 template_from_string_unittest_OBJECTS =  \
 	$(am_template_from_string_unittest_OBJECTS)
-template_from_string_unittest_DEPENDENCIES = libctemplate.la \
+template_from_string_unittest_DEPENDENCIES = libctemplate_debug.la \
 	$(am__DEPENDENCIES_1)
-am__objects_4 = template_modifiers_nothreads_unittest-template_modifiers_unittest.$(OBJEXT)
-am_template_modifiers_nothreads_unittest_OBJECTS = $(am__objects_4)
+am__objects_7 = template_modifiers_nothreads_unittest-template_modifiers_unittest.$(OBJEXT)
+am_template_modifiers_nothreads_unittest_OBJECTS = $(am__objects_7)
 template_modifiers_nothreads_unittest_OBJECTS =  \
 	$(am_template_modifiers_nothreads_unittest_OBJECTS)
 template_modifiers_nothreads_unittest_DEPENDENCIES =  \
-	libctemplate_nothreads.la libctemplate_testing.la
+	libctemplate_testing.la libctemplate_nothreads_debug.la
 am_template_modifiers_unittest_OBJECTS = template_modifiers_unittest-template_modifiers_unittest.$(OBJEXT)
 template_modifiers_unittest_OBJECTS =  \
 	$(am_template_modifiers_unittest_OBJECTS)
-template_modifiers_unittest_DEPENDENCIES = libctemplate.la \
-	libctemplate_testing.la $(am__DEPENDENCIES_1)
-am__objects_5 = template_nothreads_regtest-template_regtest.$(OBJEXT)
-am_template_nothreads_regtest_OBJECTS = $(am__objects_5)
+template_modifiers_unittest_DEPENDENCIES = libctemplate_testing.la \
+	libctemplate_debug.la $(am__DEPENDENCIES_1)
+am__objects_8 = template_nothreads_regtest-template_regtest.$(OBJEXT)
+am_template_nothreads_regtest_OBJECTS = $(am__objects_8)
 template_nothreads_regtest_OBJECTS =  \
 	$(am_template_nothreads_regtest_OBJECTS)
-template_nothreads_regtest_DEPENDENCIES = libctemplate_nothreads.la
+template_nothreads_regtest_DEPENDENCIES =  \
+	libctemplate_nothreads_debug.la
 am_template_nothreads_unittest_OBJECTS =  \
 	template_nothreads_unittest-template_unittest.$(OBJEXT)
 template_nothreads_unittest_OBJECTS =  \
 	$(am_template_nothreads_unittest_OBJECTS)
-template_nothreads_unittest_DEPENDENCIES = libctemplate_nothreads.la
+template_nothreads_unittest_DEPENDENCIES =  \
+	libctemplate_nothreads_debug.la
 am_template_regtest_OBJECTS =  \
 	template_regtest-template_regtest.$(OBJEXT)
 template_regtest_OBJECTS = $(am_template_regtest_OBJECTS)
-template_regtest_DEPENDENCIES = libctemplate.la $(am__DEPENDENCIES_1)
-am__objects_6 = template_setglobals_nothreads_unittest-template_setglobals_unittest.$(OBJEXT)
-am_template_setglobals_nothreads_unittest_OBJECTS = $(am__objects_6)
+template_regtest_DEPENDENCIES = libctemplate_debug.la \
+	$(am__DEPENDENCIES_1)
+am__objects_9 = template_setglobals_nothreads_unittest-template_setglobals_unittest.$(OBJEXT)
+am_template_setglobals_nothreads_unittest_OBJECTS = $(am__objects_9)
 template_setglobals_nothreads_unittest_OBJECTS =  \
 	$(am_template_setglobals_nothreads_unittest_OBJECTS)
 template_setglobals_nothreads_unittest_DEPENDENCIES =  \
-	libctemplate_nothreads.la
+	libctemplate_nothreads_debug.la
 am_template_setglobals_unittest_OBJECTS = template_setglobals_unittest-template_setglobals_unittest.$(OBJEXT)
 template_setglobals_unittest_OBJECTS =  \
 	$(am_template_setglobals_unittest_OBJECTS)
-template_setglobals_unittest_DEPENDENCIES = libctemplate.la \
+template_setglobals_unittest_DEPENDENCIES = libctemplate_debug.la \
 	$(am__DEPENDENCIES_1)
 am_template_unittest_OBJECTS =  \
 	template_unittest-template_unittest.$(OBJEXT)
 template_unittest_OBJECTS = $(am_template_unittest_OBJECTS)
-template_unittest_DEPENDENCIES = libctemplate.la $(am__DEPENDENCIES_1)
+template_unittest_DEPENDENCIES = libctemplate_debug.la \
+	$(am__DEPENDENCIES_1)
 binSCRIPT_INSTALL = $(INSTALL_SCRIPT)
 SCRIPTS = $(bin_SCRIPTS) $(noinst_SCRIPTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)/src
@@ -210,8 +237,9 @@ LTCOMPILE = $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(libctemplate_la_SOURCES) \
+SOURCES = $(libctemplate_la_SOURCES) $(libctemplate_debug_la_SOURCES) \
 	$(libctemplate_nothreads_la_SOURCES) \
+	$(libctemplate_nothreads_debug_la_SOURCES) \
 	$(libctemplate_testing_la_SOURCES) \
 	$(make_tpl_varnames_h_SOURCES) \
 	$(template_dictionary_nothreads_unittest_SOURCES) \
@@ -227,7 +255,9 @@ SOURCES = $(libctemplate_la_SOURCES) \
 	$(template_setglobals_unittest_SOURCES) \
 	$(template_unittest_SOURCES)
 DIST_SOURCES = $(libctemplate_la_SOURCES) \
+	$(libctemplate_debug_la_SOURCES) \
 	$(libctemplate_nothreads_la_SOURCES) \
+	$(libctemplate_nothreads_debug_la_SOURCES) \
 	$(libctemplate_testing_la_SOURCES) \
 	$(make_tpl_varnames_h_SOURCES) \
 	$(template_dictionary_nothreads_unittest_SOURCES) \
@@ -412,6 +442,8 @@ dist_doc_DATA = AUTHORS COPYING ChangeLog INSTALL NEWS README README.windows \
 # because we use an extra compiler flag.
 lib_LTLIBRARIES = libctemplate.la libctemplate_nothreads.la
 
+# For our tests, we want versions of these libraries that include asserts.
+
 # We could also make a library that has the TemplateDictionaryPeer
 # class.  This class is useful for testing (it provides introspection
 # on the TemplateDictionary hierarchy that's easier to use than the
@@ -420,7 +452,8 @@ lib_LTLIBRARIES = libctemplate.la libctemplate_nothreads.la
 # We don't expose the library for now, until the demonstrated need
 # outweighs the costs.  If you'd like to use this library, please send
 # mail to google-ctemplate@googlegroups.com!
-noinst_LTLIBRARIES = libctemplate_testing.la
+noinst_LTLIBRARIES = libctemplate_debug.la \
+	libctemplate_nothreads_debug.la libctemplate_testing.la
 bin_SCRIPTS = src/template-converter
 WINDOWS_PROJECTS = google-ctemplate.sln \
 	vsprojects/libctemplate/libctemplate.vcproj \
@@ -467,11 +500,18 @@ libctemplate_la_LIBADD = $(PTHREAD_LIBS)
 libctemplate_nothreads_la_SOURCES = $(libctemplate_la_SOURCES)
 libctemplate_nothreads_la_CXXFLAGS = -DNDEBUG -DNO_THREADS $(AM_CXXFLAGS)
 libctemplate_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_SYMBOLS)
+libctemplate_debug_la_SOURCES = $(libctemplate_la_SOURCES)
+libctemplate_debug_la_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
+libctemplate_debug_la_LDFLAGS = $(libctemplate_la_LDFLAGS)
+libctemplate_debug_la_LIBADD = $(libctemplate_la_LIBADD)
+libctemplate_nothreads_debug_la_SOURCES = $(libctemplate_nothreads_la_SOURCES)
+libctemplate_nothreads_debug_la_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
+libctemplate_nothreads_debug_la_LDFLAGS = $(libctemplate_nothreads_la_LDFLAGS)
 libctemplate_testing_la_SOURCES = $(googleinclude_HEADERS) \
                                   src/tests/template_test_util.h \
                                   src/tests/template_test_util.cc
 
-libctemplate_testing_la_CXXFLAGS = -DNDEBUG $(AM_CXXFLAGS)
+libctemplate_testing_la_CXXFLAGS = $(AM_CXXFLAGS)
 CTEMPLATE_TESTING_SYMBOLS = 'TemporaryRegisterTemplate|TemplateDictionaryPeer'
 libctemplate_testing_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS)
 make_tpl_varnames_h_SOURCES = $(googleinclude_HEADERS) \
@@ -484,61 +524,61 @@ template_dictionary_unittest_SOURCES = src/config_for_unittests.h \
 
 template_dictionary_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_dictionary_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
-template_dictionary_unittest_LDADD = libctemplate.la libctemplate_testing.la \
+template_dictionary_unittest_LDADD = libctemplate_testing.la libctemplate_debug.la \
                                      $(PTHREAD_LIBS)
 
 template_dictionary_nothreads_unittest_SOURCES = $(template_dictionary_unittest_SOURCES)
 template_dictionary_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
-template_dictionary_nothreads_unittest_LDADD = libctemplate_nothreads.la \
-                                               libctemplate_testing.la
+template_dictionary_nothreads_unittest_LDADD = libctemplate_testing.la \
+                                               libctemplate_nothreads_debug.la
 
 template_modifiers_unittest_SOURCES = src/config_for_unittests.h \
                                       src/tests/template_modifiers_unittest.cc
 
 template_modifiers_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_modifiers_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
-template_modifiers_unittest_LDADD = libctemplate.la libctemplate_testing.la \
+template_modifiers_unittest_LDADD = libctemplate_testing.la libctemplate_debug.la \
                                     $(PTHREAD_LIBS)
 
 template_modifiers_nothreads_unittest_SOURCES = $(template_modifiers_unittest_SOURCES)
 template_modifiers_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
-template_modifiers_nothreads_unittest_LDADD = libctemplate_nothreads.la \
-                                              libctemplate_testing.la
+template_modifiers_nothreads_unittest_LDADD = libctemplate_testing.la \
+                                              libctemplate_nothreads_debug.la
 
 template_setglobals_unittest_SOURCES = src/config_for_unittests.h \
                                        src/tests/template_setglobals_unittest.cc
 
 template_setglobals_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_setglobals_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
-template_setglobals_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
+template_setglobals_unittest_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
 template_setglobals_nothreads_unittest_SOURCES = $(template_setglobals_unittest_SOURCES)
 template_setglobals_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
-template_setglobals_nothreads_unittest_LDADD = libctemplate_nothreads.la
+template_setglobals_nothreads_unittest_LDADD = libctemplate_nothreads_debug.la
 template_from_string_unittest_SOURCES = src/config_for_unittests.h \
                                         src/tests/template_from_string_unittest.cc
 
 template_from_string_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_from_string_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
-template_from_string_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
+template_from_string_unittest_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
 template_from_string_nothreads_unittest_SOURCES = $(template_from_string_unittest_SOURCES)
 template_from_string_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
-template_from_string_nothreads_unittest_LDADD = libctemplate_nothreads.la
+template_from_string_nothreads_unittest_LDADD = libctemplate_nothreads_debug.la
 template_unittest_SOURCES = src/config_for_unittests.h \
                             src/tests/template_unittest.cc
 
 template_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
-template_unittest_LDADD = libctemplate.la $(PTHREAD_LIBS)
+template_unittest_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
 template_nothreads_unittest_SOURCES = src/tests/template_unittest.cc
 template_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
-template_nothreads_unittest_LDADD = libctemplate_nothreads.la
+template_nothreads_unittest_LDADD = libctemplate_nothreads_debug.la
 template_regtest_SOURCES = src/tests/template_regtest.cc
 template_regtest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_regtest_LDFLAGS = $(PTHREAD_CFLAGS)
-template_regtest_LDADD = libctemplate.la $(PTHREAD_LIBS)
+template_regtest_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
 template_nothreads_regtest_SOURCES = $(template_regtest_SOURCES)
 template_nothreads_regtest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
-template_nothreads_regtest_LDADD = libctemplate_nothreads.la
+template_nothreads_regtest_LDADD = libctemplate_nothreads_debug.la
 EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb \
 	$(SCRIPTS) libtool \
 	src/windows $(WINDOWS_PROJECTS) src/solaris/libstdc++.la contrib
@@ -651,8 +691,12 @@ clean-noinstLTLIBRARIES:
 	done
 libctemplate.la: $(libctemplate_la_OBJECTS) $(libctemplate_la_DEPENDENCIES) 
 	$(CXXLINK) -rpath $(libdir) $(libctemplate_la_LDFLAGS) $(libctemplate_la_OBJECTS) $(libctemplate_la_LIBADD) $(LIBS)
+libctemplate_debug.la: $(libctemplate_debug_la_OBJECTS) $(libctemplate_debug_la_DEPENDENCIES) 
+	$(CXXLINK)  $(libctemplate_debug_la_LDFLAGS) $(libctemplate_debug_la_OBJECTS) $(libctemplate_debug_la_LIBADD) $(LIBS)
 libctemplate_nothreads.la: $(libctemplate_nothreads_la_OBJECTS) $(libctemplate_nothreads_la_DEPENDENCIES) 
 	$(CXXLINK) -rpath $(libdir) $(libctemplate_nothreads_la_LDFLAGS) $(libctemplate_nothreads_la_OBJECTS) $(libctemplate_nothreads_la_LIBADD) $(LIBS)
+libctemplate_nothreads_debug.la: $(libctemplate_nothreads_debug_la_OBJECTS) $(libctemplate_nothreads_debug_la_DEPENDENCIES) 
+	$(CXXLINK)  $(libctemplate_nothreads_debug_la_LDFLAGS) $(libctemplate_nothreads_debug_la_OBJECTS) $(libctemplate_nothreads_debug_la_LIBADD) $(LIBS)
 libctemplate_testing.la: $(libctemplate_testing_la_OBJECTS) $(libctemplate_testing_la_DEPENDENCIES) 
 	$(CXXLINK)  $(libctemplate_testing_la_LDFLAGS) $(libctemplate_testing_la_OBJECTS) $(libctemplate_testing_la_LIBADD) $(LIBS)
 install-binPROGRAMS: $(bin_PROGRAMS)
@@ -755,6 +799,13 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-arena.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-template.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-template_dictionary.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-template_from_string.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-template_modifiers.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-template_namelist.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-template_pathops.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-arena.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template_dictionary.Plo@am__quote@
@@ -762,6 +813,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template_modifiers.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template_namelist.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template_pathops.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-arena.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-template.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-template_dictionary.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-template_from_string.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-template_modifiers.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-template_namelist.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-template_pathops.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-arena.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-template.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-template_dictionary.Plo@am__quote@
@@ -854,6 +912,55 @@ libctemplate_la-template_from_string.lo: src/template_from_string.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_la-template_from_string.lo `test -f 'src/template_from_string.cc' || echo '$(srcdir)/'`src/template_from_string.cc
 
+libctemplate_debug_la-arena.lo: src/base/arena.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_debug_la-arena.lo -MD -MP -MF "$(DEPDIR)/libctemplate_debug_la-arena.Tpo" -c -o libctemplate_debug_la-arena.lo `test -f 'src/base/arena.cc' || echo '$(srcdir)/'`src/base/arena.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_debug_la-arena.Tpo" "$(DEPDIR)/libctemplate_debug_la-arena.Plo"; else rm -f "$(DEPDIR)/libctemplate_debug_la-arena.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/base/arena.cc' object='libctemplate_debug_la-arena.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_debug_la-arena.lo `test -f 'src/base/arena.cc' || echo '$(srcdir)/'`src/base/arena.cc
+
+libctemplate_debug_la-template.lo: src/template.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_debug_la-template.lo -MD -MP -MF "$(DEPDIR)/libctemplate_debug_la-template.Tpo" -c -o libctemplate_debug_la-template.lo `test -f 'src/template.cc' || echo '$(srcdir)/'`src/template.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_debug_la-template.Tpo" "$(DEPDIR)/libctemplate_debug_la-template.Plo"; else rm -f "$(DEPDIR)/libctemplate_debug_la-template.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template.cc' object='libctemplate_debug_la-template.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_debug_la-template.lo `test -f 'src/template.cc' || echo '$(srcdir)/'`src/template.cc
+
+libctemplate_debug_la-template_dictionary.lo: src/template_dictionary.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_debug_la-template_dictionary.lo -MD -MP -MF "$(DEPDIR)/libctemplate_debug_la-template_dictionary.Tpo" -c -o libctemplate_debug_la-template_dictionary.lo `test -f 'src/template_dictionary.cc' || echo '$(srcdir)/'`src/template_dictionary.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_debug_la-template_dictionary.Tpo" "$(DEPDIR)/libctemplate_debug_la-template_dictionary.Plo"; else rm -f "$(DEPDIR)/libctemplate_debug_la-template_dictionary.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_dictionary.cc' object='libctemplate_debug_la-template_dictionary.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_debug_la-template_dictionary.lo `test -f 'src/template_dictionary.cc' || echo '$(srcdir)/'`src/template_dictionary.cc
+
+libctemplate_debug_la-template_modifiers.lo: src/template_modifiers.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_debug_la-template_modifiers.lo -MD -MP -MF "$(DEPDIR)/libctemplate_debug_la-template_modifiers.Tpo" -c -o libctemplate_debug_la-template_modifiers.lo `test -f 'src/template_modifiers.cc' || echo '$(srcdir)/'`src/template_modifiers.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_debug_la-template_modifiers.Tpo" "$(DEPDIR)/libctemplate_debug_la-template_modifiers.Plo"; else rm -f "$(DEPDIR)/libctemplate_debug_la-template_modifiers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_modifiers.cc' object='libctemplate_debug_la-template_modifiers.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_debug_la-template_modifiers.lo `test -f 'src/template_modifiers.cc' || echo '$(srcdir)/'`src/template_modifiers.cc
+
+libctemplate_debug_la-template_namelist.lo: src/template_namelist.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_debug_la-template_namelist.lo -MD -MP -MF "$(DEPDIR)/libctemplate_debug_la-template_namelist.Tpo" -c -o libctemplate_debug_la-template_namelist.lo `test -f 'src/template_namelist.cc' || echo '$(srcdir)/'`src/template_namelist.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_debug_la-template_namelist.Tpo" "$(DEPDIR)/libctemplate_debug_la-template_namelist.Plo"; else rm -f "$(DEPDIR)/libctemplate_debug_la-template_namelist.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_namelist.cc' object='libctemplate_debug_la-template_namelist.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_debug_la-template_namelist.lo `test -f 'src/template_namelist.cc' || echo '$(srcdir)/'`src/template_namelist.cc
+
+libctemplate_debug_la-template_pathops.lo: src/template_pathops.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_debug_la-template_pathops.lo -MD -MP -MF "$(DEPDIR)/libctemplate_debug_la-template_pathops.Tpo" -c -o libctemplate_debug_la-template_pathops.lo `test -f 'src/template_pathops.cc' || echo '$(srcdir)/'`src/template_pathops.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_debug_la-template_pathops.Tpo" "$(DEPDIR)/libctemplate_debug_la-template_pathops.Plo"; else rm -f "$(DEPDIR)/libctemplate_debug_la-template_pathops.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_pathops.cc' object='libctemplate_debug_la-template_pathops.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_debug_la-template_pathops.lo `test -f 'src/template_pathops.cc' || echo '$(srcdir)/'`src/template_pathops.cc
+
+libctemplate_debug_la-template_from_string.lo: src/template_from_string.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_debug_la-template_from_string.lo -MD -MP -MF "$(DEPDIR)/libctemplate_debug_la-template_from_string.Tpo" -c -o libctemplate_debug_la-template_from_string.lo `test -f 'src/template_from_string.cc' || echo '$(srcdir)/'`src/template_from_string.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_debug_la-template_from_string.Tpo" "$(DEPDIR)/libctemplate_debug_la-template_from_string.Plo"; else rm -f "$(DEPDIR)/libctemplate_debug_la-template_from_string.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_from_string.cc' object='libctemplate_debug_la-template_from_string.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_debug_la-template_from_string.lo `test -f 'src/template_from_string.cc' || echo '$(srcdir)/'`src/template_from_string.cc
+
 libctemplate_nothreads_la-arena.lo: src/base/arena.cc
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_la-arena.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_la-arena.Tpo" -c -o libctemplate_nothreads_la-arena.lo `test -f 'src/base/arena.cc' || echo '$(srcdir)/'`src/base/arena.cc; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_nothreads_la-arena.Tpo" "$(DEPDIR)/libctemplate_nothreads_la-arena.Plo"; else rm -f "$(DEPDIR)/libctemplate_nothreads_la-arena.Tpo"; exit 1; fi
@@ -902,6 +1009,55 @@ libctemplate_nothreads_la-template_from_string.lo: src/template_from_string.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_from_string.cc' object='libctemplate_nothreads_la-template_from_string.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_la-template_from_string.lo `test -f 'src/template_from_string.cc' || echo '$(srcdir)/'`src/template_from_string.cc
+
+libctemplate_nothreads_debug_la-arena.lo: src/base/arena.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_debug_la-arena.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_debug_la-arena.Tpo" -c -o libctemplate_nothreads_debug_la-arena.lo `test -f 'src/base/arena.cc' || echo '$(srcdir)/'`src/base/arena.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_nothreads_debug_la-arena.Tpo" "$(DEPDIR)/libctemplate_nothreads_debug_la-arena.Plo"; else rm -f "$(DEPDIR)/libctemplate_nothreads_debug_la-arena.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/base/arena.cc' object='libctemplate_nothreads_debug_la-arena.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_debug_la-arena.lo `test -f 'src/base/arena.cc' || echo '$(srcdir)/'`src/base/arena.cc
+
+libctemplate_nothreads_debug_la-template.lo: src/template.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_debug_la-template.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_debug_la-template.Tpo" -c -o libctemplate_nothreads_debug_la-template.lo `test -f 'src/template.cc' || echo '$(srcdir)/'`src/template.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_nothreads_debug_la-template.Tpo" "$(DEPDIR)/libctemplate_nothreads_debug_la-template.Plo"; else rm -f "$(DEPDIR)/libctemplate_nothreads_debug_la-template.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template.cc' object='libctemplate_nothreads_debug_la-template.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_debug_la-template.lo `test -f 'src/template.cc' || echo '$(srcdir)/'`src/template.cc
+
+libctemplate_nothreads_debug_la-template_dictionary.lo: src/template_dictionary.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_debug_la-template_dictionary.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_debug_la-template_dictionary.Tpo" -c -o libctemplate_nothreads_debug_la-template_dictionary.lo `test -f 'src/template_dictionary.cc' || echo '$(srcdir)/'`src/template_dictionary.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_nothreads_debug_la-template_dictionary.Tpo" "$(DEPDIR)/libctemplate_nothreads_debug_la-template_dictionary.Plo"; else rm -f "$(DEPDIR)/libctemplate_nothreads_debug_la-template_dictionary.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_dictionary.cc' object='libctemplate_nothreads_debug_la-template_dictionary.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_debug_la-template_dictionary.lo `test -f 'src/template_dictionary.cc' || echo '$(srcdir)/'`src/template_dictionary.cc
+
+libctemplate_nothreads_debug_la-template_modifiers.lo: src/template_modifiers.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_debug_la-template_modifiers.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_debug_la-template_modifiers.Tpo" -c -o libctemplate_nothreads_debug_la-template_modifiers.lo `test -f 'src/template_modifiers.cc' || echo '$(srcdir)/'`src/template_modifiers.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_nothreads_debug_la-template_modifiers.Tpo" "$(DEPDIR)/libctemplate_nothreads_debug_la-template_modifiers.Plo"; else rm -f "$(DEPDIR)/libctemplate_nothreads_debug_la-template_modifiers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_modifiers.cc' object='libctemplate_nothreads_debug_la-template_modifiers.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_debug_la-template_modifiers.lo `test -f 'src/template_modifiers.cc' || echo '$(srcdir)/'`src/template_modifiers.cc
+
+libctemplate_nothreads_debug_la-template_namelist.lo: src/template_namelist.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_debug_la-template_namelist.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_debug_la-template_namelist.Tpo" -c -o libctemplate_nothreads_debug_la-template_namelist.lo `test -f 'src/template_namelist.cc' || echo '$(srcdir)/'`src/template_namelist.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_nothreads_debug_la-template_namelist.Tpo" "$(DEPDIR)/libctemplate_nothreads_debug_la-template_namelist.Plo"; else rm -f "$(DEPDIR)/libctemplate_nothreads_debug_la-template_namelist.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_namelist.cc' object='libctemplate_nothreads_debug_la-template_namelist.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_debug_la-template_namelist.lo `test -f 'src/template_namelist.cc' || echo '$(srcdir)/'`src/template_namelist.cc
+
+libctemplate_nothreads_debug_la-template_pathops.lo: src/template_pathops.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_debug_la-template_pathops.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_debug_la-template_pathops.Tpo" -c -o libctemplate_nothreads_debug_la-template_pathops.lo `test -f 'src/template_pathops.cc' || echo '$(srcdir)/'`src/template_pathops.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_nothreads_debug_la-template_pathops.Tpo" "$(DEPDIR)/libctemplate_nothreads_debug_la-template_pathops.Plo"; else rm -f "$(DEPDIR)/libctemplate_nothreads_debug_la-template_pathops.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_pathops.cc' object='libctemplate_nothreads_debug_la-template_pathops.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_debug_la-template_pathops.lo `test -f 'src/template_pathops.cc' || echo '$(srcdir)/'`src/template_pathops.cc
+
+libctemplate_nothreads_debug_la-template_from_string.lo: src/template_from_string.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_debug_la-template_from_string.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_debug_la-template_from_string.Tpo" -c -o libctemplate_nothreads_debug_la-template_from_string.lo `test -f 'src/template_from_string.cc' || echo '$(srcdir)/'`src/template_from_string.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_nothreads_debug_la-template_from_string.Tpo" "$(DEPDIR)/libctemplate_nothreads_debug_la-template_from_string.Plo"; else rm -f "$(DEPDIR)/libctemplate_nothreads_debug_la-template_from_string.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/template_from_string.cc' object='libctemplate_nothreads_debug_la-template_from_string.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_debug_la-template_from_string.lo `test -f 'src/template_from_string.cc' || echo '$(srcdir)/'`src/template_from_string.cc
 
 libctemplate_testing_la-template_test_util.lo: src/tests/template_test_util.cc
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_testing_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_testing_la-template_test_util.lo -MD -MP -MF "$(DEPDIR)/libctemplate_testing_la-template_test_util.Tpo" -c -o libctemplate_testing_la-template_test_util.lo `test -f 'src/tests/template_test_util.cc' || echo '$(srcdir)/'`src/tests/template_test_util.cc; \

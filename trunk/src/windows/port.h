@@ -54,12 +54,11 @@
 #include <string>
 #include <vector>
 
-// 4018: signed/unsigned mismatch is common (and ok for signed_i < unsigned_i)
 // 4244: otherwise we get problems when substracting two size_t's to an int
 // 4251: it's complaining about a private struct I've chosen not to dllexport
 // 4715: for some reason VC++ stopped realizing you can't return after abort()
 // 4996: Yes, we're ok using "unsafe" functions like fopen() and strerror()
-#pragma warning(disable:4018 4244 4251 4715 4996)
+#pragma warning(disable:4244 4251 4715 4996)
 
 // file I/O
 #define PATH_MAX 1024

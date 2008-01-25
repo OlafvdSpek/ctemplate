@@ -266,14 +266,12 @@ class TemplateUnittest {
     AssertExpandIs(tpl, &dict, "hi yo_yo # <b>foo & bar</b> lo", true);
 
     // Test with custom modifier
-    ASSERT(template_modifiers::AddModifier(
-               "x-test",
-               template_modifiers::MODVAL_FORBIDDEN,
-               &template_modifiers::html_escape));
-    ASSERT(template_modifiers::AddModifier(
-               "x-test-arg",
-               template_modifiers::MODVAL_REQUIRED,
-               &template_modifiers::html_escape_with_arg));
+    ASSERT(template_modifiers::AddModifier("x-test",
+                                           &template_modifiers::html_escape));
+    ASSERT(template_modifiers::AddModifier("x-test-arg=",
+                                           &template_modifiers::html_escape));
+    ASSERT(template_modifiers::AddModifier("x-test-arg=snippet",
+                                           &template_modifiers::snippet_escape));
 
     tpl = StringToTemplate("hi {{VAR:x-test}} lo", STRIP_WHITESPACE);
     AssertExpandIs(tpl, &dict, "hi yo&amp;yo lo", true);
@@ -285,10 +283,7 @@ class TemplateUnittest {
 
     // Test with a modifier taking per-expand data
     DynamicModifier dynamic_modifier;
-    ASSERT(template_modifiers::AddModifier(
-               "x-dynamic",
-               template_modifiers::MODVAL_FORBIDDEN,
-               &dynamic_modifier));
+    ASSERT(template_modifiers::AddModifier("x-dynamic", &dynamic_modifier));
     tpl = StringToTemplate("hi {{VAR:x-dynamic}} lo", STRIP_WHITESPACE);
     AssertExpandIs(tpl, &dict, "hi  lo", true);
     dict.SetModifierData("value", "foo");
@@ -399,7 +394,7 @@ class TemplateUnittest {
 
   static void TestInclude() {
     string incname = StringToTemplateFile("include file\n");
-    string incname2 = StringToTemplateFile("inc2\n");
+    string incname2 = StringToTemplateFile("inc2a\ninc2b\n");
     string incname_bad = StringToTemplateFile("{{syntax_error");
     Template* tpl = StringToTemplate("hi {{>INC}} bar\n", STRIP_WHITESPACE);
     TemplateDictionary dict("dict");
@@ -418,12 +413,44 @@ class TemplateUnittest {
     dict.AddIncludeDictionary("inc")->SetFilename(incname);
     AssertExpandIs(tpl, &dict, "hi include fileinclude file bar", false);
     dict.AddIncludeDictionary("INC")->SetFilename(incname2);
-    AssertExpandIs(tpl, &dict, "hi include fileinclude fileinc2 bar", false);
+    AssertExpandIs(tpl, &dict,
+                   "hi include fileinclude fileinc2ainc2b bar", false);
 
     // Now test that includes preserve Strip
     Template* tpl2 = StringToTemplate("hi {{>INC}} bar", DO_NOT_STRIP);
-    AssertExpandIs(tpl2, &dict, "hi include file\ninclude file\ninc2\n bar",
+    AssertExpandIs(tpl2, &dict,
+                   "hi include file\ninclude file\ninc2a\ninc2b\n bar", false);
+
+    // Test that if we indent the include, every line on the include
+    // is indented.
+    Template* tpl3 = StringToTemplate("hi\n  {{>INC}} bar", DO_NOT_STRIP);
+    AssertExpandIs(tpl3, &dict,
+                   "hi\n  include file\n  include file\n"
+                   "  inc2a\n  inc2b\n   bar",
                    false);
+    // But obviously, if we strip leading whitespace, no indentation.
+    Template* tpl4 = StringToTemplate("hi\n  {{>INC}} bar", STRIP_WHITESPACE);
+    AssertExpandIs(tpl4, &dict,
+                   "hiinclude fileinclude fileinc2ainc2b bar", false);
+    // And if it's not a whitespace indent, we don't indent either.
+    Template* tpl5 = StringToTemplate("hi\n - {{>INC}} bar", DO_NOT_STRIP);
+    AssertExpandIs(tpl5, &dict,
+                   "hi\n - include file\ninclude file\n"
+                   "inc2a\ninc2b\n bar",
+                   false);
+    // Make sure we indent properly at the beginning.
+    Template* tpl6 = StringToTemplate("  {{>INC}}\nbar", DO_NOT_STRIP);
+    AssertExpandIs(tpl6, &dict,
+                   "  include file\n  include file\n"
+                   "  inc2a\n  inc2b\n  \nbar",
+                   false);
+    // And deal correctly when we include twice in a row.
+    Template* tpl7 = StringToTemplate("  {{>INC}}-{{>INC}}", DO_NOT_STRIP);
+    AssertExpandIs(tpl7, &dict,
+                   "  include file\n  include file\n  inc2a\n  inc2b\n  "
+                   "-include file\ninclude file\ninc2a\ninc2b\n",
+                   false);
+
   }
 
   static void TestIncludeWithModifiers() {
@@ -438,6 +465,10 @@ class TemplateUnittest {
     Template* tpl3 = StringToTemplate("hi {{>INC:pre_escape}} bar\n",
                                       DO_NOT_STRIP);
     Template* tpl4 = StringToTemplate("hi {{>INC:u}} bar\n", DO_NOT_STRIP);
+    // Test that if we include the same template twice, once with a modifer
+    // and once without, they each get applied properly.
+    Template* tpl5 = StringToTemplate("hi {{>INC:h}} bar {{>INC}} baz\n",
+                                      DO_NOT_STRIP);
 
     TemplateDictionary dict("dict");
     AssertExpandIs(tpl1, &dict, "hi  bar\n", true);
@@ -454,17 +485,24 @@ class TemplateUnittest {
     AssertExpandIs(tpl4, &dict,
                    "hi include+%26+print+file%0Ainc2%0Ayo%26yo bar\n",
                    true);
+    AssertExpandIs(tpl5, &dict,
+                   "hi include &amp; print file inc2 yo&amp;yo bar "
+                   "include & print file\ninc2\nyo&yo baz\n",
+                   true);
 
     // Don't test modifier syntax here; that's in TestVariableWithModifiers()
   }
 
   // Make sure we don't deadlock when a template includes itself.
+  // This also tests we handle recursive indentation properly.
   static void TestRecursiveInclude() {
-    string incname = StringToTemplateFile("hi {{>INC}} bar\n");
-    Template* tpl = Template::GetTemplate(incname, STRIP_WHITESPACE);
+    string incname = StringToTemplateFile("hi {{>INC}} bar\n  {{>INC}}!");
+    Template* tpl = Template::GetTemplate(incname, DO_NOT_STRIP);
     TemplateDictionary dict("dict");
     dict.AddIncludeDictionary("INC")->SetFilename(incname);
-    AssertExpandIs(tpl, &dict, "hi hi  bar bar", true);
+    // Note the last line is indented 4 spaces instead of 2.  This is
+    // because the last sub-include is indented.
+    AssertExpandIs(tpl, &dict, "hi hi  bar\n  ! bar\n  hi  bar\n    !!", true);
   }
 
   // Tests that vars inherit/override their parents properly
@@ -535,12 +573,12 @@ class TemplateUnittest {
     dict.SetAnnotateOutput("");
     char expected[10240];           // 10k should be big enough!
     snprintf(expected, sizeof(expected),
-             "{{#FILE=%s003}}{{#SEC=__MAIN__}}boo!\n"
+             "{{#FILE=%s003}}{{#SEC=__{{MAIN}}__}}boo!\n"
              "{{#INC=INC}}{{#FILE=%s001}}"
-             "{{#SEC=__MAIN__}}include {{#SEC=ISEC}}file{{/SEC}}\n"
+             "{{#SEC=__{{MAIN}}__}}include {{#SEC=ISEC}}file{{/SEC}}\n"
              "{{/SEC}}{{/FILE}}{{/INC}}"
              "{{#INC=INC}}{{#FILE=%s002}}"
-             "{{#SEC=__MAIN__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
+             "{{#SEC=__{{MAIN}}__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
              "\nhi {{#SEC=SEC}}lo{{/SEC}} bar "
              "{{#VAR=VAR:x-foo<not registered>}}var{{/VAR}}{{/SEC}}{{/FILE}}",
              (FLAGS_test_tmpdir + slash_tpl).c_str(),
@@ -550,12 +588,12 @@ class TemplateUnittest {
 
     dict.SetAnnotateOutput(slash_tpl.c_str());
     snprintf(expected, sizeof(expected),
-             "{{#FILE=%s003}}{{#SEC=__MAIN__}}boo!\n"
+             "{{#FILE=%s003}}{{#SEC=__{{MAIN}}__}}boo!\n"
              "{{#INC=INC}}{{#FILE=%s001}}"
-             "{{#SEC=__MAIN__}}include {{#SEC=ISEC}}file{{/SEC}}\n"
+             "{{#SEC=__{{MAIN}}__}}include {{#SEC=ISEC}}file{{/SEC}}\n"
              "{{/SEC}}{{/FILE}}{{/INC}}"
              "{{#INC=INC}}{{#FILE=%s002}}"
-             "{{#SEC=__MAIN__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
+             "{{#SEC=__{{MAIN}}__}}include #2\n{{/SEC}}{{/FILE}}{{/INC}}"
              "\nhi {{#SEC=SEC}}lo{{/SEC}} bar "
              "{{#VAR=VAR:x-foo<not registered>}}var{{/VAR}}{{/SEC}}{{/FILE}}",
              (slash_tpl).c_str(),
