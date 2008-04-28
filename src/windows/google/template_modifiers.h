@@ -148,8 +148,20 @@ extern CTEMPLATE_DLL_DECL PreEscape pre_escape;
 class CTEMPLATE_DLL_DECL SnippetEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
 extern CTEMPLATE_DLL_DECL SnippetEscape snippet_escape;
 
-// Replaces characters not safe for an unquoted attribute with underscore.
-// Safe characters are alphanumeric, underscore, dash, period, and colon.
+// The equal sign is also considered safe unless it is at the start
+// or end of the input in which case it is replaced with underscore.
+//
+// We added the equal sign to the safe characters to allow this modifier
+// to be used on attribute name/value pairs in HTML tags such as
+//   <div {{CLASS:H=attribute}}>
+// where CLASS is expanded to "class=bla".
+//
+// Note: The equal sign is replaced when found at either boundaries of the
+// string due to the concern it may be lead to XSS under some special
+// circumstances: Say, if this string is the value of an attribute in an
+// HTML tag and ends with an equal sign, a browser may possibly end up
+// interpreting the next token as the value of this string rather than
+// a new attribute (esoteric).
 class CTEMPLATE_DLL_DECL CleanseAttribute : public TemplateModifier { MODIFY_SIGNATURE_; };
 extern CTEMPLATE_DLL_DECL CleanseAttribute cleanse_attribute;
 
@@ -175,15 +187,50 @@ class CTEMPLATE_DLL_DECL ValidateUrl : public TemplateModifier {
 extern CTEMPLATE_DLL_DECL ValidateUrl validate_url_and_html_escape;
 extern CTEMPLATE_DLL_DECL ValidateUrl validate_url_and_javascript_escape;
 
-// Escapes &nbsp; to &#160;
-// TODO(csilvers): have this do something more useful, once all callers have
-//                 been fixed.  Dunno what 'more useful' might be, yet.
+// Escapes < > & " ' to &lt; &gt; &amp; &quot; &#39; (same as in HtmlEscape).
+// If you use it within a CDATA section, you may be escaping more characters
+// than strictly necessary. If this turns out to be an issue, we will need
+// to add a variant just for CDATA.
 class CTEMPLATE_DLL_DECL XmlEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
 extern CTEMPLATE_DLL_DECL XmlEscape xml_escape;
 
-// Escapes " ' \ <CR> <LF> <BS> to \" \' \\ \r \n \b
+// Escapes characters that cannot appear unescaped in a javascript string
+// assuming UTF-8 encoded input.
+// This does NOT escape all characters that cannot appear unescaped in a
+// javascript regular expression literal.
 class CTEMPLATE_DLL_DECL JavascriptEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
 extern CTEMPLATE_DLL_DECL JavascriptEscape javascript_escape;
+
+// Checks that the input is a valid javascript non-string literal
+// meaning a boolean (true, false) or a numeric value (decimal, hex or octal).
+// If valid, we output the input as is, otherwise we output null instead.
+// Input of zero length is considered valid and nothing is output.
+//
+// The emphasis is on safety against injection of javascript code rather
+// than perfect validation, as such it is possible for non-valid literals to
+// pass through.
+//
+// You would use this modifier for javascript variables that are not
+// enclosed in quotes such as:
+//    <script>var a = {{VALUE}};</script> OR
+//    <a href="url" onclick="doSubmit({{ID}})">
+// For variables that are quoted (i.e. string literals) use javascript_escape.
+//
+// Limitations:
+// . NaN, +/-Infinity and null are not recognized.
+// . Output is not guaranteed to be a valid literal,
+//   e.g: +55+-e34 will output as is.
+//   e.g: trueeee will output nothing as it is not a valid boolean.
+//
+// Details:
+// . For Hex numbers, it checks for case-insensitive 0x[0-9A-F]+
+//   that should be a proper check.
+// . For other numbers, it checks for case-insensitive [0-9eE+-.]*
+//   so can also accept invalid numbers such as the number 5..45--10.
+// . "true" and "false" (without quotes) are also accepted and that's it.
+//
+class CTEMPLATE_DLL_DECL JavascriptNumber : public TemplateModifier { MODIFY_SIGNATURE_; };
+extern CTEMPLATE_DLL_DECL JavascriptNumber javascript_number;
 
 // Escapes characters not in [0-9a-zA-Z.,_:*/~!()-] as %-prefixed hex.
 // Space is encoded as a +.
@@ -211,6 +258,25 @@ extern CTEMPLATE_DLL_DECL PrefixLine prefix_line;
 // (Or more exactly, registering new modifier/value pairs.)
 // They are not intended for any other users.
 
+// A Modifier belongs to an XssClass which determines whether
+// it is an XSS safe addition to a modifier chain or not. This
+// is used by the Auto-Escape mode when determining how to handle
+// extra modifiers provided in template. For example, :j is a safe
+// addition to :h because they are both in the same class (XSS_WEB_STANDARD).
+//
+// XssClass is not exposed in any API and cannot be set in custom
+// modifiers, it is for internal use only (for Auto-Escape). We currently
+// have only two classes.
+//
+// XSS_UNUSED: not used.
+// XSS_WEB_STANDARD: All the curent built-in escaping modifiers.
+// XSS_UNIQUE: Set for all custom modifiers.
+enum XssClass {
+  XSS_UNUSED,
+  XSS_WEB_STANDARD,
+  XSS_UNIQUE,
+};
+
 // TODO(csilvers): collapse this into the TemplateModifier class?
 struct ModifierInfo {
 
@@ -223,15 +289,20 @@ struct ModifierInfo {
   // m should be NULL *only if* default-registering a user-defined longname
   //   that the user neglected to register themselves.  In this case, we
   //   use the null modifier as the actual modifier.
-  ModifierInfo(std::string ln, char sn, const TemplateModifier *m)
+  // xss_class indicates an equivalence class this modifier is
+  // in, such that any other modifier in the class could be applied
+  // after this modifier without affecting its XSS-safety.  If in
+  // doubt, say XSS_UNIQUE, which is the most conservative choice.
+  ModifierInfo(std::string ln, char sn, XssClass xc, const TemplateModifier *m)
       : long_name(ln), short_name(sn),
         modval_required(strchr(ln.c_str(), '=') != NULL),
-        is_registered(m != NULL),
+        is_registered(m != NULL), xss_class(xc),
         modifier(m ? m : &null_modifier) { }
   std::string long_name;
   char short_name;
   bool modval_required;           // true iff ln has an '=' in it
   bool is_registered;             // true for built-in and AddModifier mods
+  XssClass xss_class;
   const TemplateModifier* modifier;
 };
 

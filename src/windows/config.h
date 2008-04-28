@@ -87,6 +87,9 @@
 /* Define to 1 if the system has the type `__uint16'. */
 #define HAVE___UINT16  1
 
+/* The namespace to put the htmlparser code. */
+#define HTMLPARSER_NAMESPACE  google_ctemplate_streamhtmlparser
+
 /* Name of package */
 #undef PACKAGE
 

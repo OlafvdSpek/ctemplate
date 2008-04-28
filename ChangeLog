@@ -1,3 +1,12 @@
+Sun Apr 27 15:06:15 2008  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.90 release
+	* MAJOR NEW FEATURE: New "auto-escape" mode (jad, falmeida, mughda)
+	* New tool, diff_tpl_auto_escape, to convert templates to auto-escaping
+	* Fixed make install to install test datafiles (csilvers)
+	* Add a new modifier: javascript_escape_with_arg=number (jad)
+	* Javascript modifier now escapes all js newlines (msamuel)
+
 Thu Jan 24 16:09:43 2008  Google Inc. <opensource@google.com>
 
 	* ctemplate: version 0.9 release

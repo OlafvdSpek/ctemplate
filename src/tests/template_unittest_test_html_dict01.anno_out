@@ -20,9 +20,9 @@
   <tr>
     <td>
       <ol>
-        <li> Result: {{#VAR=RESULT}}&quot;result #0&nbsp;&quot;{{/VAR}}
+        <li> Result: {{#VAR=RESULT}}<&>"result" #0'&'{{/VAR}}
         <li> Goodness of result: {{#VAR=GOODNESS}}5{{/VAR}}
-        <li> xml-safe result: {{#VAR=XML_RESULT}}&quot;result #0&#160;&quot;{{/VAR}}
+        <li> xml-safe result: {{#VAR=XML_RESULT}}&lt;&amp;&gt;&quot;result&quot; #0&#39;&amp;&#39;{{/VAR}}
       </ol>
     </td>
   </tr>
@@ -32,9 +32,9 @@
   <tr>
     <td>
       <ol>
-        <li> Result: {{#VAR=RESULT}}&quot;result #1&nbsp;&quot;{{/VAR}}
+        <li> Result: {{#VAR=RESULT}}<&>"result" #1'&'{{/VAR}}
         <li> Goodness of result: {{#VAR=GOODNESS}}6{{/VAR}}
-        <li> xml-safe result: {{#VAR=XML_RESULT}}&quot;result #1&#160;&quot;{{/VAR}}
+        <li> xml-safe result: {{#VAR=XML_RESULT}}&lt;&amp;&gt;&quot;result&quot; #1&#39;&amp;&#39;{{/VAR}}
       </ol>
     </td>
   </tr>
@@ -44,9 +44,9 @@
   <tr>
     <td>
       <ol>
-        <li> Result: {{#VAR=RESULT}}&quot;result #2&nbsp;&quot;{{/VAR}}
+        <li> Result: {{#VAR=RESULT}}<&>"result" #2'&'{{/VAR}}
         <li> Goodness of result: {{#VAR=GOODNESS}}7{{/VAR}}
-        <li> xml-safe result: {{#VAR=XML_RESULT}}&quot;result #2&#160;&quot;{{/VAR}}
+        <li> xml-safe result: {{#VAR=XML_RESULT}}&lt;&amp;&gt;&quot;result&quot; #2&#39;&amp;&#39;{{/VAR}}
       </ol>
     </td>
   </tr>

@@ -76,6 +76,7 @@
 // Not quite as lightweight as a hard-link, but more than good enough for us.
 #define link(oldpath, newpath)  CopyFileA(oldpath, newpath, false)
 
+#define strcasecmp   _stricmp
 #define strncasecmp  _strnicmp
 
 // In windows-land, hash<> is called hash_compare<> (from xhash.h)

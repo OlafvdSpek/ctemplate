@@ -4,7 +4,7 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 0.9, opensource@google.com)
+AC_INIT(ctemplate, 0.90, opensource@google.com)
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
@@ -74,6 +74,13 @@ ac_windows_dllexport=
 AC_SUBST(ac_windows_dllexport_defines)
 AC_SUBST(ac_windows_dllexport)
 
+# This will (should) never change, but we put it here so if we do need
+# to change it, to avoid naming conflicts or something, it's easy to
+# do in one place.
+ac_htmlparser_namespace=google_ctemplate_streamhtmlparser
+AC_SUBST(ac_htmlparser_namespace)
+AC_DEFINE_UNQUOTED(HTMLPARSER_NAMESPACE, $ac_htmlparser_namespace,
+                   [The namespace to put the htmlparser code.])
 
 # Write generated configuration file, and also .h files
 AC_CONFIG_FILES([Makefile \

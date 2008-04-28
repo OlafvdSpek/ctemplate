@@ -295,7 +295,7 @@ class TemplateDictionaryUnittest {
     dict.SetEscapedFormattedValue("URL", TemplateDictionary::url_query_escape,
                                   "pageviews-%s", "r?egex");
     dict.SetEscapedFormattedValue("XML", TemplateDictionary::xml_escape,
-                                  "This&nbsp;is&nb%s -- ok?", "sp; #1&nbsp;");
+                                  "This&is%s -- ok?", "just&");
 
     ASSERT_STREQ(dict.GetSectionValue("HTML"),
                  "This is &lt;a &amp; b&gt; #0.3333");
@@ -304,7 +304,7 @@ class TemplateDictionaryUnittest {
     ASSERT_STREQ(dict.GetSectionValue("URL"), "pageviews-r%3Fegex");
 
     ASSERT_STREQ(dict.GetSectionValue("XML"),
-                 "This&#160;is&#160; #1&#160; -- ok?");
+                 "This&amp;isjust&amp; -- ok?");
   }
 
   static void TestAddSectionDictionary() {

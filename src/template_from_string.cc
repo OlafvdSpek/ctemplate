@@ -58,8 +58,9 @@ using HASH_NAMESPACE::hash_map;
 // "reloaded."
 TemplateFromString::TemplateFromString(const string& cache_key,
                                        const string& template_text,
-                                       Strip strip)
-    : Template("", strip) {
+                                       Strip strip,
+                                       TemplateContext context)
+    : Template("", strip, context) {
   filename_ = cache_key;    // for cache and reporting purposes only
 
   // We know that InsertFile never writes more output than it gets input.
@@ -81,17 +82,17 @@ class TemplateCacheHash {
  public:
   HASH_NAMESPACE::hash<const char *> string_hash_;
   TemplateCacheHash() : string_hash_() {}
-  size_t operator()(const pair<string, Strip>& p) const {
+  size_t operator()(const pair<string, int>& p) const {
     // Using + here is silly, but should work ok in practice
-    return string_hash_(p.first.c_str()) + static_cast<int>(p.second);
+    return string_hash_(p.first.c_str()) + p.second;
   }
-  // Less operator for MSVC's hash containers.  We make Strip be the
+  // Less operator for MSVC's hash containers.  We make int be the
   // primary key, unintuitively, because it's a bit faster.
-  bool operator()(const pair<string, Strip>& a,
-                  const pair<string, Strip>& b) const {
+  bool operator()(const pair<string, int>& a,
+                  const pair<string, int>& b) const {
     return (a.second == b.second
             ? a.first < b.first
-            : static_cast<int>(a.second) < static_cast<int>(b.second));
+            : a.second < b.second);
   }
   // These two public members are required by msvc.  4 and 8 are defaults.
   static const size_t bucket_size = 4;
@@ -100,7 +101,7 @@ class TemplateCacheHash {
 
 // The template cache.  Note that we don't define a ClearCache() in this
 // class, so there's no way to delete the entries from this cache!
-typedef hash_map<pair<string, Strip>, TemplateFromString*, TemplateCacheHash>
+typedef hash_map<pair<string, int>, TemplateFromString*, TemplateCacheHash>
   TemplateFromStringCache;
 
 static TemplateFromStringCache *g_template_from_string_cache = NULL;
@@ -112,22 +113,49 @@ static TemplateFromStringCache *g_template_from_string_cache = NULL;
 TemplateFromString *TemplateFromString::GetTemplate(const string& cache_key,
                                                     const string& template_text,
                                                     Strip strip) {
+  return GetTemplateCommon(cache_key, template_text, strip, TC_MANUAL);
+}
+
+// TemplateFromString::GetTemplateWithAutoEscaping.
+// Makes sure the template cache has been created and then tries to
+// retrieve a TemplateFromString object from it via the cache_key.
+// This factory method enables auto-escaping and hence requires
+// a valid context for auto-escaping.
+TemplateFromString *
+TemplateFromString::GetTemplateWithAutoEscaping(const string& cache_key,
+                                                const string& template_text,
+                                                Strip strip,
+                                                TemplateContext context) {
+  assert(context != TC_MANUAL);
+  return GetTemplateCommon(cache_key, template_text, strip, context);
+}
+
+// TemplateFromString::GetTemplateCommon (private).
+// Does the real work for GetTemplate and GetTemplateWithAutoEscaping.
+TemplateFromString *
+TemplateFromString::GetTemplateCommon(const string& cache_key,
+                                      const string& template_text,
+                                      Strip strip,
+                                      TemplateContext context) {
   TemplateFromString *tpl = NULL;
   if (cache_key.empty()) {   // user doesn't want to use the cache
-    tpl = new TemplateFromString(cache_key, template_text, strip);
+    tpl = new TemplateFromString(cache_key, template_text, strip,
+                                 context);
   } else {
     MutexLock ml(&g_cache_mutex);
     if (g_template_from_string_cache == NULL) {
       g_template_from_string_cache = new TemplateFromStringCache;
     }
-    // If the object isn't really a TemplateFromString this will be a cache miss
-    tpl = (*g_template_from_string_cache)[pair<string,Strip>(cache_key, strip)];
+
+    TemplateCacheKey template_cache_key = GetTemplateCacheKey(cache_key, strip,
+                                                              context);
+    tpl = (*g_template_from_string_cache)[template_cache_key];
 
     // If we didn't find one, then create one and store it in the cache
     if (!tpl) {
-      tpl = new TemplateFromString(cache_key, template_text, strip);
-      (*g_template_from_string_cache)[pair<string, Strip>(cache_key, strip)] =
-          tpl;
+      tpl = new TemplateFromString(cache_key, template_text, strip,
+                                   context);
+      (*g_template_from_string_cache)[template_cache_key] = tpl;
     }
   }
 
@@ -156,12 +184,20 @@ static void InvalidMethodCall(const char* method_name) {
   assert(false);  // Can't call this method on TemplateFromString.
 }
 
-// These last three methods merely call attention to the developer's error
+// These last four methods merely call attention to the developer's error
 // Since they are private, the compiler will detect such calls everywhere
 // except in modifications to the other methods in this class. It is
 // therefore very unlikely these will ever be called.
 Template *TemplateFromString::GetTemplate(const string& filename, Strip strip) {
   InvalidMethodCall("GetTemplate");
+  return NULL;
+}
+
+Template *
+TemplateFromString::GetTemplateWithAutoEscaping(const string& filename,
+                                                Strip strip,
+                                                TemplateContext context) {
+  InvalidMethodCall("GetTemplateWithAutoEscaping");
   return NULL;
 }
 

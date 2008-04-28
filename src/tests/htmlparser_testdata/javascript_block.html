@@ -1,0 +1,45 @@
+<html>
+<body>
+
+<script>
+
+x < 1;
+
+<?state state=text, tag=script, in_js=true ?>
+
+</script>
+
+<?state state=text?>
+
+<script>
+//<!--
+var x = 1;
+<?state state=text, tag=script, in_js=true ?>
+//--> </script>
+
+<?state state=text?>
+
+<script> //<!--
+var x = 1;
+<?state state=text, tag=script, in_js=true ?>
+</script>
+<?state state=text, tag=script, in_js=true ?>
+//--> </script>
+
+<?state state=text?>
+
+<script>
+<!--
+var x = 1;
+<?state state=text, tag=script, in_js=true ?>
+</script>
+<?state state=text, tag=script, in_js=true ?>
+-->
+</script>
+
+<?state state=text?>
+
+</body>
+</html>
+<?state state=text ?>
+<?state state=text ?>

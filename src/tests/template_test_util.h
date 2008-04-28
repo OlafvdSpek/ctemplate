@@ -35,6 +35,7 @@
 
 #include "config_for_unittests.h"
 #include <string>
+#include <vector>
 #include HASH_MAP_H           // defined in config.h
 #include <google/template_namelist.h>
 
@@ -67,14 +68,39 @@ class TemporaryRegisterTemplate {
 //  EXPECT_EQ("5", peer.GetSectionValue("width"));
 class TemplateDictionaryPeer {
  public:
-  explicit TemplateDictionaryPeer(TemplateDictionary* dict) : dict_(dict) { }
+  explicit TemplateDictionaryPeer(const TemplateDictionary* dict)
+      : dict_(dict) {}
 
+  // Returns the value for the named variable.
   const char* GetSectionValue(const std::string& variable) const;
 
+  // Returns true if the named section is hidden.
   bool IsHiddenSection(const std::string& name) const;
 
+  // Retrieves TemplateDictionary instances for the given section name.  The
+  // caller does not assume ownership of the returned TemplateDictionary
+  // instances.  The number of instances is returned.  All prior entries in
+  // the dicts vector are cleared.
+  //
+  // NOTE: This method assumes that old-style template dictionaries are not in
+  // use.  That is, it assumes that all section dictionaries have been added
+  // with AddSectionDictionary rather than AddOldstyleSectionDictionary.
+  int GetSectionDictionaries(const std::string& section_name,
+                             std::vector<const TemplateDictionary*>* dicts) const;
+
+  // Retrieves included TemplateDictionary instances for the given name.  The
+  // caller does not assume ownership of the returned TemplateDictionary
+  // instances.  The number of instances is returned.  All prior entries in
+  // the dicts vector are cleared.
+  //
+  // NOTE: This method assumes that old-style template dictionaries are not in
+  // use.  That is, it assumes that all section dictionaries have been added
+  // with AddIncludeDictionary rather than AddOldstyleIncludeDictionary.
+  int GetIncludeDictionaries(const std::string& section_name,
+                             std::vector<const TemplateDictionary*>* dicts) const;
+
  private:
-  TemplateDictionary* dict_;  // Not owned.
+  const TemplateDictionary* dict_;  // Not owned.
 
   // disallow copy constructor and assignment
   TemplateDictionaryPeer(const TemplateDictionaryPeer&);

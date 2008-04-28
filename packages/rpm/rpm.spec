@@ -1,18 +1,17 @@
-%define	ver	%VERSION
 %define	RELEASE	1
 %define rel     %{?CUSTOM_RELEASE} %{!?CUSTOM_RELEASE:%RELEASE}
 %define	prefix	/usr
 
 Name: %NAME
 Summary: Simple but powerful template language for C++
-Version: %ver
+Version: %VERSION
 Release: %rel
 Group: Development/Libraries
-URL: http://goog-ctemplate.sourceforge.net
+URL: http://code.google.com/p/ctemplate
 License: BSD
 Vendor: Google
 Packager: Google Inc. <opensource@google.com>
-Source: http://goog-ctemplate.sourceforge.net/%{NAME}-%{PACKAGE_VERSION}.tar.gz
+Source: http://%{NAME}.googlecode.com/files/%{NAME}-%{VERSION}.tar.gz
 Distribution: Redhat 7 and above.
 Buildroot: %{_tmppath}/%{name}-root
 Prefix: %prefix
@@ -28,6 +27,7 @@ without limiting the power of the template *system*.  Indeed, Google's
 %package devel
 Summary: Simple but powerful template language for C++
 Group: Development/Libraries
+Requires: %{NAME} = %{VERSION}
 
 %description devel
 The %name-devel package contains static and debug libraries and header
@@ -54,7 +54,11 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root)
 
-%doc AUTHORS COPYING ChangeLog INSTALL NEWS README doc/designstyle.css doc/index.html doc/howto.html doc/tips.html doc/example.html doc/xss_resources.html contrib/README.contrib contrib/highlighting.vim contrib/tpl-mode.el
+%doc AUTHORS COPYING ChangeLog INSTALL NEWS README
+%doc doc/designstyle.css doc/index.html
+%doc doc/howto.html doc/auto_escape.html doc/tips.html doc/example.html
+%doc doc/xss_resources.html
+%doc contrib/README.contrib contrib/highlighting.vim contrib/tpl-mode.el
 
 %{prefix}/lib/libctemplate.so.0
 %{prefix}/lib/libctemplate.so.0.0.0
@@ -73,3 +77,4 @@ rm -rf $RPM_BUILD_ROOT
 %{prefix}/lib/libctemplate_nothreads.so
 %{prefix}/bin/make_tpl_varnames_h
 %{prefix}/bin/template-converter
+%{prefix}/bin/diff_tpl_auto_escape

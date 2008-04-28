@@ -61,7 +61,7 @@
 #  include <ndir.h>
 # endif
 #endif
-#include <algorithm>   // for sort()
+#include <algorithm>   // for sort() and stable_partition()
 #include <vector>
 #include <string>
 #include "google/template.h"
@@ -78,6 +78,7 @@ using GOOGLE_NAMESPACE::TemplateDictionary;
 using GOOGLE_NAMESPACE::DO_NOT_STRIP;
 using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
 using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
+using GOOGLE_NAMESPACE::TC_HTML;
 namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;
 
 // This default value is only used when the TEMPLATE_ROOTDIR envvar isn't set
@@ -100,7 +101,7 @@ namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;
     assert(StringEq(a, b, __FILE__, __LINE__, #a, #b)); \
 } while (0)
 
-bool StringEq(const string&a, const string& b,
+bool StringEq(const string& a, const string& b,
                     const char* filename, int lineno,
                     const char* namea, const char* nameb) {
   if (a != b) {
@@ -316,13 +317,25 @@ static TemplateDictionary* MakeDict1() {
     TemplateDictionary* result = dict->AddSectionDictionary("RESULTS");
     if (i % 2 == 0)
       result->ShowSection("WHITE_BG");  // gives us striped results!
-    const char* res = "&quot;result #%d&nbsp;&quot;";
+    const char* res = "<&>\"result\" #%d'&'";
     result->SetFormattedValue("RESULT", res, i);
     result->SetEscapedFormattedValue("XML_RESULT",
                                      TemplateDictionary::xml_escape,
                                      res, i);
     result->SetIntValue("GOODNESS", i + 5);
   }
+
+  // For testing auto-escape.
+  dict->SetValue("AE_TITLE_GOOD", "Hello World!");
+  dict->SetValue("AE_TITLE_BAD", "Hello <script>alert(1)</script> World!");
+  dict->SetValue("AE_URL_GOOD", "http://www.google.com/");
+  dict->SetValue("AE_URL_BAD", "javascript:alert(1)");
+  dict->SetValue("AE_BG_COLOR_GOOD", "red");
+  dict->SetValue("AE_BG_COLOR_BAD", "evil! &");
+  dict->SetValue("AE_JS_GOOD", "your text here");
+  dict->SetValue("AE_JS_BAD", "your text'is clever'thanks");
+  dict->SetValue("AE_USERNAME_GOOD", "Mr. Nice");
+  dict->SetValue("AE_USERNAME_BAD", "Doctor<script>alert(2)</script>Evil");
 
   // This won't see any of the vars *we* set
   TemplateDictionary* footer_dict = dict->AddIncludeDictionary("FOOTER");
@@ -364,9 +377,10 @@ static TemplateDictionary* MakeDictionary(int i) {
 }
 
 
-static void TestExpand(const vector<Testdata>& testdata) {
-  for (vector<Testdata>::const_iterator one_test = testdata.begin();
-       one_test != testdata.end(); ++one_test) {
+static void TestExpand(const vector<Testdata>::const_iterator& begin,
+                       const vector<Testdata>::const_iterator& end) {
+  for (vector<Testdata>::const_iterator one_test = begin;
+       one_test != end; ++one_test) {
     Template* tpl_none = Template::GetTemplate(one_test->input_template_name,
                                                DO_NOT_STRIP);
     Template* tpl_lines = Template::GetTemplate(one_test->input_template_name,
@@ -455,6 +469,46 @@ static void TestExpand(const vector<Testdata>& testdata) {
   }
 }
 
+// Predicate function used to separate tests which require initializing
+// the template in auto-escape mode from the ones that don't. This is done
+// by checking if the input filename contains "_autoescape_".
+// Returns true for manual-escape tests, false otherwise.
+static bool TestNeedsManualEscape(const Testdata& testdata) {
+  return (testdata.input_template_name.find("_autoescape_") == string::npos);
+}
+
+// Runs tests only against filenames that have "_autoescape_" in them
+// and it just tests with STRIP_WHITESPACE.
+static void
+TestExpandWithAutoEscape(const vector<Testdata>::const_iterator& begin,
+                         const vector<Testdata>::const_iterator& end) {
+  for (vector<Testdata>::const_iterator one_test = begin;
+       one_test != end; ++one_test) {
+    string template_name(one_test->input_template_name);
+    Template* tpl_ws = Template::GetTemplateWithAutoEscaping(template_name,
+                                                             STRIP_WHITESPACE,
+                                                             TC_HTML);
+    for (vector<string>::const_iterator out = one_test->output.begin();
+         out != one_test->output.end(); ++out) {
+      int dictnum = out - one_test->output.begin() + 1;  // first dict is 01
+      // If output is the empty string, we assume the file does not exist
+      if (out->empty())
+        continue;
+      printf("Testing template %s on dict #%d\n",
+             template_name.c_str(), dictnum);
+      // If we're expecting output, the template better not have had an error
+      ASSERT(tpl_ws);
+      string output_ws;
+      TemplateDictionary* dict = MakeDictionary(dictnum);
+      tpl_ws->Expand(&output_ws, dict);
+      delete dict;   // it's our responsibility
+
+      // "out" is the output for STRIP_WHITESPACE mode.
+      ASSERT_STRING_EQ(*out, output_ws);
+    }
+  }
+}
+
 int main(int argc, char** argv) {
   // If TEMPLATE_ROOTDIR is set in the environment, it overrides the
   // default of ".".  We use an env-var rather than argv because
@@ -466,7 +520,17 @@ int main(int argc, char** argv) {
   rootdir = ctemplate::PathJoin(rootdir, "tests");
   Template::SetTemplateRootDirectory(rootdir);
 
-  TestExpand(ReadDataFiles(Template::template_root_directory().c_str()));
+  vector<Testdata> testdata = ReadDataFiles(
+      Template::template_root_directory().c_str());
+
+  // We separate the test cases (dictionaries) into those that test
+  // the auto escape mode and those that don't using the predicate
+  // TestNeedsManualEscape.
+  vector<Testdata>::const_iterator separator;
+  separator = stable_partition(testdata.begin(), testdata.end(),
+                          TestNeedsManualEscape);
+  TestExpand(testdata.begin(), separator);
+  TestExpandWithAutoEscape(separator, testdata.end());
 
   printf("DONE\n");
   return 0;

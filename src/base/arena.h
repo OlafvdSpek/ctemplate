@@ -80,6 +80,9 @@
 
 _START_GOOGLE_NAMESPACE_
 
+// This class is "thread-compatible": different threads can access the
+// arena at the same time without locking, as long as they use only
+// const methods.
 class CTEMPLATE_DLL_DECL BaseArena {
  protected:         // You can't make an arena directly; only a subclass of one
   BaseArena(char* first_block, const size_t block_size);
@@ -173,14 +176,14 @@ class CTEMPLATE_DLL_DECL BaseArena {
 
 class CTEMPLATE_DLL_DECL UnsafeArena : public BaseArena {
  public:
-  // Allocates a non-thread-safe arena with the specified block size.
+  // Allocates a thread-compatible arena with the specified block size.
   explicit UnsafeArena(const size_t block_size)
     : BaseArena(NULL, block_size) { }
 
-  // Allocates a non-thread-safe arena with the specified block size.
-  // "first_block" must have size "block_size".  Memory is allocated
-  // from "first_block" until it is exhausted; after that memory is
-  // allocated by allocating new blocks from the heap.
+  // Allocates a thread-compatible arena with the specified block
+  // size. "first_block" must have size "block_size". Memory is
+  // allocated from "first_block" until it is exhausted; after that
+  // memory is allocated by allocating new blocks from the heap.
   UnsafeArena(char* first_block, const size_t block_size)
     : BaseArena(first_block, block_size) { }
 
