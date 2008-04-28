@@ -42,6 +42,25 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "make_tpl_varname_h", "vspro
 		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "diff_tpl_auto_escape", "vsprojects\diff_tpl_auto_escape\diff_tpl_auto_escape.vcproj", "{72CD1C2A-56F6-4DDA-957B-BCF181BB558E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_test_util_test", "vsprojects\template_test_util_test\template_test_util_test.vcproj", "{87132061-D584-4388-A80B-D8560F8D0895}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "statemachine_test", "vsprojects\statemachine_test\statemachine_test.vcproj", "{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "htmlparser_test", "vsprojects\htmlparser_test\htmlparser_test.vcproj", "{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfiguration) = preSolution
 		Debug = Debug
@@ -86,6 +105,22 @@ Global
 		{CFD560F2-1B16-4CEE-985D-B19FDE74513F}.Debug.Build.0 = Debug|Win32
 		{CFD560F2-1B16-4CEE-985D-B19FDE74513F}.Release.ActiveCfg = Release|Win32
 		{CFD560F2-1B16-4CEE-985D-B19FDE74513F}.Release.Build.0 = Release|Win32
+		{72CD1C2A-56F6-4DDA-957B-BCF181BB558E}.Debug.ActiveCfg = Debug|Win32
+		{72CD1C2A-56F6-4DDA-957B-BCF181BB558E}.Debug.Build.0 = Debug|Win32
+		{72CD1C2A-56F6-4DDA-957B-BCF181BB558E}.Release.ActiveCfg = Release|Win32
+		{72CD1C2A-56F6-4DDA-957B-BCF181BB558E}.Release.Build.0 = Release|Win32
+		{87132061-D584-4388-A80B-D8560F8D0895}.Debug.ActiveCfg = Debug|Win32
+		{87132061-D584-4388-A80B-D8560F8D0895}.Debug.Build.0 = Debug|Win32
+		{87132061-D584-4388-A80B-D8560F8D0895}.Release.ActiveCfg = Release|Win32
+		{87132061-D584-4388-A80B-D8560F8D0895}.Release.Build.0 = Release|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.ActiveCfg = Debug|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.Build.0 = Debug|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.ActiveCfg = Release|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.Build.0 = Release|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.ActiveCfg = Debug|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.Build.0 = Debug|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.ActiveCfg = Release|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 	EndGlobalSection

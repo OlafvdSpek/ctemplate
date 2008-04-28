@@ -35,7 +35,11 @@
 #include <google/template_dictionary.h>
 #include <google/template_namelist.h>
 
+#include <string>
+#include <vector>
+
 using std::string;
+using std::vector;
 
 _START_GOOGLE_NAMESPACE_
 
@@ -60,6 +64,38 @@ const char* TemplateDictionaryPeer::GetSectionValue(const string& variable)
 
 bool TemplateDictionaryPeer::IsHiddenSection(const string& name) const {
   return dict_->IsHiddenSection(name);
+}
+
+int TemplateDictionaryPeer::GetSectionDictionaries(
+    const string& section_name,
+    vector<const TemplateDictionary*>* dicts) const {
+  dicts->clear();
+  if (dict_->IsHiddenSection(section_name))
+    return 0;
+
+  const TemplateDictionary::DictVector& dict_vector =
+      dict_->GetDictionaries(section_name);
+
+  for (size_t i = 0; i < dict_vector.size(); ++i)
+    dicts->push_back(dict_vector[i]);
+
+  return static_cast<int>(dicts->size());
+}
+
+int TemplateDictionaryPeer::GetIncludeDictionaries(
+    const string& section_name,
+    vector<const TemplateDictionary*>* dicts) const {
+  dicts->clear();
+  if (dict_->IsHiddenTemplate(section_name))
+    return 0;
+
+  const TemplateDictionary::DictVector& dict_vector =
+      dict_->GetTemplateDictionaries(section_name);
+
+  for (size_t i = 0; i < dict_vector.size(); ++i)
+    dicts->push_back(dict_vector[i]);
+
+  return static_cast<int>(dicts->size());
 }
 
 _END_GOOGLE_NAMESPACE_

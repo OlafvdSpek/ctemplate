@@ -1,0 +1,74 @@
+<html>
+
+<body blah='<?state state=value, tag=body, attr=blah, attr_type=regular,
+attr_quoted=true ?>'>
+
+<?state state=text, tag=body ?>
+<a href=<?state state=value, tag=a, attr=href, attr_type=uri ?>><?state state=text, tag=a ?></a>
+<a href=
+  "<?state state=value, tag=a, attr=href, attr_type=uri, attr_quoted=true ?>"></a>
+
+<a href=<?state state=value, tag=a, attr=href, attr_type=uri ?> blah=x></a>
+<a href=
+  "<?state state=value, tag=a, attr=href, attr_type=uri ?>" blah=x></a>
+
+<a href=
+  <?state state=value, tag=a, attr=href, attr_type=uri, attr_quoted=false ?> blah=x></a>
+
+<a href><?state state=text, tag=a ?></a>
+
+<a href=x<?state state=value, tag=a, attr=href, attr_type=uri ?> <?state state=tag, tag=a ?>></a>
+
+<a href =<?state state=value, tag=a, attr=href, attr_type=uri ?>></a>
+<a href
+=<?state state=value, tag=a, attr=href, attr_type=uri ?>></a>
+<a href
+  =<?state state=value, tag=a, attr=href, attr_type=uri ?>></a>
+
+<?state state=text?>
+
+<b font=<?state state=value, value_index=0?>></b>
+<b font=x<?state state=value, value_index=1?>></b>
+<b font='<?state state=value, value_index=0?>'></b>
+<b font='x<?state state=value, value_index=1?>'></b>
+
+<!-- XML Processing instruction -->
+
+<?example <?state state=text?> <a href=<?state state=text?>></a
+  <script>
+  <?state state=text, in_js=false?>
+  </script>
+?>
+
+<a href=http://www.google.com/<?state state=value, tag=a, attr=href, attr_type=uri ?>?q=tt<?state state=value, tag=a, attr=href, attr_type=uri ?>>test</a>
+
+<!-- Test javascript url handling -->
+<a href="test<?state value=test, in_js=false ?>">test</a>
+<a href="javascript<?state value=javascript, in_js=false ?>">test</a>
+<a href="javascript:<?state value=javascript:, in_js=false ?>">test</a>
+<a href="javascript:alert('<?state in_js=false ?>">test</a>
+<a href="http:<?state value=http:, in_js=false ?>">test</a>
+<a href="http://www.google.com"
+   alt="javascript:<?state value=javascript:, in_js=false ?>">test</a>
+
+<!-- Test calls to  TemplateDirective() -->
+<b font=<?state state=value?>
+   color<?state state=value?>></b>
+
+<b font=<?state state=value?><?state insert_text=true?>
+   color<?state state=attr?>></b>
+
+<b font="<?state state=value?><?state insert_text=true?>
+   color<?state state=value?>"></b>
+
+<a href=
+  <?state state=value?><?state insert_text=true?> alt<?state state=attr?>>
+  link
+</a>
+
+<b font=<?state state=value?>><?state state=text, tag=b?></b>
+
+</body>
+
+</html>
+<?state state=text ?>

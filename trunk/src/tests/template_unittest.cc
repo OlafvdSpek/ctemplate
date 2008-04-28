@@ -42,6 +42,9 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>     // for mkdir
+#if defined(HAVE_PTHREAD) && !defined(NO_THREADS)
+#include <pthread.h>
+#endif
 #ifdef HAVE_DIRENT_H
 # include <dirent.h>      // for readdir
 #else
@@ -56,6 +59,7 @@
 #  include <ndir.h>
 # endif
 #endif
+#include <string>
 #include <vector>         // for MissingListType, SyntaxListType
 #include HASH_SET_H       // (defined in config.h)  for NameListType
 #include "google/template.h"
@@ -72,10 +76,16 @@ using GOOGLE_NAMESPACE::ExpandEmitter;
 using GOOGLE_NAMESPACE::Template;
 using GOOGLE_NAMESPACE::TemplateDictionary;
 using GOOGLE_NAMESPACE::TemplateNamelist;
+using GOOGLE_NAMESPACE::TemplateContext;
 using GOOGLE_NAMESPACE::Strip;
 using GOOGLE_NAMESPACE::DO_NOT_STRIP;
 using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
 using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
+using GOOGLE_NAMESPACE::TC_HTML;
+using GOOGLE_NAMESPACE::TC_JS;
+using GOOGLE_NAMESPACE::TC_JSON;
+using GOOGLE_NAMESPACE::TC_XML;
+using GOOGLE_NAMESPACE::TC_NONE;
 namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;   // an interior namespace
 namespace template_modifiers = GOOGLE_NAMESPACE::template_modifiers;
 
@@ -97,6 +107,7 @@ namespace template_modifiers = GOOGLE_NAMESPACE::template_modifiers;
 #define ASSERT_STREQ_EXCEPT(a, b, except)  ASSERT(StreqExcept(a, b, except))
 #define ASSERT_STREQ(a, b)                 ASSERT(strcmp(a, b) == 0)
 #define ASSERT_NOT_STREQ(a, b)             ASSERT(strcmp(a, b) != 0)
+#define ASSERT_STREQ_VERBOSE(a, b, c)      ASSERT(StrEqVerbose(a, b, c))
 
 // First, (conceptually) remove all chars in "except" from both a and b.
 // Then return true iff munged_a == munged_b.
@@ -114,6 +125,18 @@ bool StreqExcept(const char* a, const char* b, const char* except) {
   }
 }
 
+// If a and b do not match, print their values and that of text
+// and return false.
+static bool StrEqVerbose(const string& a, const string& b,
+                         const string& text) {
+  if (a != b) {
+    printf("EXPECTED: %s\n", a.c_str());
+    printf("ACTUAL: %s\n", b.c_str());
+    printf("TEXT: %s\n", text.c_str());
+    return false;
+  }
+  return true;
+}
 
 RegisterTemplateFilename(VALID1_FN, "template_unittest_test_valid1.in");
 RegisterTemplateFilename(INVALID1_FN, "template_unittest_test_invalid1.in");
@@ -169,6 +192,14 @@ static Template* StringToTemplate(const string& s, Strip strip) {
   return Template::GetTemplate(StringToTemplateFile(s), strip);
 }
 
+// This writes s to a file and then loads it into a template object.
+static Template* StringToTemplateWithAutoEscaping(const string& s,
+                                                  Strip strip,
+                                                  TemplateContext context) {
+  return Template::GetTemplateWithAutoEscaping(StringToTemplateFile(s), strip,
+                                               context);
+}
+
 // This is esp. useful for calling from within gdb.
 // The gdb nice-ness is balanced by the need for the caller to delete the buf.
 
@@ -191,6 +222,45 @@ static void AssertExpandIs(Template* tpl, TemplateDictionary *dict,
   }
   ASSERT_STREQ(buf, is.c_str());
   delete [] buf;
+}
+
+// A helper method used by TestCorrectModifiersForAutoEscape.
+// Populates out with lines of the form:
+// VARNAME:mod1[=val1][:mod2[=val2]]...\n from the dump of the template
+// and compares against the expected string.
+// The template is initialized in Auto Escape mode in the given
+// TemplateContext.
+static void AssertCorrectModifiers(TemplateContext template_type,
+                                   const string& text,
+                                   const string& expected_out) {
+  Strip strip = STRIP_WHITESPACE;
+  Template *tpl = StringToTemplateWithAutoEscaping(text, strip, template_type);
+  string dump_out, out;
+  tpl->DumpToString("bogus_filename", &dump_out);
+  string::size_type i, j;
+  i = 0;
+  while ((i = dump_out.find("Variable Node: ", i)) != string::npos) {
+    i += strlen("Variable Node: ");
+    j = dump_out.find("\n", i);
+    out.append(dump_out.substr(i, j - i));   // should be safe.
+    out.append("\n");
+  }
+  ASSERT_STREQ_VERBOSE(expected_out, out, text);
+}
+
+// A helper method used by TestCorrectModifiersForAutoEscape.
+// Initializes the template in the Auto Escape mode with the
+// given TemplateContext, expands it with the given dictionary
+// and checks that the output matches the expected value.
+static void AssertCorrectEscaping(TemplateContext template_type,
+                                  const TemplateDictionary& dict,
+                                  const string& text,
+                                  const string& expected_out) {
+  Strip strip = STRIP_WHITESPACE;
+  Template *tpl = StringToTemplateWithAutoEscaping(text, strip, template_type);
+  string outstring;
+  tpl->Expand(&outstring, &dict);
+  ASSERT_STREQ_VERBOSE(expected_out, outstring, text);
 }
 
 class DynamicModifier : public template_modifiers::TemplateModifier {
@@ -635,6 +705,47 @@ class TemplateUnittest {
     ASSERT(!tpl9);
   }
 
+  static void TestTemplateCache() {
+    const string filename_a = StringToTemplateFile("Test template 1");
+    const string filename_b = StringToTemplateFile("Test template 2.");
+
+    Template *tpl, *tpl2;
+    ASSERT(tpl = Template::GetTemplate(filename_a, DO_NOT_STRIP));
+
+    // Tests with standard (non auto-escape) mode.
+    ASSERT(tpl2 = Template::GetTemplate(filename_b, DO_NOT_STRIP));
+    ASSERT(tpl2 != tpl);  // different filenames.
+    ASSERT(tpl2 = Template::GetTemplate(filename_a, STRIP_BLANK_LINES));
+    ASSERT(tpl2 != tpl);  // different strip.
+    ASSERT(tpl2 = Template::GetTemplate(filename_b, STRIP_BLANK_LINES));
+    ASSERT(tpl2 != tpl);  // different filenames and strip.
+    ASSERT(tpl2 = Template::GetTemplate(filename_a, DO_NOT_STRIP));
+    ASSERT(tpl2 == tpl);  // same filename and strip.
+
+    // Test mixing standard and auto-escape mode.
+    ASSERT(tpl = Template::GetTemplate(filename_a, DO_NOT_STRIP));
+    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(filename_a, DO_NOT_STRIP,
+                                                        TC_HTML));
+    ASSERT(tpl2 != tpl);  // different mode.
+
+    // Tests with auto-escape mode.
+    ASSERT(tpl = Template::GetTemplateWithAutoEscaping(filename_a, DO_NOT_STRIP,
+                                                       TC_HTML));
+    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(filename_b, DO_NOT_STRIP,
+                                                        TC_HTML));
+    ASSERT(tpl2 != tpl);  // different filenames.
+    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(filename_a,
+                                                        STRIP_BLANK_LINES,
+                                                        TC_HTML));
+    ASSERT(tpl2 != tpl);  // different strip.
+    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(filename_a, DO_NOT_STRIP,
+                                                        TC_JS));
+    ASSERT(tpl2 != tpl);  // different context.
+    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(filename_a, DO_NOT_STRIP,
+                                                        TC_HTML));
+    ASSERT(tpl2 == tpl);  // same filename and strip and context.
+  }
+
   // Tests that the various strip values all do the expected thing.
   static void TestStrip() {
     TemplateDictionary dict("dict");
@@ -892,6 +1003,364 @@ class TemplateUnittest {
     ASSERT(missing.size() == 2);
   }
 
+  // This test is not "end-to-end", it doesn't use a dictionary
+  // and only outputs what the template system thinks is the
+  // correct modifier for variables.
+  static void TestCorrectModifiersForAutoEscape() {
+    string text, expected_out;
+
+    // template with no variable, nothing to emit.
+    text = "Static template.";
+    AssertCorrectModifiers(TC_HTML, text, "");
+
+    // Simple templates with one variable substitution.
+
+    // 1. No in-template modifiers. Auto Escaper sets correct ones.
+    text = "Hello {{USER}}";
+    AssertCorrectModifiers(TC_HTML, text, "USER:h\n");
+
+    // Complete URLs in different attributes that take URLs.
+    text = "<a href=\"{{URL}}\">bla</a>";
+    AssertCorrectModifiers(TC_HTML, text, "URL:U=html\n");
+    text = "<script src=\"{{URL}}\"></script>";
+    AssertCorrectModifiers(TC_HTML, text, "URL:U=html\n");
+    text = "<img src=\"{{URL}}\">";
+    AssertCorrectModifiers(TC_HTML, text, "URL:U=html\n");
+    // URL fragment only so just html_escape.
+    text = "<img src=\"/bla?q={{QUERY}}\">";
+    AssertCorrectModifiers(TC_HTML, text, "QUERY:h\n");
+    // URL fragment not quoted, so url_escape.
+    text = "<img src=/bla?q={{QUERY}}>";
+    AssertCorrectModifiers(TC_HTML, text, "QUERY:u\n");
+
+    text = "<br class=\"{{CLASS}}\">";
+    AssertCorrectModifiers(TC_HTML, text, "CLASS:h\n");
+    text = "<br class={{CLASS}}>";
+    AssertCorrectModifiers(TC_HTML, text, "CLASS:H=attribute\n");
+    text = "<br {{CLASS}}>";   // CLASS here is name/value pair.
+    AssertCorrectModifiers(TC_HTML, text, "CLASS:H=attribute\n");
+    text = "<br style=\"display:{{DISPLAY}}\">";   // Style attribute.
+    AssertCorrectModifiers(TC_HTML, text, "DISPLAY:c\n");
+
+    // onMouseEvent and onKeyUp accept javascript.
+    text = "<a href=\"url\" onkeyup=\"doX('{{ID}}');\">";  // ID quoted
+    AssertCorrectModifiers(TC_HTML, text, "ID:j\n");
+    text = "<a href=\"url\" onclick=\"doX({{ID}});\">";    // ID not quoted
+    AssertCorrectModifiers(TC_HTML, text, "ID:J=number\n");
+    text = "<a href=\"url\" onclick=\"'{{ID}}'\">";        // not common
+    AssertCorrectModifiers(TC_HTML, text, "ID:j\n");
+    // If ID is javascript code, J=number  will break it, for good and bad.
+    text = "<a href=\"url\" onclick=\"{{ID}}\">";
+    AssertCorrectModifiers(TC_HTML, text, "ID:J=number\n");
+
+    // Target just needs html escaping.
+    text = "<a href=\"url\" target=\"{{TARGET}}\">";
+    AssertCorrectModifiers(TC_HTML, text, "TARGET:h\n");
+
+    // Test a parsing corner case which uses TemplateDirective
+    // call in the parser to change state properly. To reproduce
+    // both variables should be unquoted and the first should
+    // have no value except the variable substitution.
+    text = "<img class={{CLASS}} src=/bla?q={{QUERY}}>";
+    AssertCorrectModifiers(TC_HTML, text, "CLASS:H=attribute\nQUERY:u\n");
+
+    // TODO(jad): Once we have a fix for it in code, fix me.
+    // Javascript URL is not properly supported, we currently
+    // apply :h which is not sufficient.
+    text = "<a href=\"javascript:foo('{{VAR}}')>bla</a>";
+    AssertCorrectModifiers(TC_HTML, text, "VAR:h\n");
+
+    // Special handling for BI_SPACE and BI_NEWLINE.
+    text = "{{BI_SPACE}}";
+    AssertCorrectModifiers(TC_HTML, text, "BI_SPACE\n");      // Untouched.
+    text = "{{BI_NEWLINE}}";
+    AssertCorrectModifiers(TC_HTML, text, "BI_NEWLINE\n");    // Untouched.
+    // Check that the parser is parsing BI_SPACE, if not, it would have failed.
+    text = "<a href=/bla{{BI_SPACE}}style=\"{{VAR}}\">text</a>";
+    AssertCorrectModifiers(TC_HTML, text, "BI_SPACE\nVAR:c\n");
+
+    // Special handling for TC_NONE. No auto-escaping.
+    text = "Hello {{USER}}";
+    AssertCorrectModifiers(TC_NONE, text, "USER\n");
+
+    // XML and JSON modes.
+    text = "<PARAM name=\"{{VAL}}\">{{DATA}}";
+    AssertCorrectModifiers(TC_XML, text, "VAL:xml_escape\nDATA:xml_escape\n");
+    text = "{ x = \"{{VAL}}\"}";
+    AssertCorrectModifiers(TC_JSON, text, "VAL:j\n");
+
+    // 2. Escaping modifiers were set, handle them.
+
+    // 2a: Modifier :none is honored whether the escaping is correct or not.
+    text = "Hello {{USER:none}}";                   // :none on its own.
+    AssertCorrectModifiers(TC_HTML, text, "USER:none\n");
+    text = "Hello {{USER:h:none}}";                 // correct escaping.
+    AssertCorrectModifiers(TC_HTML, text, "USER:h:none\n");
+    text = "Hello {{USER:j:none}}";                 // incorrect escaping.
+    AssertCorrectModifiers(TC_HTML, text, "USER:j:none\n");
+    text = "<a href=\"url\" onkeyup=\"doX('{{ID:none}}');\">";
+    AssertCorrectModifiers(TC_HTML, text, "ID:none\n");
+
+    // 2b: Correct modifiers, nothing to change.
+    text = "Hello {{USER:h}}";
+    AssertCorrectModifiers(TC_HTML, text, "USER:h\n");
+    text = "Hello {{USER:h:j}}";   // Extra :j, honor it.
+    AssertCorrectModifiers(TC_HTML, text, "USER:h:j\n");
+    text = "<a href=\"{{URL:U=html}}\">bla</a>";
+    AssertCorrectModifiers(TC_HTML, text, "URL:U=html\n");
+    text = "<a href=\"/bla?q={{QUERY:h}}\">bla</a>";  // :h is valid.
+    AssertCorrectModifiers(TC_HTML, text, "QUERY:h\n");
+    text = "<a href=\"/bla?q={{QUERY:u}}\">bla</a>";  // so is :u.
+    AssertCorrectModifiers(TC_HTML, text, "QUERY:u\n");
+    text = "<a href=\"url\" onclick=\"doX('{{ID:j}}');\">";
+    AssertCorrectModifiers(TC_HTML, text, "ID:j\n");
+    text = "<a href=\"url\" onclick=\"doX({{ID:J=number}});\">";
+    AssertCorrectModifiers(TC_HTML, text, "ID:J=number\n");
+
+    // 2c: Incorrect modifiers, add our own.
+    text = "Hello {{USER:j}}";                          // Missing :h
+    AssertCorrectModifiers(TC_HTML, text, "USER:j:h\n");
+    text = "Hello {{USER:c:c:c:c:c:j}}";                // Still missing :h
+    AssertCorrectModifiers(TC_HTML, text, "USER:c:c:c:c:c:j:h\n");
+    text = "<script>var a = \"{{VAR:h}}\";</script>";   // Missing :j
+    AssertCorrectModifiers(TC_HTML, text, "VAR:h:j\n");
+    text = "<script>var a = \"{{VAR:j:h:j}}\";</script>";   // Extra :h:j
+    AssertCorrectModifiers(TC_HTML, text, "VAR:j:h:j\n");
+    text = "<a href=\"url\" onclick=\"doX({{ID:j}});\">";   // Unquoted
+    AssertCorrectModifiers(TC_HTML, text, "ID:j:J=number\n");
+
+    // 2d: Custom modifiers are maintained.
+    text = "Hello {{USER:x-bla}}";                  // Missing :h
+    AssertCorrectModifiers(TC_HTML, text, "USER:x-bla:h\n");
+    text = "Hello {{USER:x-bla:h}}";                // Correct, accept it.
+    AssertCorrectModifiers(TC_HTML, text, "USER:x-bla:h\n");
+    text = "Hello {{USER:x-bla:x-foo}}";            // Missing :h
+    AssertCorrectModifiers(TC_HTML, text, "USER:x-bla:x-foo:h\n");
+    text = "Hello {{USER:x-bla:none}}";             // Complete due to :none
+    AssertCorrectModifiers(TC_HTML, text, "USER:x-bla:none\n");
+    text = "Hello {{USER:h:x-bla}}";                // Still missing :h.
+    AssertCorrectModifiers(TC_HTML, text, "USER:h:x-bla:h\n");
+    text = "Hello {{USER:x-bla:h:x-foo}}";          // Still missing :h
+    AssertCorrectModifiers(TC_HTML, text, "USER:x-bla:h:x-foo:h\n");
+    text = "Hello {{USER:x-bla:h:x-foo:h}}";        // Valid, accept it.
+    AssertCorrectModifiers(TC_HTML, text, "USER:x-bla:h:x-foo:h\n");
+
+    // 2e: Equivalent modifiers are honored. All HTML Escapes.
+    text = "Hello {{USER:p}}";
+    AssertCorrectModifiers(TC_HTML, text, "USER:p\n");
+    text = "Hello {{USER:H=attribute}}";
+    AssertCorrectModifiers(TC_HTML, text, "USER:H=attribute\n");
+    text = "Hello {{USER:H=snippet}}";
+    AssertCorrectModifiers(TC_HTML, text, "USER:H=snippet\n");
+    text = "Hello {{USER:H=pre}}";
+    AssertCorrectModifiers(TC_HTML, text, "USER:H=pre\n");
+    // All URL + HTML Escapes.
+    text = "<a href=\"{{URL:H=url}}\">bla</a>";
+    AssertCorrectModifiers(TC_HTML, text, "URL:H=url\n");
+    text = "<a href=\"{{URL:U=html}}\">bla</a>";
+    AssertCorrectModifiers(TC_HTML, text, "URL:U=html\n");
+
+    // 2f: Initialize template in Javascript Context.
+    text = "var a = '{{VAR}}'";                     // Escaping not given.
+    AssertCorrectModifiers(TC_JS, text, "VAR:j\n");
+    text = "var a = '{{VAR:none}}'";                // Variable safe.
+    AssertCorrectModifiers(TC_JS, text, "VAR:none\n");
+    text = "var a = '{{VAR:j}}'";                   // Escaping correct.
+    AssertCorrectModifiers(TC_JS, text, "VAR:j\n");
+    text = "var a = '{{VAR:h}}'";                   // Escaping incorrect.
+    AssertCorrectModifiers(TC_JS, text, "VAR:h:j\n");
+    text = "var a = '{{VAR:J=number}}'";            // Not considered equiv.
+    AssertCorrectModifiers(TC_JS, text, "VAR:J=number:j\n");
+
+    // 2g: Honor any modifiers for BI_SPACE and BI_NEWLINE.
+    text = "{{BI_NEWLINE:j}}";     // An invalid modifier for the context.
+    AssertCorrectModifiers(TC_HTML, text, "BI_NEWLINE:j\n");
+    text = "{{BI_SPACE:h}}";       // An otherwise valid modifier.
+    AssertCorrectModifiers(TC_HTML, text, "BI_SPACE:h\n");
+    text = "{{BI_SPACE:x-bla}}";   // Also support custom modifiers.
+    AssertCorrectModifiers(TC_HTML, text, "BI_SPACE:x-bla\n");
+
+    // 2h: In TC_NONE context, don't touch modifiers.
+    text = "Hello {{USER:h}}";
+    AssertCorrectModifiers(TC_NONE, text, "USER:h\n");
+    text = "Hello {{USER:j}}";
+    AssertCorrectModifiers(TC_NONE, text, "USER:j\n");
+    text = "Hello {{USER:x-bla:none}}";
+    AssertCorrectModifiers(TC_NONE, text, "USER:x-bla:none\n");
+
+    // 2i: TC_XML and TC_JSON
+    text = "<PARAM name=\"{{VAL:xml_escape}}\">";   // Correct escaping
+    AssertCorrectModifiers(TC_XML, text, "VAL:xml_escape\n");
+    text = "<PARAM name=\"{{VAL:H=attribute}}\">";   // XSS equivalent
+    AssertCorrectModifiers(TC_XML, text, "VAL:H=attribute\n");
+    text = "<PARAM name=\"{{VAL:h}}\">";   // XSS equivalent
+    AssertCorrectModifiers(TC_XML, text, "VAL:h\n");
+    text = "<PARAM name=\"{{VAL:H=pre}}\">";   // Not XSS equivalent
+    AssertCorrectModifiers(TC_XML, text, "VAL:H=pre:xml_escape\n");
+    text = "<PARAM name=\"{{VAL:c}}\">";   // Not XSS equivalent
+    AssertCorrectModifiers(TC_XML, text, "VAL:c:xml_escape\n");
+    text = "{user={{USER:j}}";   // Correct escaping
+    AssertCorrectModifiers(TC_JSON, text, "USER:j\n");
+    text = "{user={{USER:h}}";   // Not XSS equivalent
+    AssertCorrectModifiers(TC_JSON, text, "USER:h:j\n");
+
+    // 3. Larger test with close to every escaping case.
+
+    text = "<h1>{{TITLE}}</h1>\n"
+        "<img src=\"{{IMG_URL}}\">\n"
+        "<form action=\"/search\">\n"
+        "  <input name=\"hl\" value={{HL}}>\n"
+        "  <input name=\"m\" value=\"{{FORM_MSG}}\">\n"
+        "</form>\n"
+        "<div style=\"background:{{BG_COLOR}}\">\n"
+        "</div>\n"
+        "<script>\n"
+        "  var msg_text = '{{MSG_TEXT}}';\n"
+        "</script>\n"
+        "<a href=\"url\" onmouseover=\"'{{MOUSE}}'\">bla</a>\n"
+        "Goodbye friend {{USER}}!\n";
+    expected_out = "TITLE:h\n"
+        "IMG_URL:U=html\n"
+        "HL:H=attribute\n"
+        "FORM_MSG:h\n"
+        "BG_COLOR:c\n"
+        "MSG_TEXT:j\n"
+        "MOUSE:j\n"   // :j also escapes html entities
+        "USER:h\n";
+    AssertCorrectModifiers(TC_HTML, text, expected_out);
+  }
+
+  // More "end-to-end" test to ensure that variables are
+  // escaped as expected with auto-escape mode enabled.
+  // Obviously there is a lot more we can test.
+  static void TestVariableWithAutoEscape() {
+    string text, expected_out;
+    TemplateDictionary dict("dict");
+    string good_url("http://www.google.com/");
+    string bad_url("javascript:alert();");
+
+    text = "hi {{VAR}} lo";
+    dict.SetValue("VAR", "<bad>yo");
+    AssertCorrectEscaping(TC_HTML, dict, text, "hi &lt;bad&gt;yo lo");
+
+    text = "<a href=\"{{URL}}\">bla</a>";
+    dict.SetValue("URL", good_url);
+    expected_out = "<a href=\"" + good_url + "\">bla</a>";
+    AssertCorrectEscaping(TC_HTML, dict, text, expected_out);
+    dict.SetValue("URL", bad_url);
+    expected_out = "<a href=\"#\">bla</a>";
+    AssertCorrectEscaping(TC_HTML, dict, text, expected_out);
+
+    text = "<br style=\"display:{{DISPLAY}}\">";
+    dict.SetValue("DISPLAY", "none");
+    expected_out = "<br style=\"display:none\">";
+    AssertCorrectEscaping(TC_HTML, dict, text, expected_out);
+    // Bad characters are simply removed in CleanseCss.
+    dict.SetValue("URL", "!#none_ ");
+    expected_out = "<br style=\"display:none\">";
+    AssertCorrectEscaping(TC_HTML, dict, text, expected_out);
+
+    text = "<a href=\"url\" onkeyup=\"'{{EVENT}}'\">";
+    dict.SetValue("EVENT", "safe");
+    expected_out = "<a href=\"url\" onkeyup=\"'safe'\">";
+    AssertCorrectEscaping(TC_HTML, dict, text, expected_out);
+    dict.SetValue("EVENT", "f = 'y';");
+    expected_out = "<a href=\"url\" onkeyup=\"'f \\x3d \\x27y\\x27;'\">";
+
+    // Check special handling of BI_SPACE and BI_NEWLINE.
+    text = "Hello\n{{BI_SPACE}}bla{{BI_NEWLINE}}foo.";
+    expected_out = "Hello bla\nfoo.";
+    AssertCorrectEscaping(TC_HTML, dict, text, expected_out);
+
+    // TC_NONE, no escaping done.
+    text = "hi {{VAR}} lo";
+    dict.SetValue("VAR", "<bad>yo");
+    AssertCorrectEscaping(TC_NONE, dict, text, "hi <bad>yo lo");
+
+    // TC_XML and TC_JSON
+    text = "<Q>{{DATA}}</Q>";
+    dict.SetValue("DATA", "good-data");
+    AssertCorrectEscaping(TC_XML, dict, text, "<Q>good-data</Q>");
+    dict.SetValue("DATA", "<BAD>FOO</BAD>");
+    AssertCorrectEscaping(TC_XML, dict, text,
+                          "<Q>&lt;BAD&gt;FOO&lt;/BAD&gt;</Q>");
+    text = "{user = \"{{USER}}\"}";
+    dict.SetValue("USER", "good-user");
+    AssertCorrectEscaping(TC_JSON, dict, text, "{user = \"good-user\"}");
+    dict.SetValue("USER", "evil'<>\"");
+    AssertCorrectEscaping(TC_JSON, dict, text,
+                          "{user = \"evil\\x27\\x3c\\x3e\\x22\"}");
+  }
+
+  // Basic test that auto-escaping continues to work on an included
+  // template.
+  static void TestIncludeWithAutoEscape() {
+    const string url = "http://www.google.com";
+    const string user = "foo";
+    const string owner = "webmaster";
+
+    // Create a template with one included template.
+    string top_text = "Hi {{>INC}}<p>Yours, truly: {{OWNER}}";
+    string sub_text = "{{USER}}; <a href=\"{{URL}}\">bla</a>";
+    Template *tpl = StringToTemplateWithAutoEscaping(top_text,
+                                                     STRIP_WHITESPACE,
+                                                     TC_HTML);
+    string incname = StringToTemplateFile(sub_text);
+    TemplateDictionary dict("dict");
+    TemplateDictionary* sub_dict = dict.AddIncludeDictionary("INC");
+    sub_dict->SetFilename(incname);
+
+    // Fill both dictionaries with good values.
+    dict.SetValue("OWNER", owner);
+    sub_dict->SetValue("USER", user);
+    sub_dict->SetValue("URL", url);
+
+    string expected = "Hi " + user + "; <a href=\"" +
+        url + "\">bla</a><p>Yours, truly: " + owner;
+    AssertExpandIs(tpl, &dict, expected, true);
+
+    // Repeat with bad values.
+    dict.SetValue("OWNER", "<");
+    sub_dict->SetValue("USER", "&>");
+    sub_dict->SetValue("URL", "javascript:alert(1)");
+
+    expected = "Hi &amp;&gt;; <a href=\"#\">bla</a><p>Yours, truly: &lt;";
+    AssertExpandIs(tpl, &dict, expected, true);
+
+    // Test modifiers at the template-include level.
+    // The whole included template (static and dynamic data) will
+    // be html escaped during expansion.
+    string top_text2 = "Hi {{>INC:h}}<p>Yours, truly: {{OWNER}}";
+    tpl = StringToTemplateWithAutoEscaping(top_text2, STRIP_WHITESPACE,
+                                           TC_HTML);
+    dict.SetValue("OWNER", "owner");
+    sub_dict->SetValue("USER", "<b>BadUser</b>");
+    sub_dict->SetValue("URL", "http://<>/bad");
+    expected = "Hi "
+        "&lt;b&gt;BadUser&lt;/b&gt;"   // {{USER}} html escaped
+        "; &lt;a href=&quot;"          // <a href=\" html escaped
+        "http://&lt;&gt;/bad"          // {{URL}} html escaped
+        "&quot;&gt;bla&lt;/a&gt;"      // rest of child html escaped
+        "<p>Yours, truly: owner";      // parent template, intact.
+    AssertExpandIs(tpl, &dict, expected, true);
+  }
+
+  // Test that the template initialization fails in auto-escape
+  // mode if the parser failed to parse.
+  static void TestFailedInitWithAutoEscape() {
+    Strip strip = STRIP_WHITESPACE;
+    // Taken from HTML Parser test suite.
+    string bad_html = "<a href='http://www.google.com' ''>\n";
+    ASSERT(NULL == StringToTemplateWithAutoEscaping(bad_html, strip, TC_HTML));
+
+    // Missing quotes around URL, not accepted in URL-taking attributes.
+    bad_html = "<a href={{URL}}>bla</a>";
+    ASSERT(NULL == StringToTemplateWithAutoEscaping(bad_html, strip, TC_HTML));
+
+    // Missing quotes around STYLE, not accepted in style-taking attributes.
+    bad_html = "<div style={{STYLE}}>";
+    ASSERT(NULL == StringToTemplateWithAutoEscaping(bad_html, strip, TC_HTML));
+  }
 };
 
 int main(int argc, char** argv) {
@@ -910,6 +1379,7 @@ int main(int argc, char** argv) {
   TemplateUnittest::TestExpand();
 
   TemplateUnittest::TestGetTemplate();
+  TemplateUnittest::TestTemplateCache();
   TemplateUnittest::TestStrip();
   TemplateUnittest::TestReloadIfChanged();
 
@@ -917,6 +1387,11 @@ int main(int argc, char** argv) {
   TemplateUnittest::TestTemplateNamelist();
 
   TemplateUnittest::TestThreadSafety();
+
+  TemplateUnittest::TestCorrectModifiersForAutoEscape();
+  TemplateUnittest::TestVariableWithAutoEscape();
+  TemplateUnittest::TestIncludeWithAutoEscape();
+  TemplateUnittest::TestFailedInitWithAutoEscape();
 
   printf("DONE\n");
   return 0;

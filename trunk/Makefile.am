@@ -41,7 +41,7 @@ docdir = $(prefix)/share/doc/$(PACKAGE)-$(VERSION)
 ## top-level boilerplate files.  Also add a TODO file if you have one.
 dist_doc_DATA = AUTHORS COPYING ChangeLog INSTALL NEWS README README.windows \
 	doc/designstyle.css doc/index.html \
-	doc/howto.html doc/tips.html doc/example.html \
+	doc/howto.html doc/tips.html doc/example.html doc/auto_escape.html \
 	doc/xss_resources.html
 
 ## The libraries (.so's) you want to install
@@ -60,11 +60,14 @@ WINDOWS_PROJECTS = google-ctemplate.sln
 ## TESTS_ENVIRONMENT sets environment variables for when you run unittest,
 ## but it only seems to take effect for *binary* unittests (argh!)
 TESTS =
-check_SCRIPTS = make_tpl_varnames_h_unittest_sh
+check_SCRIPTS = make_tpl_varnames_h_unittest_sh \
+                diff_tpl_auto_escape_unittest_sh
 TESTS_ENVIRONMENT = TEMPLATE_ROOTDIR=$(top_srcdir)
 # Every time you add a unittest to check_SCRIPTS, add it here too
-noinst_SCRIPTS = src/tests/make_tpl_varnames_h_unittest.sh
-
+noinst_SCRIPTS = src/tests/make_tpl_varnames_h_unittest.sh \
+                 src/tests/diff_tpl_auto_escape_unittest.sh
+# Add to this for tests that use data
+TESTDATA =
 
 ## vvvv RULES TO MAKE THE LIBRARIES, BINARIES, AND UNITTESTS
 
@@ -81,7 +84,14 @@ libctemplate_la_SOURCES = $(googleinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
 	src/template_namelist.cc src/template_pathops.cc \
-	src/template_from_string.cc
+	src/template_from_string.cc \
+	src/htmlparser/htmlparser.h src/htmlparser/htmlparser.cc \
+	src/htmlparser/jsparser.h src/htmlparser/jsparser.cc \
+	src/htmlparser/statemachine.h src/htmlparser/statemachine.cc \
+	src/htmlparser/htmlparser_cpp.h
+# These .cc files are #included directly by {html,js}parser.cc
+libctemplate_la_DEPENDENCIES = src/htmlparser/jsparser_fsm.cc \
+	src/htmlparser/htmlparser_fsm.cc
 libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG $(AM_CXXFLAGS)
 libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) -export-symbols-regex $(CTEMPLATE_SYMBOLS)
 libctemplate_la_LIBADD = $(PTHREAD_LIBS)
@@ -90,17 +100,20 @@ libctemplate_la_LIBADD = $(PTHREAD_LIBS)
 # because we use an extra compiler flag.
 lib_LTLIBRARIES += libctemplate_nothreads.la
 libctemplate_nothreads_la_SOURCES = $(libctemplate_la_SOURCES)
+libctemplate_nothreads_la_DEPENDENCIES = $(libctemplate_la_DEPENDENCIES)
 libctemplate_nothreads_la_CXXFLAGS = -DNDEBUG -DNO_THREADS $(AM_CXXFLAGS)
 libctemplate_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_SYMBOLS)
 
 # For our tests, we want versions of these libraries that include asserts.
 noinst_LTLIBRARIES += libctemplate_debug.la
 libctemplate_debug_la_SOURCES = $(libctemplate_la_SOURCES)
+libctemplate_debug_la_DEPENDENCIES = $(libctemplate_la_DEPENDENCIES)
 libctemplate_debug_la_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 libctemplate_debug_la_LDFLAGS = $(libctemplate_la_LDFLAGS)
 libctemplate_debug_la_LIBADD = $(libctemplate_la_LIBADD)
 noinst_LTLIBRARIES += libctemplate_nothreads_debug.la
 libctemplate_nothreads_debug_la_SOURCES = $(libctemplate_nothreads_la_SOURCES)
+libctemplate_nothreads_debug_la_DEPENDENCIES = $(libctemplate_nothreads_la_DEPENDENCIES)
 libctemplate_nothreads_debug_la_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 libctemplate_nothreads_debug_la_LDFLAGS = $(libctemplate_nothreads_la_LDFLAGS)
 
@@ -134,9 +147,29 @@ make_tpl_varnames_h_SOURCES = $(googleinclude_HEADERS) \
 	src/make_tpl_varnames_h.cc
 make_tpl_varnames_h_LDADD = libctemplate_nothreads.la
 
+bin_PROGRAMS += diff_tpl_auto_escape
+WINDOWS_PROJECTS += vsprojects/diff_tpl_auto_escape/diff_tpl_auto_escape.vcproj
+diff_tpl_auto_escape_SOURCES = $(googleinclude_HEADERS) \
+	src/diff_tpl_auto_escape.cc
+diff_tpl_auto_escape_LDADD = libctemplate_nothreads.la
+
 bin_SCRIPTS += src/template-converter
 
 # For each of the tests, we test with and without threads
+
+TESTS += template_test_util_test template_test_util_nothreads_test
+WINDOWS_PROJECTS += vsprojects/template_test_util_test/template_test_util_test.vcproj
+template_test_util_test_SOURCES = src/config_for_unittests.h \
+                                   src/template_dictionary.cc \
+                                   src/tests/template_test_util_test.cc
+template_test_util_test_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
+template_test_util_test_LDFLAGS = $(PTHREAD_CFLAGS)
+template_test_util_test_LDADD = libctemplate_testing.la libctemplate_debug.la \
+                                 $(PTHREAD_LIBS)
+template_test_util_nothreads_test_SOURCES = $(template_test_util_test_SOURCES)
+template_test_util_nothreads_test_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
+template_test_util_nothreads_test_LDADD = libctemplate_testing.la \
+                                          libctemplate_nothreads_debug.la
 
 TESTS += template_dictionary_unittest template_dictionary_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_dictionary_unittest/template_dictionary_unittest.vcproj
@@ -209,11 +242,65 @@ template_regtest_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
 template_nothreads_regtest_SOURCES = $(template_regtest_SOURCES)
 template_nothreads_regtest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_nothreads_regtest_LDADD = libctemplate_nothreads_debug.la
+TESTDATA += \
+   src/tests/template_unittest_test_autoescape_simple.in  \
+   src/tests/template_unittest_test_footer.in  \
+   src/tests/template_unittest_test_html.in  \
+   src/tests/template_unittest_test_invalid1.in  \
+   src/tests/template_unittest_test_invalid2.in  \
+   src/tests/template_unittest_test_modifiers.in  \
+   src/tests/template_unittest_test_nul.in  \
+   src/tests/template_unittest_test_simple.in  \
+   src/tests/template_unittest_test_valid1.in  \
+   src/tests/template_unittest_test_autoescape_simple_dict01.out  \
+   src/tests/template_unittest_test_autoescape_simple_dict02.out  \
+   src/tests/template_unittest_test_autoescape_simple_dict03.out  \
+   src/tests/template_unittest_test_footer_dict01.out  \
+   src/tests/template_unittest_test_footer_dict02.out  \
+   src/tests/template_unittest_test_html_dict01.out  \
+   src/tests/template_unittest_test_html_dict02.out  \
+   src/tests/template_unittest_test_modifiers_dict01.out  \
+   src/tests/template_unittest_test_nul_dict01.out  \
+   src/tests/template_unittest_test_simple_dict01.out  \
+   src/tests/template_unittest_test_simple_dict02.out  \
+   src/tests/template_unittest_test_simple_dict03.out  \
+   src/tests/template_unittest_test_valid1_dict01.out 
+
+TESTS += statemachine_test
+WINDOWS_PROJECTS += vsprojects/statemachine_test/statemachine_test.vcproj
+statemachine_test_SOURCES = src/tests/statemachine_test.c \
+                            src/htmlparser/statemachine.cc
+# We force this to be compiled as C code, just to make sure no c++ snuck
+# into statemachine.cc (only the namespace declaration should be c++).
+statemachine_test_CXXFLAGS = -xc
+
+TESTS += htmlparser_test htmlparser_nothreads_test
+WINDOWS_PROJECTS += vsprojects/htmlparser_test/htmlparser_test.vcproj
+htmlparser_test_SOURCES = src/tests/htmlparser_test.cc
+htmlparser_test_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
+htmlparser_test_LDFLAGS = $(PTHREAD_CFLAGS)
+htmlparser_test_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
+htmlparser_nothreads_test_SOURCES = $(htmlparser_test_SOURCES)
+htmlparser_nothreads_test_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
+htmlparser_nothreads_test_LDADD = libctemplate_nothreads_debug.la
+TESTDATA += \
+   src/tests/htmlparser_testdata/cdata.html \
+   src/tests/htmlparser_testdata/comments.html \
+   src/tests/htmlparser_testdata/javascript_attribute.html \
+   src/tests/htmlparser_testdata/javascript_block.html \
+   src/tests/htmlparser_testdata/reset.html \
+   src/tests/htmlparser_testdata/simple.html \
+   src/tests/htmlparser_testdata/tags.html
 
 make_tpl_varnames_h_unittest_sh: $(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
                                  make_tpl_varnames_h
 	$(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
 	   $(top_builddir)/make_tpl_varnames_h /tmp/$@_dir
+
+diff_tpl_auto_escape_unittest_sh: $(top_srcdir)/src/tests/diff_tpl_auto_escape_unittest.sh \
+                                  diff_tpl_auto_escape
+	$(top_srcdir)/src/tests/diff_tpl_auto_escape_unittest.sh \
+	   $(top_builddir)/diff_tpl_auto_escape /tmp/$@_dir
 
 ## ^^^^ END OF RULES TO MAKE THE LIBRARIES, BINARIES, AND UNITTESTS
 
@@ -236,6 +323,11 @@ dist-hook:
 ## If you're using libtool, add 'libtool' here.  Also add this rule:
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
+# In addition to the normal stuff, we include all the windows-specific
+# code, and also the code used to generate the html-parser fsm files.
 EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb \
-	$(SCRIPTS) libtool \
+	$(SCRIPTS) $(TESTDATA) libtool \
+	src/htmlparser/README src/htmlparser/generate_fsm.py \
+	src/htmlparser/htmlparser_fsm.config src/htmlparser/htmlparser_fsm.cc \
+	src/htmlparser/jsparser_fsm.config src/htmlparser/jsparser_fsm.cc \
 	src/windows $(WINDOWS_PROJECTS) src/solaris/libstdc++.la contrib

@@ -35,6 +35,7 @@
 
 #include "base/mutex.h"     // This must go first so we get _XOPEN_SOURCE
 #include <assert.h>
+#include <stdio.h>          // for fwrite, fflush
 #include <stdlib.h>
 #include <errno.h>
 #include <ctype.h>
@@ -49,9 +50,11 @@
 #include <iomanip>          // for indenting in Dump()
 #include <string>
 #include <list>
+#include <iterator>
 #include <vector>
 #include <utility>          // for pair
 #include HASH_MAP_H         // defined in config.h
+#include "htmlparser/htmlparser_cpp.h"
 #include <google/template_pathops.h>
 #include <google/template.h>
 #include <google/template_modifiers.h>
@@ -74,6 +77,7 @@ using std::vector;
 using std::pair;
 using HASH_NAMESPACE::hash_map;
 using HASH_NAMESPACE::hash;
+using HTMLPARSER_NAMESPACE::HtmlParser;
 
 const int kIndent = 2;            // num spaces to indent each level
 
@@ -94,8 +98,14 @@ static Mutex g_header_mutex;
 // depend on any other global constructors running first, and the
 // variable is used in only one place below, always after main() has
 // started.
+// It is ok for this modifier to be in XssClass XSS_WEB_STANDARD because
+// it only adds indentation characters - typically whitespace - iff these
+// are already present in the text. If such characters were XSS-harmful
+// in a given context, they would have already been escaped or replaced
+// by earlier escaping such as H=attribute.
 static const template_modifiers::ModifierInfo g_prefix_line_info(
-    "", '\0', &template_modifiers::prefix_line);
+    "", '\0', template_modifiers::XSS_WEB_STANDARD,
+    &template_modifiers::prefix_line);
 
 const char * const kDefaultTemplateDirectory = ctemplate::kCWD;   // "./"
 // Note this name is syntactically impossible for a user to accidentally use.
@@ -107,23 +117,23 @@ class TemplateCacheHash {
  public:
   hash<const char *> string_hash_;
   TemplateCacheHash() : string_hash_() {}
-  size_t operator()(const pair<string, Strip>& p) const {
+  size_t operator()(const pair<string, int>& p) const {
     // Using + here is silly, but should work ok in practice
-    return string_hash_(p.first.c_str()) + static_cast<int>(p.second);
+    return string_hash_(p.first.c_str()) + p.second;
   }
-  // Less operator for MSVC's hash containers.  We make Strip be the
+  // Less operator for MSVC's hash containers.  We make int be the
   // primary key, unintuitively, because it's a bit faster.
-  bool operator()(const pair<string, Strip>& a,
-                  const pair<string, Strip>& b) const {
+  bool operator()(const pair<string, int>& a,
+                  const pair<string, int>& b) const {
     return (a.second == b.second
             ? a.first < b.first
-            : static_cast<int>(a.second) < static_cast<int>(b.second));
+            : a.second < b.second);
   }
   // These two public members are required by msvc.  4 and 8 are defaults.
   static const size_t bucket_size = 4;
   static const size_t min_buckets = 8;
 };
-typedef hash_map<pair<string, Strip>, Template*, TemplateCacheHash>
+typedef hash_map<pair<string, int>, Template*, TemplateCacheHash>
   TemplateCache;
 static TemplateCache *g_template_cache;
 
@@ -135,9 +145,379 @@ static int kVerbosity = 0;   // you can change this by hand to get vlogs
 #define LOG_TEMPLATE_NAME(severity, template) \
    LOG(severity) << "Template " << template->template_file() << ": "
 
-typedef vector< pair<const template_modifiers::ModifierInfo*, string> >
-  ModifierAndNonces;
+#define LOG_AUTO_ESCAPE_ERROR(error_msg, my_template) \
+      LOG_TEMPLATE_NAME(ERROR, my_template); \
+      LOG(ERROR) << "Auto-Escape: " << error_msg << endl;
 
+// We are in auto-escape mode.
+#define AUTO_ESCAPE_MODE(context) ((context) != TC_MANUAL)
+
+// Auto-Escape contexts which utilize the HTML Parser.
+#define AUTO_ESCAPE_PARSING_CONTEXT(context) \
+  ((context) == TC_HTML || (context) == TC_JS || (context) == TC_CSS)
+
+typedef pair<const template_modifiers::ModifierInfo*, string> ModifierAndValue;
+
+// ----------------------------------------------------------------------
+// AutoModifyDirective
+// AddModval()
+// InitializeGlobalModifiers()
+// FilenameValidForContext()
+// GetTemplateContext()
+// GetModifierForContext()
+// FindLongestMatch()
+// PrettyPrintModifiers()
+// CheckInHTMLProper()
+//    Static methods for the auto-escape mode specifically.
+
+// For escaping variables under the auto-escape mode:
+// Each directive below maps to a distinct sequence of
+// escaping directives (i.e a vector<ModifierAndValue>) applied
+// to a variable during run-time substitution.
+// The directives are stored in a global array (g_mods_ae)
+// initialized under lock in InitializeGlobalModifiers.
+enum AutoModifyDirective {
+  AM_DIR_EMPTY,   // When no directives are needed.
+  AM_DIR_HTML,
+  AM_DIR_HTML_UNQUOTED,
+  AM_DIR_JS,
+  AM_DIR_JS_NUMBER,
+  AM_DIR_URL_HTML,
+  AM_DIR_URL_QUERY,
+  AM_DIR_STYLE,
+  AM_DIR_XML,
+  AM_DIR_NULL,
+};
+static vector<ModifierAndValue>* g_mods_ae[AM_DIR_NULL];
+
+// Convenience wrapper when initializing the global ModifiersAndNonces pointer
+// corresponding to the directive given.
+static void AddModval(AutoModifyDirective dir, const char *modval_name,
+                      const string& value) {
+  const template_modifiers::ModifierInfo *modval;
+  modval = template_modifiers::FindModifier(modval_name, strlen(modval_name),
+                                            value.c_str(), value.length());
+  assert(modval);
+  g_mods_ae[dir]->push_back(
+      pair<const template_modifiers::ModifierInfo*, string>(modval, value));
+}
+
+// Performs a one-time initialization of the global ModifierAndValue vector
+// (g_mods_ae) required for the auto-escape mode.
+// . Only called under a mutex lock from AssureGlobalsInitialized.
+// . Can assert if the modifiers in template_modifiers.cc were somehow
+//   removed (which would be a bug there) or if called multiple times.
+static void InitializeGlobalModifiers() {
+  for (int i = 0; i < AM_DIR_NULL; i++) {
+    assert(g_mods_ae[i] == NULL);
+    g_mods_ae[i] = new vector<ModifierAndValue>();
+  }
+  AddModval(AM_DIR_HTML, "html_escape", "");
+  AddModval(AM_DIR_HTML_UNQUOTED, "html_escape_with_arg", "=attribute");
+  AddModval(AM_DIR_JS, "javascript_escape", "");
+  AddModval(AM_DIR_JS_NUMBER, "javascript_escape_with_arg", "=number");
+  AddModval(AM_DIR_URL_HTML, "url_escape_with_arg", "=html");
+  AddModval(AM_DIR_URL_QUERY, "url_query_escape", "");
+  // TODO(jad): cleanse_css may be too strict for names of style attributes.
+  AddModval(AM_DIR_STYLE, "cleanse_css", "");
+  AddModval(AM_DIR_XML, "xml_escape", "");
+}
+
+// Perfoms matching of filename against the TemplateContext
+// and warns in the log on mismatch using "unwritten" filename
+// conventions below for templates in our codebase:
+//   1. If filename contains "css", "stylesheet" or "style"
+//      check that it has type TC_CSS.
+//   2. If filename contains "js" or "javascript" check that
+//      it has type TC_JS.
+// Returns false if there was a mismatch although currently
+// we ignore it and just rely on the LOG(WARNING) in the logs.
+static bool FilenameValidForContext(const string& filename,
+                                    TemplateContext context) {
+  // TODO(jad): Improve by also checking for "word" boundaries.
+  if ( filename.find("css") != string::npos ||
+       filename.find("stylesheet") != string::npos ||
+       filename.find("style") != string::npos) {
+    if (context != TC_CSS) {
+      LOG(WARNING) << "Template filename " << filename
+                   << " indicates CSS but given TemplateContext"
+                   << " was not TC_CSS." << endl;
+      return false;
+    }
+  } else if (filename.find("js") != string::npos ||
+             filename.find("javascript") != string::npos) {
+    if (context != TC_JS) {
+      LOG(WARNING) << "Template filename " << filename
+                   << " indicates javascript but given TemplateContext"
+                   << " was not TC_JS." << endl;
+      return false;
+    }
+  }
+  return true;
+}
+
+// In Auto-Escape mode, when we encounter a template-include directive,
+// we need to determine the type of the template to include to
+// give as an argument to the GetTemplate factory method. This method
+// determines that based on the initial context of the template it
+// is being included in and where applicable the state of the parser.
+// Only TC_HTML and TC_JS require a parser to determine context,
+// for all other contexts, the context is the same as the initial one
+// since no context transitions are possible.
+static TemplateContext GetTemplateContext(TemplateContext my_context,
+                                          HtmlParser *htmlparser) {
+  if (my_context == TC_HTML || my_context == TC_JS) {
+    assert(htmlparser);
+    if (htmlparser->InJavascript())
+      return TC_JS;
+    return TC_HTML;
+  }
+  return my_context;
+}
+
+// Based on the state of the parser, determines the appropriate escaping
+// directive and returns a pointer to the corresponding
+// global ModifierAndValue vector. Called when a variable template node
+// is traversed.
+// Returns NULL if there is no suitable modifier for that context in
+// which the case the caller is expected to fail the template initialization.
+static const vector<ModifierAndValue>*
+GetModifierForContext(TemplateContext my_context, HtmlParser *htmlparser,
+                      const Template* my_template) {
+  assert(AUTO_ESCAPE_MODE(my_context));
+
+  // In these states, the initial template context is sufficient
+  // to determine the context. There are no state transitions.
+  if (my_context == TC_NONE)
+    return g_mods_ae[AM_DIR_EMPTY];
+  else if (my_context == TC_XML)
+    return g_mods_ae[AM_DIR_XML];
+  else if (my_context == TC_JSON)
+    return g_mods_ae[AM_DIR_JS];
+
+  // Remaining states all have a parser.
+  assert(AUTO_ESCAPE_PARSING_CONTEXT(my_context));
+  assert(htmlparser);
+
+  // Two cases of being inside javascript:
+  // 1. Inside raw javascript (within a <script> tag). If the value
+  //    is quoted we apply javascript_escape, if not we have to coerce
+  //    it to a safe value due to the risk of javascript code execution
+  //    hence apply :J=number. If arbitrary code needs to be inserted
+  //    at run-time, the developer must use :none.
+  // 2. In the value of an attribute that takes javascript such
+  //    as onmouseevent in '<a href="someUrl" onmousevent="{{EVENT}}">'.
+  //    That will be covered in the STATE_VALUE state logic below.
+  if (htmlparser->InJavascript() &&
+      htmlparser->state() != HtmlParser::STATE_VALUE) {
+    if (htmlparser->IsJavascriptQuoted())
+      return g_mods_ae[AM_DIR_JS];
+    else
+      return g_mods_ae[AM_DIR_JS_NUMBER];
+  }
+  switch (htmlparser->state()) {
+    case HtmlParser::STATE_VALUE:{
+      AutoModifyDirective dir = AM_DIR_HTML;        // Initial value arbitrary.
+      string attribute_name = htmlparser->attribute();
+      switch (htmlparser->AttributeType()) {
+        case HtmlParser::ATTR_URI:
+          // Case 1: The URL is quoted:
+          // . Apply :U=html if it is a complete URL or :h if it is a fragment.
+          // Case 2: The URL is not quoted:
+          // .  If it is a complete URL, we have no safe modifiers that
+          //   won't break it so we have to fail.
+          // .  If it is a URL fragment, then :u is safe and not likely to
+          //   break the URL.
+          if (!htmlparser->IsAttributeQuoted()) {
+            if (htmlparser->ValueIndex() == 0) {   // Complete URL.
+              string error_msg("Value of URL attribute \"" + attribute_name +
+                               "\" must be enclosed in quotes.");
+              LOG_AUTO_ESCAPE_ERROR(error_msg, my_template);
+              return NULL;
+            } else {                                // URL fragment.
+              dir = AM_DIR_URL_QUERY;
+            }
+          } else {
+            // Only validate the URL if we have a complete URL,
+            // otherwise simply html_escape.
+            if (htmlparser->ValueIndex() == 0)
+              dir = AM_DIR_URL_HTML;                // Complete URL.
+            else
+              dir = AM_DIR_HTML;                    // URL fragment.
+          }
+          break;
+        case HtmlParser::ATTR_REGULAR:
+          // If the value is quoted, simply HTML escape, otherwise
+          // apply stricter escaping using H=attribute.
+          if (htmlparser->IsAttributeQuoted())
+            dir = AM_DIR_HTML;
+          else
+            dir = AM_DIR_HTML_UNQUOTED;
+          break;
+        case HtmlParser::ATTR_STYLE:
+          // If the value is quoted apply :c, otherwise fail.
+          if (htmlparser->IsAttributeQuoted()) {
+            dir = AM_DIR_STYLE;
+          } else {
+            string error_msg("Value of style attribute \"" + attribute_name +
+                             "\" must be enclosed in quotes.");
+            LOG_AUTO_ESCAPE_ERROR(error_msg, my_template);
+            return NULL;
+          }
+          break;
+        case HtmlParser::ATTR_JS:
+          // We require javascript accepting attributes (such as onclick)
+          // to be HTML quoted, otherwise they are vulnerable to
+          // HTML attribute insertion via the use of whitespace.
+          if (!htmlparser->IsAttributeQuoted()) {
+            string error_msg("Value of javascript attribute \"" +
+                             attribute_name + "\" must be enclosed in quotes.");
+            LOG_AUTO_ESCAPE_ERROR(error_msg, my_template);
+            return NULL;
+          }
+          // If the variable is quoted apply javascript_escape otherwise
+          // apply javascript_number which will ensure it is safe against
+          // code injection.
+          // Note: We normally need to HTML escape after javascript escape
+          // but the javascript escape implementation provided makes the
+          // HTML escape redundant so simply javascript escape.
+          if (htmlparser->IsJavascriptQuoted())
+            dir = AM_DIR_JS;
+          else
+            dir = AM_DIR_JS_NUMBER;
+          break;
+        case HtmlParser::ATTR_NONE:
+          assert("We should be in attribute!" == NULL);
+        default:
+          assert("Should not be able to get here." == NULL);
+          return NULL;
+      }
+      // In STATE_VALUE particularly, the parser may get out of sync with
+      // the correct state - that the browser sees - due to the fact that
+      // it does not get to parse run-time content (variables). So we tell
+      // the parser there is content that will be expanded here.
+      // A good example is:
+      //   <a href={{URL}} alt={{NAME}}>
+      // The parser sees <a href= alt=> and interprets 'alt=' to be
+      // the value of href.
+      htmlparser->InsertText();  // Ignore return value.
+      return g_mods_ae[dir];
+    }
+    case HtmlParser::STATE_TAG:{
+      // Apply H=attribute to tag names since they are alphabetic.
+      // Examples of tag names: TITLE, BODY, A and BR.
+      return g_mods_ae[AM_DIR_HTML_UNQUOTED];
+    }
+    case HtmlParser::STATE_ATTR:{
+      // Apply H=attribute to attribute names since they are alphabetic.
+      // Examples of attribute names: HREF, SRC and WIDTH.
+      return g_mods_ae[AM_DIR_HTML_UNQUOTED];
+    }
+    case HtmlParser::STATE_COMMENT:
+    case HtmlParser::STATE_TEXT:{
+      return g_mods_ae[AM_DIR_HTML];
+    }
+    default:{
+      assert("Should not be able to get here." == NULL);
+      return NULL;
+    }
+  }
+  assert("Should not be able to get here." == NULL);
+  return NULL;
+}
+
+// Returns the largest int N indicating how many XSS safe alternative
+// modifiers are in the in-template modifiers already.
+// . If N is equal to the number of modifiers determined by the Auto Escaper,
+//   we have a full match and the in-template modifiers were safe. We leave
+//   them untouched.
+// . Otherwise, N is less (or zero) and we have a partial match (or none).
+//   The in-template modifiers are not XSS safe and need the missing ones,
+//   i.e. those in the auto escape modifiers which are not in the first N.
+//
+// We allow in-template modifiers to have extra modifiers than we deem
+// necessary, for e.g. :j:h when :j would have sufficed. But to make sure
+// these modifiers do not introduce XSS concerns we require that they
+// be in the same XssClass as the modifier we had.
+// For example :h:x-bla is not safe in HTML context because x-bla is
+// in a different XssClass as our :h whereas :h:j would be safe.
+static size_t FindLongestMatch(const vector<ModifierAndValue>& modvals_man,
+                               const vector<ModifierAndValue>& modvals_auto) {
+  if (modvals_auto.empty())
+    return 0;
+
+  // See if modvals_auto is "consistent" with the modifiers that are
+  // already present (modvals_man).  This is true if all the
+  // modifiers in auto also occur in man, and any gaps between them
+  // (if any) are filled by "neutral" modifiers that do not affect
+  // xss-safety. We go through the vectors backwards.
+  // If all of modvals_auto is not consistent, maybe a prefix of it
+  // is; that's better than nothing, since we only need to auto-apply
+  // the suffix that's not already in modvals_man.
+  typedef vector<ModifierAndValue>::const_reverse_iterator ModIterator;
+  for (ModIterator end_of_prefix = modvals_auto.rbegin();
+       end_of_prefix != modvals_auto.rend();
+       ++end_of_prefix) {
+    ModIterator curr_auto = end_of_prefix;
+    ModIterator curr_man = modvals_man.rbegin();
+    while (curr_auto != modvals_auto.rend() &&
+           curr_man != modvals_man.rend()) {
+      if (IsSafeXSSAlternative(*curr_auto->first, *curr_man->first)) {
+        ++curr_auto;
+        ++curr_man;
+      } else if (curr_man->first->xss_class == curr_auto->first->xss_class &&
+                 curr_man->first->xss_class != template_modifiers::XSS_UNIQUE) {
+        ++curr_man;  // Ignore this modifier: it's harmless.
+      } else {
+        break;      // An incompatible modifier; we've failed
+      }
+    }
+    if (curr_auto == modvals_auto.rend())  // got through them all, full match!
+      return curr_auto - end_of_prefix;
+  }
+  return 0;
+}
+
+// Convenience function to dump the (zero or more) modifiers (and values)
+// in the format:
+// :modifier1[=val1][:modifier2][=val2]...
+// If the modifier does not have a short_name, we print its long_name instead.
+// Note that the '=' is the first character of the value when present.
+static string PrettyPrintModifiers(const vector<ModifierAndValue>& modvals) {
+  string out;
+  for (vector<ModifierAndValue>::const_iterator it = modvals.begin();
+       it != modvals.end();  ++it) {
+    out.append(":");
+    if (it->first->short_name)   // short_name is a char.
+      out.append(1, it->first->short_name);
+    else
+      out.append(it->first->long_name);
+    if (!it->second.empty())
+      out.append(it->second.c_str());
+  }
+  return out;
+}
+
+// Checks that the current context - current state of the HTML Parser -
+// indicates we are inside HTML text only. If instead, the parser
+// indicates we are within an HTML comment or in an HTML tag
+// (within the name of the tag, the name or value of an attribute)
+// we log a warning.
+// This is intended to be called when a template is being included
+// because we only support inclusion of templates within HTML text proper.
+// Currently only returns true as we just log the error.
+static bool CheckInHTMLProper(HtmlParser *htmlparser, const string& filename) {
+  assert(htmlparser);
+  if (htmlparser->state() != HtmlParser::STATE_TEXT) {
+    char buf[20];
+    snprintf(buf, sizeof(buf), "%d", htmlparser->state());
+    LOG(WARNING) << "Template filename " << filename
+                 << " ended in a non-expected state " << string(buf)
+                 << ". This may prevent auto-escaping from working correctly."
+                 << endl;
+  }
+  return true;
+}
 
 // ----------------------------------------------------------------------
 // WriteOneHeaderEntry()
@@ -256,17 +636,17 @@ struct TemplateToken {
   TemplateTokenType type;
   const char* text;
   size_t textlen;
-  ModifierAndNonces modifier_plus_values;
+  vector<ModifierAndValue> modvals;
   TemplateToken(TemplateTokenType t, const char* txt, size_t len,
-                const ModifierAndNonces* modval)
+                const vector<ModifierAndValue>* m)
       : type(t), text(txt), textlen(len) {
-    if (modval) modifier_plus_values = *modval;
+    if (m) modvals = *m;
   }
 
   string ToString() const {   // used for debugging (annotations)
     string retval(text, textlen);
-    for (ModifierAndNonces::const_iterator it = modifier_plus_values.begin();
-         it != modifier_plus_values.end();  ++it) {
+    for (vector<ModifierAndValue>::const_iterator it = modvals.begin();
+         it != modvals.end();  ++it) {
       const string& modname = it->first->long_name;
       retval += string(":") + modname;
       if (!it->first->is_registered)
@@ -274,11 +654,50 @@ struct TemplateToken {
     }
     return retval;
   }
+
+  // Updates the correct modifiers for the token (variable or template node)
+  // based on our computed modifiers from the HTML parser context as well
+  // as the in-template modifiers that may have been provided.
+  // If the in-template modifiers are considered safe, we use them
+  // without modification. This could happen in one of two cases:
+  //   1. The token has the ":none" modifier as its last or only modifier.
+  //   2. The escaping modifiers are XSS-equivalent to the ones we computed.
+  //
+  // If the in-template modifiers are not found to be safe, we add
+  // the escaping modifiers we determine missing and issue a warning in the
+  // logs. This is done based on a longest match search between the two
+  // modifiers vectors, refer to comment in FindLongestMatch.
+  void UpdateModifier(const vector<ModifierAndValue>* auto_modvals) {
+    // Common case: no modifiers given in template. Assign our own. No warning.
+    if (modvals.empty()) {
+      modvals = *auto_modvals;
+      return;
+    }
+    // Variable is considered safe, do not touch.
+    if (modvals.back().first->long_name == "none") {
+      return;
+    }
+
+    size_t longest_match = FindLongestMatch(modvals, *auto_modvals);
+    if (longest_match == auto_modvals->size()) {
+      return;             // We have a complete match, nothing to do.
+    } else {              // Copy missing ones and issue warning.
+      assert(longest_match >= 0 && longest_match < auto_modvals->size());
+      const string before = PrettyPrintModifiers(modvals); // for logging.
+      modvals.insert(modvals.end(), auto_modvals->begin() + longest_match,
+                           auto_modvals->end());
+      LOG(WARNING) << "Token: " << string(text, textlen)
+                   << " has missing in-template modifiers. You gave " << before
+                   << " and we computed " << PrettyPrintModifiers(*auto_modvals)
+                   << ". We changed to " << PrettyPrintModifiers(modvals)
+                   << endl;
+    }
+  }
 };
 
 // This applies the modifiers to the string in/inlen, and writes the end
 // result directly to the end of outbuf.  Precondition: |modifiers| > 0.
-static void EmitModifiedString(const ModifierAndNonces& modifiers,
+static void EmitModifiedString(const vector<ModifierAndValue>& modifiers,
                                const char* in, size_t inlen,
                                const ModifierData* data,
                                ExpandEmitter* outbuf) {
@@ -294,7 +713,7 @@ static void EmitModifiedString(const ModifierAndNonces& modifiers,
                                               &scratchbuf,
                                               modifiers.front().second);
     // Only used when modifiers.size() > 2
-    for (ModifierAndNonces::const_iterator it = modifiers.begin()+1;
+    for (vector<ModifierAndValue>::const_iterator it = modifiers.begin() + 1;
          it != modifiers.end()-1;  ++it) {
       string output_of_this_modifier;
       output_of_this_modifier.reserve(result.size() + result.size()/8 + 16);
@@ -310,6 +729,14 @@ static void EmitModifiedString(const ModifierAndNonces& modifiers,
   assert(!modifiers.empty());
   modifiers.back().first->modifier->Modify(in, inlen, data, outbuf,
                                            modifiers.back().second);
+}
+
+static void AppendTokenWithIndent(int level, string *out, const string& before,
+                                  const TemplateToken& token,
+                                  const string& after) {
+ out->append(string(level * kIndent, ' '));
+ string token_string(token.text, token.textlen);
+ out->append(before + token_string + after);
 }
 
 // ----------------------------------------------------------------------
@@ -340,9 +767,9 @@ class TemplateNode {
   virtual void WriteHeaderEntries(string *outstring,
                                   const string& filename) const = 0;
 
-  // Dumps a representation of the node and its subnodes to LOG(INFO)
+  // Appends a representation of the node and its subnodes to a string
   // as a debugging aid.
-  virtual void Dump(int level) const = 0;
+  virtual void DumpToString(int level, string *out) const = 0;
 
  public:
   // In addition to the pure-virtual API (above), we also define some
@@ -383,14 +810,14 @@ class TemplateNode {
 
 class TextTemplateNode : public TemplateNode {
  public:
-  explicit TextTemplateNode(const char* text, size_t textlen)
-      : text_(text), textlen_(textlen) {
-    VLOG(2) << "Constructing TextTemplateNode: " << string(text_, textlen_)
-            << endl;
+  explicit TextTemplateNode(const TemplateToken& token)
+      : token_(token) {
+    VLOG(2) << "Constructing TextTemplateNode: "
+            << string(token_.text, token_.textlen) << endl;
   }
   virtual ~TextTemplateNode() {
-    VLOG(2) << "Deleting TextTemplateNode: " << string(text_, textlen_)
-            << endl;
+    VLOG(2) << "Deleting TextTemplateNode: "
+            << string(token_.text, token_.textlen) << endl;
   }
 
   // Expands the text node by simply outputting the text string. This
@@ -399,7 +826,7 @@ class TextTemplateNode : public TemplateNode {
   virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionary *,
                       const TemplateDictionary *) const {
-    output_buffer->Emit(text_, textlen_);
+    output_buffer->Emit(token_.text, token_.textlen);
     return true;
   }
 
@@ -409,16 +836,14 @@ class TextTemplateNode : public TemplateNode {
     return;
   }
 
-  // Dumps a representation of the text node.
-  virtual void Dump(int level) const {
-    LOG(INFO) << std::setfill(' ') << std::setw(kIndent*level) << " "
-              << "Text Node: -->|" << string(text_, textlen_) << "|<--"
-              << endl;
+  // Appends a representation of the text node to a string.
+  virtual void DumpToString(int level, string *out) const {
+    assert(out);
+    AppendTokenWithIndent(level, out, "Text Node: -->|", token_, "|<--\n");
   }
 
  private:
-  const char* text_;   // The text held by this node
-  size_t textlen_;
+  TemplateToken token_;  // The text held by this node.
 };
 
 // ----------------------------------------------------------------------
@@ -454,10 +879,13 @@ class VariableTemplateNode : public TemplateNode {
                         filename);
   }
 
-  virtual void Dump(int level) const {
-    LOG(INFO) << std::setfill(' ') << std::setw(kIndent*level) << " "
-              << "Variable Node: " << string(token_.text, token_.textlen)
-              << endl;
+  // Appends a representation of the variable node to a string. We
+  // also append the modifiers for that variable in the form:
+  // :modifier1[=val1][:modifier2][=val2]...\n
+  virtual void DumpToString(int level, string *out) const {
+    assert(out);
+    AppendTokenWithIndent(level, out, "Variable Node: ", token_,
+                          PrettyPrintModifiers(token_.modvals) + "\n");
   }
 
  protected:
@@ -474,10 +902,11 @@ bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
 
   const string var(token_.text, token_.textlen);
   const char *value = dictionary->GetSectionValue(var);
-  if (token_.modifier_plus_values.empty()) {   // no need to modify value
+
+  if (token_.modvals.empty()) {   // no need to modify value
     output_buffer->Emit(value);               // so just emit it
   } else {
-    EmitModifiedString(token_.modifier_plus_values, value, strlen(value),
+    EmitModifiedString(token_.modvals, value, strlen(value),
                        force_annotate->modifier_data(), output_buffer);
   }
 
@@ -493,12 +922,20 @@ bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
 //    Holds a variable to be replaced by an expanded (included)
 //    template whose filename is the value of the variable in the
 //    dictionary.
+//    Also holds the corresponding TemplateContext as follows:
+//    . When not in the Auto Escape mode, TemplateContext is
+//      simply TC_MANUAL.
+//    . In Auto Escape mode, TemplateContext is determined based on the
+//      parent's context and possibly the state of the parser when we
+//      encounter the template-include directive. It is then passed on to
+//      GetTemplateWithAutoEscape when this included template is initialized.
 // ----------------------------------------------------------------------
 
 class TemplateTemplateNode : public TemplateNode {
  public:
-  explicit TemplateTemplateNode(const TemplateToken& token, Strip strip)
-      : token_(token), strip_(strip) {
+  explicit TemplateTemplateNode(const TemplateToken& token, Strip strip,
+                                TemplateContext context)
+      : token_(token), strip_(strip), initial_context_(context) {
     VLOG(2) << "Constructing TemplateTemplateNode: "
             << string(token_.text, token_.textlen) << endl;
   }
@@ -523,15 +960,15 @@ class TemplateTemplateNode : public TemplateNode {
                         filename);
   }
 
-  virtual void Dump(int level) const {
-    LOG(INFO) <<  std::setfill(' ') << std::setw(kIndent*level) << " "
-              << "Template Node: " << string(token_.text, token_.textlen)
-              << endl;
+  virtual void DumpToString(int level, string *out) const {
+    assert(out);
+    AppendTokenWithIndent(level, out, "Template Node: ", token_, "\n");
   }
 
  protected:
-  const TemplateToken token_; // text is the name of a template file
-  Strip strip_;       // Flag to pass from parent template to included template
+  const TemplateToken token_; // text is the name of a template file.
+  Strip strip_;       // Flag to pass from parent template to included template.
+  const enum TemplateContext initial_context_;  // for auto-escaping.
 };
 
 // If no value is found in the dictionary for the template variable
@@ -565,8 +1002,15 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
     if (!filename || filename[0] == '\0')
       continue;
 
+    Template *included_template;
     // pass the flag values from the parent template to the included template
-    Template *included_template = Template::GetTemplate(filename, strip_);
+    if (AUTO_ESCAPE_MODE(initial_context_)) {
+      included_template = Template::GetTemplateWithAutoEscaping(filename,
+                                                                strip_,
+                                                                initial_context_);
+    } else {
+      included_template = Template::GetTemplate(filename, strip_);
+    }
 
     // if there was a problem retrieving the template, bail!
     if (!included_template) {
@@ -589,7 +1033,7 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
     // If the include-template has modifiers, we need to expand to a string,
     // modify the string, and append to output_buffer.  Otherwise (common
     // case), we can just expand into the output-buffer directly.
-    if (token_.modifier_plus_values.empty()) {  // no need to modify sub-template
+    if (token_.modvals.empty()) {  // no need to modify sub-template
       error_free &= included_template->Expand(
           output_buffer,
           *dv_iter ? *dv_iter : dictionary,
@@ -601,7 +1045,7 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
           &subtemplate_buffer,
           *dv_iter ? *dv_iter : dictionary,
           force_annotate);
-      EmitModifiedString(token_.modifier_plus_values,
+      EmitModifiedString(token_.modvals,
                          sub_template.data(), sub_template.size(),
                          force_annotate->modifier_data(), output_buffer);
     }
@@ -659,7 +1103,7 @@ class SectionTemplateNode : public TemplateNode {
   virtual void WriteHeaderEntries(string *outstring,
                                   const string& filename) const;
 
-  virtual void Dump(int level) const;
+  virtual void DumpToString(int level, string *out) const;
 
  protected:
   const TemplateToken token_;   // text is the name of the section
@@ -693,10 +1137,13 @@ class SectionTemplateNode : public TemplateNode {
 
   // The specific methods called used by AddSubnode to add the
   // different types of nodes to this section node.
-  void AddTextNode(const char* text, size_t textlen);
-  void AddVariableNode(const TemplateToken& token);
-  void AddTemplateNode(const TemplateToken& token, Template* my_template);
-  void AddSectionNode(const TemplateToken& token, Template* my_template);
+  // Currently only reason to fail (return false) is if the
+  // HTML parser failed to parse in auto-escape mode. Note that we do
+  // not attempt to parse if the HTML Parser state shows an error already.
+  bool AddTextNode(const TemplateToken* token, Template* my_template);
+  bool AddVariableNode(TemplateToken* token, Template* my_template);
+  bool AddTemplateNode(TemplateToken* token, Template* my_template);
+  bool AddSectionNode(const TemplateToken* token, Template* my_template);
 };
 
 // --- constructor and destructor, Expand, Dump, and WriteHeaderEntries
@@ -758,8 +1205,7 @@ bool SectionTemplateNode::Expand(ExpandEmitter *output_buffer,
     for (; iter != node_list_.end(); ++iter) {
       error_free &=
         (*iter)->Expand(output_buffer,
-                        *dv_iter ? *dv_iter : dictionary,
-                        force_annotate);
+                        *dv_iter ? *dv_iter : dictionary, force_annotate);
     }
 
     if (force_annotate->ShouldAnnotateOutput()) {
@@ -781,34 +1227,105 @@ void SectionTemplateNode::WriteHeaderEntries(string *outstring,
   }
 }
 
-void SectionTemplateNode::Dump(int level) const {
-  LOG(INFO) <<  std::setfill(' ') << std::setw(kIndent*level) << " "
-            << "Section Start: " << string(token_.text, token_.textlen)
-            << endl;
+void SectionTemplateNode::DumpToString(int level, string *out) const {
+  assert(out);
+  AppendTokenWithIndent(level, out, "Section Start: ", token_, "\n");
   NodeList::const_iterator iter = node_list_.begin();
   for (; iter != node_list_.end(); ++iter) {
-    (*iter)->Dump(level+1);
+    (*iter)->DumpToString(level + 1, out);
   }
-  LOG(INFO) << std::setfill(' ') << std::setw(kIndent*level) << " "
-            << "Section End: " << string(token_.text, token_.textlen) << endl;
+  AppendTokenWithIndent(level, out, "Section End: ", token_, "\n");
 }
 
 // --- AddSubnode and its sub-routines
 
-void SectionTemplateNode::AddTextNode(const char* text, size_t textlen) {
-  if (textlen > 0) {  // ignore null text sections
-    node_list_.push_back(new TextTemplateNode(text, textlen));
+// Under auto-escape (and parsing-enabled modes) advance the parser state.
+// TextTemplateNode is the only TemplateNode type that can change
+// the state of the parser.
+// Returns false only if the HTML parser failed to parse in
+// auto-escape mode.
+bool SectionTemplateNode::AddTextNode(const TemplateToken* token,
+                                      Template* my_template) {
+  assert(token);
+  bool success = true;
+  HtmlParser *htmlparser = my_template->htmlparser_;
+
+  if (token->textlen > 0) {  // ignore null text sections
+    node_list_.push_back(new TextTemplateNode(*token));
+    if (AUTO_ESCAPE_PARSING_CONTEXT(my_template->initial_context_)) {
+      assert(htmlparser);
+      if (htmlparser->state() == HtmlParser::STATE_ERROR ||
+          htmlparser->Parse(token->text, static_cast<int>(token->textlen)) ==
+          HtmlParser::STATE_ERROR) {
+        string error_msg =  "Failed parsing: " +
+            string(token->text, token->textlen) +
+            "\nIn: " + string(token_.text, token_.textlen);
+        LOG_AUTO_ESCAPE_ERROR(error_msg, my_template);
+        success = false;
+      }
+    }
   }
+  return success;
 }
 
-void SectionTemplateNode::AddVariableNode(const TemplateToken& token) {
-  node_list_.push_back(new VariableTemplateNode(token));
+// In Auto Escape mode (htmlparser not null), we update the variable
+// modifiers baseed on what is specified in the template and what the
+// parser computes for that context.
+// Returns false only if the HTML parser failed to parse in
+// auto-escape mode.
+//
+// We also have special logic for BI_SPACE and BI_NEWLINE.
+// Even though they look like variables, they're really not: the user
+// is expected to use them in situations where they'd normally put
+// a space character or a newline character, but can't for technical
+// reasons (namely, that the template parser would strip these
+// characters because of the STRIP mode it's in).  So unlike other
+// variables, we want to treat these variables as literal text.  This
+// means that we never add modifiers to them, but we do let the
+// htmlparser know about them in order to update its state. Existing
+// modifiers will be honored.
+bool SectionTemplateNode::AddVariableNode(TemplateToken* token,
+                                          Template* my_template) {
+  assert(token);
+  bool success = true;
+  HtmlParser *htmlparser = my_template->htmlparser_;
+  TemplateContext initial_context = my_template->initial_context_;
+
+  if (AUTO_ESCAPE_MODE(initial_context)) {
+      // Determines modifiers for the variable in auto escape mode.
+      string variable_name(token->text, token->textlen);
+      // We declare in the documentation that if the user changes the
+      // value of these variables, they must only change it to a value
+      // that's "equivalent" from the point of view of an html parser.
+      // So it's ok to hard-code in that these are " " and "\n",
+      // respectively, even though in theory the user could change them
+      // (to say, BI_NEWLINE == "\r\n").
+      if (variable_name == "BI_SPACE" || variable_name == "BI_NEWLINE") {
+        if (AUTO_ESCAPE_PARSING_CONTEXT(initial_context)) {
+          assert(htmlparser);
+          if (htmlparser->state() == HtmlParser::STATE_ERROR ||
+              htmlparser->Parse(variable_name == "BI_SPACE" ? " " : "\n") ==
+              HtmlParser::STATE_ERROR)
+            success = false;
+        }
+      } else {
+        const vector<ModifierAndValue>* modvals =
+            GetModifierForContext(initial_context, htmlparser, my_template);
+        if (modvals == NULL)
+          success = false;
+        else
+          token->UpdateModifier(modvals);
+      }
+  }
+  node_list_.push_back(new VariableTemplateNode(*token));
+  return success;
 }
 
 // AddSectionNode
-void SectionTemplateNode::AddSectionNode(const TemplateToken& token,
-                                         Template *my_template) {
-  SectionTemplateNode *new_node = new SectionTemplateNode(token);
+bool SectionTemplateNode::AddSectionNode(const TemplateToken* token,
+                                         Template* my_template) {
+  assert(token);
+  SectionTemplateNode *new_node = new SectionTemplateNode(*token);
 
   // Not only create a new section node, but fill it with all *its*
   // subnodes by repeatedly calling AddSubNode until it returns false
@@ -817,12 +1334,57 @@ void SectionTemplateNode::AddSectionNode(const TemplateToken& token,
     // Found a new subnode to add
   }
   node_list_.push_back(new_node);
+  return true;
 }
 
-void SectionTemplateNode::AddTemplateNode(const TemplateToken& token,
-                                          Template *my_template) {
+bool SectionTemplateNode::AddTemplateNode(TemplateToken* token,
+                                          Template* my_template) {
+  assert(token);
+  bool success = true;
+  TemplateContext initial_context = my_template->initial_context_;
+  // Safe to call even outside auto-escape (TC_MANUAL).
+  TemplateContext context = GetTemplateContext(initial_context,
+                                               my_template->htmlparser_);
+
+  if (AUTO_ESCAPE_MODE(initial_context)) {
+    // Auto-Escape supports specifying modifiers at the template-include
+    // level in which case it checks them for XSS-correctness and modifies
+    // them as needed. Unlike the case of Variable nodes, we only modify
+    // them if they are present, we do not add any otherwise.
+    // If there are modifiers, we give the included template the context
+    // TC_NONE so that no further modifiers are applied to any variables
+    // or templates it may in turn include. Otherwise we end up escaping
+    // multiple times.
+    if (!token->modvals.empty()) {
+      const vector<ModifierAndValue>* modvals =
+          GetModifierForContext(initial_context, my_template->htmlparser_,
+                                my_template);
+      if (modvals == NULL)
+        success = false;
+      else
+        token->UpdateModifier(modvals);
+      context = TC_NONE;
+    }
+    if (AUTO_ESCAPE_PARSING_CONTEXT(initial_context)) {
+      assert(my_template->htmlparser_);
+      // In Auto-Escape context where HTML parsing happens we require that
+      // an included template be only included within regular text not
+      // inside a tag or attribute of a tag (say). There are three reasons:
+      // 1. We currently do not have a way to initialize the HTML Parser
+      //    with that level of granularity.
+      // 2. We currently do not have a way for an included template to
+      //    relay its ending state back to its parent so it is easier
+      //    to impose this restriction and enforce it.
+      // 3. It seems really bad form to do anyways. The demand may prove
+      //    us wrong but no harm in starting with extra requirements.
+      CheckInHTMLProper(my_template->htmlparser_,
+                        string(token->text, token->textlen));
+    }
+  }
   // pass the flag values from my_template to the new node
-  node_list_.push_back(new TemplateTemplateNode(token, my_template->strip_));
+  node_list_.push_back(new TemplateTemplateNode(*token, my_template->strip_,
+                                                context));
+  return success;
 }
 
 // If "text" ends with a newline followed by whitspace, returns a
@@ -853,6 +1415,7 @@ static string GetIndentation(const char* text, size_t textlen,
 }
 
 bool SectionTemplateNode::AddSubnode(Template *my_template) {
+  bool auto_escape_success = true;
   // Don't proceed if we already found an error
   if (my_template->state() == TS_ERROR) {
     return false;
@@ -874,17 +1437,17 @@ bool SectionTemplateNode::AddSubnode(Template *my_template) {
 
   switch (token.type) {
     case TOKENTYPE_TEXT:
-      this->AddTextNode(token.text, token.textlen);
+      auto_escape_success = this->AddTextNode(&token, my_template);
       // Store the indentation (trailing whitespace after a newline), if any.
       this->indentation_ = GetIndentation(token.text, token.textlen,
                                           indentation_ == "\n");
       break;
     case TOKENTYPE_VARIABLE:
-      this->AddVariableNode(token);
+      auto_escape_success = this->AddVariableNode(&token, my_template);
       this->indentation_.clear(); // clear whenever last read wasn't whitespace
       break;
     case TOKENTYPE_SECTION_START:
-      this->AddSectionNode(token, my_template);
+      auto_escape_success = this->AddSectionNode(&token, my_template);
       this->indentation_.clear(); // clear whenever last read wasn't whitespace
       break;
     case TOKENTYPE_SECTION_END:
@@ -907,11 +1470,10 @@ bool SectionTemplateNode::AddSubnode(Template *my_template) {
       // first one.  We do this by adding a modifier that applies to
       // the entire template node, that inserts spaces after newlines.
       if (!this->indentation_.empty()) {
-        token.modifier_plus_values.push_back(
-            pair<const template_modifiers::ModifierInfo*, string>(
-                &g_prefix_line_info, this->indentation_));
+        token.modvals.push_back(ModifierAndValue(&g_prefix_line_info,
+                                                 this->indentation_));
       }
-      this->AddTemplateNode(token, my_template);
+      auto_escape_success = this->AddTemplateNode(&token, my_template);
       this->indentation_.clear(); // clear whenever last read wasn't whitespace
       break;
     case TOKENTYPE_COMMENT:
@@ -928,6 +1490,14 @@ bool SectionTemplateNode::AddSubnode(Template *my_template) {
       LOG_TEMPLATE_NAME(ERROR, my_template);
       LOG(ERROR) << "Invalid token type returned from GetNextToken" << endl;
   }
+
+  if (!auto_escape_success) {
+    // The error is logged where it happens. Here indicate
+    // the initialization failed.
+    my_template->set_state(TS_ERROR);
+    return false;
+  }
+
   // for all the cases where we did not return false
   return true;
 }
@@ -1096,7 +1666,7 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
       }
 
       // Figure out what all the modifiers are.  Mods are colon-separated.
-      ModifierAndNonces modifiers;
+      vector<ModifierAndValue> modifiers;
       const char* mod_end;
       for (const char* mod = mod_start; mod < token_end; mod = mod_end) {
         assert(*mod == ':');
@@ -1175,16 +1745,20 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
 // Template::~Template()
 // Template::AssureGlobalsInitialized()
 // Template::GetTemplate()
+// Template::GetTemplateWithAutoEscaping()
+// Template::TemplateCacheKey()
+// Template::GetTemplateCommon()
 //   Calls ReloadIfChanged to load the template the first time.
 //   The constructor is private; GetTemplate() is the factory
 //   method used to actually construct a new template if needed.
 // ----------------------------------------------------------------------
 
-Template::Template(const string& filename, Strip strip)
+Template::Template(const string& filename, Strip strip,
+                   TemplateContext context)
     : filename_(filename), filename_mtime_(0), strip_(strip),
-      state_(TS_EMPTY),
-      template_text_(NULL), template_text_len_(0), tree_(NULL),
-      parse_state_(), mutex_(new Mutex) {
+      state_(TS_EMPTY), template_text_(NULL), template_text_len_(0),
+      tree_(NULL), parse_state_(), mutex_(new Mutex),
+      initial_context_(context), htmlparser_(NULL) {
   // Make sure g_use_current_dict, etc. are initted before any possbility
   // of calling Expand() or other Template classes that access globals.
   AssureGlobalsInitialized();
@@ -1198,6 +1772,13 @@ Template::Template(const string& filename, Strip strip)
     strip_ = STRIP_BLANK_LINES;
   }
 
+  // TC_MANUAL and remaining Auto-Escape contexts don't need a parser.
+  if (AUTO_ESCAPE_PARSING_CONTEXT(initial_context_)) {
+    htmlparser_ = new HtmlParser();
+    if (initial_context_ == TC_JS)
+      htmlparser_->ResetMode(HtmlParser::MODE_JS);
+    FilenameValidForContext(filename_, initial_context_);
+  }
   ReloadIfChangedLocked();
 }
 
@@ -1207,6 +1788,7 @@ Template::~Template() {
   delete tree_;
   // Delete this last, since tree has pointers into template_text_
   delete[] template_text_;
+  delete htmlparser_;
 }
 
 // NOTE: This function must be called by any static function that
@@ -1218,10 +1800,43 @@ void Template::AssureGlobalsInitialized() {
     // this_dict is a dictionary with a single NULL entry in it
     g_use_current_dict = new vector<TemplateDictionary*>;
     g_use_current_dict->push_back(NULL);
+    InitializeGlobalModifiers();   // initializes g_mods_ae.
   }
 }
 
+// This factory method disables auto-escape mode for backwards compatibility.
 Template *Template::GetTemplate(const string& filename, Strip strip) {
+  return GetTemplateCommon(filename, strip, TC_MANUAL);
+}
+
+// This factory method is called only when the auto-escape mode
+// should be enabled for that template (and included templates).
+Template *Template::GetTemplateWithAutoEscaping(const string& filename,
+                                                Strip strip,
+                                                TemplateContext context) {
+  // Must provide a valid context to enable auto-escaping.
+  assert(AUTO_ESCAPE_MODE(context));
+  return GetTemplateCommon(filename, strip, context);
+}
+
+// With the addition of the auto-escape mode, the cache key includes
+// the TemplateContext as well to allow the same template to
+// be initialized in both modes and have their copies separate. It also
+// allows for the less likely case of the same template initialized
+// with different TemplateContexts.
+// For simplicity, the TemplateContext is folded in with Strip to
+// form a single integer. Both are very small and definitely fit in the
+// first 16 bits [lower 8 for Strip, upper 8 for TemplateContext].
+Template::TemplateCacheKey
+Template::GetTemplateCacheKey(const string& name,
+                              Strip strip, TemplateContext context) {
+  int strip_and_context  = strip + (context << 8);
+  return pair<string, int>(name, strip_and_context);
+}
+
+// Protected factory method.
+Template *Template::GetTemplateCommon(const string& filename, Strip strip,
+                                      TemplateContext context) {
   // No need to have the cache-mutex acquired for this step
   string abspath(ctemplate::PathJoin(template_root_directory(), filename));
 
@@ -1231,10 +1846,12 @@ Template *Template::GetTemplate(const string& filename, Strip strip) {
     if (g_template_cache == NULL)
       g_template_cache = new TemplateCache;
 
-    tpl = (*g_template_cache)[pair<string, Strip>(abspath, strip)];
+    TemplateCacheKey template_cache_key = GetTemplateCacheKey(abspath, strip,
+                                                              context);
+    tpl = (*g_template_cache)[template_cache_key];
     if (!tpl) {
-      tpl = new Template(abspath, strip);
-      (*g_template_cache)[pair<string, Strip>(abspath, strip)] = tpl;
+      tpl = new Template(abspath, strip, context);
+      (*g_template_cache)[template_cache_key] = tpl;
     }
   }
 
@@ -1277,6 +1894,9 @@ Template *Template::GetTemplate(const string& filename, Strip strip) {
 //       It should have been created via new[].
 // You should hold a write-lock on mutex_ before calling this
 // (unless you're calling it from a constructor).
+// In auto-escape mode, the HTML context is tracked as the tree is being
+// built, in a single pass. When this function completes, all variables
+// will have the proper modifiers set.
 bool Template::BuildTree(const char* input_buffer,
                          const char* input_buffer_end) {
   // Assign an arbitrary name to the top-level node
@@ -1297,7 +1917,9 @@ bool Template::BuildTree(const char* input_buffer,
   template_text_ = input_buffer;
   template_text_len_ = input_buffer_end - input_buffer;
 
-  if (state() != TS_ERROR) {  // BuildTree had no problem parsing
+  // TS_ERROR can also be set by the auto-escape mode, at the point
+  // where the parser failed to parse.
+  if (state() != TS_ERROR) {
     set_state(TS_READY);
     return true;
   } else {
@@ -1316,15 +1938,26 @@ void Template::WriteHeaderEntries(string *outstring) const {
   }
 }
 
+// Dumps the parsed structure of the template for debugging assistance.
+// It goes to stdout instead of LOG to avoid possible truncation due to size.
 void Template::Dump(const char *filename) const {
-  LOG(INFO) << "------------Start Template Dump ["
-            << filename << "]--------------" << endl;
+  string out;
+  DumpToString(filename, &out);
+  fwrite(out.data(), 1, out.length(), stdout);
+  fflush(stdout);
+}
+
+void Template::DumpToString(const char *filename, string *out) const {
+  if (!out)
+    return;
+  out->append("------------Start Template Dump [" + string(filename) +
+                        "]--------------\n");
   if (tree_) {
-    tree_->Dump(1);
+    tree_->DumpToString(1, out);
   } else {
-    LOG(INFO) << "No parse tree has been produced for this template" << endl;
+    out->append("No parse tree has been produced for this template\n");
   }
-  LOG(INFO) << "------------End Template Dump----------------" << endl;
+  out->append("------------End Template Dump----------------\n");
 }
 
 // ----------------------------------------------------------------------

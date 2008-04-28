@@ -96,17 +96,46 @@ class CTEMPLATE_DLL_DECL TemplateFromString : public Template {
                                          const std::string& template_text,
                                          Strip strip);
 
+  //   Same logic as GetTemplate above except it also enables
+  //   auto-escaping for that template and for all templates it may
+  //   include. The auto-escaping mode is not for everyone, in particular
+  //   it is only useful when you are using the Template System in the
+  //   context of web-applications which operate on untrusted
+  //   content that requires proper escaping when expanded into the template.
+  //   In order to automatically determine the correct escaping to apply
+  //   to all variable substitutions, the Template System becomes
+  //   "HTML-aware" and parses the template during initial creation.
+  //
+  //   TemplateContext must match the context in which the template
+  //   is being returned or the auto-escaping will be wrong.
+  static TemplateFromString *
+  GetTemplateWithAutoEscaping(const std::string& cache_key,
+                              const std::string& template_text,
+                              Strip strip,
+                              TemplateContext context);
+
  private:
+
+  // Performs the actual work for both factory methods
+  // GetTemplate and GetTemplateWithAutoEscaping.
+  static TemplateFromString *GetTemplateCommon(const std::string& cache_key,
+                                               const std::string& template_text,
+                                               Strip strip,
+                                               TemplateContext context);
+
   /* This templates constuctor is private just like the parent's is.
      New ones are acquired through TemplateFromString::GetTemplate */
   TemplateFromString(const std::string& cache_key,
                      const std::string& template_text,
-                     Strip strip);
+                     Strip strip, TemplateContext context);
 
   /* The remaining methods, which are valid on the parent, cannot be
      called on this kind of template instance */
 
   virtual Template *GetTemplate(const std::string& filename, Strip strip);
+  virtual Template *GetTemplateWithAutoEscaping(const std::string& filename,
+                                                Strip strip,
+                                                TemplateContext context);
 
   virtual void Reload();
   virtual bool ReloadIfChanged();

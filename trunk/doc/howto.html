@@ -18,7 +18,7 @@
     color: #000;
     font-family: "Times Roman", times, serif;
   }
-  ul.blacklist li {  
+  ul.blacklist li {
     color: #000;
     font-family: "Times Roman", times, serif;
   }
@@ -304,10 +304,10 @@ previous one:</p>
 </tr>
 
 <tr><td><code>:url_query_escape</code></td><td><code>:u</code></td>
-    <td>performs URL escaping on the variable before output.  
+    <td>performs URL escaping on the variable before output.
         space is turned into +, and everything other than [0-9a-zA-Z.,_:*/~!()-], is
         transformed into %-style escapes.  Use this when you are building
-        URLs with variables as parameters: 
+        URLs with variables as parameters:
         <pre>&lt;a href="http://google.com/search?q={{QUERY:u}}"&gt;{{QUERY:h}}&lt;/a&gt;</pre>
     </td> 
 </tr>
@@ -315,6 +315,11 @@ previous one:</p>
 <tr><td><code>:javascript_escape</code></td><td><code>:j</code></td>
     <td>javascript-escapes the variable before output
         (eg <code>"</code> -> <code>\"</code>)</td>
+</tr>
+
+<tr><td><code>:javascript_escape_with_arg</code></td><td><code>:J</code>
+    </td>
+    <td>special purpose javascript escaping. See below for details.</td>
 </tr>
 
 <tr><td><code>:cleanse_css</code></td><td><code>:c</code></td>
@@ -325,8 +330,12 @@ previous one:</p>
 
 <tr><td><code>:json_escape</code></td><td><code>:o</code></td>
     <td>json-escapes a variable before output as a string in json;
-        similar to javascript escaping, but ignores characters such
-        as <code>=</code> and <code>&amp;</code>.</td>
+        similar to javascript escaping, but does not modify
+        characters such
+        as <code>=</code>, <code>&lt;</code> and <code>&gt;</code>.
+        If your application does not reject or escape these characters, 
+        it may be safer to use <code>:javascript_escape</code> instead.
+    </td>
 </tr>
 
 <tr><td><code>:html_escape_with_arg</code></td><td><code>:H</code></td>
@@ -335,6 +344,14 @@ previous one:</p>
 
 <tr><td><code>:url_escape_with_arg</code></td><td><code>:U</code></td>
     <td>special purpose url escaping. See below for details</td>
+</tr>
+
+<tr><td><code>:xml_escape</code></td><td></td>
+    <td>xml-escapes the variable before output
+        (the five characters <code>&lt;&gt;&amp;&quot;&#39;</code> become
+        <code>&amp;lt&amp;gt;&amp;amp;&amp;quot;&amp;#39;</code>) 
+        suitable for content returned in raw XML. It is not intended
+        for escaping content within CDATA blocks.</td>
 </tr>
 
 <tr><td><code>:none</code></td><td></td>
@@ -403,6 +420,27 @@ the <code>url_escape_with_arg</code> modifier:</p>
 
 </table>
 
+<p>Here are the values that are supported by
+the <code>javascript_escape_with_arg</code> modifier:</p>
+<table border=1 cellpadding=3>
+<tr><th>value</th><th>description</th></tr>
+
+<tr><td><code>=number</code></td>
+    <td>Ensures that the variable is a valid number or boolean
+        javascript literal. This includes booleans
+        <code>true</code> and <code>false</code>, decimal
+        numbers (e.g. <code>4.10</code> or <code>-5.01e+10</code>)
+        as well as hex numbers (e.g. <code>0x5FF</code>). This modifier
+        is intended to ensure the variable not enclosed in
+        quotes cannot contain javascript code that may execute. It does
+        not guarantee that the variable is syntatically well-formed.
+        If the variable is safe, it is returned
+        as-is, otherwise it is replaced with <code>null</code>.
+        In the future we may add more logic to support objects and 
+        arrays.</td>
+</tr>
+</table>
+
 <p><strong>NOTE:</strong> At the moment, there are no filters for handling XML
 attributes and text nodes. For HTML snippets, use the html filter; in other
 situations, it may be appropriate to use CDATA blocks.</p>
@@ -430,6 +468,21 @@ code for a custom modifier:</p>
      }
    };
 </pre>
+
+<h3><A NAME="AutoEscape">Auto Escape Mode</A></h3>
+
+<p>The Auto Escape mode helps protect against cross-site scripting (XSS)
+attacks in web-applications by automatically applying escaping
+modifiers to your variables. Refer to 
+<a href="auto_escape.html">Guide to using Auto Escape</a> for
+an overview of Auto Escape as well as its limitations.</p>
+
+<p>To use the Auto Escape mode, call
+<code>google::Template::GetTemplateWithAutoEscaping()</code> instead of
+<code>google::Template::GetTemplate()</code>.  In addition to the template
+name, you will have to specify the <i>context</i> your template is in,
+usually <code>TC_HTML</code>.  See <code>template.h</code> for the
+possible values and their meanings.</p>
 
 <h3> <A NAME="inheritence">Details on Dictionary Lookup</A> </h3>
 
@@ -523,12 +576,19 @@ all template code in namespace <code>google</code>.
 
 <h3> Loading A Template </h3>
 
-<p>The main routine to load a template is
-<code>google::Template::GetTemplate()</code>, defined in
-<code>template.h</code>.  This is a static, factory method, that loads
+<p>There are two routines to load a template depending on whether
+you would like to leverage the Auto Escape mode of execution or not.
+<ul>
+    <li> For the Standard mode, use <code>google::Template::GetTemplate()</code>.
+    <li> For the Auto Escape mode, use
+         <code>google::Template::GetTemplateWithAutoEscaping()</code>.
+</ul>
+
+Both are defined in <code>template.h</code>.  They are static,
+factory methods that load
 a template from either disk or from an internal template cache, and
-returns a pointer to a <code>Template</code> object.  Besides a
-filename to load from, this routine takes a 'strip' argument which
+return a pointer to a <code>Template</code> object.  Besides a
+filename to load from, these routines take a 'strip' argument which
 defines how to expand whitespace found in a template file.  It can
 have one of the following values:</p>
 
@@ -556,7 +616,30 @@ have one of the following values:</p>
        to force a space or newline in a particular situation.
 </ul>
 
-<p>This factory method returns NULL if the template cannot be found,
+In addition, <code>GetTemplateWithAutoEscaping</code> requires an initial
+context <code>context</code> which determines the initial state of its
+HTML parsing. You only need to provide the context of the top-level
+template, any included template will have the context automatically computed.
+The context can have one of the following values:</p>
+
+<ul>
+   <li><code>TC_HTML</code>: The template contains HTML code which is not
+       required to be a complete HTML page just content the browser
+       interprets in the context of HTML parsing.
+       This should be the most common context to use.
+  <li><code>TC_CSS</code>: The template contains CSS (cascaded style-sheet).
+       If your template starts with a &lt;style&gt; tag, it is of type
+       <code>TC_HTML</code> not <code>TC_CSS</code>. A <code>TC_CSS</code>
+       template is typically associated with a <code>text/css</code>
+        content-type header.
+  <li><code>TC_JS</code>: The template contains raw javascript.
+       If your template starts with &lt;script&gt; tag, it is of type
+       <code>TC_HTML</code> not <code>TC_JS</code>. <code>TC_JS</code>
+       is typically associated with a content-type of
+       <code>text/javascript</code>.
+</ul>
+
+<p>Both factory methods returns NULL if the template cannot be found,
 or if there is a syntax error trying to load it.</p>
 
 <p>Besides loading templates, the application can also ask the
@@ -704,7 +787,7 @@ value)</code>.</p>
 <p>Example:</p>
 <pre>
    using google::TemplateDictionary;
-   TemplateDictionary* dict = new TemplateDictionary("section example");   
+   TemplateDictionary* dict = new TemplateDictionary("section example");
    const char* username = GetUsername();   // returns "" for no user
    if (username[0] != '\0') {
       TemplateDictionary* sub_dict = dict->AddSectionDictionary("CHANGE_USER");
@@ -754,7 +837,7 @@ it's relative to <A HREF="#managing">template_root</A>.</p>
 <p>Example:</p>
 <pre>
    using google::TemplateDictionary;
-   TemplateDictionary* dict = new TemplateDictionary("include example");   
+   TemplateDictionary* dict = new TemplateDictionary("include example");
    GetResults(results, &amp;num_results);
    for (int i = 0; i < num_results; ++i) {
       TemplateDictionary* sub_dict = dict->AddIncludeDictionary("RESULT_TEMPLATE");
@@ -809,7 +892,7 @@ the output in a string:</p>
    string output;
    bool error_free = <font color=red>tpl->Expand(&amp;output, &amp;dict);</font>
    // output now holds the expanded template
-   // Expand returns false if the system cannot load any of the template files 
+   // Expand returns false if the system cannot load any of the template files
    // referenced by the TemplateDictionary.
 </pre>
 
@@ -867,7 +950,7 @@ different.  Computing the values is slow.  Here's how you can use
 </ol>
 
 
-<h2>Security Considerations</h2>
+<h2><A NAME="Security">Security Considerations</h2>
 
 <p>Like all web applications, programs that use the Google Template System
 to create HTML documents can be vulnerable to Cross-Site-Scripting (XSS)
@@ -876,14 +959,23 @@ and/or escaped.  Which specific form of escaping or sanitization is
 required depends on the context in which the template variable appears
 within a HTML document (such as, regular "inner text", within a
 <code>&lt;script&gt;</code> tag, or within an <code>onClick</code>
-handler).  The remainder of this section provides a brief summary of
-techniques to prevent XSS vulnerabilities due to template variables in
-various HTML contexts.  Note that while escaping is typically required,
-escaping alone is often not enough!  You also may need to sanitize or
+handler).
+
+<p>If you are concerned with XSS, your are strongly encouraged
+to leverage the <a href="auto_escape.html">Auto Escape</a> mode 
+developed specifically to better
+defend your application against XSS. The Auto Escape mode
+follows the guidelines outlined below. Do note however that regardless
+of whether you use Auto Escape or not, escaping alone while generally
+required, is often not enough!  You also may need to sanitize or
 validate the input, as for instance with URL attributes.  For further
 information, refer to additional <a
   href="xss_resources.html">resources</a> on Cross-Site-Scripting
 issues.</p>
+
+The remainder of this section provides a brief summary of
+techniques to prevent XSS vulnerabilities due to template variables in
+various HTML contexts.
 
 <ol class=bluelist>
 <li>Regular text (outside of tags and other special situations).
@@ -909,13 +1001,17 @@ issues.</p>
 
 <li>URL attributes (eg., href/src).
 
-  <p>Validate that the URL is a well-formed URL with an appropriate
-  scheme (e.g., http(s), ftp, mailto).  Then enclose the URL in quotes
-  in the template and use the <code>:html_escape</code> or
-  <code>:h</code> modifier to escape the variable:</p>
+  <p>Enclose the URL in quotes in the template and use the
+  <code>:url_escape_with_arg=html</code> (or <code>:U=html</code>)
+  modifier which validates that the URL has an appropriate
+  scheme (http, https) before HTML-escaping it:</p>
   <pre>
-    &lt;img src="{{IMAGE_URL:h}}"&gt;
+    &lt;img src="{{IMAGE_URL:U=html}}"&gt;
   </pre>
+
+  <p>Alternatively, validate that the URL is correct using your
+  own validation logic and apply <code>:html_escape</code> instead
+  of <code>:url_escape_with_arg=html</code>.</p>
 </li>
 
 <li>Beware of inserting variables containing data from untrusted sources
@@ -963,15 +1059,19 @@ into the context of a <code>style</code> tag or attribute.
 <code>onClick</code>.
 
   <p>Tag attributes whose values are evaluated as a javascript
-  expression (such as <code>on{Click,Load,etc}</code> handlers) require an
-  additional consideration, since the attribute's value is HTML-unescaped
-  by the browser before it is passed to the javascript interpreter.
+  expression (such as <code>on{Click,Load,etc}</code> handlers)
+  generally require HTML-Escape in addition to Javascript-Escape,
+  since the attribute's value is HTML-unescaped by the browser
+  before it is passed to the javascript interpreter.</p>
 
-  <p>To avoid XSS vulnerabilities, it is in generally necessary to 
-  HTML-escape after javascript-escaping:</p>
+  <p>However, the <code>javascript_escape</code> implementation provided
+  makes a subsequent HTML-Escape unnecessary, as such you can
+  apply the same escaping for variables within event handlers
+  as you would for javascript variables in string literals:</p>
+
   <pre>
     &lt;button ...
-                 onclick='GotoUrl(&quot;{{TARGET_URL:j:h}}&quot;);'&gt;
+                 onclick='GotoUrl(&quot;{{TARGET_URL:j}}&quot;);'&gt;
   </pre>
 </li>
 
@@ -1002,7 +1102,6 @@ into the context of a <code>style</code> tag or attribute.
 </li>
 
 </ol>
-
 
 <h2> Working Effectively with Templates </h2>
 
@@ -1209,7 +1308,7 @@ alternate extension may be provided via the command line flag
 
 <p>For a full list of command line flags, run
 <code>make_tpl_varnames_h --help</code>.</p>
-	
+
 
 <h3> <A name="converter">template-converter: convert a template to a C++ string</A> </h3>
 
@@ -1227,11 +1326,19 @@ C++ code is output is to stdout; it can be stored in a .h file or
 included directly into a C++ file.  Perl must be installed to use this
 script.</p>
 
+<h3> <A name="diff_tpl_auto_escape">diff_tpl_auto_escape:
+    Escaping Modifier Comparaison tool for Templates</A> </h3>
+
+Refer to <a href="auto_escape.html#diff_tpl_auto_escape">
+diff_tpl_auto_escape</a> for a description of this tool.
+
+
 <hr>
 <ul>
 <!--
   <li> <A HREF="howto.html">Howto</A> </li>
 -->
+  <li> <A HREF="auto_escape.html">Auto Escape</A> </li>
   <li> <A HREF="tips.html">Tips</A> </li>
   <li> <A HREF="example.html">Example</A> </li>
 </ul>

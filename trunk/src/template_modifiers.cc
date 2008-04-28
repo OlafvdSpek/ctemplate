@@ -55,10 +55,20 @@
 using std::string;
 using std::vector;
 
+// Really we should be using uint_16_t or something, but this is good
+// enough, and more portable...
+typedef unsigned int uint16;
+
 
 // A most-efficient way to append a string literal to the var named 'out'.
 // The ""s ensure literal is actually a string literal
 #define APPEND(literal)  out->Emit("" literal "", sizeof(literal)-1)
+
+// Check whether the string of length len is identical to the literal.
+// The ""s ensure literal is actually a string literal
+#define STR_IS(str, len, literal) \
+  ((len) == sizeof(""literal"")-1 && \
+   memcmp(str, literal, sizeof(""literal"")-1) == 0)
 
 _START_GOOGLE_NAMESPACE_
 
@@ -182,6 +192,13 @@ void CleanseAttribute::Modify(const char* in, size_t inlen,
   for (size_t i = 0; i < inlen; ++i) {
     char c = in[i];
     switch (c) {
+      case '=': {
+        if (i == 0 || i == (inlen - 1))
+          out->Emit('_');
+        else
+          out->Emit(c);
+        break;
+      }
       case '-':
       case '.':
       case '_':
@@ -263,29 +280,68 @@ ValidateUrl validate_url_and_javascript_escape(javascript_escape);
 void XmlEscape::Modify(const char* in, size_t inlen,
                        const ModifierData*,
                        ExpandEmitter* out, const string& arg) const {
-  const char* end = in + inlen;
-  const char* pos = in;
-  for (const char* next_amp = static_cast<const char*>(memchr(in, '&', inlen));
-       next_amp; next_amp = static_cast<const char*>(memchr(pos, '&', end-pos))) {
-    out->Emit(pos, next_amp - pos);  // emit everything between the ampersands
-    if (next_amp + sizeof("&nbsp;")-1 <= end &&
-        memcmp(next_amp, "&nbsp;", sizeof("&nbsp;")-1) == 0) {
-      out->Emit("&#160;");
-      pos = next_amp + sizeof("&nbsp;")-1;
-    } else {
-      out->Emit('&');           // & == *next_amp
-      pos = next_amp + 1;
+  for (size_t i = 0; i < inlen; ++i) {
+    switch (in[i]) {
+      case '&': APPEND("&amp;"); break;
+      case '"': APPEND("&quot;"); break;
+      case '\'': APPEND("&#39;"); break;
+      case '<': APPEND("&lt;"); break;
+      case '>': APPEND("&gt;"); break;
+      default: out->Emit(in[i]);
     }
   }
-  out->Emit(pos, end - pos);    // everything past the last ampersand
 }
 XmlEscape xml_escape;
 
+// Returns the UTF-8 code-unit starting at start, or the special codepoint
+// 0xFFFD if the input ends abruptly or is not well-formed UTF-8.
+// start -- address of the start of the code unit which also receives the
+//          address past the end of the code unit returned.
+// end -- exclusive end of the string
+static inline uint16 UTF8CodeUnit(const char** start, const char *end) {
+  size_t code_unit_len = 1;
+  switch (**start & 0xF0) {
+    case 0xC0: case 0xD0:  // 110x xxxx  10xx xxxx
+      code_unit_len = 2;
+      break;
+    case 0xE0:             // 1110 xxxx  10xx xxxx  10xx xxxx
+      code_unit_len = 3;
+      break;
+    default:
+      // Return the current byte as a codepoint.
+      // Either it is a valid single byte codepoint, or it's not part of a valid
+      // UTF-8 sequence, and so has to be handled individually.
+      char first_char = **start;
+      ++*start;
+      return static_cast<unsigned char>(first_char);
+  }
+  const char *code_unit_end = *start + code_unit_len;
+  if (code_unit_end < *start || code_unit_end > end) {  // Truncated code unit.
+    ++*start;
+    return 0xFFFDU;
+  }
+  const char* pos = *start;
+  uint16 code_unit = *pos & (0xFFU >> code_unit_len);
+  while (--code_unit_len) {
+    uint16 tail_byte = *(++pos);
+    if ((tail_byte & 0xC0U) != 0x80U) {  // Malformed code unit.
+      ++*start;
+      return 0xFFFDU;
+    }
+    code_unit = (code_unit << 6) | (tail_byte & 0x3FU);
+  }
+  *start = code_unit_end;
+  return code_unit;
+}
 void JavascriptEscape::Modify(const char* in, size_t inlen,
                               const ModifierData*,
                               ExpandEmitter* out, const string& arg) const {
-  for (size_t i = 0; i < inlen; ++i) {
-    switch (in[i]) {
+  const char* end = in + inlen;
+  if (end < in) { return; }
+  for (const char* p = in, *pnext = in; p != end; p = pnext) {
+    uint16 code_unit = UTF8CodeUnit(&pnext, end);
+    switch (code_unit) {
+      case '\0': APPEND("\\x00"); break;
       case '"': APPEND("\\x22"); break;
       case '\'': APPEND("\\x27"); break;
       case '\\': APPEND("\\\\"); break;
@@ -293,15 +349,73 @@ void JavascriptEscape::Modify(const char* in, size_t inlen,
       case '\r': APPEND("\\r"); break;
       case '\n': APPEND("\\n"); break;
       case '\b': APPEND("\\b"); break;
+      case '\v':
+        // Do not escape vertical tabs to "\\v" since it is interpreted as 'v'
+        // by JScript according to section 2.1 of
+        // http://wiki.ecmascript.org/lib/exe/fetch.php?id=resources%3Aresources
+        // &cache=cache&media=resources:jscriptdeviationsfromes3.pdf
+        APPEND("\\x0b");
+        break;
       case '&': APPEND("\\x26"); break;
       case '<': APPEND("\\x3c"); break;
       case '>': APPEND("\\x3e"); break;
       case '=': APPEND("\\x3d"); break;
-      default: out->Emit(in[i]);
+      // Linebreaks according to EcmaScript 262 which cannot appear in strings.
+      case 0x2028: APPEND("\\u2028"); break;  // Line separator
+      case 0x2029: APPEND("\\u2029"); break;  // Paragraph separator
+      default:
+        out->Emit(p, pnext - p);
+        break;
     }
   }
 }
 JavascriptEscape javascript_escape;
+
+
+void JavascriptNumber::Modify(const char* in, size_t inlen,
+                              const ModifierData*,
+                              ExpandEmitter* out, const string& arg) const {
+  if (inlen == 0)
+    return;
+
+  if (STR_IS(in, inlen, "true") || STR_IS(in, inlen, "false")) {
+    out->Emit(in, inlen);
+    return;
+  }
+
+  bool valid = true;
+  if (in[0] == '0' && inlen > 2 && (in[1] == 'x' || in[1] == 'X')) {
+    // There must be at least one hex digit after the 0x for it to be valid.
+    // Hex number. Check that it is of the form 0(x|X)[0-9A-Fa-f]+
+    for (size_t i = 2; i < inlen; i++) {
+      char c = in[i];
+      if (!((c >= 'a' && c <= 'f') ||
+            (c >= 'A' && c <= 'F') ||
+            (c >= '0' && c <= '9'))) {
+        valid = false;
+        break;
+      }
+    }
+  } else {
+    // Must be a base-10 (or octal) number.
+    // Check that it has the form [0-9+-.eE]+
+    for (size_t i = 0; i < inlen; i++) {
+      char c = in[i];
+      if (!((c >= '0' && c <= '9') ||
+            c == '+' || c == '-' || c == '.' ||
+            c == 'e' || c == 'E')) {
+        valid = false;
+        break;
+      }
+    }
+  }
+  if (valid) {
+    out->Emit(in, inlen);   // Number was valid, output it.
+  } else {
+    APPEND("null");         // Number was not valid, output null instead.
+  }
+}
+JavascriptNumber javascript_number;
 
 void UrlQueryEscape::Modify(const char* in, size_t inlen,
                             const ModifierData*,
@@ -402,42 +516,63 @@ static struct ModifierWithAlternatives {
   ModifierInfo modifier_info;
   ModifierInfo* safe_alt_mods[MAX_SAFE_ALTERNATIVES];
 } g_modifiers[] = {
-  /* 0 */ { ModifierInfo("cleanse_css", 'c', &cleanse_css), {} },
-  /* 1 */ { ModifierInfo("html_escape", 'h', &html_escape),
+  /* 0 */ { ModifierInfo("cleanse_css", 'c',
+                         XSS_WEB_STANDARD, &cleanse_css), {} },
+  /* 1 */ { ModifierInfo("html_escape", 'h',
+                         XSS_WEB_STANDARD, &html_escape),
             {&g_modifiers[2].modifier_info,   // html_escape_with_arg=snippet
              &g_modifiers[3].modifier_info,   // html_escape_with_arg=pre
              &g_modifiers[4].modifier_info,   // html_escape_with_arg=attribute
-             &g_modifiers[8].modifier_info} },  // pre_escape
-  /* 2 */ { ModifierInfo("html_escape_with_arg=snippet", 'H', &snippet_escape),
+             &g_modifiers[8].modifier_info,   // pre_escape
+             &g_modifiers[9].modifier_info,   // url_query_escape
+             &g_modifiers[12].modifier_info} },  // url_escape_with_arg=query
+
+  /* 2 */ { ModifierInfo("html_escape_with_arg=snippet", 'H',
+                         XSS_WEB_STANDARD, &snippet_escape),
             {&g_modifiers[1].modifier_info,   // html_escape
              &g_modifiers[3].modifier_info,   // html_escape_with_arg=pre
              &g_modifiers[4].modifier_info,   // html_escape_with_arg=attribute
-             &g_modifiers[8].modifier_info} },  // pre_escape
-  /* 3 */ { ModifierInfo("html_escape_with_arg=pre", 'H', &pre_escape),
+             &g_modifiers[8].modifier_info,   // pre_escape
+             &g_modifiers[9].modifier_info,   // url_query_escape
+             &g_modifiers[12].modifier_info} },  // url_escape_with_arg=query
+  /* 3 */ { ModifierInfo("html_escape_with_arg=pre", 'H',
+                         XSS_WEB_STANDARD, &pre_escape),
             {&g_modifiers[1].modifier_info,   // html_escape
              &g_modifiers[2].modifier_info,   // html_escape_with_arg=snippet
              &g_modifiers[4].modifier_info,   // html_escape_with_arg=attribute
-             &g_modifiers[8].modifier_info} },  // pre_escape
-  /* 4 */ { ModifierInfo("html_escape_with_arg=attribute",
-                         'H', &cleanse_attribute), {} },
-  /* 5 */ { ModifierInfo("html_escape_with_arg=url",
-                         'H', &validate_url_and_html_escape), {} },
-  /* 6 */ { ModifierInfo("javascript_escape", 'j', &javascript_escape), {} },
-  /* 7 */ { ModifierInfo("json_escape", 'o', &json_escape),
+             &g_modifiers[8].modifier_info,   // pre_escape
+             &g_modifiers[9].modifier_info,   // url_query_escape
+             &g_modifiers[12].modifier_info} },  // url_escape_with_arg=query
+  /* 4 */ { ModifierInfo("html_escape_with_arg=attribute", 'H',
+                         XSS_WEB_STANDARD, &cleanse_attribute), {} },
+  /* 5 */ { ModifierInfo("html_escape_with_arg=url", 'H',
+                         XSS_WEB_STANDARD, &validate_url_and_html_escape), {} },
+  /* 6 */ { ModifierInfo("javascript_escape", 'j',
+                         XSS_WEB_STANDARD, &javascript_escape), {} },
+  /* 7 */ { ModifierInfo("json_escape", 'o', XSS_WEB_STANDARD, &json_escape),
             {&g_modifiers[6].modifier_info} },  // javascript_escape
-  /* 8 */ { ModifierInfo("pre_escape", 'p', &pre_escape),
+  /* 8 */ { ModifierInfo("pre_escape", 'p', XSS_WEB_STANDARD, &pre_escape),
             {&g_modifiers[1].modifier_info,     // html_escape
              &g_modifiers[2].modifier_info,     // html_escape_with_arg=snippet
              &g_modifiers[3].modifier_info,     // html_escape_with_arg=pre
-             &g_modifiers[4].modifier_info} },  // html_escape_with_arg=attr...
-  /* 9 */ { ModifierInfo("url_query_escape", 'u', &url_query_escape), {} },
+             &g_modifiers[4].modifier_info,     // html_escape_with_arg=attr...
+             &g_modifiers[9].modifier_info,     // url_query_escape
+             &g_modifiers[12].modifier_info} },   // url_escape_with_arg=query
+  /* 9 */ { ModifierInfo("url_query_escape", 'u',
+                         XSS_WEB_STANDARD, &url_query_escape), {} },
   /* 10 */ { ModifierInfo("url_escape_with_arg=javascript", 'U',
+                          XSS_WEB_STANDARD,
                           &validate_url_and_javascript_escape), {} },
-  /* 11 */ { ModifierInfo("url_escape_with_arg=html",
-                          'U', &validate_url_and_html_escape), {} },
-  /* 12 */ { ModifierInfo("url_escape_with_arg=query",
-                          'U', &url_query_escape), {} },
-  /* 13 */ { ModifierInfo("none", '\0', &null_modifier), {} },
+  /* 11 */ { ModifierInfo("url_escape_with_arg=html", 'U',
+                          XSS_WEB_STANDARD, &validate_url_and_html_escape), {} },
+  /* 12 */ { ModifierInfo("url_escape_with_arg=query", 'U',
+                          XSS_WEB_STANDARD, &url_query_escape), {} },
+  /* 13 */ { ModifierInfo("none", '\0', XSS_UNIQUE, &null_modifier), {} },
+  /* 14 */ { ModifierInfo("xml_escape", '\0', XSS_WEB_STANDARD, &xml_escape),
+             {&g_modifiers[1].modifier_info,      // html_escape
+              &g_modifiers[4].modifier_info,} },  // H=attribute
+  /* 15 */ { ModifierInfo("javascript_escape_with_arg=number", 'J',
+                          XSS_WEB_STANDARD, &javascript_number), {} },
 };
 
 static vector<ModifierInfo> g_extension_modifiers;
@@ -515,7 +650,8 @@ bool AddModifier(const char* long_name,
     }
   }
 
-  g_extension_modifiers.push_back(ModifierInfo(long_name, '\0', modifier));
+  g_extension_modifiers.push_back(ModifierInfo(long_name, '\0',
+                                               XSS_UNIQUE, modifier));
   return true;
 }
 
@@ -598,8 +734,13 @@ const ModifierInfo* FindModifier(const char* modname, size_t modname_len,
       return best_match;
     // This is the only situation where we can pass in a modifier of NULL.
     // It means "we don't know about this modifier-name."
-    g_unknown_modifiers.push_back(ModifierInfo(string(modname, modname_len),
-                                               '\0', NULL));
+    string fullname(modname, modname_len);
+    if (modval_len) {
+      fullname.append("=");
+      fullname.append(modval, modval_len);
+    }
+    g_unknown_modifiers.push_back(ModifierInfo(fullname, '\0',
+                                               XSS_UNIQUE, NULL));
     return &g_unknown_modifiers.back();
   } else {
     for (const ModifierWithAlternatives* mod_with_alts = g_modifiers;

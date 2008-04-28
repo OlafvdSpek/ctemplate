@@ -84,6 +84,9 @@
 /* Define to 1 if the system has the type `__uint16'. */
 #undef HAVE___UINT16
 
+/* The namespace to put the htmlparser code. */
+#undef HTMLPARSER_NAMESPACE
+
 /* Name of package */
 #undef PACKAGE
 

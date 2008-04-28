@@ -62,6 +62,9 @@ using GOOGLE_NAMESPACE::Strip;
 using GOOGLE_NAMESPACE::DO_NOT_STRIP;
 using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
 using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
+using GOOGLE_NAMESPACE::TC_HTML;
+using GOOGLE_NAMESPACE::TC_JS;
+using GOOGLE_NAMESPACE::TC_NONE;
 
 #define ASSERT(cond)  do {                                      \
   if (!(cond)) {                                                \
@@ -185,6 +188,50 @@ class TemplateFromStringUnittest {
     ASSERT(!tpl9);
   }
 
+  static void TestTemplateCache() {
+    const string cache_key_a = "cache key a";
+    const string cache_key_b = "cache key b";
+    const string text = "Test template 1";
+
+    Template *tpl, *tpl2;
+    ASSERT(tpl = TemplateFromString::GetTemplate(
+               cache_key_a, text, DO_NOT_STRIP));
+
+    // Tests with standard (non auto-escape) mode.
+    ASSERT(tpl2 = TemplateFromString::GetTemplate(
+               cache_key_b, text, DO_NOT_STRIP));
+    ASSERT(tpl2 != tpl);  // different cache_key.
+    ASSERT(tpl2 = TemplateFromString::GetTemplate(
+               cache_key_a, text, STRIP_BLANK_LINES));
+    ASSERT(tpl2 != tpl);  // different strip.
+    ASSERT(tpl2 = TemplateFromString::GetTemplate(
+               cache_key_a, text, DO_NOT_STRIP));
+    ASSERT(tpl2 == tpl);  // same cache_key and strip.
+
+    // Test mixing standard and auto-escape mode.
+    ASSERT(tpl = TemplateFromString::GetTemplate(
+               cache_key_a, text, DO_NOT_STRIP));
+    ASSERT(tpl2 = TemplateFromString::GetTemplateWithAutoEscaping(
+               cache_key_a, text, DO_NOT_STRIP, TC_HTML));
+    ASSERT(tpl2 != tpl);  // different mode.
+
+    // Tests with auto-escape mode.
+    ASSERT(tpl = TemplateFromString::GetTemplateWithAutoEscaping(
+               cache_key_a, text, DO_NOT_STRIP, TC_HTML));
+    ASSERT(tpl2 = TemplateFromString::GetTemplateWithAutoEscaping(
+               cache_key_b, text, DO_NOT_STRIP, TC_HTML));
+    ASSERT(tpl2 != tpl);  // different cache_key.
+    ASSERT(tpl2 = TemplateFromString::GetTemplateWithAutoEscaping(
+               cache_key_a, text, STRIP_BLANK_LINES, TC_HTML));
+    ASSERT(tpl2 != tpl);  // different strip.
+    ASSERT(tpl2 = TemplateFromString::GetTemplateWithAutoEscaping(
+               cache_key_a, text, DO_NOT_STRIP, TC_JS));
+    ASSERT(tpl2 != tpl);  // different context.
+    ASSERT(tpl2 = TemplateFromString::GetTemplateWithAutoEscaping(
+               cache_key_a, text, DO_NOT_STRIP, TC_HTML));
+    ASSERT(tpl2 == tpl);  // same cache_key and strip and context.
+  }
+
   // Tests that the various strip values all do the expected thing.
   // This also tests TemplateFromString's parsing of newlines in its
   // input.
@@ -224,6 +271,7 @@ int main(int argc, char** argv) {
   TemplateFromStringUnittest::TestVariable();
   TemplateFromStringUnittest::TestSection();
   TemplateFromStringUnittest::TestGetTemplate();
+  TemplateFromStringUnittest::TestTemplateCache();
   TemplateFromStringUnittest::TestStrip();
 
   printf("DONE\n");

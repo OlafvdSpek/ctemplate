@@ -55,6 +55,14 @@ echo '<a href={{QCHAR}}{{HREF}}{{QC' > $TMPDIR/bad1.tpl
 echo '<img {{#ATTRIBUTES}}{{ATTRIBUTE}}>' > $TMPDIR/bad2.tpl
 echo '<html><head><title>{{TITLE?}}</title></head></html>' > $TMPDIR/bad3.tpl
 
+# We'll make some templates with modifiers as well.
+echo '<a href={{HREF:h}} {{PARAMS}}>' > $TMPDIR/ok4.tpl
+echo '<a href={{HREF:html_escape_with_arg=url}} {{PARAMS}}>' > $TMPDIR/ok5.tpl
+echo '<a href={{HREF:x-custom-modifier}} {{PARAMS}}>' > $TMPDIR/ok6.tpl
+echo '<a href={{HREF:x-custom-modifier=arg}} {{PARAMS}}>' > $TMPDIR/ok7.tpl
+echo '<a href={{HREF:x-custom-modifier=}} {{PARAMS}}>' > $TMPDIR/ok8.tpl
+
+
 # First, test commandline flags
 $MAKETPL >/dev/null 2>&1 \
    && die "$LINENO: $MAKETPL with no args didn't give an error"
@@ -98,6 +106,22 @@ expected_ok3=`cat <<EOF | grep -v '^EOF$'
 //
 const char * const ko_TITLE = "TITLE";
 EOF`
+
+expected_ok4=`cat <<EOF | grep -v '^EOF$'
+//
+// This header file auto-generated for the template
+//    $TMPDIR/ok4.tpl
+// DO NOT MODIFY THIS FILE DIRECTLY
+//
+const char * const ko_HREF = "HREF";
+const char * const ko_PARAMS = "PARAMS";
+EOF`
+
+expected_ok5=`echo "$expected_ok4" | sed s/ok4/ok5/g`
+expected_ok6=`echo "$expected_ok4" | sed s/ok4/ok6/g`
+expected_ok7=`echo "$expected_ok4" | sed s/ok4/ok7/g`
+expected_ok8=`echo "$expected_ok4" | sed s/ok4/ok8/g`
+
 
 # The "by <program>" line is messed up when using libtool.  Thus, we just
 # strip it out when doing the comparisons.
@@ -148,24 +172,20 @@ echo "$expected_ok1" | diff - "$TMPDIR/ok1.h.cleansed" \
    || die "$LINENO: $MAKETPL didn't make ok1.h output correctly"
 
 # Verify we don't give any output iff everything works, with -q flag.
-# Also test using a different output dir.
+# Also test using a different output dir.  Also, test *every* ok template.
 mkdir $TMPDIR/output
-out=`$MAKETPL -q -t$TMPDIR -o$TMPDIR/output -s"#" ok1.tpl ok2.tpl ok3.tpl 2>&1`
-[ -z "$out" ] || die "$LINENO: $MAKETPL -q wasn't so quiet"
-Cleanse "$TMPDIR/output/ok1.tpl#"
-echo "$expected_ok1" | diff - "$TMPDIR/output/ok1.tpl#.cleansed" \
-   || die "$LINENO: $MAKETPL didn't make ok1 output correctly"
-Cleanse "$TMPDIR/output/ok2.tpl#"
-echo "$expected_ok2" | diff - "$TMPDIR/output/ok2.tpl#.cleansed" \
-   || die "$LINENO: $MAKETPL didn't make ok2 output correctly"
-Cleanse "$TMPDIR/output/ok3.tpl#"
-echo "$expected_ok3" | diff - "$TMPDIR/output/ok3.tpl#.cleansed" \
-   || die "$LINENO: $MAKETPL didn't make ok3 output correctly"
+out=`$MAKETPL -q -t$TMPDIR -o$TMPDIR/output -s"#" ok{1,2,3,4,5,6,7,8}.tpl 2>&1`
+[ -z "$out" ] || die "$LINENO: $MAKETPL -q wasn't so quiet: '$out'"
+for i in 1 2 3 4 5 6 7 8; do
+  Cleanse "$TMPDIR/output/ok$i.tpl#"
+  eval "echo \"\$expected_ok$i\"" | diff - "$TMPDIR/output/ok$i.tpl#.cleansed" \
+     || die "$LINENO: $MAKETPL didn't make ok$i output correctly"
+done
 
-out=`$MAKETPL -q --outputfile_suffix=2 $TMPDIR/bad1.tpl $TMPDIR/bad2.tpl $TMPDIR/bad3.tpl 2>&1`
+out=`$MAKETPL -q --outputfile_suffix=2 $TMPDIR/bad{1,2,3}.tpl 2>&1`
 [ -z "$out" ] && die "$LINENO: $MAKETPL -q was too quiet"
-[ -f "$TMPDIR/output/bad1.tpl2" ] && die "$LINENO: $MAKETPL did make bad1 output"
-[ -f "$TMPDIR/output/bad2.tpl2" ] && die "$LINENO: $MAKETPL did make bad2 output"
-[ -f "$TMPDIR/output/bad3.tpl2" ] && die "$LINENO: $MAKETPL did make bad3 output"
+for i in 1 2 3; do
+  [ -f "$TMPDIR/output/bad$i.tpl2" ] && die "$LINENO: $MAKETPL made bad$i output"
+done
 
 echo "PASSED"

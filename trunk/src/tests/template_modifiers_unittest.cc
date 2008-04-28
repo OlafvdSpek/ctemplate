@@ -121,21 +121,26 @@ class TemplateModifiersUnittest {
 
   static void TestXmlEscape() {
     TemplateDictionary dict("TestXmlEscape", NULL);
+    dict.SetEscapedValue("no XML", "",
+                         template_modifiers::xml_escape);
     dict.SetEscapedValue("easy XML", "xoo",
                          template_modifiers::xml_escape);
-    dict.SetEscapedValue("harder XML", "xoo & xar",
+    dict.SetEscapedValue("harder XML-1", "<>&'\"",
                          template_modifiers::xml_escape);
-    dict.SetEscapedValue("harder XML 2", "&nbsp;",
+    dict.SetEscapedValue("harder XML-2", "Hello<script>alert('&')</script>",
                          template_modifiers::xml_escape);
-    dict.SetEscapedValue("hardest XML", "&nbsp;xoo &nbsp;&nbsp; x&nbsp;x &nbsp",
+    dict.SetEscapedValue("hardest XML", "<<b>>&!''\"\"foo",
                          template_modifiers::xml_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
+    ASSERT_STREQ(peer.GetSectionValue("no XML"), "");
     ASSERT_STREQ(peer.GetSectionValue("easy XML"), "xoo");
-    ASSERT_STREQ(peer.GetSectionValue("harder XML"), "xoo & xar");
-    ASSERT_STREQ(peer.GetSectionValue("harder XML 2"), "&#160;");
+    ASSERT_STREQ(peer.GetSectionValue("harder XML-1"),
+                 "&lt;&gt;&amp;&#39;&quot;");
+    ASSERT_STREQ(peer.GetSectionValue("harder XML-2"),
+                 "Hello&lt;script&gt;alert(&#39;&amp;&#39;)&lt;/script&gt;");
     ASSERT_STREQ(peer.GetSectionValue("hardest XML"),
-                 "&#160;xoo &#160;&#160; x&#160;x &nbsp");
+                 "&lt;&lt;b&gt;&gt;&amp;!&#39;&#39;&quot;&quot;foo");
   }
 
   static void TestValidateUrlHtmlEscape() {
@@ -215,7 +220,6 @@ class TemplateModifiersUnittest {
         template_modifiers::validate_url_and_javascript_escape);
 
 
-
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy http URL"),
                  "http://www.google.com");
@@ -248,14 +252,28 @@ class TemplateModifiersUnittest {
     dict.SetEscapedValue("hardest attribute",
                          "top onclick='alert(document.cookie)'",
                          template_modifiers::cleanse_attribute);
+    dict.SetEscapedValue("equal in middle", "foo = bar",
+                         template_modifiers::cleanse_attribute);
+    dict.SetEscapedValue("leading equal", "=foo",
+                         template_modifiers::cleanse_attribute);
+    dict.SetEscapedValue("trailing equal", "foo=",
+                         template_modifiers::cleanse_attribute);
+    dict.SetEscapedValue("all equals", "===foo===bar===",
+                         template_modifiers::cleanse_attribute);
+    dict.SetEscapedValue("just equals", "===",
+                         template_modifiers::cleanse_attribute);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
-    ASSERT_STREQ(peer.GetSectionValue("easy attribute"),
-                  "top");
-    ASSERT_STREQ(peer.GetSectionValue("harder attribute"),
-                  "foo___bar");
+    ASSERT_STREQ(peer.GetSectionValue("easy attribute"), "top");
+    ASSERT_STREQ(peer.GetSectionValue("harder attribute"), "foo___bar");
     ASSERT_STREQ(peer.GetSectionValue("hardest attribute"),
-                 "top_onclick__alert_document.cookie__");
+                 "top_onclick=_alert_document.cookie__");
+
+    ASSERT_STREQ(peer.GetSectionValue("equal in middle"), "foo_=_bar");
+    ASSERT_STREQ(peer.GetSectionValue("leading equal"), "_foo");
+    ASSERT_STREQ(peer.GetSectionValue("trailing equal"), "foo_");
+    ASSERT_STREQ(peer.GetSectionValue("just equals"), "_=_");
+    ASSERT_STREQ(peer.GetSectionValue("all equals"), "_==foo===bar==_");
   }
 
   static void TestCleanseCss() {
@@ -289,6 +307,13 @@ class TemplateModifiersUnittest {
     dict.SetEscapedValue("close script JS",
                          "//--></script><script>alert(123);</script>",
                          template_modifiers::javascript_escape);
+    dict.SetEscapedValue("unicode codepoints",
+                         ("line1" "\xe2\x80\xa8" "line2" "\xe2\x80\xa9" "line3"
+                          /* \u2027 */ "\xe2\x80\xa7"
+                          /* \u202A */ "\xe2\x80\xaa"
+                          /* malformed */ "\xe2" "\xe2\x80\xa8"
+                          /* truncated */ "\xe2\x80"),
+                         template_modifiers::javascript_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy JS"), "joo");
@@ -299,6 +324,91 @@ class TemplateModifiersUnittest {
     ASSERT_STREQ(peer.GetSectionValue("close script JS"),
                  "//--\\x3e\\x3c/script\\x3e\\x3cscript\\x3e"
                  "alert(123);\\x3c/script\\x3e");
+    ASSERT_STREQ(peer.GetSectionValue("unicode codepoints"),
+                 "line1" "\\u2028" "line2" "\\u2029" "line3"
+                 "\xe2\x80\xa7"
+                 "\xe2\x80\xaa"
+                 "\xe2" "\\u2028"
+                 "\xe2\x80");
+  }
+
+  static void TestJavascriptNumber() {
+    TemplateDictionary dict("TestJavascriptNumber", NULL);
+    dict.SetEscapedValue("empty string", "",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("boolean true", "true",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("boolean false", "false",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("bad boolean 1", "tfalse",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("bad boolean 2", "tru",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("bad boolean 3", "truee",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("bad boolean 4", "invalid",
+                         template_modifiers::javascript_number);
+
+    // Check that our string comparisons for booleans do not
+    // assume input is null terminated.
+    dict.SetEscapedValue("good boolean 5", TemplateString("truee", 4),
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("bad boolean 6", TemplateString("true", 3),
+                         template_modifiers::javascript_number);
+
+    dict.SetEscapedValue("hex number 1", "0x123456789ABCDEF",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("hex number 2", "0X123456789ABCDEF",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("bad hex number 1", "0x123GAC",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("bad hex number 2", "0x",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("number zero", "0",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("invalid number", "A9",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("decimal zero", "0.0",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("octal number", "01234567",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("decimal number", "799.123",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("negative number", "-244",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("positive number", "+244",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("valid float 1", ".55",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("valid float 2", "8.55e-12",
+                         template_modifiers::javascript_number);
+    dict.SetEscapedValue("invalid float", "8.55ABC",
+                         template_modifiers::javascript_number);
+
+    TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
+    ASSERT_STREQ(peer.GetSectionValue("empty string"), "");
+    ASSERT_STREQ(peer.GetSectionValue("boolean true"), "true");
+    ASSERT_STREQ(peer.GetSectionValue("boolean false"), "false");
+    ASSERT_STREQ(peer.GetSectionValue("bad boolean 1"), "null");
+    ASSERT_STREQ(peer.GetSectionValue("bad boolean 2"), "null");
+    ASSERT_STREQ(peer.GetSectionValue("bad boolean 3"), "null");
+    ASSERT_STREQ(peer.GetSectionValue("bad boolean 4"), "null");
+    ASSERT_STREQ(peer.GetSectionValue("good boolean 5"), "true");
+    ASSERT_STREQ(peer.GetSectionValue("bad boolean 6"), "null");
+    ASSERT_STREQ(peer.GetSectionValue("hex number 1"), "0x123456789ABCDEF");
+    ASSERT_STREQ(peer.GetSectionValue("hex number 2"), "0X123456789ABCDEF");
+    ASSERT_STREQ(peer.GetSectionValue("bad hex number 1"), "null");
+    ASSERT_STREQ(peer.GetSectionValue("bad hex number 2"), "null");
+    ASSERT_STREQ(peer.GetSectionValue("number zero"), "0");
+    ASSERT_STREQ(peer.GetSectionValue("invalid number"), "null");
+    ASSERT_STREQ(peer.GetSectionValue("decimal zero"), "0.0");
+    ASSERT_STREQ(peer.GetSectionValue("octal number"), "01234567");
+    ASSERT_STREQ(peer.GetSectionValue("decimal number"), "799.123");
+    ASSERT_STREQ(peer.GetSectionValue("negative number"), "-244");
+    ASSERT_STREQ(peer.GetSectionValue("positive number"), "+244");
+    ASSERT_STREQ(peer.GetSectionValue("valid float 1"), ".55");
+    ASSERT_STREQ(peer.GetSectionValue("valid float 2"), "8.55e-12");
+    ASSERT_STREQ(peer.GetSectionValue("invalid float"), "null");
   }
 
   static void TestJsonEscape() {
@@ -390,6 +500,12 @@ class TemplateModifiersUnittest {
     ASSERT(info->modifier == &template_modifiers::pre_escape);
     ASSERT(info = template_modifiers::FindModifier("H", 1, "=pre", 4));
     ASSERT(info->modifier == &template_modifiers::pre_escape);
+
+    ASSERT(info = template_modifiers::FindModifier("javascript_escape_with_arg",
+                                                   26, "=number", 7));
+    ASSERT(info = template_modifiers::FindModifier("J", 1, "=number", 7));
+    ASSERT(info->modifier == &template_modifiers::javascript_number);
+
     // html_escape_with_arg doesn't have a default value, so these should fail.
     ASSERT(!template_modifiers::FindModifier("H", 1, "=pre", 2));  // "=p"
     ASSERT(!template_modifiers::FindModifier("H", 1, "=pree", 5));
@@ -555,16 +671,18 @@ class TemplateModifiersUnittest {
     ASSERT(CheckXSSAlternative("url_query_escape", "",
                                "url_escape_with_arg", "=query"));
 
-    // H=pre, H=snippet, H=attribute and p are all alternatives to h.
+    // H=(pre|snippet|attribute), p, u and U=query are all alternatives to h.
     ASSERT(CheckXSSAlternative("h", "", "H", "=pre"));
     ASSERT(CheckXSSAlternative("h", "", "H", "=snippet"));
     ASSERT(CheckXSSAlternative("h", "", "H", "=attribute"));
     ASSERT(CheckXSSAlternative("h", "", "p", ""));
+    ASSERT(CheckXSSAlternative("h", "", "u", ""));
+    ASSERT(CheckXSSAlternative("h", "", "U", "=query"));
 
     // But h is not an alternative to H=attribute
-    // nor are u or json_escape alternatives to h.
+    // nor are U=html (yet) or json_escape alternatives to h.
     ASSERT(!CheckXSSAlternative("H", "=attribute", "h", ""));
-    ASSERT(!CheckXSSAlternative("h", "", "u", ""));
+    ASSERT(!CheckXSSAlternative("h", "", "U", "=html"));
     ASSERT(!CheckXSSAlternative("h", "", "json_escape", ""));
 
     // H=snippet and H=attribute are alternatives to H=pre
@@ -596,6 +714,7 @@ int main(int argc, char** argv) {
   TemplateModifiersUnittest::TestCleanseAttribute();
   TemplateModifiersUnittest::TestCleanseCss();
   TemplateModifiersUnittest::TestJavascriptEscape();
+  TemplateModifiersUnittest::TestJavascriptNumber();
   TemplateModifiersUnittest::TestJsonEscape();
   TemplateModifiersUnittest::TestUrlQueryEscape();
   TemplateModifiersUnittest::TestPrefixLine();

@@ -53,6 +53,10 @@
 
 @ac_windows_dllexport_defines@
 
+namespace @ac_htmlparser_namespace@ {
+class HtmlParser;
+}
+
 @ac_google_start_namespace@
 
 // TemplateState of a template is:
@@ -63,6 +67,38 @@
 // (TS_UNUSED is not used)
 enum TemplateState { TS_UNUSED, TS_EMPTY, TS_ERROR, TS_READY, TS_SHOULD_RELOAD };
 
+// To use the auto-escape mode you will need to provide the context (a.k.a type)
+// of the template in GetTemplate. We provide:
+// - TC_HTML:   The template contains HTML code. Need not be a complete HTML
+//              page just content the browser interprets in the context of
+//              HTML parsing. This should be the most common context to use.
+//              This mode activates our HTML parser.
+// - TC_JS:     The template contains raw javascript. If your template
+//              starts with <script> tag, it is of type TC_HTML not TC_JS.
+//              TC_JS is typically associated with a content-type of
+//              text/javascript. This mode activates our HTML parser.
+// - TC_CSS:    The template contains CSS (cascaded style-sheet). If your
+//              template starts with a <style> tag, it is of type TC_HTML
+//              not TC_CSS. A TC_CSS template is typically associated with a
+//              text/css content-type header. Currently treated same as
+//              TC_HTML but don't rely on that. We may later develop
+//              CSS-specific sanitizers and parsers.
+// - TC_JSON:   The template contains raw JSON. Applies javascript_escape
+//              to variables. Note: javascript_escape is safer than
+//              json_escape which we may want to remove.
+// - TC_XML:    The template contains raw XML. Applies xml_escape to variables.
+//              CAUTION: This mode is not suitable for cases where the
+//              application data encapsulated in XML requires special
+//              escaping, such as the case of XHTML.
+//              TC_XML is typically associated with text/xml content-type.
+// - TC_NONE:   Don't use, Internal use only to support passivating the
+//              HTML-aware parsing and auto-escaping when template-includes
+//              specify modifiers.
+// - TC_MANUAL: Don't use, internal only.
+//
+// TODO(jad): Move declaration to inside Template class.
+enum TemplateContext { TC_UNUSED, TC_HTML, TC_JS, TC_CSS, TC_JSON,
+                       TC_XML, TC_NONE, TC_MANUAL };
 
 // Template
 //   The object which reads and parses the template file and then is used to
@@ -96,6 +132,23 @@ class @ac_windows_dllexport@ Template {
   //   at either the beginning or end of a line.  See template constructor
   //   for more details.
   static Template *GetTemplate(const std::string& filename, Strip strip);
+
+  // GetTemplateWithAutoEscaping (static Template factory method)
+  //   Same logic as GetTemplate above except it also enables
+  //   auto-escaping for that template and for all templates it may
+  //   include. The auto-escaping mode is not for everyone, in particular
+  //   it is only useful when you are using the Template System in the
+  //   context of web-applications which operate on untrusted
+  //   content that requires proper escaping when expanded into the template.
+  //   In order to automatically determine the correct escaping to apply
+  //   to all variable substitutions, the Template System becomes
+  //   "HTML-aware" and parses the template during initial creation.
+  //
+  //   TemplateContext must match the context in which the template
+  //   is being returned or the auto-escaping will be wrong.
+  static Template *GetTemplateWithAutoEscaping(const std::string& filename,
+                                               Strip strip,
+                                               TemplateContext context);
 
   // Template destructor
   virtual ~Template();
@@ -133,15 +186,22 @@ class @ac_windows_dllexport@ Template {
               const TemplateDictionary *dictionary) const;
 
   // Dump
-  //   Dumps the parsed structure to stdout for debugging assistance
+  //   Dumps the parsed structure of the template for debugging assistance.
+  //   It goes to stdout because it could be too big for LOG(INFO) and
+  //   would end up truncated.
   void Dump(const char *filename) const;
 
+  // DumpToString
+  //   Same as Dump above except it dumps to the given string instead.
+  //   Format is identical to Dump.
+  void DumpToString(const char *filename, std::string *out) const;
+
   // state
-  //   Retrieves the state of the template (see TemplateState above)
+  //   Retrieves the state of the template (see TemplateState above).
   TemplateState state() const;
 
   // template_file
-  //   Returns the name of the template file used to build this template
+  //   Returns the name of the template file used to build this template.
   const char *template_file() const;
 
   // ReloadIfChanged
@@ -166,6 +226,19 @@ class @ac_windows_dllexport@ Template {
   friend class SectionTemplateNode;  // for access to set_state(), ParseState
   friend class TemplateTemplateNode; // for recursive call to Expand()
 
+  typedef std::pair<std::string, int> TemplateCacheKey;
+
+  // Used by Template and TemplateFromString. Constructs the key to look-up
+  // this template in the template cache. The key is comprised of the name
+  // (filename or string identifier), the Strip and the TemplateContext.
+  static TemplateCacheKey GetTemplateCacheKey(const std::string& name, Strip strip,
+                                              TemplateContext context);
+
+  // Performs the actual work for both factory methods
+  // GetTemplate and GetTemplateWithAutoEscaping.
+  static Template *GetTemplateCommon(const std::string& filename, Strip strip,
+                                     TemplateContext context);
+
   // AssureGlobalsInitialized
   //   Initializes the global (static) variables the first time it is
   //   called. After that it simply checks one of the
@@ -187,7 +260,9 @@ class @ac_windows_dllexport@ Template {
   //   a comment marker as the last element on the line.
   //   These two options allow the template to include whitespace for
   //   readability without adding to the expanded output.
-  Template(const std::string& filename, Strip strip);
+  //   If context is not TC_MANUAL we enable auto-escaping
+  //   for that template and any template it includes.
+  Template(const std::string& filename, Strip strip, TemplateContext context);
 
   // BuildTree
   //   Parses the contents of the file (retrieved via ReloadIfChanged)
@@ -220,7 +295,6 @@ class @ac_windows_dllexport@ Template {
   //   Used by ReloadIfChanged()
   size_t InsertLine(const char *line, size_t len, char* buffer);
   size_t InsertFile(const char *file, size_t len, char* buffer);
-
 
   // The file we read the template from
   std::string filename_;    // can't be const because of TemplateFromString :-(
@@ -256,6 +330,12 @@ class @ac_windows_dllexport@ Template {
   // The root directory for all templates. Defaults to "./" until
   // SetTemplateRootDirectory changes it
   static std::string *template_root_directory_;
+
+  // TC_MANUAL indicates the template is not in auto-escaping mode.
+  // other values imply auto-escape mode is enabled.
+  const TemplateContext initial_context_;
+  // Non-null if template was initialized in auto_escape mode.
+  @ac_htmlparser_namespace@::HtmlParser *htmlparser_;
 
  private:
   // Can't invoke copy constructor or assignment operator

@@ -63,6 +63,22 @@ int main() {
 
 </pre>
 
+Note: If this template was intended to run in a web application, you can 
+leverage the functionality provided by the auto-escape mode. Simply change the
+template initialization by calling <code>GetTemplateWithAutoEscaping</code>
+instead of <code>GetTemplate</code> as shown below. Your variables will be
+automatically escaped for the HTML context as specified by <code>TC_HTML</code>
+supplied in the initialization.
+
+<pre>
+
+  Template* tpl = 
+    TemplateFromString::GetTemplateWithAutoEscaping("error_msg_tpl", 
+                                                    template_text,
+                                                    DO_NOT_STRIP, TC_HTML);
+
+</pre>
+
 <p>This example is only slightly more complicated: we only print the
 ": &lt;error message&gt;" part when the error message isn't the empty
 string.</p>
@@ -318,6 +334,7 @@ void output_page(const Query* query) {
 <hr>
 <ul>
   <li> <A HREF="howto.html">Howto</A> </li>
+  <li> <A HREF="auto_escape.html">Auto Escape</A> </li>
   <li> <A HREF="tips.html">Tips</A> </li>
 <!--
   <li> <A HREF="example.html">Example</A> </li>
