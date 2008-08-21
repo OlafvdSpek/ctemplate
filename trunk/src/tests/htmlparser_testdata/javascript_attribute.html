@@ -16,6 +16,12 @@ attr=onmouseover, attr_type=js, in_js=true ?>)'>test</a>
 
 <?state state=text, in_js=false ?>
 
+<a onclick="<?state in_js=true, js_quoted=false?>">test</a>
+<?state state=text, in_js=false ?>
+
+<a onclick="'<?state in_js=true, js_quoted=true?>">test</a>
+<?state state=text, in_js=false ?>
+
 </body>
 </html>
 <?state state=text ?><?state state=text ?>

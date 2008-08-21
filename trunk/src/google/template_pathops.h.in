@@ -30,8 +30,8 @@
 // ---
 // Author: Craig Silverstein
 
-#ifndef TEMPLATE_TEMPLATE_PATHOPS_H__
-#define TEMPLATE_TEMPLATE_PATHOPS_H__
+#ifndef TEMPLATE_TEMPLATE_PATHOPS_H_
+#define TEMPLATE_TEMPLATE_PATHOPS_H_
 
 #include <string>
 
@@ -57,4 +57,4 @@ std::string @ac_windows_dllexport@ Basename(const std::string& path);
 
 @ac_google_end_namespace@
 
-#endif  // TEMPLATE_TEMPLATE_PATHOPS_H__
+#endif  // TEMPLATE_TEMPLATE_PATHOPS_H_

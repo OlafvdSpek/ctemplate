@@ -47,8 +47,12 @@
 #if 1
 #include <google/template_dictionary.h>
 #include <google/template_namelist.h>
+#include <google/per_expand_data.h>
 #else
-namespace google { class TemplateDictionary; }
+namespace google {
+class TemplateDictionary;
+class PerExpandData;
+}
 #endif
 
 // NOTE: if you are statically linking the template library into your binary
@@ -99,7 +103,9 @@ enum TemplateState { TS_UNUSED, TS_EMPTY, TS_ERROR, TS_READY, TS_SHOULD_RELOAD }
 // - TC_NONE:   Don't use, Internal use only to support passivating the
 //              HTML-aware parsing and auto-escaping when template-includes
 //              specify modifiers.
-// - TC_MANUAL: Don't use, internal only.
+// - TC_MANUAL: Equivalent to not specifying auto-escaping at all.
+//              That is, GetTemplateWithAutoEscaping(..., TC_MANUAL) is
+//              equivalent to GetTemplate(...).
 //
 // TODO(jad): Move declaration to inside Template class.
 enum TemplateContext { TC_UNUSED, TC_HTML, TC_JS, TC_CSS, TC_JSON,
@@ -165,6 +171,28 @@ class CTEMPLATE_DLL_DECL Template {
   //   this root-directory is prepended to the filename.
   static bool SetTemplateRootDirectory(const std::string& directory);
 
+  // RegisterStringAsTemplate
+  //   Inserts a template into the cache with key FILENAME, to be
+  //   later retrieved by GetTemplate.  Returns the constructed
+  //   template, or NULL on error.
+  //   NOTE: As a special case, if you pass in the empty string as
+  //         "filename", this routine will create and return a
+  //         template, but not cache it.  In this case, and this case
+  //         only, the caller is responsible for deleting the returned
+  //         Template object.  I recommend you avoid this confusing case.
+  static Template *RegisterStringAsTemplate(const std::string& filename,
+                                            Strip strip,
+                                            TemplateContext context,
+                                            const char* content,
+                                            size_t content_len);
+  static Template *RegisterStringAsTemplate(const std::string& filename,
+                                            Strip strip,
+                                            TemplateContext context,
+                                            const std::string& content) {
+    return RegisterStringAsTemplate(filename, strip, context,
+                                    content.data(), content.length());
+  }
+
   // ReloadAllIfChanged
   //   Marks each template object in the cache to check to see if
   //   its template file has changed the next time it is invoked
@@ -183,12 +211,25 @@ class CTEMPLATE_DLL_DECL Template {
   //   program will prevent unnecessary reporting in that case.
   static void ClearCache();
 
+  // ExpandWithData
+  //   If you want any per-expand data to be used at expand time, call
+  //   this routine instead of Expand.  You pass in an extra PerExpandData
+  //   structure (see per_expand_data.h) which sets this data:
+  //   whether or not you want the template to be annotated, and any
+  //   data you want to pass in to template modifers.  If per_expand_data
+  //   is NULL, this is exactly the same as Expand().
+  bool ExpandWithData(std::string *output_buffer,
+                      const TemplateDictionary *dictionary,
+                      const ctemplate::PerExpandData* per_expand_data) const;
+
   // Expand
   //   Expands the template into a string using the values
   //   in the supplied dictionary.  Returns true iff all the template
   //   files load and parse correctly.
   bool Expand(std::string *output_buffer,
-              const TemplateDictionary *dictionary) const;
+              const TemplateDictionary *dictionary) const {
+    return ExpandWithData(output_buffer, dictionary, NULL);
+  }
 
   // Dump
   //   Dumps the parsed structure of the template for debugging assistance.
@@ -233,9 +274,10 @@ class CTEMPLATE_DLL_DECL Template {
 
   typedef std::pair<std::string, int> TemplateCacheKey;
 
-  // Used by Template and TemplateFromString. Constructs the key to look-up
-  // this template in the template cache. The key is comprised of the name
-  // (filename or string identifier), the Strip and the TemplateContext.
+  // Used by GetTemplate and RegisterStringAsTemplate. Constructs the
+  // key to look-up this template in the template cache. The key is
+  // comprised of the name (filename or string identifier), the Strip
+  // and the TemplateContext.
   static TemplateCacheKey GetTemplateCacheKey(const std::string& name, Strip strip,
                                               TemplateContext context);
 
@@ -276,12 +318,9 @@ class CTEMPLATE_DLL_DECL Template {
   bool BuildTree(const char *input_buffer, const char* input_buffer_end);
 
   // Internal version of Expand, used for recursive calls.
-  // force_annotate_dict is a dictionary that can be used to force
-  // annotations: even if dictionary->ShouldAnnotateOutput() is false,
-  // if force_annotate_dict->ShouldAnnotateOutput() is true, we annotate.
   bool Expand(class ExpandEmitter *expand_emitter,
               const TemplateDictionary *dictionary,
-              const TemplateDictionary *force_annotate_dict) const;
+              const ctemplate::PerExpandData *per_expand_data) const;
 
   // Internal version of ReloadIfChanged, used when the function already
   // has a write-lock on mutex_.
@@ -291,18 +330,14 @@ class CTEMPLATE_DLL_DECL Template {
   //   Sets the state of the template.  Used during BuildTree().
   void set_state(TemplateState new_state);
 
-  // InsertLine and InsertFile
-  //   Writes each line to buffer, and returns number of bytes written.
-  //   A line is a string of characters that ends with a \n (or \0).
-  //   (We need to be line-based because Strip works line-by-line).
-  //   buffer must be big enough to hold the output.  It's guaranteed
-  //   that the output size is no bigger than the input size.
-  //   Used by ReloadIfChanged()
-  size_t InsertLine(const char *line, size_t len, char* buffer);
-  size_t InsertFile(const char *file, size_t len, char* buffer);
+  // StripBuffer
+  //   Modifies buffer in-place based on the strip_ mode, to remove
+  //   extra whitespace.  May delete[] the input buffer and replace
+  //   it with a new buffer.  Used by ReloadIfChanged().
+  void StripBuffer(char **buffer, size_t* len);
 
   // The file we read the template from
-  std::string filename_;    // can't be const because of TemplateFromString :-(
+  const std::string filename_;
   time_t filename_mtime_;   // lastmod time for filename last time we loaded it
 
   // What to do with whitespace at template-expand time
@@ -318,12 +353,31 @@ class CTEMPLATE_DLL_DECL Template {
   // The current parsed template structure.  Has pointers into template_text_.
   class SectionTemplateNode *tree_;       // defined in template.cc
 
+  // Template markers have the form {{VARIABLE}}, etc.  These constants
+  // define the {{ and }} that delimit template markers.
+  struct MarkerDelimiters {
+    const char* start_marker;
+    size_t start_marker_len;
+    const char* end_marker;
+    size_t end_marker_len;
+
+    MarkerDelimiters() {
+      start_marker = "{{";    // The default start-marker
+      start_marker_len = strlen(start_marker);
+      end_marker = "}}";
+      end_marker_len = strlen(end_marker);
+    }
+  };
+
   // The current parsing state.  Used in BuildTree() and subroutines
   struct ParseState {
     const char* bufstart;
     const char* bufend;
     enum { PS_UNUSED, GETTING_TEXT, GETTING_NAME } phase;
-    ParseState() : bufstart(NULL), bufend(NULL), phase(PS_UNUSED) {}
+    MarkerDelimiters current_delimiters;
+    ParseState()
+        : bufstart(NULL), bufend(NULL), phase(PS_UNUSED), current_delimiters()
+    {}
   };
   ParseState parse_state_;
 
@@ -343,6 +397,15 @@ class CTEMPLATE_DLL_DECL Template {
   google_ctemplate_streamhtmlparser::HtmlParser *htmlparser_;
 
  private:
+  // These are helper routines to StripFile.  I would make them static
+  // inside template.cc, but they use the MarerDelimiters struct.
+  static bool ParseDelimiters(const char* text, size_t textlen,
+                              MarkerDelimiters* delim);
+  static bool IsBlankOrOnlyHasOneRemovableMarker(const char** line, size_t* len,
+                                                 const MarkerDelimiters& delim);
+  static size_t InsertLine(const char *line, size_t len, Strip strip,
+                           const MarkerDelimiters& delim, char* buffer);
+
   // Can't invoke copy constructor or assignment operator
   Template(const Template&);
   void operator=(const Template &);

@@ -66,53 +66,35 @@ echo '<a href={{HREF:x-custom-modifier=}} {{PARAMS}}>' > $TMPDIR/ok8.tpl
 # First, test commandline flags
 $MAKETPL >/dev/null 2>&1 \
    && die "$LINENO: $MAKETPL with no args didn't give an error"
-$MAKETPL -o/var/tmp/foo >/dev/null 2>&1 \
+$MAKETPL -o$TMPDIR/foo >/dev/null 2>&1 \
    && die "$LINENO: $MAKETPL with no template didn't give an error"
 $MAKETPL -h >/dev/null 2>&1 \
    || die "$LINENO: $MAKETPL -h failed"
 $MAKETPL --help >/dev/null 2>&1 \
    || die "$LINENO: $MAKETPL --help failed"
-$MAKETPL -f/var/tmp/bar.h $TMPDIR/ok1.tpl $TMPDIR/ok2.tpl >/dev/null 2>&1 \
-   || die "$LINENO: $MAKETPL -f with multiple input files didn't give an error"
+$MAKETPL --nonsense >/dev/null 2>&1 \
+   && die "$LINENO: $MAKETPL --nonsense didn't give an error"
+$MAKETPL -f$TMPDIR/bar.h $TMPDIR/ok1.tpl $TMPDIR/ok2.tpl >/dev/null 2>&1 \
+   && die "$LINENO: $MAKETPL -f with multiple input files didn't give an error"
 
 # Some weird (broken) shells leave the ending EOF in the here-document,
 # hence the grep.
 expected_ok1=`cat <<EOF | grep -v '^EOF$'
-//
-// This header file auto-generated for the template
-//    $TMPDIR/ok1.tpl
-// DO NOT MODIFY THIS FILE DIRECTLY
-//
 const char * const ko_QCHAR = "QCHAR";
 const char * const ko_HREF = "HREF";
 const char * const ko_PARAMS = "PARAMS";
 EOF`
 
 expected_ok2=`cat <<EOF | grep -v '^EOF$'
-//
-// This header file auto-generated for the template
-//    $TMPDIR/ok2.tpl
-// DO NOT MODIFY THIS FILE DIRECTLY
-//
 const char * const ko_ATTRIBUTES = "ATTRIBUTES";
 const char * const ko_ATTRIBUTE = "ATTRIBUTE";
 EOF`
 
 expected_ok3=`cat <<EOF | grep -v '^EOF$'
-//
-// This header file auto-generated for the template
-//    $TMPDIR/ok3.tpl
-// DO NOT MODIFY THIS FILE DIRECTLY
-//
 const char * const ko_TITLE = "TITLE";
 EOF`
 
 expected_ok4=`cat <<EOF | grep -v '^EOF$'
-//
-// This header file auto-generated for the template
-//    $TMPDIR/ok4.tpl
-// DO NOT MODIFY THIS FILE DIRECTLY
-//
 const char * const ko_HREF = "HREF";
 const char * const ko_PARAMS = "PARAMS";
 EOF`
@@ -124,9 +106,9 @@ expected_ok8=`echo "$expected_ok4" | sed s/ok4/ok8/g`
 
 
 # The "by <program>" line is messed up when using libtool.  Thus, we just
-# strip it out when doing the comparisons.
+# strip it out when doing the comparisons.  In fact, get rid of all comments.
 Cleanse() {
-  grep -v '^// by ' "$1" > "$1.cleansed"
+  grep -v '^//' "$1" > "$1.cleansed"
 }
 
 # syntax-check these templates
@@ -138,7 +120,7 @@ $MAKETPL -n $TMPDIR/ok1.tpl $TMPDIR/ok2.tpl $TMPDIR/ok100.tpl >/dev/null 2>&1 \
    && die "$LINENO: $MAKETPL gave no error parsing non-existent template"
 
 # Now try the same thing, but use template-root so we don't need absdirs
-$MAKETPL -n --template_root=$TMPDIR ok1.tpl ok2.tpl ok3.tpl >/dev/null 2>&1 \
+$MAKETPL -n --template_dir=$TMPDIR ok1.tpl ok2.tpl ok3.tpl >/dev/null 2>&1 \
    || die "$LINENO: $MAKETPL gave error parsing good templates"
 
 # Parse the templates.  Bad one in the middle should be ignored.
@@ -174,7 +156,10 @@ echo "$expected_ok1" | diff - "$TMPDIR/ok1.h.cleansed" \
 # Verify we don't give any output iff everything works, with -q flag.
 # Also test using a different output dir.  Also, test *every* ok template.
 mkdir $TMPDIR/output
-out=`$MAKETPL -q -t$TMPDIR -o$TMPDIR/output -s"#" ok{1,2,3,4,5,6,7,8}.tpl 2>&1`
+# Normally I'd do {1,2,3,4,...}, but solaris sh doesn't understand that syntax
+out=`$MAKETPL -q -t$TMPDIR -o$TMPDIR/output -s"#" \
+     ok1.tpl ok2.tpl ok3.tpl ok4.tpl ok5.tpl ok6.tpl ok7.tpl ok8.tpl \
+     2>&1`
 [ -z "$out" ] || die "$LINENO: $MAKETPL -q wasn't so quiet: '$out'"
 for i in 1 2 3 4 5 6 7 8; do
   Cleanse "$TMPDIR/output/ok$i.tpl#"

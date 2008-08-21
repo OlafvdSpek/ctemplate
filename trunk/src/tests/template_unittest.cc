@@ -85,9 +85,12 @@ using GOOGLE_NAMESPACE::TC_HTML;
 using GOOGLE_NAMESPACE::TC_JS;
 using GOOGLE_NAMESPACE::TC_JSON;
 using GOOGLE_NAMESPACE::TC_XML;
+using GOOGLE_NAMESPACE::TC_MANUAL;
 using GOOGLE_NAMESPACE::TC_NONE;
 namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;   // an interior namespace
 namespace template_modifiers = GOOGLE_NAMESPACE::template_modifiers;
+
+using ctemplate::PerExpandData;
 
 // How many threads to use for our threading test.
 // This is a #define instead of a const int so we can use it in array-sizes
@@ -203,25 +206,33 @@ static Template* StringToTemplateWithAutoEscaping(const string& s,
 // This is esp. useful for calling from within gdb.
 // The gdb nice-ness is balanced by the need for the caller to delete the buf.
 
-static const char* ExpandIs(Template* tpl, TemplateDictionary *dict,
+static const char* ExpandIs(Template* tpl, const TemplateDictionary *dict,
+                            const PerExpandData* per_expand_data,
                             bool expected) {
   string outstring;
-  ASSERT(expected == tpl->Expand(&outstring, dict));
+  ASSERT(expected == tpl->ExpandWithData(&outstring, dict, per_expand_data));
 
   char* buf = new char [outstring.size()+1];
   strcpy(buf, outstring.c_str());
   return buf;
 }
 
-static void AssertExpandIs(Template* tpl, TemplateDictionary *dict,
-                           const string& is, bool expected) {
-  const char* buf = ExpandIs(tpl, dict, expected);
+static void AssertExpandWithDataIs(Template* tpl, const TemplateDictionary *dict,
+                                   const PerExpandData* per_expand_data,
+                                   const string& is, bool expected) {
+  const char* buf = ExpandIs(tpl, dict, per_expand_data, expected);
   if (strcmp(buf, is.c_str())) {
     printf("expected = '%s'\n", is.c_str());
     printf("actual   = '%s'\n", buf);
   }
   ASSERT_STREQ(buf, is.c_str());
   delete [] buf;
+}
+
+static void AssertExpandIs(Template* tpl, TemplateDictionary *dict,
+                           const string& is, bool expected) {
+  PerExpandData per_expand_data;
+  AssertExpandWithDataIs(tpl, dict, &per_expand_data, is, expected);
 }
 
 // A helper method used by TestCorrectModifiersForAutoEscape.
@@ -266,14 +277,37 @@ static void AssertCorrectEscaping(TemplateContext template_type,
 class DynamicModifier : public template_modifiers::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
-              const template_modifiers::ModifierData* per_expand_data,
+              const PerExpandData* per_expand_data,
               ExpandEmitter* outbuf, const string& arg) const {
     assert(arg.empty());    // we don't take an argument
     assert(per_expand_data);
-    const char* value = per_expand_data->LookupAsString("value");
+    const char* value = per_expand_data->LookupForModifiersAsString("value");
     if (value)
       outbuf->Emit(value);
   }
+};
+
+class EmphasizeTemplateModifier : public template_modifiers::TemplateModifier {
+ public:
+  EmphasizeTemplateModifier(const string& match)
+      : match_(match) {
+  }
+
+  bool MightModify(const PerExpandData* per_expand_data,
+                   const string& arg) const {
+    return strstr(arg.c_str(), match_.c_str());
+  }
+
+  void Modify(const char* in, size_t inlen,
+              const PerExpandData* per_expand_data,
+              ExpandEmitter* outbuf, const string& arg) const {
+    outbuf->Emit(">>");
+    outbuf->Emit(in, inlen);
+    outbuf->Emit("<<");
+  }
+
+ private:
+  string match_;
 };
 
 // This is all in a single class just to make friendship easier:
@@ -283,6 +317,112 @@ class TemplateUnittest {
  public:
 
   // The following tests test various aspects of how Expand() should behave.
+  static void TestWeirdSyntax() {
+    TemplateDictionary dict("dict");
+
+    // When we see {{{, we should match the second {{, not the first.
+    Template* tpl1 = StringToTemplate("hi {{{! VAR {{!VAR} }} lo",
+                                      STRIP_WHITESPACE);
+    AssertExpandIs(tpl1, &dict, "hi { lo", true);
+
+    // Likewise for }}}
+    Template* tpl2 = StringToTemplate("fn(){{{BI_NEWLINE}} x=4;{{BI_NEWLINE}}}",
+                                      DO_NOT_STRIP);
+    AssertExpandIs(tpl2, &dict, "fn(){\n x=4;\n}", true);
+
+    // Try lots of {'s!
+    Template* tpl3 = StringToTemplate("{{{{{{VAR}}}}}}}}", DO_NOT_STRIP);
+    AssertExpandIs(tpl3, &dict, "{{{{}}}}}}", true);
+  }
+
+  static void TestComment() {
+    TemplateDictionary dict("dict");
+    Template* tpl1 = StringToTemplate("hi {{!VAR}} lo",
+                                      STRIP_WHITESPACE);
+    AssertExpandIs(tpl1, &dict, "hi  lo", true);
+
+    Template* tpl2 = StringToTemplate("hi {{!VAR {VAR} }} lo",
+                                      STRIP_WHITESPACE);
+    AssertExpandIs(tpl2, &dict, "hi  lo", true);
+
+    Template* tpl3 = StringToTemplate("hi {{! VAR {{!VAR} }} lo",
+                                      STRIP_WHITESPACE);
+    AssertExpandIs(tpl3, &dict, "hi  lo", true);
+  }
+
+  static void TestSetMarkerDelimiters() {
+    TemplateDictionary dict("dict");
+    dict.SetValue("VAR", "yo");
+    Template* tpl1 = StringToTemplate("{{=| |=}}\nhi |VAR| {{lo}}",
+                                      STRIP_WHITESPACE);
+    AssertExpandIs(tpl1, &dict, "hi yo {{lo}}", true);
+
+    Template* tpl2 = StringToTemplate("{{=| |=}}hi |VAR| {{lo}}",
+                                      STRIP_WHITESPACE);
+    AssertExpandIs(tpl2, &dict, "hi yo {{lo}}", true);
+
+    Template* tpl3 = StringToTemplate("{{=| ||=}}hi ||VAR|||VAR|| {{lo}}",
+                                      STRIP_WHITESPACE);
+    AssertExpandIs(tpl3, &dict, "hi |yoyo {{lo}}", true);
+
+    Template* tpl4 = StringToTemplate("{{=< >=}}hi <<VAR>> {{lo}}",
+                                      STRIP_WHITESPACE);
+    AssertExpandIs(tpl4, &dict, "hi <yo> {{lo}}", true);
+
+    Template* tpl4b = StringToTemplate("{{=<< >>=}}hi <<VAR>> {{lo}}",
+                                      STRIP_WHITESPACE);
+    AssertExpandIs(tpl4b, &dict, "hi yo {{lo}}", true);
+
+    Template* tpl4c = StringToTemplate("{{=<< <<=}}hi <<VAR<< {{lo}}",
+                                      STRIP_WHITESPACE);
+    AssertExpandIs(tpl4c, &dict, "hi yo {{lo}}", true);
+
+    Template* tpl5 = StringToTemplate("hi {{VAR}} lo\n{{=< >=}}\n"
+                                      "hi {{VAR}} lo\n"
+                                      "hi <VAR> lo\n<={ }=>\n"
+                                      "hi {{VAR}} lo\n{={{ }}=}\n"
+                                      "hi {{VAR}} lo\n",
+                                      STRIP_WHITESPACE);
+    AssertExpandIs(tpl5, &dict,
+                   "hi yo lohi {{VAR}} lohi yo lohi {yo} lohi yo lo",
+                   true);
+
+    Template* tpl6 = StringToTemplate("hi {{VAR}} lo\n{{=< >}}\n",
+                                      STRIP_WHITESPACE);
+    ASSERT(tpl6 == NULL);
+
+    Template* tpl7 = StringToTemplate("hi {{VAR}} lo\n{{=<>}}\n",
+                                      STRIP_WHITESPACE);
+    ASSERT(tpl7 == NULL);
+
+    Template* tpl8 = StringToTemplate("hi {{VAR}} lo\n{{=<  >=}}\n",
+                                      STRIP_WHITESPACE);
+    ASSERT(tpl8 == NULL);
+
+    Template* tpl9 = StringToTemplate("hi {{VAR}} lo\n{{==}}\n",
+                                      STRIP_WHITESPACE);
+    ASSERT(tpl9 == NULL);
+
+    Template* tpl10 = StringToTemplate("hi {{VAR}} lo\n{{=}}\n",
+                                       STRIP_WHITESPACE);
+    ASSERT(tpl10 == NULL);
+
+    // Test that {{= =}} is a "removable" marker.
+    Template* tpl11 = StringToTemplate("line\n  {{=| |=}} \nhi |VAR| {{lo}}\n",
+                                       STRIP_BLANK_LINES);
+    AssertExpandIs(tpl11, &dict, "line\nhi yo {{lo}}\n", true);
+
+    // Test that "removable" markers survive marker-modification.
+    Template* tpl12 = StringToTemplate("  {{#SEC1}}  \n"
+                                       "{{=| |=}}    |VAR|\n"
+                                       "  |/SEC1|\ntada! |VAR|\n"
+                                       "hello|=<< >>=|\n"
+                                       "   <<! a blank line>>  \n"
+                                       "done",
+                                       STRIP_BLANK_LINES);
+    AssertExpandIs(tpl12, &dict, "tada! yo\nhello\ndone", true);
+  }
+
   static void TestVariable() {
     Template* tpl = StringToTemplate("hi {{VAR}} lo", STRIP_WHITESPACE);
     TemplateDictionary dict("dict");
@@ -295,6 +435,21 @@ class TemplateUnittest {
     dict.SetValue("VAR ", "noyo2");
     dict.SetValue("var", "noyo3");
     AssertExpandIs(tpl, &dict, "hi yoyo lo", true);
+
+    // Sanity check string template behaviour while we're at it.
+    Template* tpl2 = Template::RegisterStringAsTemplate(
+        "mytpl", STRIP_WHITESPACE, TC_MANUAL, "hi {{VAR}} lo");
+    TemplateDictionary dict2("dict");
+    AssertExpandIs(tpl2, &dict2, "hi  lo", true);
+    dict2.SetValue("VAR", "yo");
+    AssertExpandIs(tpl2, &dict2, "hi yo lo", true);
+    dict2.SetValue("VAR", "yoyo");
+    AssertExpandIs(tpl2, &dict2, "hi yoyo lo", true);
+    dict2.SetValue("VA", "noyo");
+    dict2.SetValue("VAR ", "noyo2");
+    dict2.SetValue("var", "noyo3");
+    AssertExpandIs(tpl2, &dict2, "hi yoyo lo", true);
+
   }
 
   static void TestVariableWithModifiers() {
@@ -354,15 +509,15 @@ class TemplateUnittest {
     // Test with a modifier taking per-expand data
     DynamicModifier dynamic_modifier;
     ASSERT(template_modifiers::AddModifier("x-dynamic", &dynamic_modifier));
+    PerExpandData per_expand_data;
     tpl = StringToTemplate("hi {{VAR:x-dynamic}} lo", STRIP_WHITESPACE);
-    AssertExpandIs(tpl, &dict, "hi  lo", true);
-    dict.SetModifierData("value", "foo");
-    AssertExpandIs(tpl, &dict, "hi foo lo", true);
-    dict.SetModifierData("value", "bar");
-    AssertExpandIs(tpl, &dict, "hi bar lo", true);
-    dict.SetModifierData("value", NULL);
-    AssertExpandIs(tpl, &dict, "hi  lo", true);
-
+    AssertExpandWithDataIs(tpl, &dict, &per_expand_data, "hi  lo", true);
+    per_expand_data.InsertForModifiers("value", "foo");
+    AssertExpandWithDataIs(tpl, &dict, &per_expand_data, "hi foo lo", true);
+    per_expand_data.InsertForModifiers("value", "bar");
+    AssertExpandWithDataIs(tpl, &dict, &per_expand_data, "hi bar lo", true);
+    per_expand_data.InsertForModifiers("value", NULL);
+    AssertExpandWithDataIs(tpl, &dict, &per_expand_data, "hi  lo", true);
 
     // Test with no modifiers.
     tpl = StringToTemplate("hi {{VAR}} lo", STRIP_WHITESPACE);
@@ -433,8 +588,6 @@ class TemplateUnittest {
     AssertExpandIs(tpl, &dict,
                    "http%3A//a.com%3Fb%3Dc%26d%3De%26f%3Dg%26q%3Da%3Eb",
                    true);
-
-
   }
 
   static void TestSection() {
@@ -460,6 +613,59 @@ class TemplateUnittest {
     AssertExpandIs(tpl, &dict2, "boo!hi lolo bar", true);
     dict2.ShowSection("SUBSEC");
     AssertExpandIs(tpl, &dict2, "boo!hi lojolojo bar", true);
+  }
+
+  static void TestSectionSeparator() {
+    Template* tpl = StringToTemplate(
+        "hi {{#SEC}}lo{{#SEC_separator}}jo{{JO}}{{/SEC_separator}}{{/SEC}} bar",
+        STRIP_WHITESPACE);
+    TemplateDictionary dict("dict");
+    AssertExpandIs(tpl, &dict, "hi  bar", true);
+    // Since SEC is only expanded once, the separator section shouldn't show.
+    dict.ShowSection("SEC");
+    AssertExpandIs(tpl, &dict, "hi lo bar", true);
+    dict.ShowSection("SEC");
+    AssertExpandIs(tpl, &dict, "hi lo bar", true);
+    // This should work even though SEC_separator isn't a child of the
+    // main dict.  It verifies SEC_separator is just a normal section, too.
+    dict.ShowSection("SEC_separator");
+    AssertExpandIs(tpl, &dict, "hi lojo bar", true);
+
+    TemplateDictionary dict2("dict2");
+    dict2.AddSectionDictionary("SEC");
+    AssertExpandIs(tpl, &dict2, "hi lo bar", true);
+    dict2.AddSectionDictionary("SEC");
+    AssertExpandIs(tpl, &dict2, "hi lojolo bar", true);
+    // This is a weird case: using separator and specifying manually.
+    dict2.ShowSection("SEC_separator");
+    AssertExpandIs(tpl, &dict2, "hi lojojolojo bar", true);
+
+    TemplateDictionary dict3("dict3");
+    TemplateDictionary* sec1 = dict3.AddSectionDictionary("SEC");
+    TemplateDictionary* sec2 = dict3.AddSectionDictionary("SEC");
+    TemplateDictionary* sec3 = dict3.AddSectionDictionary("SEC");
+    dict3.SetValue("JO", "J");
+    AssertExpandIs(tpl, &dict3, "hi lojoJlojoJlo bar", true);
+    sec1->SetValue("JO", "JO");
+    AssertExpandIs(tpl, &dict3, "hi lojoJOlojoJlo bar", true);
+    sec2->SetValue("JO", "JOO");
+    AssertExpandIs(tpl, &dict3, "hi lojoJOlojoJOOlo bar", true);
+    dict3.AddSectionDictionary("SEC");
+    AssertExpandIs(tpl, &dict3, "hi lojoJOlojoJOOlojoJlo bar", true);
+    sec3->AddSectionDictionary("SEC_separator");
+    AssertExpandIs(tpl, &dict3, "hi lojoJOlojoJOOlojoJjoJlo bar", true);
+
+    // Make sure we don't do anything special with var or include names
+    Template* tpl2 = StringToTemplate(
+        "hi {{#SEC}}lo{{>SEC_separator}}{{/SEC}} bar",
+        STRIP_WHITESPACE);
+    AssertExpandIs(tpl2, &dict2, "hi lolo bar", true);
+
+    Template* tpl3 = StringToTemplate(
+        "hi {{#SEC}}lo{{SEC_separator}}{{/SEC}} bar",
+        STRIP_WHITESPACE);
+    dict2.SetValue("SEC_separator", "-");
+    AssertExpandIs(tpl3, &dict2, "hi lo-lo- bar", true);
   }
 
   static void TestInclude() {
@@ -520,7 +726,6 @@ class TemplateUnittest {
                    "  include file\n  include file\n  inc2a\n  inc2b\n  "
                    "-include file\ninclude file\ninc2a\ninc2b\n",
                    false);
-
   }
 
   static void TestIncludeWithModifiers() {
@@ -631,6 +836,8 @@ class TemplateUnittest {
         "{{VAR:x-foo}}",
         DO_NOT_STRIP);
     TemplateDictionary dict("dict");
+    PerExpandData per_expand_data;
+
     dict.ShowSection("SEC");
     TemplateDictionary* incdict = dict.AddIncludeDictionary("INC");
     incdict->SetFilename(incname);
@@ -640,7 +847,7 @@ class TemplateUnittest {
 
     // This string is equivalent to "/template." (at least on unix)
     string slash_tpl(ctemplate::PathJoin(ctemplate::kRootdir, "template."));
-    dict.SetAnnotateOutput("");
+    per_expand_data.SetAnnotateOutput("");
     char expected[10240];           // 10k should be big enough!
     snprintf(expected, sizeof(expected),
              "{{#FILE=%s003}}{{#SEC=__{{MAIN}}__}}boo!\n"
@@ -654,9 +861,9 @@ class TemplateUnittest {
              (FLAGS_test_tmpdir + slash_tpl).c_str(),
              (FLAGS_test_tmpdir + slash_tpl).c_str(),
              (FLAGS_test_tmpdir + slash_tpl).c_str());
-    AssertExpandIs(tpl, &dict, expected, true);
+    AssertExpandWithDataIs(tpl, &dict, &per_expand_data, expected, true);
 
-    dict.SetAnnotateOutput(slash_tpl.c_str());
+    per_expand_data.SetAnnotateOutput(slash_tpl.c_str());
     snprintf(expected, sizeof(expected),
              "{{#FILE=%s003}}{{#SEC=__{{MAIN}}__}}boo!\n"
              "{{#INC=INC}}{{#FILE=%s001}}"
@@ -669,12 +876,44 @@ class TemplateUnittest {
              (slash_tpl).c_str(),
              (slash_tpl).c_str(),
              (slash_tpl).c_str());
-    AssertExpandIs(tpl, &dict, expected, true);
+    AssertExpandWithDataIs(tpl, &dict, &per_expand_data, expected, true);
 
-    dict.SetAnnotateOutput(NULL);   // should turn off annotations
-    AssertExpandIs(tpl, &dict,
-                   "boo!\ninclude file\ninclude #2\n\nhi lo bar var",
-                   true);
+    per_expand_data.SetAnnotateOutput(NULL);   // should turn off annotations
+    AssertExpandWithDataIs(tpl, &dict, &per_expand_data,
+                           "boo!\ninclude file\ninclude #2\n\nhi lo bar var",
+                           true);
+  }
+
+  static void TestTemplateExpansionModifier() {
+    string parent_tpl_name = StringToTemplateFile("before {{>INC}} after");
+    string child_tpl_name1 = StringToTemplateFile("child1");
+    string child_tpl_name2 = StringToTemplateFile("child2");
+    Template* tpl = Template::GetTemplate(parent_tpl_name, DO_NOT_STRIP);
+
+    TemplateDictionary dict("parent dict");
+    dict.AddIncludeDictionary("INC")->SetFilename(child_tpl_name1);
+    dict.AddIncludeDictionary("INC")->SetFilename(child_tpl_name2);
+
+    PerExpandData per_expand_data;
+
+    EmphasizeTemplateModifier modifier1(child_tpl_name1);
+    per_expand_data.SetTemplateExpansionModifier(&modifier1);
+    AssertExpandWithDataIs(tpl, &dict, &per_expand_data,
+                           "before >>child1<<child2 after", true);
+
+    EmphasizeTemplateModifier modifier2(child_tpl_name2);
+    per_expand_data.SetTemplateExpansionModifier(&modifier2);
+    AssertExpandWithDataIs(tpl, &dict, &per_expand_data,
+                           "before child1>>child2<< after", true);
+
+    EmphasizeTemplateModifier modifier3(parent_tpl_name);
+    per_expand_data.SetTemplateExpansionModifier(&modifier3);
+    AssertExpandWithDataIs(tpl, &dict, &per_expand_data,
+                           ">>before child1child2 after<<", true);
+
+    per_expand_data.SetTemplateExpansionModifier(NULL);
+    AssertExpandWithDataIs(tpl, &dict, &per_expand_data,
+                           "before child1child2 after", true);
   }
 
   static void TestGetTemplate() {
@@ -703,6 +942,115 @@ class TemplateUnittest {
     ASSERT(!tpl8);
     Template* tpl9 = StringToTemplate("{{noend", DO_NOT_STRIP);
     ASSERT(!tpl9);
+  }
+
+  static void TestStringCacheKey() {
+    const string cache_key_a = "cache key a";
+    const string cache_key_b = "cache key b";
+    const string text = "Test template 1";
+
+    Template *tpl, *tpl2;
+    ASSERT(tpl = Template::RegisterStringAsTemplate(
+               cache_key_a, DO_NOT_STRIP, TC_MANUAL, text));
+
+    // Tests with standard (non auto-escape) mode.
+    ASSERT(!Template::GetTemplate(
+               cache_key_b, DO_NOT_STRIP));       // different filename
+    ASSERT(!Template::GetTemplate(
+               cache_key_a, STRIP_BLANK_LINES));  // different strip
+    ASSERT(tpl2 = Template::GetTemplate(
+               cache_key_a, DO_NOT_STRIP));
+    ASSERT(tpl2 == tpl);  // same cache_key and strip.
+
+    // Test mixing standard and auto-escape mode.
+    ASSERT(!Template::GetTemplateWithAutoEscaping(
+               cache_key_a, DO_NOT_STRIP, TC_HTML));  // different mode
+
+    // Tests with auto-escape mode.
+    ASSERT(tpl = Template::RegisterStringAsTemplate(
+               cache_key_a, DO_NOT_STRIP, TC_HTML, text));
+    ASSERT(tpl2 = Template::RegisterStringAsTemplate(
+               cache_key_b, DO_NOT_STRIP, TC_HTML, text));
+    ASSERT(tpl2 != tpl);  // different cache_key.
+    ASSERT(!Template::GetTemplateWithAutoEscaping(
+               cache_key_a, STRIP_BLANK_LINES, TC_HTML)); // different strip
+    ASSERT(!Template::GetTemplateWithAutoEscaping(
+               cache_key_a, DO_NOT_STRIP, TC_JS));        // different context
+    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(
+               cache_key_a, DO_NOT_STRIP, TC_HTML));
+    ASSERT(tpl2 == tpl);  // same cache_key and strip and context.
+
+    // Test the feature that an empty cache-key results in no caching.
+    Template* tpl_e1 = Template::RegisterStringAsTemplate(
+        "", DO_NOT_STRIP, TC_HTML, text);
+    Template* tpl_e2 = Template::RegisterStringAsTemplate(
+        "", DO_NOT_STRIP, TC_HTML, text);
+    ASSERT(tpl_e1);
+    ASSERT(tpl_e2);
+    ASSERT(tpl_e1 != tpl_e2);
+    // One possible bug is if e2 replaced e1.  Try to make sure not.
+    TemplateDictionary dict("test");
+    AssertExpandIs(tpl_e1, &dict, text, true);  // shouldn't crash...
+    AssertExpandIs(tpl_e2, &dict, text, true);
+    // In this special case, you have to delete the template yourself.
+    delete tpl_e2;
+    delete tpl_e1;
+  }
+
+  static void TestStringGetTemplate() {
+    TemplateDictionary dict("dict");
+
+    // Test cache lookups
+    const char* const tpltext = "{This is perfectly valid} yay!";
+    Template* tpl_orig = Template::RegisterStringAsTemplate(
+        "tgt", DO_NOT_STRIP, TC_MANUAL, string(tpltext));
+    Template* tpl_strip = Template::RegisterStringAsTemplate(
+        "tgt", STRIP_WHITESPACE, TC_MANUAL, tpltext, strlen(tpltext));
+    Template* tpl_context = Template::RegisterStringAsTemplate(
+        "tgt", DO_NOT_STRIP, TC_HTML, tpltext, strlen(tpltext));
+    ASSERT(tpl_orig && tpl_strip && tpl_context);
+
+    Template* tpl1 = Template::GetTemplate("tgt", DO_NOT_STRIP);
+    Template* tpl2 = Template::GetTemplate("tgt", STRIP_WHITESPACE);
+    Template* tpl3 = Template::GetTemplateWithAutoEscaping(
+        "tgt", DO_NOT_STRIP, TC_HTML);
+    ASSERT(tpl1 && tpl2 && tpl3);
+    ASSERT(tpl_orig == tpl1);
+    ASSERT(tpl_strip == tpl2);
+    ASSERT(tpl_context == tpl3);
+    ASSERT(tpl_orig != tpl_strip);
+    ASSERT(tpl_context != tpl_strip);
+    ASSERT(tpl_orig != tpl_context);
+    AssertExpandIs(tpl1, &dict, tpltext, true);
+    AssertExpandIs(tpl2, &dict, tpltext, true);
+    AssertExpandIs(tpl3, &dict, tpltext, true);
+
+    // We use filename_ == "" to signify a string-based template.
+    // Make sure we didn't somehow pollute the cache entry for ""
+    Template* tpl1b = Template::GetTemplate("", DO_NOT_STRIP);
+    ASSERT(!tpl1b);
+
+    // Tests that syntax errors cause us to return NULL
+    Template* tpl1c = Template::RegisterStringAsTemplate(
+        "tgt", DO_NOT_STRIP, TC_MANUAL, "{{This has spaces in it}}");
+    ASSERT(!tpl1c);
+    Template* tpl2c = Template::RegisterStringAsTemplate(
+        "tgt", DO_NOT_STRIP, TC_MANUAL, "{{#SEC}}foo");
+    ASSERT(!tpl2c);
+    Template* tpl3c = Template::RegisterStringAsTemplate(
+        "tgt", DO_NOT_STRIP, TC_MANUAL, "{{#S1}}foo{{/S2}}");
+    ASSERT(!tpl3c);
+    Template* tpl4c = Template::RegisterStringAsTemplate(
+        "tgt", DO_NOT_STRIP, TC_MANUAL, "{{#S1}}foo{{#S2}}bar{{/S1}{{/S2}");
+    ASSERT(!tpl4c);
+    Template* tpl5c = Template::RegisterStringAsTemplate(
+        "tgt", DO_NOT_STRIP, TC_MANUAL, "{{noend");
+    ASSERT(!tpl5c);
+
+    // ... and that syntax errors leave the original untouched
+    Template* tpl6c = Template::GetTemplate("tgt", DO_NOT_STRIP);
+    ASSERT(tpl6c == tpl_orig);
+    AssertExpandIs(tpl6c, &dict, tpltext, true);
   }
 
   static void TestTemplateCache() {
@@ -759,6 +1107,12 @@ class TemplateUnittest {
       {"{{FOO}}\r\n\r\n{{FOO}}", "foo\r\n\r\nfoo", "foo\r\nfoo", "foofoo"},
       {"{{FOO}}\n   \n{{FOO}}\n", "foo\n   \nfoo\n", "foo\nfoo\n", "foofoo"},
       {"{{FOO}}\n{{BI_NEWLINE}}\nb", "foo\n\n\nb", "foo\n\n\nb", "foo\nb"},
+      {"{{FOO}}\n{{!comment}}\nb", "foo\n\nb", "foo\nb", "foob"},
+      {"{{FOO}}\n{{!comment}}{{!comment2}}\nb", "foo\n\nb", "foo\n\nb", "foob"},
+      {"{{FOO}}\n{{>ONE_INC}}\nb", "foo\n\nb", "foo\nb", "foob"},
+      {"{{FOO}}\n\t{{>ONE_INC}}  \nb", "foo\n\t  \nb", "foo\nb", "foob"},
+      {"{{FOO}}\n{{>ONE_INC}}{{>TWO_INC}}\nb", "foo\n\nb", "foo\n\nb", "foob"},
+      {"{{FOO}}\n  {{#SEC}}\ntext \n  {{/SEC}}\n", "foo\n  \n", "foo\n", "foo"},
       // These test strip-whitespace
       {"foo\nbar\n", "foo\nbar\n", "foo\nbar\n", "foobar"},
       {"{{FOO}}\nbar\n", "foo\nbar\n", "foo\nbar\n", "foobar"},
@@ -1361,17 +1715,74 @@ class TemplateUnittest {
     bad_html = "<div style={{STYLE}}>";
     ASSERT(NULL == StringToTemplateWithAutoEscaping(bad_html, strip, TC_HTML));
   }
+
+  static void TestRegisterString() {
+    Template* tpl =
+        Template::RegisterStringAsTemplate("file1", STRIP_WHITESPACE,
+                                           TC_MANUAL, "Some text");
+    ASSERT(tpl);
+    ASSERT(Template::GetTemplate("file1", STRIP_WHITESPACE) == tpl);
+
+    Template::RegisterStringAsTemplate("file2", STRIP_WHITESPACE,
+                                       TC_MANUAL, "Top {{>INC}}");
+
+    TemplateDictionary dict("dict");
+    string expected = "Some text";
+    AssertExpandIs(tpl, &dict, expected, true);
+
+    TemplateDictionary* sub_dict = dict.AddIncludeDictionary("INC");
+    sub_dict->SetFilename("file1");
+    tpl = Template::GetTemplate("file2", STRIP_WHITESPACE);
+    expected = "Top Some text";
+    AssertExpandIs(tpl, &dict, expected, true);
+  }
+
+  static void TestRegisterStringCollision() {
+    TemplateDictionary dict("dict");
+
+    string filename = StringToTemplateFile("file contents");
+
+    Template *tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);
+    string expected = "file contents";
+    AssertExpandIs(tpl, &dict, expected, true);
+
+    // Register new template contents under the same template key
+    Template::RegisterStringAsTemplate(filename, STRIP_WHITESPACE,
+                                       TC_MANUAL, "string contents");
+
+    tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);
+    expected = "string contents";
+    AssertExpandIs(tpl, &dict, expected, true);
+
+    // Confirm string contents survive file-based mtime checks
+    StringToFile("new file contents", filename);
+
+    ASSERT(!tpl->ReloadIfChanged()); // no reload - string trumps file
+    ASSERT(Template::GetTemplate(filename, STRIP_WHITESPACE) == tpl);
+    AssertExpandIs(tpl, &dict, expected, true);
+
+    Template::ReloadAllIfChanged();
+    ASSERT(Template::GetTemplate(filename, STRIP_WHITESPACE) == tpl);
+    AssertExpandIs(tpl, &dict, expected, true);
+  }
 };
+
 
 int main(int argc, char** argv) {
   CleanTestDir(FLAGS_test_tmpdir);
 
   // This goes first so that future tests don't mess up the filenames
   TemplateUnittest::TestAnnotation();
+  TemplateUnittest::TestTemplateExpansionModifier();
 
+  TemplateUnittest::TestWeirdSyntax();
+
+  TemplateUnittest::TestComment();
+  TemplateUnittest::TestSetMarkerDelimiters();
   TemplateUnittest::TestVariable();
   TemplateUnittest::TestVariableWithModifiers();
   TemplateUnittest::TestSection();
+  TemplateUnittest::TestSectionSeparator();
   TemplateUnittest::TestInclude();
   TemplateUnittest::TestIncludeWithModifiers();
   TemplateUnittest::TestRecursiveInclude();
@@ -1379,6 +1790,10 @@ int main(int argc, char** argv) {
   TemplateUnittest::TestExpand();
 
   TemplateUnittest::TestGetTemplate();
+  TemplateUnittest::TestRegisterString();
+  TemplateUnittest::TestRegisterStringCollision();
+  TemplateUnittest::TestStringCacheKey();
+  TemplateUnittest::TestStringGetTemplate();
   TemplateUnittest::TestTemplateCache();
   TemplateUnittest::TestStrip();
   TemplateUnittest::TestReloadIfChanged();

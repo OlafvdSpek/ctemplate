@@ -30,8 +30,8 @@
 // ---
 // Author: Craig Silverstein
 
-#ifndef TEMPLATE_TEMPLATE_PATHOPS_H__
-#define TEMPLATE_TEMPLATE_PATHOPS_H__
+#ifndef TEMPLATE_TEMPLATE_PATHOPS_H_
+#define TEMPLATE_TEMPLATE_PATHOPS_H_
 
 #include <string>
 
@@ -62,4 +62,4 @@ std::string CTEMPLATE_DLL_DECL Basename(const std::string& path);
 
 }
 
-#endif  // TEMPLATE_TEMPLATE_PATHOPS_H__
+#endif  // TEMPLATE_TEMPLATE_PATHOPS_H_

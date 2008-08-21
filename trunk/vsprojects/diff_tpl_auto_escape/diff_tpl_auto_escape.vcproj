@@ -153,6 +153,9 @@
 				RelativePath="..\..\src\windows\google\template_dictionary.h">
 			</File>
 			<File
+				RelativePath="..\..\src\windows\google\per_expand_data.h">
+			</File>
+			<File
 				RelativePath="..\..\src\windows\google\template_emitter.h">
 			</File>
 			<File

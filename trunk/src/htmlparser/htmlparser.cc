@@ -78,9 +78,23 @@ static struct entityfilter_table_s {
 
 /* Utility functions */
 
+/* Similar to strncpy() but avoids the NULL padding. */
+static inline void nopad_strncpy(char *dst, const char *src, size_t dst_size,
+                                 size_t src_size)
+{
+  size_t size;
+
+  /* size = min(dst_size, src_size) */
+  size = dst_size > src_size ? src_size : dst_size;
+  strncpy(dst, src, size);
+  if (size > 0)
+    dst[size - 1] = '\0';
+}
+
 /* Converts the internal state into the external superstate.
  */
-static int state_external(int st) {
+static int state_external(int st)
+{
     if (st == STATEMACHINE_ERROR)
       return HTMLPARSER_STATE_ERROR;
     else
@@ -236,9 +250,9 @@ static const char *parse_dec(const char *s, char *output)
 }
 
 /* Converts a string with an html entity to it's encoded form, which is written
- * to the output string
+ * to the output string.
  */
-static const char *entity_convert(const char *s, char *output)
+static const char *entity_convert(const char *s, char *output, char terminator)
 {
   /* TODO(falmeida): Handle wide char encodings */
     struct entityfilter_table_s *t = entityfilter_table;
@@ -257,7 +271,7 @@ static const char *entity_convert(const char *s, char *output)
         t++;
     }
 
-    snprintf(output, HTMLPARSER_MAX_ENTITY_SIZE, "&%s;", s);
+    snprintf(output, HTMLPARSER_MAX_ENTITY_SIZE, "&%s%c", s, terminator);
     output[HTMLPARSER_MAX_ENTITY_SIZE - 1] = '\0';
 
     return output;
@@ -277,17 +291,20 @@ const char *entityfilter_process(entityfilter_ctx *ctx, char c)
     if (ctx->in_entity) {
         if (c == ';' || html_isspace(c)) {
             ctx->in_entity = 0;
-            ctx->buffer[ctx->buffer_pos] = 0;
+            ctx->buffer[ctx->buffer_pos] = '\0';
             ctx->buffer_pos = 0;
-            return entity_convert(ctx->buffer, ctx->output);
+            return entity_convert(ctx->buffer, ctx->output, c);
         } else {
             ctx->buffer[ctx->buffer_pos++] = c;
-            if (ctx->buffer_pos >= HTMLPARSER_MAX_ENTITY_SIZE - 1) {
-                /* No more buffer to use, finalize and return */
+            if (ctx->buffer_pos >= HTMLPARSER_MAX_ENTITY_SIZE - 2) {
+                /* No more buffer to use, finalize and return.
+                 * We need two characters left, one for the '&' character and
+                 * another for the NULL termination. */
                 ctx->buffer[ctx->buffer_pos] = '\0';
                 ctx->in_entity=0;
                 ctx->buffer_pos = 0;
-                strncpy(ctx->output, ctx->buffer, HTMLPARSER_MAX_ENTITY_SIZE);
+                snprintf(ctx->output, HTMLPARSER_MAX_ENTITY_SIZE, "&%s",
+                         ctx->buffer);
                 ctx->output[HTMLPARSER_MAX_ENTITY_SIZE - 1] = '\0';
                 return ctx->output;
             }
@@ -313,7 +330,8 @@ static void enter_tag_name(statemachine_ctx *ctx, int start, char chr, int end)
     htmlparser_ctx *html = CAST(htmlparser_ctx *, ctx->user);
     assert(html != NULL);
 
-    statemachine_start_record(ctx, html->tag, HTMLPARSER_MAX_STRING - 1);
+    html->tag[0] = '\0';
+    statemachine_start_record(ctx);
 }
 
 /* Called when the parser exits the tag name in order to finalize the recording.
@@ -326,12 +344,13 @@ static void exit_tag_name(statemachine_ctx *ctx, int start, char chr, int end)
     htmlparser_ctx *html = CAST(htmlparser_ctx *, ctx->user);
     assert(html != NULL);
 
-    statemachine_stop_record(ctx);
+    nopad_strncpy(html->tag, statemachine_stop_record(ctx),
+                  HTMLPARSER_MAX_STRING, statemachine_record_length(ctx));
 
     tolower_str(html->tag);
 
     if (html->tag[0] == '/')
-      html->tag[0] = 0;
+      html->tag[0] = '\0';
 }
 
 /* Called when the parser enters a new tag. Starts recording it's name into
@@ -342,10 +361,12 @@ static void enter_attr(statemachine_ctx *ctx, int start, char chr, int end)
     htmlparser_ctx *html = CAST(htmlparser_ctx *, ctx->user);
     assert(html != NULL);
 
-    statemachine_start_record(ctx, html->attr, HTMLPARSER_MAX_STRING - 1);
+    html->attr[0] = '\0';
+    statemachine_start_record(ctx);
 }
 
-/* Called when the parser exits the tag name in order to finalize the recording.
+/* Called when the parser exits the attribute name in order to finalize the
+ * recording.
  *
  * It converts the tag name to lowercase.
  */
@@ -354,7 +375,9 @@ static void exit_attr(statemachine_ctx *ctx, int start, char chr, int end)
     htmlparser_ctx *html = CAST(htmlparser_ctx *, ctx->user);
     assert(html != NULL);
 
-    statemachine_stop_record(ctx);
+    nopad_strncpy(html->attr, statemachine_stop_record(ctx),
+                  HTMLPARSER_MAX_STRING, statemachine_record_length(ctx));
+
     tolower_str(html->attr);
 }
 
@@ -389,7 +412,8 @@ static void enter_value_content(statemachine_ctx *ctx, int start, char chr,
   htmlparser_ctx *html = CAST(htmlparser_ctx *, ctx->user);
   assert(html != NULL);
 
-  statemachine_start_record(ctx, html->value, HTMLPARSER_MAX_STRING - 1);
+  html->value[0] = '\0';
+  statemachine_start_record(ctx);
 }
 
 /* Called when we exit the contents of an attribute value.
@@ -402,7 +426,9 @@ static void exit_value_content(statemachine_ctx *ctx, int start, char chr,
   htmlparser_ctx *html = CAST(htmlparser_ctx *, ctx->user);
   assert(html != NULL);
 
-  statemachine_stop_record(ctx);
+  nopad_strncpy(html->value, statemachine_stop_record(ctx),
+                HTMLPARSER_MAX_STRING, statemachine_record_length(ctx));
+
   html->in_js = 0;
 }
 
@@ -435,7 +461,7 @@ static void in_state_value(statemachine_ctx *ctx, int start, char chr, int end)
  * To simplify the code, we treat RCDATA and CDATA sections the same since the
  * differences between them don't affect the context we are in.
  */
-static void enter_text(statemachine_ctx *ctx, int start, char chr, int end)
+static void tag_close(statemachine_ctx *ctx, int start, char chr, int end)
 {
     htmlparser_ctx *html = CAST(htmlparser_ctx *, ctx->user);
     assert(html != NULL);
@@ -474,11 +500,7 @@ static void in_state_cdata(statemachine_ctx *ctx, int start, char chr, int end)
 static void enter_state_cdata_may_close(statemachine_ctx *ctx, int start,
                                         char chr, int end)
 {
-  htmlparser_ctx *html = CAST(htmlparser_ctx *, ctx->user);
-  assert(html != NULL);
-
-  statemachine_start_record(ctx, html->cdata_close_tag,
-                            HTMLPARSER_MAX_STRING - 1);
+  statemachine_start_record(ctx);
 }
 
 /* Called when we finish reading what could be a closing cdata tag.
@@ -490,12 +512,13 @@ static void exit_state_cdata_may_close(statemachine_ctx *ctx, int start,
                                        char chr, int end)
 {
   htmlparser_ctx *html = CAST(htmlparser_ctx *, ctx->user);
+  const char *cdata_close_tag;
   assert(html != NULL);
 
-  statemachine_stop_record(ctx);
-  assert(html->cdata_close_tag[0] == '/');
+  cdata_close_tag = statemachine_stop_record(ctx);
+  assert(cdata_close_tag[0] == '/');
 
-  if (strcasecmp(&html->cdata_close_tag[1], html->tag) == 0 &&
+  if (strcasecmp(&cdata_close_tag[1], html->tag) == 0 &&
       (chr == '>' || html_isspace(chr))) { /* Make sure we have a delimiter */
     html->tag[0] = '\0';  /* Empty tag mimicking exit_tag_name(). */
     html->in_js = 0;  /* In case this was a script tag. */
@@ -525,7 +548,6 @@ void htmlparser_reset_mode(htmlparser_ctx *ctx, int mode)
   ctx->tag[0] = '\0';
   ctx->attr[0] = '\0';
   ctx->value[0] = '\0';
-  ctx->cdata_close_tag[0] = '\0';
 
   jsparser_reset(ctx->jsparser);
 
@@ -599,7 +621,7 @@ htmlparser_ctx *htmlparser_new()
     statemachine_enter_state(def, HTMLPARSER_STATE_INT_ATTR, enter_attr);
     statemachine_exit_state(def, HTMLPARSER_STATE_INT_ATTR, exit_attr);
 
-    statemachine_enter_state(def, HTMLPARSER_STATE_INT_TEXT, enter_text);
+    statemachine_enter_state(def, HTMLPARSER_STATE_INT_TAG_CLOSE, tag_close);
 
 /* CDATA states. We must list all cdata and javascript states here. */
 /* TODO(falmeida): Declare this list in htmlparser_fsm.config so it doensn't go
@@ -715,7 +737,8 @@ int htmlparser_in_js(htmlparser_ctx *ctx) {
       return 0;
 }
 
-/* Returns the current tag or NULL if not available.
+/* Returns the current tag or NULL if not available or we haven't seen the
+ * entire tag yet.
  *
  * There is no stack implemented because we currently don't have a need for
  * it, which means tag names are tracked only one level deep.
@@ -753,8 +776,8 @@ int htmlparser_in_attr(htmlparser_ctx *ctx)
            ext_state == HTMLPARSER_STATE_VALUE;
 }
 
-/* Returns the current attribute name if inside an attribute name or an
- * attribute value. Returns NULL otherwise */
+/* Returns the current attribute name if after an attribute name or in an
+ * attribute value. Returns NULL otherwise. */
 const char *htmlparser_attr(htmlparser_ctx *ctx)
 {
   if (htmlparser_in_attr(ctx))
@@ -771,6 +794,9 @@ const char *htmlparser_value(htmlparser_ctx *ctx)
 {
   int ext_state = state_external(statemachine_get_state(ctx->statemachine));
   if (ext_state == HTMLPARSER_STATE_VALUE) {
+    strncpy(ctx->value, statemachine_record_buffer(ctx->statemachine),
+            HTMLPARSER_MAX_STRING);
+    ctx->value[HTMLPARSER_MAX_STRING - 1] = '\0';
     return ctx->value;
   } else {
     return NULL;

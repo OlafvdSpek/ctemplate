@@ -44,16 +44,16 @@
 // For (many) more details, see the doc/ directory.
 
 
-#ifndef TEMPLATE_TEMPLATE_DICTIONARY_H__
-#define TEMPLATE_TEMPLATE_DICTIONARY_H__
+#ifndef TEMPLATE_TEMPLATE_DICTIONARY_H_
+#define TEMPLATE_TEMPLATE_DICTIONARY_H_
 
 #include <stdlib.h>      // for NULL
-#include <string.h>      // for the memcmp() in CompareTemplateString()
 #include <stdarg.h>      // for StringAppendV()
 #include <sys/types.h>   // for size_t
 #include <string>
 #include <vector>
 #include @ac_cv_cxx_hash_map@
+#include <google/template_string.h>
 #include <google/template_modifiers.h>
 
 @ac_windows_dllexport_defines@
@@ -61,43 +61,17 @@
 @ac_google_start_namespace@
 
 class UnsafeArena;
-using template_modifiers::ModifierData;
-
-// Most methods below take a TemplateString rather than a C++ string.
-// This is for efficiency: it can avoid extra string copies.
-// For any argument that takes a TemplateString, you can pass in any of:
-//    * A C++ string
-//    * A char*
-//    * TemplateString(char*, length)
-// The last of these is the most efficient, though it requires more work
-// on the call site (you have to create the TemplateString explicitly).
-class TemplateString {
- private:
-  const char*  ptr_;
-  size_t       length_;
-
- public:
-  TemplateString(const char* s) : ptr_(s ? s : ""), length_(strlen(ptr_)) {}
-  TemplateString(const std::string& s) : ptr_(s.data()), length_(s.size()) {}
-  TemplateString(const char* s, size_t slen) : ptr_(s), length_(slen) {}
-  TemplateString(const TemplateString& s) : ptr_(s.ptr_), length_(s.length_) {}
- private:
-  TemplateString();    // no empty constructor allowed
-  void operator=(const TemplateString&);   // or assignment
-
-  friend class TemplateDictionary;         // only one who can read these
-};
-
 
 class @ac_windows_dllexport@ TemplateDictionary {
  public:
   // name is used only for debugging.
   // arena is used to store all names and values.  It can be NULL (the
   //    default), in which case we create own own arena.
+  // TODO(csilvers): consider using "TemplateString name" instead of string&.
   explicit TemplateDictionary(const std::string& name,
                               UnsafeArena* arena=NULL);
   ~TemplateDictionary();
-  const std::string& name() const { return name_; }
+  const char* name() const { return name_; }
 
   // Returns a recursive copy of this dictionary.  This dictionary
   // *must* be a "top-level" dictionary (that is, not created via
@@ -177,13 +151,6 @@ class @ac_windows_dllexport@ TemplateDictionary {
   // document what template-file the dictionary is intended to go with.
   void SetFilename(const TemplateString filename);
 
-  // SetModifierData
-  //   Stores data which will be accessible by modifiers when
-  //   expanding this dictionary. Call with value set to NULL
-  //   to clear any value previously set.
-  void SetModifierData(const char* key, const void* value);
-
-
   // --- DEBUGGING TOOLS
 
   // Logs the contents of a dictionary and its sub-dictionaries.
@@ -191,14 +158,6 @@ class @ac_windows_dllexport@ TemplateDictionary {
   // 'indent' is how much to indent each line of the output.
   void Dump(int indent=0) const;
   void DumpToString(std::string* out, int indent=0) const;
-
-  // Indicate that annotations should be inserted during template expansion.
-  // template_path_start - the start of a template path.  When
-  // printing the filename for template-includes, anything before and
-  // including template_path_start is elided.  This can make the
-  // output less dependent on filesystem location for template files.
-  void SetAnnotateOutput(const char* template_path_start);
-
 
   // --- DEPRECATED ESCAPING FUNCTIONALITY
 
@@ -230,74 +189,31 @@ class @ac_windows_dllexport@ TemplateDictionary {
   friend class SectionTemplateNode;   // for access to GetSectionValue(), etc.
   friend class TemplateTemplateNode;  // for access to GetSectionValue(), etc.
   friend class VariableTemplateNode;  // for access to GetSectionValue(), etc.
-  friend class TemplateNode;          // for access to ShouldAnnotateOutput()
-  friend class Template;              // for access to ShouldAnnotateOutput()
   // For unittesting code using a TemplateDictionary.
   friend class TemplateDictionaryPeer;
   // TODO(csilvers): get these classes to use the peer class
   friend class TemplateDictionaryUnittest;
   friend class TemplateSetGlobalsUnittest;
 
-  // The dictionary types
-  inline static int TemplateStringCmp(const TemplateString& a,
-                                      const TemplateString& b) {
-    if (a.length_ == b.length_)
-      return memcmp(a.ptr_, b.ptr_, a.length_);
-    else if (a.length_ < b.length_)   // when a is shorter, 0 means <
-      return memcmp(a.ptr_, b.ptr_, a.length_) <= 0 ? -1 : 1;
-    else                              // when a is longer, 0 means >
-      return memcmp(a.ptr_, b.ptr_, b.length_) < 0 ? -1 : 1;
-  }
-  struct TemplateStringEqual {
-    bool operator()(const TemplateString& a, const TemplateString& b) const {
-      return TemplateStringCmp(a, b) == 0;
-    }
-  };
-
-  // Normally we'd put this code directly in TemplateStringHash, below, but
-  // TemplateString friendship rules require the code to be at this level.
-  inline static size_t HashTemplateString(const TemplateString& s) {
-    // This is a terrible hash-function
-    unsigned long r = 0;
-    for (size_t i = 0; i < s.length_; i++)
-      r = 5 * r + s.ptr_[i];
-    return static_cast<size_t>(r);
-  }
-  struct TemplateStringHash {
-    size_t operator()(const TemplateString& s) const {
-      return HashTemplateString(s);
-    }
-    // Less operator for MSVC's hash containers.
-    bool operator()(const TemplateString& a, const TemplateString& b) const {
-      return TemplateStringCmp(a, b) < 0;
-    }
-    // These two public members are required by msvc.  4 and 8 are defaults.
-    static const size_t bucket_size = 4;
-    static const size_t min_buckets = 8;
-  };
-#ifdef WIN32
-# define TS_HASH_MAP_(value_type) \
-  @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, value_type, TemplateStringHash>
-#else
-# define TS_HASH_MAP_(value_type) \
-  @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, value_type, TemplateStringHash, TemplateStringEqual>
-#endif
-
-  // This is a helper function to insert <key,value> into m.  Normally,
-  // we'd just use m[key] == value, but hash_map rules require
-  // TemplateString::operator== and default constructor to be public for
-  // that to compile, and we'd rather now allow that.
+  // This is a helper function to insert <key,value> into m.
+  // Normally, we'd just use m[key] == value, but hash_map rules
+  // require default constructor to be public for that to compile, and
+  // we'd rather now allow that.
   template<typename ValueType>
-  static void HashInsert(TS_HASH_MAP_(ValueType)* m,
-                         TemplateString key, ValueType value);
+  static void HashInsert(
+      @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, ValueType, TemplateString::Hash>* m,
+      TemplateString key, ValueType value);
 
   typedef std::vector<TemplateDictionary *>  DictVector;
-  typedef TS_HASH_MAP_(TemplateString) VariableDict;
-  typedef TS_HASH_MAP_(DictVector*) SectionDict;
-  typedef TS_HASH_MAP_(DictVector*) IncludeDict;
+  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, TemplateString, TemplateString::Hash>
+      VariableDict;
+  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, DictVector*, TemplateString::Hash>
+      SectionDict;
+  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, DictVector*, TemplateString::Hash>
+      IncludeDict;
   // This is used only for global_dict_, which is just like a VariableDict
-  typedef TS_HASH_MAP_(TemplateString) GlobalDict;
-#undef TS_HASH_MAP_
+  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateString, TemplateString, TemplateString::Hash>
+      GlobalDict;
 
   // Constructor created for all children dictionaries. This includes
   // both a pointer to the parent dictionary and also the the
@@ -307,14 +223,10 @@ class @ac_windows_dllexport@ TemplateDictionary {
   explicit TemplateDictionary(const std::string& name,
                               class UnsafeArena* arena,
                               TemplateDictionary* parent_dict,
-                              VariableDict* template_global_dict);
+                              TemplateDictionary* template_global_dict_owner);
 
   // Helps set up the static stuff
   static GlobalDict* SetupGlobalDictUnlocked();
-
-  // This is true iff this template was created via the public constructor,
-  // and not the private one used for subsidiary dicts (section/include)
-  bool is_rootlevel_template() const { return template_global_dict_owner_; }
 
   // Utility functions for copying a string into the arena.
   TemplateString Memdup(const char* s, size_t slen);
@@ -330,28 +242,22 @@ class @ac_windows_dllexport@ TemplateDictionary {
   static int StringAppendV(char* space, char** out,
                            const char* format, va_list ap);
 
-  // Was AnnotateOutput() called?  If so, what parameter was passed in?
-  bool ShouldAnnotateOutput() const;
-  const char* GetTemplatePathStart() const;
-
   // How Template::Expand() and its children access the template-dictionary.
-  // TODO(csilvers): have inputs be a TemplateString rather than a string&.
   // TODO(csilvers): have GetSectionValue return a TemplateString.
-  const char *GetSectionValue(const std::string& variable) const;
-  bool IsHiddenSection(const std::string& name) const;
-  const DictVector& GetDictionaries(const std::string& section_name) const;
-  bool IsHiddenTemplate(const std::string& name) const;
-  const char *GetIncludeTemplateName(const std::string& variable, int dictnum) const;
-  const DictVector& GetTemplateDictionaries(const std::string& include_name) const;
-
-  const ModifierData* modifier_data() const { return &modifier_data_; }
-
+  const char *GetSectionValue(const TemplateString& variable) const;
+  bool IsHiddenSection(const TemplateString& name) const;
+  const DictVector& GetDictionaries(const TemplateString& section_name) const;
+  bool IsHiddenTemplate(const TemplateString& name) const;
+  const char *GetIncludeTemplateName(const TemplateString& variable,
+                                     int dictnum) const;
+  const DictVector& GetTemplateDictionaries(
+      const TemplateString& include_name) const;
 
   // The "name" of the dictionary for debugging output (Dump, etc.)
-  // The arena, also set at construction time
-  std::string const name_;
+  // The arena, also set at construction time.
   class UnsafeArena* const arena_;
   bool should_delete_arena_;   // only true if we 'new arena' in constructor
+  const char* const name_;     // points into the arena
 
   // The three dictionaries that I own -- for vars, sections, and template-incs
   VariableDict* variable_dict_;
@@ -359,10 +265,15 @@ class @ac_windows_dllexport@ TemplateDictionary {
   IncludeDict* include_dict_;
 
   // Like variable_dict_, but persists across template-includes.
-  // Unlike the global dict in that only this template and its children
-  // get to see the values.  So it's halfway in between.
+  // Unlike the global dict in that only this template and its
+  // children get to see the values.  So it's halfway in between.  For
+  // the parent-template, template_global_dict_ is not NULL, and
+  // template_global_dict_owner_ is this.  For all of its children,
+  // template_global_dict_ is NULL, and template_global_dict_owner_
+  // points to the root parent-template (the one with the non-NULL
+  // template_global_dict_).
   VariableDict* template_global_dict_;
-  bool template_global_dict_owner_;  // true iff our class new-ed template_g_d_
+  TemplateDictionary* template_global_dict_owner_;
 
   // My parent dictionary, used when variable lookups at this level fail.
   // Note this is only for *variables*, not sections or templates.
@@ -375,10 +286,6 @@ class @ac_windows_dllexport@ TemplateDictionary {
   // for template-includes, optional (but useful) for 'normal' dicts.
   const char* filename_;
 
-  // Data used by the modifiers and the template library during
-  // Expand (ie: should we annotate the output?).
-  ModifierData modifier_data_;
-
  private:
   // Can't invoke copy constructor or assignment operator
   TemplateDictionary(const TemplateDictionary&);
@@ -387,4 +294,4 @@ class @ac_windows_dllexport@ TemplateDictionary {
 
 @ac_google_end_namespace@
 
-#endif  // TEMPLATE_TEMPLATE_DICTIONARY_H__
+#endif  // TEMPLATE_TEMPLATE_DICTIONARY_H_

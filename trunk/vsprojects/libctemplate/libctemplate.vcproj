@@ -184,23 +184,6 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="..\..\src\template_from_string.cc">
-				<FileConfiguration
-					Name="Debug|Win32">
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
-						RuntimeLibrary="3"/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32">
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
-						RuntimeLibrary="2"/>
-				</FileConfiguration>
-			</File>
-			<File
 				RelativePath="..\..\src\template_modifiers.cc">
 				<FileConfiguration
 					Name="Debug|Win32">
@@ -336,6 +319,9 @@
 			</File>
 			<File
 				RelativePath="..\..\src\windows\google\template_dictionary.h">
+			</File>
+			<File
+				RelativePath="..\..\src\windows\google\per_expand_data.h">
 			</File>
 			<File
 				RelativePath="..\..\src\windows\google\template_emitter.h">

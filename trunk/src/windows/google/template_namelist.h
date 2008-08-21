@@ -36,8 +36,8 @@
 // For information about how to use these classes and macros, and to
 // write the templates it takes as input, see doc/howto.html
 
-#ifndef TEMPLATE_TEMPLATE_NAMELIST_H__
-#define TEMPLATE_TEMPLATE_NAMELIST_H__
+#ifndef TEMPLATE_TEMPLATE_NAMELIST_H_
+#define TEMPLATE_TEMPLATE_NAMELIST_H_
 
 #include <time.h>    // for time_t
 #include <string>
@@ -180,4 +180,4 @@ class CTEMPLATE_DLL_DECL TemplateNamelist {
 
 }
 
-#endif  // TEMPLATE_TEMPLATE_NAMELIST_H__
+#endif  // TEMPLATE_TEMPLATE_NAMELIST_H_

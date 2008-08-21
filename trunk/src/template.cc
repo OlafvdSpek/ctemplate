@@ -59,6 +59,7 @@
 #include <google/template.h>
 #include <google/template_modifiers.h>
 #include <google/template_dictionary.h>
+#include <google/per_expand_data.h>
 
 #ifndef PATH_MAX
 #ifdef MAXPATHLEN
@@ -78,6 +79,7 @@ using std::pair;
 using HASH_NAMESPACE::hash_map;
 using HASH_NAMESPACE::hash;
 using HTMLPARSER_NAMESPACE::HtmlParser;
+using ctemplate::PerExpandData;
 
 const int kIndent = 2;            // num spaces to indent each level
 
@@ -156,7 +158,43 @@ static int kVerbosity = 0;   // you can change this by hand to get vlogs
 #define AUTO_ESCAPE_PARSING_CONTEXT(context) \
   ((context) == TC_HTML || (context) == TC_JS || (context) == TC_CSS)
 
+// Emits an open annotation string.  'name' must be a string literal.
+#define EMIT_OPEN_ANNOTATION(emitter, name, value) \
+  (emitter)->Emit("{{#" name "=", 4 + sizeof(name)-1);       \
+  (emitter)->Emit(value);                                       \
+  (emitter)->Emit("}}", 2);
+
+// Emits a close annotation string.  'name' must be a string literal.
+#define EMIT_CLOSE_ANNOTATION(emitter, name) \
+  (emitter)->Emit("{{/" name "}}", 5 + sizeof(name)-1);
+
 typedef pair<const template_modifiers::ModifierInfo*, string> ModifierAndValue;
+
+// ----------------------------------------------------------------------
+// memmatch()
+//    Return a pointer to the first occurrences of the given
+//    length-denominated string, inside a bigger length-denominated
+//    string, or NULL if not found.  The mem version of strstr.
+// ----------------------------------------------------------------------
+
+static const char *memmatch(const char *haystack, size_t haystack_len,
+                            const char *needle, size_t needle_len) {
+  if (needle_len == 0)
+    return haystack;    // even if haystack_len is 0
+  else if (needle_len > haystack_len)
+    return NULL;
+
+  const char* match;
+  const char* hayend = haystack + haystack_len - needle_len + 1;
+  while ((match = static_cast<char*>(memchr(haystack, needle[0],
+                                            hayend - haystack)))) {
+    if (memcmp(match, needle, needle_len) == 0)
+      return match;
+    else
+      haystack = match + 1;
+  }
+  return NULL;
+}
 
 // ----------------------------------------------------------------------
 // AutoModifyDirective
@@ -615,7 +653,8 @@ static void WriteOneHeaderEntry(string *outstring,
 enum TemplateTokenType { TOKENTYPE_UNUSED,        TOKENTYPE_TEXT,
                          TOKENTYPE_VARIABLE,      TOKENTYPE_SECTION_START,
                          TOKENTYPE_SECTION_END,   TOKENTYPE_TEMPLATE,
-                         TOKENTYPE_COMMENT,       TOKENTYPE_NULL };
+                         TOKENTYPE_COMMENT,       TOKENTYPE_SET_DELIMITERS,
+                         TOKENTYPE_NULL };
 
 }  // anonymous namespace
 
@@ -628,6 +667,7 @@ enum TemplateTokenType { TOKENTYPE_UNUSED,        TOKENTYPE_TEXT,
 //   TOKENTYPE_TEMPLATE      - the name of the variable whose value will be
 //                             the template filename
 //   TOKENTYPE_COMMENT       - the empty string, not used
+//   TOKENTYPE_SET_DELIMITERS- the empty string, not used
 //   TOKENTYPE_NULL          - the empty string
 // All non-comment tokens may also have modifiers, which follow the name
 // of the token: the syntax is {{<PREFIX><NAME>:<mod>:<mod>:<mod>...}}
@@ -695,11 +735,27 @@ struct TemplateToken {
   }
 };
 
+static bool AnyMightModify(const vector<ModifierAndValue>& modifiers,
+                           const PerExpandData* data) {
+  for (vector<ModifierAndValue>::const_iterator it = modifiers.begin();
+       it != modifiers.end();  ++it) {
+    if (it->first->modifier->MightModify(data, it->second)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // This applies the modifiers to the string in/inlen, and writes the end
 // result directly to the end of outbuf.  Precondition: |modifiers| > 0.
+//
+// TODO(turnidge): In the case of multiple modifiers, we are applying
+// all of them if any of them MightModify the output.  We can do
+// better.  We should store the MightModify values that we use to
+// compute AnyMightModify and respect them here.
 static void EmitModifiedString(const vector<ModifierAndValue>& modifiers,
                                const char* in, size_t inlen,
-                               const ModifierData* data,
+                               const PerExpandData* data,
                                ExpandEmitter* outbuf) {
   string result;
   if (modifiers.size() > 1) {
@@ -753,14 +809,12 @@ class TemplateNode {
   virtual ~TemplateNode() {}
 
   // Expands the template node using the supplied dictionary. The
-  // result is placed into output_buffer.  If force_annotate_dictionary is
-  // not NULL, and force_annotate_dictionary->ShoudlAnnotateOutput() is
-  // true, the output is annotated, even if
-  // dictionary->ShouldAnnotateOutput() is false.
+  // result is placed into output_buffer.  If
+  // per_expand_data->annotate() is true, the output is annotated.
   // Returns true iff all the template files load and parse correctly.
   virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionary *dictionary,
-                      const TemplateDictionary *force_annotate) const = 0;
+                      const PerExpandData *per_expand_data) const = 0;
 
   // Writes entries to a header file to provide syntax checking at
   // compile time.
@@ -770,28 +824,6 @@ class TemplateNode {
   // Appends a representation of the node and its subnodes to a string
   // as a debugging aid.
   virtual void DumpToString(int level, string *out) const = 0;
-
- public:
-  // In addition to the pure-virtual API (above), we also define some
-  // useful helper functions, as static methods.  These could have
-  // been global methods, but what the hey, we'll put them here.
-
-  // Return an opening template annotation, that can be emitted
-  // in the Expanded template output.  Used for generating template
-  // debugging information in the result document.
-  static string OpenAnnotation(const string& name,
-                               const string& value) {
-    // The opening annotation looks like: {{#name=value}}
-    return string("{{#") + name + string("=") + value + string("}}");
-  }
-
-  // Return a closing template annotation, that can be emitted
-  // in the Expanded template output.  Used for generating template
-  // debugging information in the result document.
-  static string CloseAnnotation(const string& name) {
-    // The closing annotation looks like: {{/name}}
-    return string("{{/") + name + string("}}");
-  }
 
  protected:
   typedef list<TemplateNode *> NodeList;
@@ -821,11 +853,11 @@ class TextTemplateNode : public TemplateNode {
   }
 
   // Expands the text node by simply outputting the text string. This
-  // virtual method does not use TemplateDictionary or force_annotate.
+  // virtual method does not use TemplateDictionary or PerExpandData.
   // Returns true iff all the template files load and parse correctly.
   virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionary *,
-                      const TemplateDictionary *) const {
+                      const PerExpandData *) const {
     output_buffer->Emit(token_.text, token_.textlen);
     return true;
   }
@@ -871,7 +903,7 @@ class VariableTemplateNode : public TemplateNode {
   // Returns true iff all the template files load and parse correctly.
   virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionary *dictionary,
-                      const TemplateDictionary *force_annotate) const;
+                      const PerExpandData *per_expand_data) const;
 
   virtual void WriteHeaderEntries(string *outstring,
                                   const string& filename) const {
@@ -894,24 +926,25 @@ class VariableTemplateNode : public TemplateNode {
 
 bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
                                   const TemplateDictionary *dictionary,
-                                  const TemplateDictionary *force_annotate)
+                                  const PerExpandData *per_expand_data)
     const {
-  if (force_annotate->ShouldAnnotateOutput()) {
-    output_buffer->Emit(OpenAnnotation("VAR", token_.ToString()));
+  if (per_expand_data->annotate()) {
+    EMIT_OPEN_ANNOTATION(output_buffer, "VAR", token_.ToString());
   }
 
-  const string var(token_.text, token_.textlen);
+  const TemplateString var(token_.text, token_.textlen);
   const char *value = dictionary->GetSectionValue(var);
 
-  if (token_.modvals.empty()) {   // no need to modify value
-    output_buffer->Emit(value);               // so just emit it
-  } else {
+  if (AnyMightModify(token_.modvals, per_expand_data)) {
     EmitModifiedString(token_.modvals, value, strlen(value),
-                       force_annotate->modifier_data(), output_buffer);
+                       per_expand_data, output_buffer);
+  } else {
+    // No need to modify value, so just emit it.
+    output_buffer->Emit(value);
   }
 
-  if (force_annotate->ShouldAnnotateOutput()) {
-    output_buffer->Emit(CloseAnnotation("VAR"));
+  if (per_expand_data->annotate()) {
+    EMIT_CLOSE_ANNOTATION(output_buffer, "VAR");
   }
 
   return true;
@@ -952,7 +985,7 @@ class TemplateTemplateNode : public TemplateNode {
   // Returns true iff all the template files load and parse correctly.
   virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionary *dictionary,
-                      const TemplateDictionary *force_annotate) const;
+                      const PerExpandData *per_expand_data) const;
 
   virtual void WriteHeaderEntries(string *outstring,
                                   const string& filename) const {
@@ -975,11 +1008,11 @@ class TemplateTemplateNode : public TemplateNode {
 // in this node, then no output is generated in place of this variable.
 bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
                                   const TemplateDictionary *dictionary,
-                                  const TemplateDictionary *force_annotate)
+                                  const PerExpandData *per_expand_data)
     const {
   bool error_free = true;
 
-  const string variable(token_.text, token_.textlen);
+  const TemplateString variable(token_.text, token_.textlen);
   if (dictionary->IsHiddenTemplate(variable)) {
     // if this "template include" section is "hidden", do nothing
     return true;
@@ -1024,8 +1057,8 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
     // possible to supply a list of more than one sub-dictionary and
     // then the template explansion will be iterative, just as though
     // the included template were an iterated section.
-    if (force_annotate->ShouldAnnotateOutput()) {
-      output_buffer->Emit(OpenAnnotation("INC", token_.ToString()));
+    if (per_expand_data->annotate()) {
+      EMIT_OPEN_ANNOTATION(output_buffer, "INC", token_.ToString());
     }
 
     // sub-dictionary NULL means 'just use the current dictionary instead'.
@@ -1033,24 +1066,25 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
     // If the include-template has modifiers, we need to expand to a string,
     // modify the string, and append to output_buffer.  Otherwise (common
     // case), we can just expand into the output-buffer directly.
-    if (token_.modvals.empty()) {  // no need to modify sub-template
-      error_free &= included_template->Expand(
-          output_buffer,
-          *dv_iter ? *dv_iter : dictionary,
-          force_annotate);
-    } else {
+    if (AnyMightModify(token_.modvals, per_expand_data)) {
       string sub_template;
       StringEmitter subtemplate_buffer(&sub_template);
       error_free &= included_template->Expand(
           &subtemplate_buffer,
           *dv_iter ? *dv_iter : dictionary,
-          force_annotate);
+          per_expand_data);
       EmitModifiedString(token_.modvals,
                          sub_template.data(), sub_template.size(),
-                         force_annotate->modifier_data(), output_buffer);
+                         per_expand_data, output_buffer);
+    } else {
+      // No need to modify sub-template
+      error_free &= included_template->Expand(
+          output_buffer,
+          *dv_iter ? *dv_iter : dictionary,
+          per_expand_data);
     }
-    if (force_annotate->ShouldAnnotateOutput()) {
-      output_buffer->Emit(CloseAnnotation("INC"));
+    if (per_expand_data->annotate()) {
+      EMIT_CLOSE_ANNOTATION(output_buffer, "INC");
     }
   }
 
@@ -1096,7 +1130,7 @@ class SectionTemplateNode : public TemplateNode {
   // Returns true iff all the template files load and parse correctly.
   virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionary *dictionary,
-                      const TemplateDictionary* force_annotate) const;
+                      const PerExpandData *per_expand_data) const;
 
   // Writes a header entry for the section name and calls the same
   // method on all the nodes in the section
@@ -1108,23 +1142,28 @@ class SectionTemplateNode : public TemplateNode {
  protected:
   const TemplateToken token_;   // text is the name of the section
   NodeList node_list_;  // The list of subnodes in the section
+  // A sub-section named "OURNAME_separator" is special.  If we see it
+  // when parsing our section, store a pointer to it for ease of use.
+  SectionTemplateNode* separator_section_;
+
   // When the last node read was literal text that ends with "\n? +"
   // (that is, leading whitespace on a line), this stores the leading
   // whitespace.  This is used to properly indent included
   // sub-templates.
   string indentation_;
 
-
   // A protected method used in parsing the template file
   // Finds the next token in the file and return it. Anything not inside
   // a template marker is just text. Each template marker type, delimited
-  // by "{{" and "}}" is a different type of token. The first character
-  // inside the opening curly braces indicates the type of the marker,
-  // as follows:
+  // by "{{" and "}}" (or parser_state_->marker_delimiters.start_marker
+  // and .end_marker, more precisely) is a different type of token. The
+  // first character inside the opening curly braces indicates the type
+  // of the marker, as follows:
   //    # - Start a section
   //    / - End a section
   //    > - A template file variable (the "include" directive)
   //    ! - A template comment
+  //    = - Change marker delimiters (from the default of '{{' and '}}')
   //    <alnum or _> - A scalar variable
   // One more thing. Before a name token is returned, if it happens to be
   // any type other than a scalar variable, and if the next character after
@@ -1134,6 +1173,12 @@ class SectionTemplateNode : public TemplateNode {
   // retained after a final marker on a line, they must add a space character
   // between the marker and the linefeed character.
   TemplateToken GetNextToken(Template* my_template);
+
+  // Helper routine used by Expand
+  virtual bool ExpandUsingDicts(ExpandEmitter *output_buffer,
+                                const TemplateDictionary *dictionary,
+                                const PerExpandData *per_expand_data,
+                                const vector<TemplateDictionary*> *dv) const;
 
   // The specific methods called used by AddSubnode to add the
   // different types of nodes to this section node.
@@ -1149,7 +1194,7 @@ class SectionTemplateNode : public TemplateNode {
 // --- constructor and destructor, Expand, Dump, and WriteHeaderEntries
 
 SectionTemplateNode::SectionTemplateNode(const TemplateToken& token)
-    : token_(token), indentation_("\n") {
+    : token_(token), separator_section_(NULL), indentation_("\n") {
   VLOG(2) << "Constructing SectionTemplateNode: "
           << string(token_.text, token_.textlen) << endl;
 }
@@ -1169,15 +1214,54 @@ SectionTemplateNode::~SectionTemplateNode() {
           << string(token_.text, token_.textlen) << endl;
 }
 
-bool SectionTemplateNode::Expand(ExpandEmitter *output_buffer,
-                                 const TemplateDictionary *dictionary,
-                                 const TemplateDictionary *force_annotate)
-    const {
+bool SectionTemplateNode::ExpandUsingDicts(
+    ExpandEmitter *output_buffer,
+    const TemplateDictionary *dictionary,
+    const PerExpandData *per_expand_data,
+    const vector<TemplateDictionary*> *dv) const {   // "dictionaries vector"
   bool error_free = true;
 
-  const vector<TemplateDictionary*> *dv;
+  vector<TemplateDictionary*>::const_iterator dv_iter = dv->begin();
+  for (; dv_iter != dv->end(); ++dv_iter) {
+    if (per_expand_data->annotate()) {
+      EMIT_OPEN_ANNOTATION(output_buffer, "SEC", token_.ToString());
+    }
 
-  const string variable(token_.text, token_.textlen);
+    // Expand using the section-specific dictionary.  A sub-dictionary
+    // of NULL means 'just use the current dictionary instead'.
+    // We force children to annotate the output if we have to.
+    NodeList::const_iterator iter = node_list_.begin();
+    for (; iter != node_list_.end(); ++iter) {
+      error_free &=
+        (*iter)->Expand(output_buffer, *dv_iter ? *dv_iter : dictionary,
+                        per_expand_data);
+      // If this sub-node is a "separator section" -- a subsection
+      // with the name "OURNAME_separator" -- expand it every time
+      // through but the last.
+      if (*iter == separator_section_ && dv_iter + 1 != dv->end()) {
+        // We call ExpandUsingDicts to make sure we always expand,
+        // even if *iter would normally be hidden.
+        error_free &=
+            separator_section_->ExpandUsingDicts(
+                output_buffer, *dv_iter ? *dv_iter : dictionary,
+                per_expand_data, g_use_current_dict);
+      }
+    }
+
+    if (per_expand_data->annotate()) {
+      EMIT_CLOSE_ANNOTATION(output_buffer, "SEC");
+    }
+  }
+
+  return error_free;
+}
+
+bool SectionTemplateNode::Expand(ExpandEmitter *output_buffer,
+                                 const TemplateDictionary *dictionary,
+                                 const PerExpandData *per_expand_data)
+    const {
+  const vector<TemplateDictionary*> *dv;
+  const TemplateString variable(token_.text, token_.textlen);
 
   // The section named __{{MAIN}}__ is special: you always expand it
   // exactly once using the containing (main) dictionary.
@@ -1192,28 +1276,7 @@ bool SectionTemplateNode::Expand(ExpandEmitter *output_buffer,
       dv = g_use_current_dict;  // a vector with one element: NULL
   }
 
-  vector<TemplateDictionary*>::const_iterator dv_iter = dv->begin();
-  for (; dv_iter != dv->end(); ++dv_iter) {
-    if (force_annotate->ShouldAnnotateOutput()) {
-      output_buffer->Emit(OpenAnnotation("SEC", token_.ToString()));
-    }
-
-    // Expand using the section-specific dictionary.  A sub-dictionary
-    // of NULL means 'just use the current dictionary instead'.
-    // We force children to annotate the output if we have to.
-    NodeList::const_iterator iter = node_list_.begin();
-    for (; iter != node_list_.end(); ++iter) {
-      error_free &=
-        (*iter)->Expand(output_buffer,
-                        *dv_iter ? *dv_iter : dictionary, force_annotate);
-    }
-
-    if (force_annotate->ShouldAnnotateOutput()) {
-      output_buffer->Emit(CloseAnnotation("SEC"));
-    }
-  }
-
-  return error_free;
+  return ExpandUsingDicts(output_buffer, dictionary, per_expand_data, dv);
 }
 
 void SectionTemplateNode::WriteHeaderEntries(string *outstring,
@@ -1334,6 +1397,13 @@ bool SectionTemplateNode::AddSectionNode(const TemplateToken* token,
     // Found a new subnode to add
   }
   node_list_.push_back(new_node);
+  // Check the name of new_node.  If it's "OURNAME_separator", store it
+  // as a special "separator" section.
+  if (token->textlen == token_.textlen + sizeof("_separator")-1 &&
+      memcmp(token->text, token_.text, token_.textlen) == 0 &&
+      memcmp(token->text + token_.textlen, "_separator", sizeof("_separator")-1)
+      == 0)
+    separator_section_ = new_node;
   return true;
 }
 
@@ -1479,6 +1549,17 @@ bool SectionTemplateNode::AddSubnode(Template *my_template) {
     case TOKENTYPE_COMMENT:
       // Do nothing. Comments just drop out of the file altogether.
       break;
+    case TOKENTYPE_SET_DELIMITERS:
+      if (!Template::ParseDelimiters(
+              token.text, token.textlen,
+              &my_template->parse_state_.current_delimiters)) {
+        LOG_TEMPLATE_NAME(ERROR, my_template);
+        LOG(ERROR) << "Invalid delimiter-setting command."
+                   << "\nFound: " << string(token.text, token.textlen)
+                   << "\nIn: " << string(token_.text, token_.textlen) << endl;
+        my_template->set_state(TS_ERROR);
+      }
+      break;
     case TOKENTYPE_NULL:
       // GetNextToken either hit the end of the file or a syntax error
       // in the file. Do nothing more here. Just return false to stop
@@ -1545,21 +1626,22 @@ string *Template::template_root_directory_ = NULL;
 
 // Parses the text of the template file in the input_buffer as
 // follows: If the buffer is empty, return the null token.  If getting
-// text, search for the next "{{" sequence. If one is found, return
-// all the text collected up to that sequence in a TextToken and
-// change the token-parsing phase variable to GETTING_NAME, so the next
-// call will know to look for a named marker, instead of more text.
-// If getting a name, read the next character to learn what kind of
-// marker it is. Then collect the characters of the name up to the
-// "}}" sequence. If the "name" is a template comment, then we do not
-// return the text of the comment in the token. If it is any other
-// valid type of name, we return the token with the appropriate type
-// and the name.  If any syntax errors are discovered (like
+// text, search for the next "{{" sequence (more precisely, for
+// parse_state_->marker_delimiters.start_marker).  If one is found,
+// return all the text collected up to that sequence in a TextToken
+// and change the token-parsing phase variable to GETTING_NAME, so the
+// next call will know to look for a named marker, instead of more
+// text.  If getting a name, read the next character to learn what
+// kind of marker it is.  Then collect the characters of the name up
+// to the "}}" sequence.  If the "name" is a template comment, then we
+// do not return the text of the comment in the token.  If it is any
+// other valid type of name, we return the token with the appropriate
+// type and the name.  If any syntax errors are discovered (like
 // inappropriate characters in a name, not finding the closing curly
 // braces, etc.) an error message is logged, the error state of the
-// template is set, and a NULL token is returned.  Updates parse_state_.
-// You should hold a write-lock on my_template->mutex_ when calling this.
-// (unless you're calling it from a constructor).
+// template is set, and a NULL token is returned.  Updates
+// parse_state_.  You should hold a write-lock on my_template->mutex_
+// when calling this.  (unless you're calling it from a constructor).
 TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
   Template::ParseState* ps = &my_template->parse_state_;   // short abbrev.
   const char* token_start = ps->bufstart;
@@ -1570,24 +1652,24 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
 
   switch (ps->phase) {
     case Template::ParseState::GETTING_TEXT: {
-      const char* token_end = (const char*)memchr(ps->bufstart, '{',
-                                                  ps->bufend - ps->bufstart);
+      const char* token_end = memmatch(ps->bufstart, ps->bufend - ps->bufstart,
+                                       ps->current_delimiters.start_marker,
+                                       ps->current_delimiters.start_marker_len);
       if (!token_end) {
-        // Didn't find a '{' so just grab all the rest of the buffer
+        // Didn't find the start-marker ('{{'), so just grab all the
+        // rest of the buffer.
         token_end = ps->bufend;
         ps->bufstart = ps->bufend;   // next token will start at EOF
       } else {
-        // see if the next char is also a '{' and remove it if it is
-        // ...but NOT if the next TWO characters are "{{"
-        if ((token_end+1 < ps->bufend && token_end[1] == '{') &&
-            !(token_end+2 < ps->bufend && token_end[2] == '{')) {
-          // Next is a {{.  Eat that up and move to GETTING_NAME mode
-          ps->phase = Template::ParseState::GETTING_NAME;
-          ps->bufstart = token_end+2;    // next token will start past {{
-        } else {
-          ++token_end;               // the { is part of our text we're reading
-          ps->bufstart = token_end;  // next token starts just after the {
-        }
+        // If we see code like this: "{{{VAR}}, we want to match the
+        // second "{{", not the first.
+        while ((token_end + 1 + ps->current_delimiters.start_marker_len
+                <= ps->bufend) &&
+               memcmp(token_end + 1, ps->current_delimiters.start_marker,
+                      ps->current_delimiters.start_marker_len) == 0)
+          token_end++;
+        ps->phase = Template::ParseState::GETTING_NAME;
+        ps->bufstart = token_end + ps->current_delimiters.start_marker_len;
       }
       return TemplateToken(TOKENTYPE_TEXT, token_start,
                            token_end - token_start, NULL);
@@ -1595,6 +1677,7 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
 
     case Template::ParseState::GETTING_NAME: {
       TemplateTokenType ttype;
+      const char* token_end = NULL;
       // Find out what type of name we are getting
       switch (token_start[0]) {
         case '#':
@@ -1609,6 +1692,21 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
           ttype = TOKENTYPE_COMMENT;
           ++token_start;
           break;
+        case '=':
+          ttype = TOKENTYPE_SET_DELIMITERS;
+          // Keep token_start the same; the token includes the leading '='.
+          // But we have to figure token-end specially: it should be "=}}".
+          if (ps->bufend > (token_start + 1))
+              token_end = (char*)memchr(token_start + 1, '=',
+                                        ps->bufend - (token_start + 1));
+          if (!token_end ||
+              token_end + ps->current_delimiters.end_marker_len > ps->bufend ||
+              memcmp(token_end + 1, ps->current_delimiters.end_marker,
+                     ps->current_delimiters.end_marker_len) != 0)
+            token_end = NULL;   // didn't find it, fall through to code below
+          else
+            token_end++;        // advance past the "=" to the "}}".
+          break;
         case '>':
           ttype = TOKENTYPE_TEMPLATE;
           ++token_start;
@@ -1620,35 +1718,29 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
       }
 
       // Now get the name (or the comment, as the case may be)
-      const char* token_end = (const char*)memchr(token_start, '}',
-                                                  ps->bufend - token_start);
-
-      if (!token_end) {   // Didn't find a '}', so name never ended.  Error!
-        FAIL("No ending '}' when parsing name starting with '"
-             << string(token_start, ps->bufend-token_start) << "'");
+      if (!token_end)   // that is, it wasn't set in special-case code above
+        token_end = memmatch(token_start, ps->bufend - token_start,
+                             ps->current_delimiters.end_marker,
+                             ps->current_delimiters.end_marker_len);
+      if (!token_end) {   // Didn't find the '}}', so name never ended.  Error!
+        FAIL("No ending '" << string(ps->current_delimiters.end_marker,
+                                     ps->current_delimiters.end_marker_len)
+             << "' when parsing name starting with "
+             << "'" << string(token_start, ps->bufend-token_start) << "'");
       }
 
-      // We found a }.  Next char should be a } too, or name isn't ended; error!
-      if (token_end+1 == ps->bufend || token_end[1] != '}') {
-        if (ttype == TOKENTYPE_COMMENT) {
-          FAIL("Illegal to use the '}' character in template "
-               << "comment that starts with '"
-               << string(token_start, token_end+1 - token_start) << "'");
-        } else {
-          FAIL("Invalid name in template starting with '"
-               << string(token_start, token_end+1 - token_start) << "'");
-        }
-      }
-
-      // Comments are a special case, since they don't have a name or action
-      if (ttype == TOKENTYPE_COMMENT) {
+      // Comments are a special case, since they don't have a name or action.
+      // The set-delimiters command is the same way.
+      if (ttype == TOKENTYPE_COMMENT || ttype == TOKENTYPE_SET_DELIMITERS) {
         ps->phase = Template::ParseState::GETTING_TEXT;
-        ps->bufstart = token_end + 2;   // read past the }}
+        ps->bufstart = token_end + ps->current_delimiters.end_marker_len;
         // If requested, remove any unescaped linefeed following a comment
         ps->bufstart = MaybeEatNewline(ps->bufstart, ps->bufend,
                                        my_template->strip_);
         // For comments, don't bother returning the text
-        return TemplateToken(ttype, "", 0, NULL);
+        if (ttype == TOKENTYPE_COMMENT)
+          token_start = token_end;
+        return TemplateToken(ttype, token_start, token_end - token_start, NULL);
       }
 
       // Now we have the name, possibly with following modifiers.
@@ -1659,8 +1751,7 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
         mod_start = token_end;
 
       // Make sure the name is legal.
-      if (ttype != TOKENTYPE_COMMENT &&
-          !IsValidName(token_start, mod_start - token_start)) {
+      if (!IsValidName(token_start, mod_start - token_start)) {
         FAIL("Illegal name in template '"
              << string(token_start, mod_start-token_start) << "'");
       }
@@ -1718,7 +1809,7 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
 
       // Whew!  We passed the guantlet.  Get ready for the next token
       ps->phase = Template::ParseState::GETTING_TEXT;
-      ps->bufstart = token_end + 2;   // read past the }}
+      ps->bufstart = token_end + ps->current_delimiters.end_marker_len;
       // If requested, remove any linefeed following a comment,
       // or section start or end, or template marker, unless
       // it is escaped by '\'
@@ -1880,6 +1971,55 @@ Template *Template::GetTemplateCommon(const string& filename, Strip strip,
   }
 }
 
+// Create a string based template and insert it into the cache under
+// 'filename'.
+Template *Template::RegisterStringAsTemplate(const string& filename,
+                                             Strip strip,
+                                             TemplateContext context,
+                                             const char* content,
+                                             size_t content_len) {
+  // An empty filename_ keeps ReloadIfChangedLocked from performing
+  // file operations.
+  Template *new_tpl = new Template("", strip, context);
+
+  // But we have to do the "loading" and parsing ourselves:
+
+  // BuildTree deletes the buffer when done, so we need a copy.
+  char* buffer = new char[content_len];
+  memcpy(buffer, content, content_len);
+  new_tpl->StripBuffer(&buffer, &content_len);
+  if ( new_tpl->BuildTree(buffer, buffer + content_len) ) {
+    assert(new_tpl->state() == TS_READY);
+  } else {
+    assert(new_tpl->state() != TS_READY);
+    delete new_tpl;
+    return NULL;
+  }
+
+  // As an special feature, if the cache-name is "", it means "don't
+  // cache this at all."  If you do this, you're responsible for
+  // deleting the resulting template.
+  if (filename.empty())
+    return new_tpl;
+
+  // No need to have the cache-mutex acquired for this step
+  string abspath(ctemplate::PathJoin(template_root_directory(), filename));
+  TemplateCacheKey template_cache_key = GetTemplateCacheKey(abspath, strip,
+                                                            context);
+
+  // Insert into template cache
+  MutexLock ml(&g_cache_mutex);
+  if (g_template_cache == NULL)
+    g_template_cache = new TemplateCache;
+
+  Template* tpl = (*g_template_cache)[template_cache_key];
+  if (tpl)
+    delete tpl;
+  (*g_template_cache)[template_cache_key] = new_tpl;
+
+  return new_tpl;
+}
+
 // ----------------------------------------------------------------------
 // Template::BuildTree()
 // Template::WriteHeaderEntry()
@@ -1903,6 +2043,7 @@ bool Template::BuildTree(const char* input_buffer,
   parse_state_.bufstart = input_buffer;
   parse_state_.bufend = input_buffer_end;
   parse_state_.phase = ParseState::GETTING_TEXT;
+  parse_state_.current_delimiters = Template::MarkerDelimiters();
   SectionTemplateNode *top_node = new SectionTemplateNode(
       TemplateToken(TOKENTYPE_SECTION_START,
                     kMainSectionName, strlen(kMainSectionName), NULL));
@@ -2024,6 +2165,200 @@ const char *Template::template_file() const {
 }
 
 // ----------------------------------------------------------------------
+// Template::ParseDelimiters()
+//    Given an input that looks like =XXX YYY=, set the
+//    MarkerDelimiters to point to XXX and YYY.  This is used to parse
+//    {{=XXX YYY=}} markers, which reset the marker delimiters.
+//    Returns true if successfully parsed (starts and ends with =,
+//    exactly one space, no internal ='s), false else.
+// ----------------------------------------------------------------------
+
+bool Template::ParseDelimiters(const char* text, size_t textlen,
+                               MarkerDelimiters* delim) {
+  const char* space = reinterpret_cast<char*>(memchr(text, ' ', textlen));
+  if (textlen < 3 ||
+      text[0] != '=' || text[textlen - 1] != '=' ||       // no = at ends
+      memchr(text + 1, '=', textlen - 2) ||               // = in the middle
+      !space ||                                           // no interior space
+      memchr(space + 1, ' ', text + textlen - (space+1))) // too many spaces
+    return false;
+
+  delim->start_marker = text + 1;
+  delim->start_marker_len = space - delim->start_marker;
+  delim->end_marker = space + 1;
+  delim->end_marker_len = text + textlen - 1 - delim->end_marker;
+  return true;
+}
+
+// ----------------------------------------------------------------------
+// StripTemplateWhiteSpace()
+// Template::IsBlankOrOnlyHasOneRemovableMarker()
+// Template::InsertLine()
+// Template::StripBuffer()
+//    This mini-parser modifies an input buffer, replacing it with a
+//    new buffer that is the same as the old, but with whitespace
+//    removed as is consistent with the given strip-mode:
+//    STRIP_WHITESPACE, STRIP_BLANK_LINES, DO_NOT_STRIP (the last
+//    of these is a no-op).  This parser may work by allocating
+//    a new buffer and deleting the input buffer when it's done).
+//    The trickiest bit if in STRIP_BLANK_LINES mode, if we see
+//    a line that consits entirely of one "removable" marker on it,
+//    and nothing else other than whitespace.  ("Removable" markers
+//    are comments, start sections, end sections, and
+//    template-include.)  In such a case, we elide the newline at
+//    the end of that line.
+// ----------------------------------------------------------------------
+
+// We define our own version rather than using the one in strutil, mostly
+// so we can take a size_t instead of an int.  The code is simple enough.
+static void StripTemplateWhiteSpace(const char** str, size_t* len) {
+  // Strip off trailing whitespace.
+  while ((*len) > 0 && isspace((*str)[(*len)-1])) {
+    (*len)--;
+  }
+
+  // Strip off leading whitespace.
+  while ((*len) > 0 && isspace((*str)[0])) {
+    (*len)--;
+    (*str)++;
+  }
+}
+
+// Adjusts line and length iff condition is met, and RETURNS true.
+// MarkerDelimiters are {{ and }}, or equivalent.
+bool Template::IsBlankOrOnlyHasOneRemovableMarker(
+    const char** line, size_t* len, const Template::MarkerDelimiters& delim) {
+  const char *clean_line = *line;
+  size_t new_len = *len;
+  StripTemplateWhiteSpace(&clean_line, &new_len);
+
+  // If there was only white space on the line, new_len will now be zero.
+  // In that case the line should be removed, so return true.
+  if (new_len == 0) {
+    *line = clean_line;
+    *len = new_len;
+    return true;
+  }
+
+  // The smallest removable marker is at least start_marker_len +
+  // end_marker_len + 1 characters long.  If there aren't enough
+  // characters, then keep the line by returning false.
+  if (new_len < delim.start_marker_len + delim.end_marker_len + 1) {
+    return false;
+  }
+
+  // Only {{#...}}, {{/....}, {{>...}, {{!...}, and {{=...=}} are "removable"
+  if (memcmp(clean_line, delim.start_marker, delim.start_marker_len) != 0 ||
+      !strchr("#/>!=", clean_line[delim.start_marker_len])) {
+    return false;
+  }
+
+  const char *found_end_marker = memmatch(clean_line + delim.start_marker_len,
+                                          new_len - delim.start_marker_len,
+                                          delim.end_marker,
+                                          delim.end_marker_len);
+
+  // Make sure the end marker comes at the end of the line.
+  if (!found_end_marker ||
+      found_end_marker + delim.end_marker_len != clean_line + new_len) {
+    return false;
+  }
+
+  // else return the line stripped of its white space chars so when the
+  // marker is removed in expansion, no white space is left from the line
+  // that has now been removed
+  *line = clean_line;
+  *len = new_len;
+  return true;
+}
+
+size_t Template::InsertLine(const char *line, size_t len, Strip strip,
+                            const MarkerDelimiters& delim, char* buffer) {
+  bool add_newline = (len > 0 && line[len-1] == '\n');
+  if (add_newline)
+    len--;                 // so we ignore the newline from now on
+
+  if (strip >= STRIP_WHITESPACE) {
+    StripTemplateWhiteSpace(&line, &len);
+    add_newline = false;
+
+  // IsBlankOrOnlyHasOneRemovableMarker may modify the two input
+  // parameters if the line contains only spaces or only one input
+  // marker.  This modification must be done before the line is
+  // written to the input buffer. Hence the need for the boolean flag
+  // add_newline to be referenced after the Write statement.
+  } else if (strip >= STRIP_BLANK_LINES
+             && IsBlankOrOnlyHasOneRemovableMarker(&line, &len, delim)) {
+    add_newline = false;
+  }
+
+  memcpy(buffer, line, len);
+
+  if (add_newline) {
+    buffer[len++] = '\n';
+  }
+  return len;
+}
+
+void Template::StripBuffer(char **buffer, size_t* len) {
+  if (strip_ == DO_NOT_STRIP)
+    return;
+
+  char* bufend = *buffer + *len;
+  char* retval = new char[*len];
+  char* write_pos = retval;
+
+  MarkerDelimiters delim;
+
+  const char* next_pos = NULL;
+  for (const char* prev_pos = *buffer; prev_pos < bufend; prev_pos = next_pos) {
+    next_pos = (char*)memchr(prev_pos, '\n', bufend - prev_pos);
+    if (next_pos)
+      next_pos++;          // include the newline
+    else
+      next_pos = bufend;   // for the last line, when it has no newline
+
+    write_pos += InsertLine(prev_pos, next_pos - prev_pos, strip_, delim,
+                            write_pos);
+    assert(write_pos >= retval &&
+           static_cast<size_t>(write_pos-retval) <= *len);
+
+    // Before looking at the next line, see if the current line
+    // changed the marker-delimiter.  We care for
+    // IsBlankOrOnlyHasOneRemovableMarker, so we don't need to be
+    // perfect -- we don't have to handle the delimiter changing in
+    // the middle of a line -- just make sure that the next time
+    // there's only one marker on a line, we notice because we know
+    // the right delim.
+    const char* end_marker = NULL;
+    for (const char* marker = prev_pos; marker; marker = end_marker) {
+      marker = memmatch(marker, next_pos - marker,
+                        delim.start_marker, delim.start_marker_len);
+      if (!marker)  break;
+      end_marker = memmatch(marker + delim.start_marker_len,
+                            next_pos - (marker + delim.start_marker_len),
+                            delim.end_marker, delim.end_marker_len);
+      if (!end_marker)  break;
+      end_marker += delim.end_marker_len;  // needed for the for loop
+      // This tries to parse the marker as a set-delimiters marker.
+      // If it succeeds, it updates delim. If not, it ignores it.
+      assert(((end_marker - delim.end_marker_len)
+              - (marker + delim.start_marker_len)) >= 0);
+      Template::ParseDelimiters(marker + delim.start_marker_len,
+                                ((end_marker - delim.end_marker_len)
+                                 - (marker + delim.start_marker_len)),
+                                &delim);
+    }
+  }
+  assert(write_pos >= retval);
+
+  // Replace the input retval with our new retval.
+  delete[] *buffer;
+  *buffer = retval;
+  *len = static_cast<size_t>(write_pos - retval);
+}
+
+// ----------------------------------------------------------------------
 // Template::ReloadIfChanged()
 // Template::ReloadIfChangedLocked()
 // Template::ReloadAllIfChanged()
@@ -2040,11 +2375,22 @@ const char *Template::template_file() const {
 // the constructor, when you know nobody else will be messing with
 // this object.
 bool Template::ReloadIfChangedLocked() {
-  if (filename_.empty()) return false;
+  if (filename_.empty()) {
+    // string-based templates don't reload
+    if (state() == TS_SHOULD_RELOAD)
+      set_state(TS_READY);
+    return false;
+  }
 
   struct stat statbuf;
   if (stat(filename_.c_str(), &statbuf) != 0) {
     LOG(WARNING) << "Unable to stat file " << filename_ << endl;
+    // We keep the old tree if there is one, otherwise we're in error
+    set_state(tree_ ? TS_READY : TS_ERROR);
+    return false;
+  }
+  if (S_ISDIR(statbuf.st_mode)) {
+    LOG(WARNING) << filename_ << "is a directory and thus not readable" << endl;
     // We keep the old tree if there is one, otherwise we're in error
     set_state(tree_ ? TS_READY : TS_ERROR);
     return false;
@@ -2063,8 +2409,9 @@ bool Template::ReloadIfChangedLocked() {
     set_state(tree_ ? TS_READY : TS_ERROR);
     return false;
   }
-  char* file_buffer = new char[statbuf.st_size];
-  if ( fread(file_buffer, 1, statbuf.st_size, fp) != statbuf.st_size ) {
+  size_t buflen = statbuf.st_size;
+  char* file_buffer = new char[buflen];
+  if (fread(file_buffer, 1, buflen, fp) != buflen) {
     LOG(ERROR) << "Error reading file " << filename_
                << ": " << strerror(errno) << endl;
     fclose(fp);
@@ -2079,14 +2426,11 @@ bool Template::ReloadIfChangedLocked() {
   filename_mtime_ = statbuf.st_mtime;
 
   // Parse the input one line at a time to get the "stripped" input.
-  // Note stripping only makes smaller, so st_size is a safe upper bound.
-  char* input_buffer = new char[statbuf.st_size];
-  const size_t buflen = InsertFile(file_buffer, statbuf.st_size, input_buffer);
-  delete[] file_buffer;
+  StripBuffer(&file_buffer, &buflen);
 
   // Now parse the template we just read.  BuildTree takes over ownership
   // of input_buffer in every case, and will eventually delete it.
-  if ( BuildTree(input_buffer, input_buffer + buflen) ) {
+  if ( BuildTree(file_buffer, file_buffer + buflen) ) {
     assert(state() == TS_READY);
     return true;
   } else {
@@ -2154,144 +2498,21 @@ void Template::ClearCache() {
 }
 
 // ----------------------------------------------------------------------
-// IsBlankOrOnlyHasOneRemovableMarker()
-// Template::InsertLine()
-// Template::InsertFile()
-//    InsertLine() is called by ReloadIfChanged for each line of
-//    the input.  In general we just add it to a char buffer so we can
-//    parse the entire file at once in a slurp.  However, we do one
-//    per-line check: see if the line is either all white space or has
-//    exactly one "removable" marker on it and nothing else. A marker
-//    is "removable" if it is either a comment, a start section, an
-//    end section, or a template include marker.  This affects whether
-//    we add a newline or not, in certain Strip modes.
-//       InsertFile() takes an entire file in, as a string, and calls
-//    InsertLine() on each line, building up the output buffer line
-//    by line.
-//       Both functions require an output buffer big enough to hold
-//    the potential output (for InsertFile(), the output is guaranteed
-//    to be no bigger than the input).  They both return the number
-//    of bytes they wrote to the output buffer.
-// ----------------------------------------------------------------------
-
-// We define our own version rather than using the one in strtuil, mostly
-// so we can take a size_t instead of an int.  The code is simple enough.
-static void StripTemplateWhiteSpace(const char** str, size_t* len) {
-  // Strip off trailing whitespace.
-  while ((*len) > 0 && isspace((*str)[(*len)-1])) {
-    (*len)--;
-  }
-
-  // Strip off leading whitespace.
-  while ((*len) > 0 && isspace((*str)[0])) {
-    (*len)--;
-    (*str)++;
-  }
-}
-
-// Adjusts line and length iff condition is met, and RETURNS true.
-static bool IsBlankOrOnlyHasOneRemovableMarker(const char** line, size_t* len) {
-  const char *clean_line = *line;
-  size_t new_len = *len;
-  StripTemplateWhiteSpace(&clean_line, &new_len);
-
-  // If there was only white space on the line, new_len will now be zero.
-  // In that case the line should be removed, so return true.
-  if (new_len == 0) {
-    *line = clean_line;
-    *len = new_len;
-    return true;
-  }
-
-  // The smallest removable marker is {{!}}, which requires five characters.
-  // If there aren't enough characters, then keep the line by returning false.
-  if (new_len < 5) {
-    return false;
-  }
-
-  if (clean_line[0] != '{'            // if first two chars are not "{{"
-      || clean_line[1] != '{'
-      || (clean_line[2] != '#'        // or next char marks not section start
-          && clean_line[2] != '/'     // nor section end
-          && clean_line[2] != '>'     // nor template include
-          && clean_line[2] != '!')) { // nor comment
-    return false;                     // then not what we are looking for.
-  }
-
-  const char *end_marker = strstr(clean_line, "}}");
-
-  if (!end_marker                   // if didn't find "}}"
-      || end_marker != &clean_line[new_len - 2]) { // or it wasn't at the end
-    return false;
-  }
-
-  // else return the line stripped of its white space chars so when the
-  // marker is removed in expansion, no white space is left from the line
-  // that has now been removed
-  *line = clean_line;
-  *len = new_len;
-  return true;
-}
-
-size_t Template::InsertLine(const char *line, size_t len, char* buffer) {
-  bool add_newline = (len > 0 && line[len-1] == '\n');
-  if (add_newline)
-    len--;                 // so we ignore the newline from now on
-
-  if (strip_ >= STRIP_WHITESPACE) {
-    StripTemplateWhiteSpace(&line, &len);
-    add_newline = false;
-  }
-
-  // IsBlankOrOnlyHasOneRemovableMarker may modify the two input
-  // parameters if the line contains only spaces or only one input
-  // marker.  This modification must be done before the line is
-  // written to the input buffer. Hence the need for the boolean flag
-  // add_newline to be referenced after the Write statement.
-  if (strip_ >= STRIP_BLANK_LINES
-      && IsBlankOrOnlyHasOneRemovableMarker(&line, &len)) {
-    add_newline = false;
-  }
-
-  memcpy(buffer, line, len);
-
-  if (add_newline) {
-    buffer[len++] = '\n';
-  }
-  return len;
-}
-
-size_t Template::InsertFile(const char *file, size_t len, char* buffer) {
-  const char* prev_pos = file;
-  const char* next_pos;
-  char* write_pos = buffer;
-
-  while ( (next_pos=(char*)memchr(prev_pos, '\n', file+len - prev_pos)) ) {
-    next_pos++;      // include the newline
-    write_pos += InsertLine(prev_pos, next_pos - prev_pos, write_pos);
-    assert(write_pos >= buffer && static_cast<size_t>(write_pos-buffer) <= len);
-    prev_pos = next_pos;
-  }
-  if (prev_pos < file + len) {          // last line doesn't end in a newline
-    write_pos += InsertLine(prev_pos, file+len - prev_pos, write_pos);
-    assert(write_pos >= buffer && static_cast<size_t>(write_pos-buffer) <= len);
-  }
-  assert(write_pos >= buffer);
-  return static_cast<size_t>(write_pos - buffer);
-}
-
-// ----------------------------------------------------------------------
 // Template::Expand()
+// Template::ExpandWithData()
 //    This is the main function clients call: it expands a template
 //    by expanding its parse tree (which starts with a top-level
 //    section node).  For each variable/section/include-template it
 //    sees, it replaces the name stored in the parse-tree with the
 //    appropriate value from the passed-in dictionary.
+//       ExpandWithData() takes a PerExpandData struct; Expand()
+//    uses an empty struct, for the (common) case the user does
+//    not wish to specify any expand-specific information.
 // ----------------------------------------------------------------------
 
 bool Template::Expand(ExpandEmitter *expand_emitter,
                       const TemplateDictionary *dict,
-                      const TemplateDictionary *force_annotate_output) const {
+                      const PerExpandData *per_expand_data) const {
   // Accumulator for the results of Expand for each sub-tree.
   bool error_free = true;
 
@@ -2307,38 +2528,53 @@ bool Template::Expand(ExpandEmitter *expand_emitter,
     return false;
   }
 
-  const bool should_annotate = (dict->ShouldAnnotateOutput() ||
-                                (force_annotate_output &&
-                                 force_annotate_output->ShouldAnnotateOutput()));
-  if (should_annotate) {
+  if (per_expand_data->annotate()) {
     // Remove the machine dependent prefix from the template file name.
     const char* file = template_file();
-    const char* short_file;
-    if (dict->ShouldAnnotateOutput()) {
-      short_file = strstr(file, dict->GetTemplatePathStart());
-    } else {
-      short_file = strstr(file, force_annotate_output->GetTemplatePathStart());
-    }
+    const char* short_file = strstr(file, per_expand_data->annotate_path());
     if (short_file != NULL) {
       file = short_file;
     }
-    expand_emitter->Emit(TemplateNode::OpenAnnotation("FILE", file));
+    EMIT_OPEN_ANNOTATION(expand_emitter, "FILE", file);
   }
 
-  // We force our sub-tree to annotate output if we annotate output
-  error_free &= tree_->Expand(expand_emitter, dict, force_annotate_output);
+  // If the client registered an expand-modifier, which is a modifier
+  // meant to modify all templates after they are expanded, apply it
+  // now.
+  const template_modifiers::TemplateModifier* modifier =
+      per_expand_data->template_expansion_modifier();
+  if (modifier && modifier->MightModify(per_expand_data, template_file())) {
+    // We found a expand TemplateModifier.  Apply it.
+    //
+    // Since the expand-modifier doesn't ever have an arg (it doesn't
+    // have a name and can't be applied in the text of a template), we
+    // pass the template name in as the string arg in this case.
+    string value;
+    StringEmitter tmp_emitter(&value);
+    error_free &= tree_->Expand(&tmp_emitter, dict, per_expand_data);
+    modifier->Modify(value.data(), value.size(), per_expand_data,
+                     expand_emitter, template_file());
+  } else {
+    // No need to modify this template.
+    error_free &= tree_->Expand(expand_emitter, dict, per_expand_data);
+  }
 
-  if (should_annotate) {
-    expand_emitter->Emit(TemplateNode::CloseAnnotation("FILE"));
+  if (per_expand_data->annotate()) {
+    EMIT_CLOSE_ANNOTATION(expand_emitter, "FILE");
   }
 
   return error_free;
 }
 
-bool Template::Expand(string *output_buffer,
-                      const TemplateDictionary *dict) const {
+bool Template::ExpandWithData(string *output_buffer,
+                              const TemplateDictionary *dict,
+                              const PerExpandData *per_expand_data) const {
   StringEmitter e(output_buffer);
-  return Expand(&e, dict, dict);
+  // TODO(csilvers): could make this static if it's expensive to construct.
+  const PerExpandData empty_per_expand_data;
+  if (per_expand_data == NULL)
+    per_expand_data = &empty_per_expand_data;
+  return Expand(&e, dict, per_expand_data);
 }
 
 _END_GOOGLE_NAMESPACE_

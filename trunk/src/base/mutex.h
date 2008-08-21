@@ -43,8 +43,8 @@
  * it to the Google namespace.
  */
 
-#ifndef GOOGLE_MUTEX_H__
-#define GOOGLE_MUTEX_H__
+#ifndef GOOGLE_MUTEX_H_
+#define GOOGLE_MUTEX_H_
 
 #include "config.h"           // to figure out pthreads support
 
@@ -53,8 +53,9 @@
 #elif defined(HAVE_PTHREAD) && defined(HAVE_RWLOCK)
   // Needed for pthread_rwlock_*.  If it causes problems, you could take it
   // out, but then you'd have to unset HAVE_RWLOCK (at least on linux -- it
-  // *does* cause problems for FreeBSD, but isn't needed for locking there.)
-# ifndef __FreeBSD__
+  // *does* cause problems for FreeBSD, or MacOSX, but isn't needed
+  // for locking there.)
+# ifdef __linux__
 #   define _XOPEN_SOURCE 500  // may be needed to get the rwlock calls
 # endif
 # include <pthread.h>
@@ -204,4 +205,4 @@ class WriterMutexLock {
 #define ReaderMutexLock(x) COMPILE_ASSERT(0, rmutex_lock_decl_missing_var_name)
 #define WriterMutexLock(x) COMPILE_ASSERT(0, wmutex_lock_decl_missing_var_name)
 
-#endif  /* #define GOOGLE_MUTEX_H__ */
+#endif  /* #define GOOGLE_MUTEX_H_ */

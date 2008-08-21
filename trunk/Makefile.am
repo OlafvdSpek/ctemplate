@@ -18,22 +18,26 @@ googleincludedir = $(includedir)/google
 ## put in noinst_HEADERS.
 nodist_googleinclude_HEADERS = \
 	src/google/template.h \
+	src/google/template_string.h \
 	src/google/template_enums.h \
 	src/google/template_pathops.h \
 	src/google/template_modifiers.h \
 	src/google/template_dictionary.h \
 	src/google/template_emitter.h \
 	src/google/template_namelist.h \
-	src/google/template_from_string.h
+	src/google/template_from_string.h \
+	src/google/per_expand_data.h
 noinst_HEADERS = \
 	src/google/template.h.in \
+	src/google/template_string.h.in \
 	src/google/template_enums.h.in \
 	src/google/template_pathops.h.in \
 	src/google/template_modifiers.h.in \
 	src/google/template_dictionary.h.in \
 	src/google/template_emitter.h.in \
 	src/google/template_namelist.h.in \
-	src/google/template_from_string.h.in
+	src/google/template_from_string.h.in \
+	src/google/per_expand_data.h.in
 
 docdir = $(prefix)/share/doc/$(PACKAGE)-$(VERSION)
 ## This is for HTML and other documentation you want to install.
@@ -84,7 +88,6 @@ libctemplate_la_SOURCES = $(googleinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
 	src/template_namelist.cc src/template_pathops.cc \
-	src/template_from_string.cc \
 	src/htmlparser/htmlparser.h src/htmlparser/htmlparser.cc \
 	src/htmlparser/jsparser.h src/htmlparser/jsparser.cc \
 	src/htmlparser/statemachine.h src/htmlparser/statemachine.cc \
@@ -210,17 +213,6 @@ template_setglobals_nothreads_unittest_SOURCES = $(template_setglobals_unittest_
 template_setglobals_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_setglobals_nothreads_unittest_LDADD = libctemplate_nothreads_debug.la
 
-TESTS += template_from_string_unittest template_from_string_nothreads_unittest
-WINDOWS_PROJECTS += vsprojects/template_from_string_unittest/template_from_string_unittest.vcproj
-template_from_string_unittest_SOURCES = src/config_for_unittests.h \
-                                        src/tests/template_from_string_unittest.cc
-template_from_string_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
-template_from_string_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
-template_from_string_unittest_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
-template_from_string_nothreads_unittest_SOURCES = $(template_from_string_unittest_SOURCES)
-template_from_string_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
-template_from_string_nothreads_unittest_LDADD = libctemplate_nothreads_debug.la
-
 TESTS += template_unittest template_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_unittest/template_unittest.vcproj
 WINDOWS_PROJECTS += vsprojects/template_unittest_static/template_unittest_static.vcproj
@@ -288,6 +280,7 @@ TESTDATA += \
    src/tests/htmlparser_testdata/comments.html \
    src/tests/htmlparser_testdata/javascript_attribute.html \
    src/tests/htmlparser_testdata/javascript_block.html \
+   src/tests/htmlparser_testdata/javascript_regexp.html \
    src/tests/htmlparser_testdata/reset.html \
    src/tests/htmlparser_testdata/simple.html \
    src/tests/htmlparser_testdata/tags.html

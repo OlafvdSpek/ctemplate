@@ -68,6 +68,67 @@ attr_quoted=true ?>'>
 
 <b font=<?state state=value?>><?state state=text, tag=b?></b>
 
+<!-- Large invalid HTML entity -->
+<a onclick="&testtesttesttesttesttesttesttesttesttesttesttest;"
+   href="http://www.google.com/"></a>
+
+<!-- URI attributes.  The attribute list can be found in
+     htmlparser.c:is_uri_attribute() -->
+<a target="<?state attr_type=regular?>"></a>
+<!-- -->
+<form action="<?state attr_type=uri?>"></form>
+<applet archive="<?state attr_type=uri?>"></applet>
+<blockquote cite="<?state attr_type=uri?>"></blockquote>
+<object classid="<?state attr_type=uri?>"></object>
+<object codebase="<?state attr_type=uri?>"></object>
+<object data="<?state attr_type=uri?>"></object>
+<img dynsrc="<?state attr_type=uri?>"></img>
+<a href="<?state attr_type=uri?>"></a>
+<img longdesc="<?state attr_type=uri?>"></img>
+<img src="<?state attr_type=uri?>"></img>
+<img usemap="<?state attr_type=uri?>"></img>
+<!-- -->
+<form style="x" action="<?state attr_type=uri?>"></form>
+<applet style="x" archive="<?state attr_type=uri?>"></applet>
+<blockquote style="x" cite="<?state attr_type=uri?>"></blockquote>
+<object style="x" classid="<?state attr_type=uri?>"></object>
+<object style="x" codebase="<?state attr_type=uri?>"></object>
+<object style="x" data="<?state attr_type=uri?>"></object>
+<img style="x" dynsrc="<?state attr_type=uri?>"></img>
+<a style="x" href="<?state attr_type=uri?>"></a>
+<img style="x" longdesc="<?state attr_type=uri?>"></img>
+<img style="x" src="<?state attr_type=uri?>"></img>
+<img style="x" usemap="<?state attr_type=uri?>"></img>
+<!-- -->
+<img alt="<?state attr_type=regular?>"></a>
+
+
+<!-- Style attributes as returned by htmlparser.c:is_style_attribute() -->
+<a target="<?state attr_type=regular?>"></a>
+<!-- -->
+<b style="<?state attr_type=style?>"></b>
+<!-- -->
+<a target="<?state attr_type=regular?>"></a>
+
+<!-- Big attribute value. We can't do prefix checking right now so we can't
+     validate the contents of the value here, although statemachine_test.c has
+     a test for that. -->
+
+<a href="http://www.google.com/"
+   alt="01234567890123456789012345678901234567890123456789
+        01234567890123456789012345678901234567890123456789
+        01234567890123456789012345678901234567890123456789
+        01234567890123456789012345678901234567890123456789
+        01234567890123456789012345678901234567890123456789
+        01234567890123456789012345678901234567890123456789
+        01234567890123456789012345678901234567890123456789
+        01234567890123456789012345678901234567890123456789
+        01234567890123456789012345678901234567890123456789
+        01234567890123456789012345678901234567890123456789
+        <?state state=value, attr_quoted=true, tag=a, attr=alt?>"></a>
+
+<?state state=text?>
+
 </body>
 
 </html>

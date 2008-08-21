@@ -122,7 +122,7 @@ as <code>11/20/2005</code>, are <b>dictionary values</b>.</p>
 
 <h3> Templates </h3>
 
-<p> The template language has four types of markers:</p>
+<p> The template language has five types of markers:</p>
 <ol>
   <li> VARIABLE markers, which are replaced by text based on
        dictionary values.  All markers in the above example are
@@ -155,6 +155,16 @@ as <code>11/20/2005</code>, are <b>dictionary values</b>.</p>
        structure but drop completely out of the expanded
        output.  Comment markers look like this:
        <code>{{!&nbsp;comment&nbsp;lives&nbsp;here -- cool, no?}}</code></li>
+
+  <li> SET-DELIMITER markers, which change the marker delimiters from
+       <code>{{</code> and <code>}}</code> to custom strings.  (The
+       only requirement is that these strings not contain whitespace
+       or the equals sign.)  This is useful for languages like TeX,
+       where double-braces may occur in the text and are awkward to
+       use for markup.  Set-delimiter markers look like this:
+       <code>{{=&lt; &gt;=}} &lt;! Now markers are delimited by braces &gt;
+             &lt;=| |=&gt;   |! And now markers are delimited by bars! |
+       </code></li>
 </ol>
 
 <p>These marker types each have their own namespace.  For readability,
@@ -254,6 +264,7 @@ whatsoever, including (single) curly braces and NUL characters.</p>
 
 
 <h3><A NAME="modifiers">Modifiers</A></h3>
+<!-- TODO(turnidge): These apply to includes too, not just variables -->
 
 <p>Recall that variables look like this: <code>{{VARNAME}}</code>.  We
 actually allow a more generic form: the variable name may be followed
@@ -462,12 +473,66 @@ code for a custom modifier:</p>
 <pre>
    class StarEscape : public template_modifiers::TemplateModifier {
      void Modify(const char* in, size_t inlen,
-                 const template_modifiers::ModifierData* per_expand_data,
+                 const ctemplate::PerExpandData* per_expand_data,
                  ExpandEmitter* outbuf, const string&amp; arg) const {
        outbuf->Emit(string("*") + string(in, inlen) + string("*"));
      }
    };
 </pre>
+
+
+<h3><A NAME="special_sections">Special Section Names</A></h3>
+
+<p>Section names may have a special meaning in the template system.
+Right now, there's one such name.</p>
+
+<h4><A NAME="separator">Separator Sections</A></h4>
+
+<p>If you have a section named <code>SEP</code>, you can define inside
+of it a section named <code>SEP_separator</code>, and the template
+system will automatically expand that section every time
+<code>SEP</code> is expanded, <i>except for the last</i>.  Thus, the
+contents of <code>SEP_separator</code> can be used to separate
+repeated values of a section.</p>
+
+<p>Here's an example:</p>
+<pre>
+   Here are the meeting attendees:
+   {{#ATTENDEES}}
+      {{NAME}}
+      {{#ATTENDEES_separator}}, {{/ATTENDEES_separator}}
+   {{/ATTENDEES}}
+   .
+</pre>
+
+<p>Here is a more convoluted example, to show the date:</p>
+<pre>
+   {{#DATE}}{{DATE_COMPONENT}}{{#DATE_separator}}{{DATE_SEP}}{{/DATE_separator}}{{/DATE}}
+</pre>
+
+<p>You'd set up a template dictionary to repeat <code>DATE</code>
+three times, with <code>DATE_COMPONENT</code> set to the month, day,
+and year (or day, month, and year, depending on your locale...), and
+<code>DATE_SEP</code> set to <code>/</code> or <code>-</code> or
+whatever date-separator is called for.</p>
+
+<p><code>SEP_separator</code> is always evaluated with the current
+dictionary.  Thus, in the date example, if you wanted a different
+separator each time, you could do so by setting <code>DATE_SEP</code>
+to a different value for each repetition of <code>DATE</code>.</p>
+
+<p>While <code>SEP_separator</code> is automatically expanded by the
+template system, it is otherwise a perfectly normal section.  You can
+even instantiate it yourself by calling
+<code>AddSectionDictionary("SEP_separator")</code>.  In that case, the
+section will be expanded both via the automatic expansion as a
+separator, and as a normal section via the section dictionary you
+added.  This is more confusing than helpful, and you should probably
+never do it.</p>
+
+<p>There can be at most one "separator" sub-section per section.  If
+there are more, only the last is automatically expanded.</p>
+
 
 <h3><A NAME="AutoEscape">Auto Escape Mode</A></h3>
 
@@ -483,6 +548,7 @@ an overview of Auto Escape as well as its limitations.</p>
 name, you will have to specify the <i>context</i> your template is in,
 usually <code>TC_HTML</code>.  See <code>template.h</code> for the
 possible values and their meanings.</p>
+
 
 <h3> <A NAME="inheritence">Details on Dictionary Lookup</A> </h3>
 
@@ -853,33 +919,6 @@ it's relative to <A HREF="#managing">template_root</A>.</p>
 not being used for a template-include; in that case, the function is a
 no-op, but is perhaps still useful as self-documenting code.</p>
 
-<h4> Modifier data </h4>
-
-<p>This last category is a bit esoteric: if you write your own <A
-HREF="#modifiers">modifier</A>, you can pass data to that modifier
-when you call <code>Expand()</code>.  The intended use of this
-functionality is to allow a modifier to work one way when you expand a
-template with dictionary A, and another way when you expand a template
-with dictionary B.  For instance, you might have a modifier that
-encrypts part of a webpage using a user's secret-key, and the
-secret-key is of course different every time you expand the
-webpage.</p>
-
-<p>To set data that the modifier can use, you call
-<code>SetModifierData()</code> on a <code>TemplateDictionary</code>.
-For instance:</p>
-<pre>
-   TemplateDictionary* dict = new TemplateDictionary("modifier example");
-   dict->SetValue("USERNAME", thisuser->username);  // regular var-setting
-   dict->SetModifierData("encrypt key", (void*)thisuser->secret_key);
-   ...
-</pre>
-
-<p>Your custom modifier is passed all the ModifierData as one of the
-arguments to <code>Modify</code>: see
-<code>&lt;google/template_modifiers.h&gt;</code> for more details.</p>
-
-
 <h3> <A name="expand">Expanding a Template</A> </h3>
 
 <p>Once you have a template and a template dictionary, it's simplicity
@@ -901,35 +940,124 @@ If <code>output</code> was not empty before calling
 <code>Expand()</code>, the expanded template is appended to the end of
 <code>output</code>.
 
+<h4> Per-expand data </h4>
+
+<p>There is a "power user" version of <code>Expand()</code>, called
+<code>ExpandWithData()</code>, that allows you to pass in per-expand
+data.  It's called like this:</p>
+<pre>
+   Template* tpl = Template::GetTemplate(...);
+   TemplateDictionary dict(...);
+   ctemplate::PerExpandData per_expand_data;
+   string output;
+   tpl->ExpandWithData(&amp;output, &amp;dict, &amp;per_expand_data);
+</pre>
+
+<p>Per-expand data is applied to all templates that are seen while
+expanding: not only the template you called <code>Expand()</code> on,
+but also sub-templates that are brought in via template-includes
+(<code>{{&gt;INCLUDE}}</code>).
+
+<p>There are several types of per-expand data you can set, by calling
+the appropriate method on a PerExpandData object:</p>
+
+<ul>
+  <li> <b><code>SetAnnotateOutput()</code></b>: This is a debugging
+       function.  When expanding this template, it adds marker-strings
+       to the output to indicate what template-substitutions the
+       system was making.  This takes a string argument which can be
+       used to shorten the filenames printed in the annotations: if
+       the filename contains the string you give, everything before
+       that string is elided from the filename before printing.  It's
+       confusing, but fear not: it's safe to just always pass in the
+       empty string.<br><br> </li>
+
+  <li> <b><code>Insert()</code></b>: This stores an arbitrary
+       key/value pair in the PerExpandData structure.  This is used
+       with <A HREF="#modifiers">template modifiers</A>: the
+       <code>PerExpandData</code> object you pass to
+       <code>ExpandWithData</code> is made available to every template
+       modifier that is called during expand time (including custom
+       modifiers you've defined yourself).  The intended use of this
+       functionality is to allow a modifier to work one way when you
+       expand a template with dictionary A, and another way when you
+       expand a template with dictionary B.  For instance, you might
+       have a modifier that encrypts part of a webpage using a user's
+       secret-key, and the secret-key is of course different every
+       time you expand the webpage.<br><br> </li>
+
+  <li> <b><code>SetTemplateExpansionModifier()</code></b>: This is
+       an advanced feature for those who need a custom hook into
+       template expansion.  It will not be used by most programmers.
+       It takes a template-modifier as its argument, but this template
+       modifier is treated specially: instead of applying when an
+       appropriate magic string appears in the text of a template, it
+       applies every time a template is expanded during a call to
+       <code>ExpandWithData</code>.  Note this means that it's called
+       not only after the top-level template, that
+       <code>ExpandWithData</code> is called on, is expanded, but also
+       on every sub-template that is expanded due to a
+       template-include.<br><br>
+       
+       This unusual functionality has a few unusual properties.  Since
+       the template expansion modifier is not called in normal
+       fashion, the normal <code>arg</code> argument to the template
+       modifier does not make sense.  Instead, the <code>arg</code> is
+       set to the path of the template which is being expanded.  Also,
+       template expansion modifiers can be expensive, since they are
+       applied pretty indiscriminately, so it can be worth
+       implementing the <code>MightModifiy</code> predicate for your
+       <code>TemplateModifier</code> to avoid unnecessary
+       work.<br><br> </li>
+</ul>
+
 
 <h3> Getting a Template From a String Rather Than a File </h3>
 
-<p>The <code>TemplateFromString</code> class, in
-<code>template_from_string.h</code>, is an alternative to the
-<code>Template</code> class when you really want your template to be
-built in to the executable rather than read from a file.  It's a
-drop-in replacement, that takes an extra argument which is the
-template contents.</p>
+<p>The <code>Template</code> class includes a
+<code>RegisterStringAsTemplate()</code> static method for when you
+want your template to be built into the executable rather than read
+from a file.  <code>RegisterStringAsTemplate()</code> inserts a string
+into the internal template cache and returns the newly constructed
+<code>Template</code> object or NULL if there was an error during
+parsing.  Later calls to <code>GetTemplate()</code> or
+<code>GetTemplateWithAutoEscaping()</code> with the same <i>(filename,
+strip, context)</i> key will retrieve the same <code>Template</code>
+object&mdash;including those performed implicitly by
+<code>{{>include}}</code>.  The <code>filename</code> passed to
+<code>RegisterStringAsTemplate()</code> is only used to form the cache
+key and no file operations are actually performed.  You should use the
+context <code>TC_MANUAL</code> for content intended for the
+non-autoescaping <code>GetTemplate()</code> method.</p>
 
-<p>Prefer <code>Template</code> to <code>TemplateFromString</code>,
-for several reasons.  For one, updating the template requires merely a
-data push, rather than pushing the new executable.  Also, you can load
-the new template without needing to restart the binary.  It also makes
-it easier for non-programmers to modify the template.  Finally,
-string-templates cannot be included by other
-templates, since <code>{{>include}}</code> takes a filename.</p>
+<p>Future calls to <code>RegisterStringAsTemplate()</code> with the
+same cache key will replace the existing template.
+<code>ReloadIfChanged()</code> has no effect on string-based
+templates.</p>
 
-<p>One reason to use <code>TemplateFromString</code> is if you are in
-an environment where having data files could be dangerous -- for
-instance, you work on a disk that is usually full, or need the
-template to work even in the face of disk I/O errors.</p>
+<p>(As a special case, if you call
+<code>RegisterStringAsTemplate()</code> with the empty string as the
+cache key, it will create and return a template without caching it.
+In that case, and that case only, the caller takes responsibility for
+deleting the template object.  Because the memory ownership issue is
+confusing in this case, it's recommended that you avoid this feature
+if at all possible.)</p>
+
+<p>Prefer file-based to string-based templates where possible.
+Updating a file-based template requires merely a data push, rather
+than pushing the new executable and it also makes it easier for
+non-programmers to modify the template.  One reason to use
+string-based templates is if you are in an environment where having
+data files could be dangerous&mdash;for instance, you work on a disk
+that is usually full, or need the template to work even in the face of
+disk I/O errors.</p>
 
 <p>This package comes with a script, <A
 HREF="#converter">template-converter</A>, that takes a template file
 as input and emits a C++ code snippet (an .h file) that defines a
 string with those template contents.  This makes it easy to start by
 using a normal, file-based template, and then switch to
-template-from-string later if you so desire.</p>
+<code>RegisterStringAsTemplate()</code> later if you so desire.</p>
 
 
 <h3> Copying a Template Dictionary </h3>
@@ -1175,14 +1303,6 @@ more detail.</p>
        (and any sub-dictionaries) to stderr. </li>
   <li> <code>dict->DumpToString()</code>: dumps the contents of the
        dictionary (and sub-dictionaries) to the given string. </li>
-  <li> <code>dict->SetAnnotateOutput()</code>: when applying this
-       dictionary to a template, add marker-strings to the output to
-       indicate what template-substitutions the system was making.
-       This takes a string argument which can be used to shorten the
-       filenames printed in the annotations: if the filename contains
-       the string you give, everything before that string is elided
-       from the filename before printing.  It's confusing, but fear
-       not: it's safe to just always pass in the empty string. </li>
 </ul>
 
 <p>Finally, <code>ClearCache()</code> removes all template objects

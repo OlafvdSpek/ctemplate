@@ -346,8 +346,9 @@ statemachine_ctx *statemachine_new(statemachine_definition *def)
 
     ctx->definition = def;
     ctx->current_state = 0;
-    ctx->record_buffer = NULL;
-    ctx->record_left = 0;
+    ctx->record_buffer[0] = '\0';
+    ctx->record_pos = 0;
+    ctx->recording = 0;
     return ctx;
 }
 
@@ -359,30 +360,35 @@ void statemachine_delete(statemachine_ctx *ctx)
     free(ctx);
 }
 
-/* Starts recording the current input stream into str. str should have been
- * previously allocated.
+/* Starts recording the current input stream into an internal buffer.
  * The current input character is included in the recording.
  */
-void statemachine_start_record(statemachine_ctx *ctx, char *str, int len)
+void statemachine_start_record(statemachine_ctx *ctx)
 {
-    assert(ctx != NULL && str != NULL);
-    ctx->record_buffer = str;
+    assert(ctx != NULL);
     ctx->record_buffer[0] = '\0';
     ctx->record_pos = 0;
-    ctx->record_left = len;
+    ctx->recording = 1;
 }
 
-/* statemachine_stop_record(statemachine_ctx *ctx)
- *
- * Stops recording the current input stream.
+/* Stops recording the current input stream.
  * The last input character is not included in the recording.
+ * This function returns a pointer to the recorded string buffer.
  */
-void statemachine_stop_record(statemachine_ctx *ctx)
+const char *statemachine_stop_record(statemachine_ctx *ctx)
 {
-    assert(ctx != NULL && ctx->record_buffer != NULL);
+    assert(ctx != NULL);
+    assert(ctx->recording);
     ctx->record_buffer[ctx->record_pos] = '\0';
-    ctx->record_buffer = NULL;
-    ctx->record_left = 0;
+    ctx->recording = 0;
+    return ctx->record_buffer;
+}
+
+ /* Returns a pointer to the record string buffer.
+ */
+const char *statemachine_record_buffer(statemachine_ctx *ctx)
+{
+    return ctx->record_buffer;
 }
 
 /* Parses the input html stream and returns the finishing state.
@@ -396,6 +402,7 @@ int statemachine_parse(statemachine_ctx *ctx, const char *str, int size)
 {
     int i;
     int **state_table = ctx->definition->transition_table;
+    statemachine_definition *def;
 
     assert(ctx !=NULL &&
            ctx->definition != NULL &&
@@ -404,7 +411,7 @@ int statemachine_parse(statemachine_ctx *ctx, const char *str, int size)
     if (size < 0)
         return STATEMACHINE_ERROR;
 
-    statemachine_definition *def = ctx->definition;
+    def = ctx->definition;
 
     for (i = 0; i < size; i++) {
         ctx->current_char = *str;
@@ -436,10 +443,10 @@ int statemachine_parse(statemachine_ctx *ctx, const char *str, int size)
                                                   ctx->next_state);
 
         /* We need two bytes left so we can NULL terminate the string. */
-        if (ctx->record_left >= 2) {
+        if (ctx->recording &&
+            STATEMACHINE_RECORD_BUFFER_SIZE - 1 > ctx->record_pos) {
             ctx->record_buffer[ctx->record_pos++] = *str;
             ctx->record_buffer[ctx->record_pos] = '\0';
-            ctx->record_left--;
         }
 
 /* TODO(falmeida): Should clarify the contract here, since an event can change

@@ -30,8 +30,8 @@
 // ---
 // Author: Jim Morrison
 
-#ifndef TEMPLATE_TEMPLATE_TEST_UTIL_H__
-#define TEMPLATE_TEMPLATE_TEST_UTIL_H__
+#ifndef TEMPLATE_TEMPLATE_TEST_UTIL_H_
+#define TEMPLATE_TEMPLATE_TEST_UTIL_H_
 
 #include "config_for_unittests.h"
 #include <string>
@@ -109,4 +109,4 @@ class TemplateDictionaryPeer {
 
 _END_GOOGLE_NAMESPACE_
 
-#endif  // TEMPLATE_TEMPLATE_TEST_UTIL_H__
+#endif  // TEMPLATE_TEMPLATE_TEST_UTIL_H_
