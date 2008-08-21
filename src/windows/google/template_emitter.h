@@ -34,8 +34,8 @@
 // This is typically a string, but could be a file-wrapper, or any
 // other data structure that supports this very simple "append" API.
 
-#ifndef TEMPLATE_TEMPLATE_EMITTER_H__
-#define TEMPLATE_TEMPLATE_EMITTER_H__
+#ifndef TEMPLATE_TEMPLATE_EMITTER_H_
+#define TEMPLATE_TEMPLATE_EMITTER_H_
 
 #include <sys/types.h>     // for size_t
 #include <string>
@@ -72,4 +72,4 @@ class CTEMPLATE_DLL_DECL StringEmitter : public ExpandEmitter {
 
 }
 
-#endif  // TEMPLATE_TEMPLATE_EMITTER_H__
+#endif  // TEMPLATE_TEMPLATE_EMITTER_H_

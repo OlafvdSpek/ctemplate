@@ -4,7 +4,7 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 0.90, opensource@google.com)
+AC_INIT(ctemplate, 0.91, opensource@google.com)
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
@@ -84,9 +84,10 @@ AC_DEFINE_UNQUOTED(HTMLPARSER_NAMESPACE, $ac_htmlparser_namespace,
 
 # Write generated configuration file, and also .h files
 AC_CONFIG_FILES([Makefile \
-                 src/google/template_enums.h src/google/template_namelist.h \
+                 src/google/template_string.h src/google/template_enums.h \
 		 src/google/template.h src/google/template_from_string.h \
 		 src/google/template_modifiers.h src/google/template_emitter.h \
 		 src/google/template_dictionary.h src/google/template_pathops.h \
+		 src/google/template_namelist.h src/google/per_expand_data.h \
 		 ])
 AC_OUTPUT

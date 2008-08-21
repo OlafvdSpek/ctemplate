@@ -33,8 +33,8 @@
 // Alas that we can't forward-declare enums!  These are the ones
 // used by multiple files
 
-#ifndef TEMPLATE_TEMPLATE_ENUMS_H__
-#define TEMPLATE_TEMPLATE_ENUMS_H__
+#ifndef TEMPLATE_TEMPLATE_ENUMS_H_
+#define TEMPLATE_TEMPLATE_ENUMS_H_
 
 namespace google {
 
@@ -44,4 +44,4 @@ enum Strip { DO_NOT_STRIP, STRIP_BLANK_LINES, STRIP_WHITESPACE,
 
 }
 
-#endif  // TEMPLATE_TEMPLATE_ENUMS_H__
+#endif  // TEMPLATE_TEMPLATE_ENUMS_H_

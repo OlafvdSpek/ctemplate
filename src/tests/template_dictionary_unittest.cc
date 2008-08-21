@@ -37,6 +37,7 @@
 #include <vector>
 #include <google/template_dictionary.h>
 #include <google/template_modifiers.h>
+#include <google/per_expand_data.h>
 #include "base/arena.h"
 #include "tests/template_test_util.h"
 
@@ -74,11 +75,13 @@ using std::vector;
 
 _START_GOOGLE_NAMESPACE_
 
+using ctemplate::PerExpandData;
+
 // test escape-functor that replaces all input with "foo"
 class FooEscaper : public template_modifiers::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
-              const template_modifiers::ModifierData*,
+              const PerExpandData*,
               ExpandEmitter* outbuf, const string& arg) const {
     assert(arg.empty());    // we don't take an argument
     outbuf->Emit("foo");
@@ -89,7 +92,7 @@ class FooEscaper : public template_modifiers::TemplateModifier {
 class NullEscaper : public template_modifiers::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
-              const template_modifiers::ModifierData*,
+              const PerExpandData*,
               ExpandEmitter* outbuf, const string& arg) const {
     assert(arg.empty());    // we don't take an argument
   }
@@ -99,7 +102,7 @@ class NullEscaper : public template_modifiers::TemplateModifier {
 class DoubleEscaper : public template_modifiers::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
-              const template_modifiers::ModifierData* data,
+              const PerExpandData* data,
               ExpandEmitter* outbuf, const string& arg) const {
     assert(arg.empty());    // we don't take an argument
     string tmp = template_modifiers::javascript_escape(in, inlen);
@@ -382,15 +385,15 @@ class TemplateDictionaryUnittest {
                  "21");
 
     // Make sure we're making descriptive names
-    ASSERT_STREQ(dict.name().c_str(),
+    ASSERT_STREQ(dict.name(),
                  "test_SetAddSectionDictionary");
-    ASSERT_STREQ(subdict_1a->name().c_str(),
+    ASSERT_STREQ(subdict_1a->name(),
                  "test_SetAddSectionDictionary/section1#1");
-    ASSERT_STREQ(subdict_1b->name().c_str(),
+    ASSERT_STREQ(subdict_1b->name(),
                  "test_SetAddSectionDictionary/section1#2");
-    ASSERT_STREQ(subdict_2->name().c_str(),
+    ASSERT_STREQ(subdict_2->name(),
                  "test_SetAddSectionDictionary/section2#1");
-    ASSERT_STREQ(subdict_2_1->name().c_str(),
+    ASSERT_STREQ(subdict_2_1->name(),
                  "test_SetAddSectionDictionary/section2#1/sub#1");
 
     // Finally, we can test the whole kit and kaboodle
@@ -678,15 +681,15 @@ class TemplateDictionaryUnittest {
                  "baz");
 
     // Make sure we're making descriptive names
-    ASSERT_STREQ(dict.name().c_str(),
+    ASSERT_STREQ(dict.name(),
                  "test_SetAddIncludeDictionary");
-    ASSERT_STREQ(subdict_1a->name().c_str(),
+    ASSERT_STREQ(subdict_1a->name(),
                  "test_SetAddIncludeDictionary/include1#1");
-    ASSERT_STREQ(subdict_1b->name().c_str(),
+    ASSERT_STREQ(subdict_1b->name(),
                  "test_SetAddIncludeDictionary/include1#2");
-    ASSERT_STREQ(subdict_2->name().c_str(),
+    ASSERT_STREQ(subdict_2->name(),
                  "test_SetAddIncludeDictionary/include2#1");
-    ASSERT_STREQ(subdict_2_1->name().c_str(),
+    ASSERT_STREQ(subdict_2_1->name(),
                  "test_SetAddIncludeDictionary/include2#1/sub#1");
 
     // Finally, we can test the whole kit and kaboodle
@@ -801,10 +804,10 @@ class TemplateDictionaryUnittest {
   }
 
   static void TestSetModifierData() {
-    TemplateDictionary dict("test_SetModifierData", NULL);
+    PerExpandData per_expand_data;
     const void* data = "test";
-    dict.SetModifierData("a", data);
-    ASSERT(data == dict.modifier_data()->Lookup("a"));
+    per_expand_data.InsertForModifiers("a", data);
+    ASSERT(data == per_expand_data.LookupForModifiers("a"));
   }
 
 };

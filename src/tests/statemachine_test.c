@@ -123,7 +123,6 @@ int test_simple()
 
   statemachine_delete(sm);
   return 0;
-
 }
 
 /* Tests error handling logic when we try to follow non existent transitions. */
@@ -163,8 +162,10 @@ int test_record()
 {
   statemachine_definition *def;
   statemachine_ctx *sm;
-  char buffer[100];
+  const char *actual;
+  char expected[STATEMACHINE_RECORD_BUFFER_SIZE];
   int res;
+  int counter;
   def = statemachine_definition_new(NUM_STATES);
   sm = statemachine_new(def);
 
@@ -183,25 +184,51 @@ int test_record()
   ASSERT(sm->current_state == B);
   ASSERT(sm->current_state == res);
 
-  statemachine_start_record(sm, buffer, 20);
+  statemachine_start_record(sm);
   statemachine_parse_str(sm, "121212");
-  ASSERT(strcmp(buffer, "121212") == 0);
+  ASSERT_STREQ("121212", statemachine_stop_record(sm));
 
-  statemachine_parse_str(sm, "000");
-  statemachine_stop_record(sm);
-  ASSERT(strcmp(buffer, "121212000") == 0);
+  statemachine_parse_str(sm, "not recorded");
 
-  /* Test for size limit. */
-  statemachine_start_record(sm, buffer, 5);
+  statemachine_start_record(sm);
+  statemachine_parse_str(sm, "121212000");
+  ASSERT_STREQ("121212000", statemachine_stop_record(sm));
+
+  statemachine_start_record(sm);
   statemachine_parse_str(sm, "1234567890");
-  ASSERT(strcmp(buffer, "1234") == 0);
-  statemachine_stop_record(sm);
+  ASSERT_STREQ("1234567890", statemachine_record_buffer(sm));
 
-  /* Test for null termination. */
-  statemachine_start_record(sm, buffer, 5);
-  statemachine_parse_str(sm, "1");
-  ASSERT(strcmp(buffer, "1") == 0);
-  statemachine_stop_record(sm);
+  statemachine_parse_str(sm, "test");
+  ASSERT_STREQ("1234567890test", statemachine_stop_record(sm));
+
+  statemachine_start_record(sm);
+
+  /* Record 1000 chars + strlen("beginning-") */
+  statemachine_parse_str(sm, "beginning-");
+  for (counter = 0; counter < 100; counter++) {
+    statemachine_parse_str(sm, "1234567890");
+  }
+
+  /* Make sure we preserved the start of the buffer. */
+  ASSERT_STRSTR(statemachine_record_buffer(sm), "beginning-");
+
+  /* And make sure the size is what we expect. */
+  ASSERT(STATEMACHINE_RECORD_BUFFER_SIZE - 1 ==
+         strlen(statemachine_stop_record(sm)));
+
+  statemachine_start_record(sm);
+  for (counter = 0; counter < 100; counter++) {
+    statemachine_parse_str(sm, "0123456789ABCDEF");
+  }
+
+  expected[0] = '\0';
+  /* Fill the buffer with a pattern 255 chars long (16 * 15 + 15). */
+  for (counter = 0; counter < 15; counter++) {
+    strcat(expected, "0123456789ABCDEF");
+  }
+  strcat(expected, "0123456789ABCDE");
+  actual = statemachine_stop_record(sm);
+  ASSERT_STREQ(expected, actual);
 
   statemachine_delete(sm);
   return 0;

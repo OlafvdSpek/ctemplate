@@ -1,7 +1,7 @@
-#ifndef GOOGLE_CTEMPLATE_WINDOWS_CONFIG_H__
-#define GOOGLE_CTEMPLATE_WINDOWS_CONFIG_H__
+#ifndef GOOGLE_CTEMPLATE_WINDOWS_CONFIG_H_
+#define GOOGLE_CTEMPLATE_WINDOWS_CONFIG_H_
 
-/* src/config.h.in.  Generated from configure.ac by autoheader.  */
+/* Hand-filled based on src/config.h.in. */
 
 /* Namespace for Google classes */
 #define GOOGLE_NAMESPACE  google
@@ -100,7 +100,7 @@
 #undef PACKAGE_NAME
 
 /* Define to the full name and version of this package. */
-#undef PACKAGE_STRING
+#define PACKAGE_STRING  "ctemplate 0.91"
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
@@ -152,4 +152,4 @@
 // TODO(csilvers): include windows/port.h in every relevant source file instead?
 #include "windows/port.h"
 
-#endif  /* GOOGLE_CTEMPLATE_WINDOWS_CONFIG_H__ */
+#endif  /* GOOGLE_CTEMPLATE_WINDOWS_CONFIG_H_ */

@@ -79,7 +79,9 @@ using GOOGLE_NAMESPACE::DO_NOT_STRIP;
 using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
 using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
 using GOOGLE_NAMESPACE::TC_HTML;
+using GOOGLE_NAMESPACE::TC_MANUAL;
 namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;
+using ctemplate::PerExpandData;
 
 // This default value is only used when the TEMPLATE_ROOTDIR envvar isn't set
 #ifndef DEFAULT_TEMPLATE_ROOTDIR
@@ -388,16 +390,16 @@ static void TestExpand(const vector<Testdata>::const_iterator& begin,
     Template* tpl_ws = Template::GetTemplate(one_test->input_template_name,
                                              STRIP_WHITESPACE);
 
-    // Test the TemplateFromString class too
-    Template* tplstr_none = TemplateFromString::GetTemplate(
-        one_test->input_template_name, one_test->input_template,
-        DO_NOT_STRIP);
-    Template* tplstr_lines = TemplateFromString::GetTemplate(
-        one_test->input_template_name, one_test->input_template,
-        STRIP_BLANK_LINES);
-    Template* tplstr_ws = TemplateFromString::GetTemplate(
-        one_test->input_template_name, one_test->input_template,
-        STRIP_WHITESPACE);
+    // Test RegisterStringAsTemplate too
+    Template* tplstr_none = Template::RegisterStringAsTemplate(
+        one_test->input_template_name + "_str", DO_NOT_STRIP, TC_MANUAL,
+        one_test->input_template);
+    Template* tplstr_lines = Template::RegisterStringAsTemplate(
+        one_test->input_template_name + "_str", STRIP_BLANK_LINES, TC_MANUAL,
+        one_test->input_template);
+    Template* tplstr_ws = Template::RegisterStringAsTemplate(
+        one_test->input_template_name + "_str", STRIP_WHITESPACE, TC_MANUAL,
+        one_test->input_template);
 
     for (vector<string>::const_iterator out = one_test->output.begin();
          out != one_test->output.end(); ++out) {
@@ -460,9 +462,10 @@ static void TestExpand(const vector<Testdata>::const_iterator& begin,
              one_test->input_template_name.c_str(), dictnum);
 
       TemplateDictionary* dict = MakeDictionary(dictnum);
-      dict->SetAnnotateOutput("template_unittest_test");
+      PerExpandData per_expand_data;
+      per_expand_data.SetAnnotateOutput("template_unittest_test");
       string output;
-      tpl_lines->Expand(&output, dict);
+      tpl_lines->ExpandWithData(&output, dict, &per_expand_data);
       ASSERT_STRING_EQ(*out, output);
       delete dict;   // it's our responsibility
     }

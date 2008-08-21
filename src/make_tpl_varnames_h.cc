@@ -84,8 +84,8 @@ static void LogPrintf(int severity, int should_log_info, const char* pat, ...) {
     exit(1);
 }
 
-// prints to outfile -- usually stdout or stderr -- and then exits
-static int Usage(const char* argv0, FILE* outfile) {
+// prints to outfile -- usually stdout or stderr
+static void Usage(const char* argv0, FILE* outfile) {
   fprintf(outfile, "USAGE: %s [-t<dir>] [-h<dir>] [-s<suffix>] [-f<filename>]"
           " [-n] [-d] [-q] <template_filename> ...\n", argv0);
   fprintf(outfile,
@@ -107,12 +107,11 @@ static int Usage(const char* argv0, FILE* outfile) {
           "By default (without -n) it also emits a header file to an output\n"
           "directory that defines all valid template keys.  This can be used\n"
           "in programs to minimze the probability of typos in template code.\n");
-  exit(0);
 }
 
-static int Version(FILE* outfile) {
+static void Version(FILE* outfile) {
   fprintf(outfile,
-          "make_tpl_varnames_h (part of google-template 0.1)\n"
+          "make_tpl_varnames_h (part of " PACKAGE_STRING ")\n"
           "\n"
           "Copyright 1998-2005 Google Inc.\n"
           "\n"
@@ -121,7 +120,6 @@ static int Version(FILE* outfile) {
           "There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A\n"
           "PARTICULAR PURPOSE.\n"
           );
-  exit(0);
 }
 
 int main(int argc, char **argv) {
@@ -140,8 +138,8 @@ int main(int argc, char **argv) {
   const char* optarg = "";   // not used
 #elif defined(HAVE_GETOPT_LONG)
   static struct option longopts[] = {
-    {"help", 1, NULL, 'h'},
-    {"version", 1, NULL, 'V'},
+    {"help", 0, NULL, 'h'},
+    {"version", 0, NULL, 'V'},
     {"template_dir", 1, NULL, 't'},
     {"header_dir", 1, NULL, 'o'},
     {"outputfile_suffix", 1, NULL, 's'},
@@ -170,9 +168,10 @@ int main(int argc, char **argv) {
       case 'n': FLAG_header = false; break;
       case 'd': FLAG_dump_templates = true; break;
       case 'q': FLAG_log_info = false; break;
-      case 'V': Version(stdout); break;
+      case 'V': Version(stdout); return 0; break;
+      case 'h': Usage(argv[0], stderr); return 0; break;
       case -1: break;   // means 'no more input'
-      default: Usage(argv[0], stderr);
+      default: Usage(argv[0], stderr); return 1; break;
     }
   }
 
@@ -184,7 +183,7 @@ int main(int argc, char **argv) {
   // If --outputfile option is being used then --outputfile_suffix as well as
   // --header_dir will be ignored. If there are multiple input files then an
   // error needs to be reported.
-  if (!FLAG_outputfile.empty() && optind + 1 > argc) {
+  if (!FLAG_outputfile.empty() && optind != argc - 1) {
     LogPrintf(LOG_FATAL, FLAG_log_info,
               "Only one template file allowed when specifying an explicit "
               "output filename.");
@@ -229,7 +228,7 @@ int main(int argc, char **argv) {
 
     string contents(string("//\n") +
                     "// This header file auto-generated for the template\n" +
-                    "//    " + tpl->template_file() + "\n" +
+                    "//    " + argv[i] + "\n" +
                     "// by " + argv[0] + "\n" +
                     "// DO NOT MODIFY THIS FILE DIRECTLY\n" +
                     "//\n");

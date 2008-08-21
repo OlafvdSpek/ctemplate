@@ -59,8 +59,8 @@
 //    If you use this method, memory management is easy: just call Alloc()
 // and friends a lot, and call Reset() when you're done with the data.
 
-#ifndef _GOOGLE_ARENA_H_
-#define _GOOGLE_ARENA_H_
+#ifndef GOOGLE_ARENA_H_
+#define GOOGLE_ARENA_H_
 
 #include "config.h"
 #include <assert.h>
@@ -265,4 +265,4 @@ class CTEMPLATE_DLL_DECL UnsafeArena : public BaseArena {
 
 _END_GOOGLE_NAMESPACE_
 
-#endif  /* #ifndef _GOOGLE_ARENA_H_ */
+#endif  /* #ifndef GOOGLE_ARENA_H_ */

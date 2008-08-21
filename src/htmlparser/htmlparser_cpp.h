@@ -32,15 +32,27 @@
 //
 // c++ bindings for htmlparser.
 
-#ifndef SECURITY_STREAMHTMLPARSER_HTMLPARSER_CPP_H__
-#define SECURITY_STREAMHTMLPARSER_HTMLPARSER_CPP_H__
+#ifndef SECURITY_STREAMHTMLPARSER_HTMLPARSER_CPP_H_
+#define SECURITY_STREAMHTMLPARSER_HTMLPARSER_CPP_H_
 
 #include "config.h"
 #include <assert.h>
 #include <string>
 #include "htmlparser.h"
+#include "jsparser.h"
 
 namespace HTMLPARSER_NAMESPACE {
+
+class JavascriptParser {
+  public:
+    enum State {
+      STATE_TEXT = JSPARSER_STATE_TEXT,
+      STATE_Q = JSPARSER_STATE_Q,
+      STATE_DQ = JSPARSER_STATE_DQ,
+      STATE_REGEXP = JSPARSER_STATE_REGEXP,
+      STATE_COMMENT = JSPARSER_STATE_COMMENT,
+    };
+};
 
 class HtmlParser {
   public:
@@ -168,6 +180,14 @@ class HtmlParser {
       return htmlparser_attr_type(parser_);
     }
 
+    /* Returns the current state the javascript parser is in.
+     *
+     * Should only be used for testing.
+     */
+    int javascript_state() const {
+      return htmlparser_js_state(parser_);
+    };
+
     /* Resets the parser to it's initial state and changes the parser mode.
      *
      * Internal state (tag name, attribute name, state of statemachine) is
@@ -221,4 +241,4 @@ class HtmlParser {
 
 }  // namespace HTMLPARSER_NAMESPACE
 
-#endif  // SECURITY_STREAMHTMLPARSER_HTMLPARSER_CPP_H__
+#endif  // SECURITY_STREAMHTMLPARSER_HTMLPARSER_CPP_H_

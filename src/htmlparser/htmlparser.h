@@ -53,7 +53,10 @@ namespace HTMLPARSER_NAMESPACE {
 
 /* entity filter */
 
-#define HTMLPARSER_MAX_STRING 256
+/* String sizes used in htmlparser and entityfilter structures including the
+ * NULL terminator.
+ */
+#define HTMLPARSER_MAX_STRING STATEMACHINE_RECORD_BUFFER_SIZE
 #define HTMLPARSER_MAX_ENTITY_SIZE 10
 
 
@@ -142,9 +145,6 @@ typedef struct htmlparser_ctx_s {
 
   /* Contents of the current value capped to HTMLPARSER_MAX_STRING. */
   char value[HTMLPARSER_MAX_STRING];
-
-  /* Temporary character buffer for detecting the end of a CDATA element. */
-  char cdata_close_tag[HTMLPARSER_MAX_STRING];
 
 } htmlparser_ctx;
 

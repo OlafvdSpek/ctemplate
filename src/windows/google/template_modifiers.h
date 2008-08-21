@@ -60,13 +60,14 @@
 // 6) .cc file: give storage for the variable declared in the .h file (in 2).
 // 7) .cc file: add the modifier to the g_modifiers array.
 
-#ifndef TEMPLATE_TEMPLATE_MODIFIERS_H__
-#define TEMPLATE_TEMPLATE_MODIFIERS_H__
+#ifndef TEMPLATE_TEMPLATE_MODIFIERS_H_
+#define TEMPLATE_TEMPLATE_MODIFIERS_H_
 
 #include <sys/types.h>   // for size_t
 #include <hash_map>
 #include <string>
 #include <google/template_emitter.h>   // so we can inline operator()
+#include <google/per_expand_data.h>    // so we can inline operator()
 
 // NOTE: if you are statically linking the template library into your binary
 // (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
@@ -81,12 +82,10 @@ class Template;
 
 namespace template_modifiers {
 
-class ModifierData;
-
 #define MODIFY_SIGNATURE_                                                    \
  public:                                                                     \
   virtual void Modify(const char* in, size_t inlen,                          \
-                      const ModifierData*, ExpandEmitter* outbuf,            \
+                      const ctemplate::PerExpandData*, ExpandEmitter* outbuf, \
                       const std::string& arg) const
 
 // If you wish to write your own modifier, it should subclass this
@@ -108,9 +107,22 @@ class CTEMPLATE_DLL_DECL TemplateModifier {
   //         every variable expanded using that dictionary.  This value
   //         comes from the source code.
   virtual void Modify(const char* in, size_t inlen,
-                      const ModifierData* per_expand_data,
+                      const ctemplate::PerExpandData* per_expand_data,
                       ExpandEmitter* outbuf,
                       const std::string& arg) const = 0;
+
+  // This function can be used to speed up modification.  If Modify()
+  // is often a noop, you can implement MightModify() to indicate
+  // situations where it's safe to avoid the call to Modify(), because
+  // Modify() won't do any modifications in this case.  Note it's
+  // always safe to return true here; you should just return false if
+  // you're certain Modify() can be ignored.  This function is
+  // advisory; the template system is not required to call
+  // MightModify() before Modify().
+  virtual bool MightModify(const ctemplate::PerExpandData* per_expand_data,
+                           const std::string& arg) const {
+    return true;
+  }
 
   // We support both modifiers that take an argument, and those that don't.
   // We also support passing in a string, or a char*/int pair.
@@ -148,6 +160,8 @@ extern CTEMPLATE_DLL_DECL PreEscape pre_escape;
 class CTEMPLATE_DLL_DECL SnippetEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
 extern CTEMPLATE_DLL_DECL SnippetEscape snippet_escape;
 
+// Replaces characters not safe for an unquoted attribute with underscore.
+// Safe characters are alphanumeric, underscore, dash, period, and colon.
 // The equal sign is also considered safe unless it is at the start
 // or end of the input in which case it is replaced with underscore.
 //
@@ -338,64 +352,8 @@ extern CTEMPLATE_DLL_DECL bool AddModifier(const char* long_name, const Template
 extern CTEMPLATE_DLL_DECL const ModifierInfo* FindModifier(const char* modname, size_t modname_len,
                                  const char* modval, size_t modval_len);
 
-// This class holds per-expand data which is available to
-// custom modifiers.
-class CTEMPLATE_DLL_DECL ModifierData  {
- public:
-  ModifierData() { }
-
-  // Retrieve data specific to this Expand call. Returns NULL if key
-  // is not found.
-  // This should only be used by modifiers.
-  const void* Lookup(const char* key) const;
-
-  // Same as Lookup, but casts the result to a c string.
-  const char* LookupAsString(const char* key) const {
-    return static_cast<const char*>(Lookup(key));
-  }
-
-  // Store data for a later call to expand. Call with value set to
-  // NULL to clear any value previously set.  Caller is responsible
-  // for ensuring key and value point to valid data for the lifetime
-  // of 'this'.  This should only be used by TemplateDictionary.
-  void Insert(const char* key, const void* value);
-
-  // Copy another ModifierData.  Only used by TemplateDictionary.
-  void CopyFrom(const ModifierData& other);
-
- private:
-#ifdef WIN32
-  struct DataHash {
-    size_t operator()(const char* s1) const {
-      return stdext::hash_compare<const char*>()(s1);
-    }
-    bool operator()(const char* s1, const char* s2) const {  // less-than
-      return (s2 == 0 ? false : s1 == 0 ? true : strcmp(s1, s2) < 0);
-    }
-    // These two public members are required by msvc.  4 and 8 are defaults.
-    static const size_t bucket_size = 4;
-    static const size_t min_buckets = 8;
-  };
-
-  typedef stdext::hash_map<const char*, const void*, DataHash> DataMap;
-#else
-  struct DataEq {
-    bool operator()(const char* s1, const char* s2) const {
-      return ((s1 == 0 && s2 == 0) ||
-              (s1 && s2 && *s1 == *s2 && strcmp(s1, s2) == 0));
-    }
-  };
-  typedef stdext::hash_map<const char*, const void*, stdext::hash_compare<const char*>, DataEq>
-    DataMap;
-#endif
-  DataMap map_;
-
-  ModifierData(const ModifierData&);    // disallow evil copy constructor
-  void operator=(const ModifierData&);  // disallow evil operator=
-};
-
 }  // namespace template_modifiers
 
 }
 
-#endif  // TEMPLATE_TEMPLATE_MODIFIERS_H__
+#endif  // TEMPLATE_TEMPLATE_MODIFIERS_H_

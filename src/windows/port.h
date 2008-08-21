@@ -37,8 +37,8 @@
  *    http://developer.gnome.org/doc/API/glib/glib-windows-compatability-functions.html
  */
 
-#ifndef CTEMPLATE_WINDOWS_PORT_H__
-#define CTEMPLATE_WINDOWS_PORT_H__
+#ifndef CTEMPLATE_WINDOWS_PORT_H_
+#define CTEMPLATE_WINDOWS_PORT_H_
 
 #include "config.h"
 
@@ -56,9 +56,11 @@
 
 // 4244: otherwise we get problems when substracting two size_t's to an int
 // 4251: it's complaining about a private struct I've chosen not to dllexport
+// 4355: we use this in a constructor, but we do it safely
 // 4715: for some reason VC++ stopped realizing you can't return after abort()
+// 4800: we know we're casting ints/char*'s to bools, and we're ok with that
 // 4996: Yes, we're ok using "unsafe" functions like fopen() and strerror()
-#pragma warning(disable:4244 4251 4715 4996)
+#pragma warning(disable:4244 4251 4355 4715 4800 4996)
 
 // file I/O
 #define PATH_MAX 1024
@@ -72,6 +74,7 @@
 #define popen   _popen
 #define pclose  _pclose
 #define R_OK    04           // read-only (for access())
+#define S_ISDIR(m)  (((m) & _S_IFMT) == _S_IFDIR)
 
 // Not quite as lightweight as a hard-link, but more than good enough for us.
 #define link(oldpath, newpath)  CopyFileA(oldpath, newpath, false)
@@ -111,4 +114,4 @@ void CTEMPLATE_DLL_DECL GetNamelist(const char* testdata_dir,
 
 #endif  /* WIN32 */
 
-#endif  /* CTEMPLATE_WINDOWS_PORT_H__ */
+#endif  /* CTEMPLATE_WINDOWS_PORT_H_ */

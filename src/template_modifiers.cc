@@ -51,6 +51,7 @@
 #include <string>
 #include <vector>
 #include <google/template_modifiers.h>
+#include <google/per_expand_data.h>
 
 using std::string;
 using std::vector;
@@ -58,7 +59,6 @@ using std::vector;
 // Really we should be using uint_16_t or something, but this is good
 // enough, and more portable...
 typedef unsigned int uint16;
-
 
 // A most-efficient way to append a string literal to the var named 'out'.
 // The ""s ensure literal is actually a string literal
@@ -72,20 +72,21 @@ typedef unsigned int uint16;
 
 _START_GOOGLE_NAMESPACE_
 
+using ctemplate::PerExpandData;
+
 namespace template_modifiers {
 
 TemplateModifier::~TemplateModifier() {}
 
-
 void NullModifier::Modify(const char* in, size_t inlen,
-                          const ModifierData*,
+                          const PerExpandData*,
                           ExpandEmitter* out, const string& arg) const {
   out->Emit(in, inlen);
 }
 NullModifier null_modifier;
 
 void HtmlEscape::Modify(const char* in, size_t inlen,
-                        const ModifierData*,
+                        const PerExpandData*,
                         ExpandEmitter* out, const string& arg) const {
   for (size_t i = 0; i < inlen; ++i) {
     switch (in[i]) {
@@ -103,7 +104,7 @@ void HtmlEscape::Modify(const char* in, size_t inlen,
 HtmlEscape html_escape;
 
 void PreEscape::Modify(const char* in, size_t inlen,
-                       const ModifierData*,
+                       const PerExpandData*,
                        ExpandEmitter* out, const string& arg) const {
   for (size_t i = 0; i < inlen; ++i) {
     switch (in[i]) {
@@ -120,7 +121,7 @@ void PreEscape::Modify(const char* in, size_t inlen,
 PreEscape pre_escape;
 
 void SnippetEscape::Modify(const char* in, size_t inlen,
-                           const ModifierData*,
+                           const PerExpandData*,
                            ExpandEmitter* out, const string& arg) const {
   bool inside_b = false;
   const char * const end = in + inlen;
@@ -187,7 +188,7 @@ void SnippetEscape::Modify(const char* in, size_t inlen,
 SnippetEscape snippet_escape;
 
 void CleanseAttribute::Modify(const char* in, size_t inlen,
-                              const ModifierData*,
+                              const PerExpandData*,
                               ExpandEmitter* out, const string& arg) const {
   for (size_t i = 0; i < inlen; ++i) {
     char c = in[i];
@@ -222,7 +223,7 @@ void CleanseAttribute::Modify(const char* in, size_t inlen,
 CleanseAttribute cleanse_attribute;
 
 void CleanseCss::Modify(const char* in, size_t inlen,
-                              const ModifierData*,
+                              const PerExpandData*,
                               ExpandEmitter* out, const string& arg) const {
   for (size_t i = 0; i < inlen; ++i) {
     char c = in[i];
@@ -252,7 +253,7 @@ void CleanseCss::Modify(const char* in, size_t inlen,
 CleanseCss cleanse_css;
 
 void ValidateUrl::Modify(const char* in, size_t inlen,
-                         const ModifierData* per_expand_data,
+                         const PerExpandData* per_expand_data,
                          ExpandEmitter* out, const string& arg) const {
   const char* slashpos = (char*)memchr(in, '/', inlen);
   if (slashpos == NULL)
@@ -278,7 +279,7 @@ ValidateUrl validate_url_and_html_escape(html_escape);
 ValidateUrl validate_url_and_javascript_escape(javascript_escape);
 
 void XmlEscape::Modify(const char* in, size_t inlen,
-                       const ModifierData*,
+                       const PerExpandData*,
                        ExpandEmitter* out, const string& arg) const {
   for (size_t i = 0; i < inlen; ++i) {
     switch (in[i]) {
@@ -334,7 +335,7 @@ static inline uint16 UTF8CodeUnit(const char** start, const char *end) {
   return code_unit;
 }
 void JavascriptEscape::Modify(const char* in, size_t inlen,
-                              const ModifierData*,
+                              const PerExpandData*,
                               ExpandEmitter* out, const string& arg) const {
   const char* end = in + inlen;
   if (end < in) { return; }
@@ -373,7 +374,7 @@ JavascriptEscape javascript_escape;
 
 
 void JavascriptNumber::Modify(const char* in, size_t inlen,
-                              const ModifierData*,
+                              const PerExpandData*,
                               ExpandEmitter* out, const string& arg) const {
   if (inlen == 0)
     return;
@@ -418,7 +419,7 @@ void JavascriptNumber::Modify(const char* in, size_t inlen,
 JavascriptNumber javascript_number;
 
 void UrlQueryEscape::Modify(const char* in, size_t inlen,
-                            const ModifierData*,
+                            const PerExpandData*,
                             ExpandEmitter* out, const string& arg) const {
   // Everything not matching [0-9a-zA-Z.,_*/~!()-] is escaped.
   static unsigned long _safe_characters[8] = {
@@ -442,7 +443,7 @@ void UrlQueryEscape::Modify(const char* in, size_t inlen,
 UrlQueryEscape url_query_escape;
 
 void JsonEscape::Modify(const char* in, size_t inlen,
-                        const ModifierData*,
+                        const PerExpandData*,
                         ExpandEmitter* out, const string& arg) const {
   for (size_t i = 0; i < inlen; ++i) {
     switch (in[i]) {
@@ -461,7 +462,7 @@ void JsonEscape::Modify(const char* in, size_t inlen,
 JsonEscape json_escape;
 
 void PrefixLine::Modify(const char* in, size_t inlen,
-                        const ModifierData*,
+                        const PerExpandData*,
                         ExpandEmitter* out, const string& arg) const {
   while (inlen > 0) {
     const char* nl = (const char*)memchr(in, '\n', inlen);
@@ -751,22 +752,6 @@ const ModifierInfo* FindModifier(const char* modname, size_t modname_len,
     }
     return best_match;
   }
-}
-
-const void* ModifierData::Lookup(const char* key) const {
-  DataMap::const_iterator it = map_.find(key);
-  if (it != map_.end()) {
-    return it->second;
-  }
-  return NULL;
-}
-
-void ModifierData::Insert(const char* key, const void* data) {
-  map_[key] = data;
-}
-
-void ModifierData::CopyFrom(const ModifierData& other) {
-  map_.insert(other.map_.begin(), other.map_.end());
 }
 
 }  // namespace template_modifiers

@@ -621,25 +621,6 @@ class TemplateModifiersUnittest {
     ASSERT(info->modifier == &foo_modifier);
   }
 
-  static void TestModifierData() {
-    const char* data_a = "data for a";
-    const char* data_b = "data for b";
-
-    template_modifiers::ModifierData data;
-    data.Insert("a", data_a);
-    data.Insert("b", data_b);
-
-    ASSERT(data_a == data.Lookup("a"));
-    ASSERT(data_b == data.Lookup("b"));
-    ASSERT_STREQ(data_a, data.LookupAsString("a"));
-    ASSERT_STREQ(data_b, data.LookupAsString("b"));
-
-    template_modifiers::ModifierData data_copy;
-    data_copy.CopyFrom(data);
-    ASSERT(data_a == data_copy.Lookup("a"));
-    ASSERT(data_b == data_copy.Lookup("b"));
-  }
-
   // Helper function. Determines whether the Modifier specified by
   // alt_modname/alt_modval is a safe XSS alternative to
   // the Modifier specified by modname/modval.
@@ -658,7 +639,6 @@ class TemplateModifiersUnittest {
   }
 
   static void TestXSSAlternatives() {
-
     // A modifier is always a safe replacement to itself, even non built-in.
     ASSERT(CheckXSSAlternative("h", "", "h", ""));
     ASSERT(CheckXSSAlternative("url_escape_with_arg", "=javascript",
@@ -720,7 +700,6 @@ int main(int argc, char** argv) {
   TemplateModifiersUnittest::TestPrefixLine();
   TemplateModifiersUnittest::TestFindModifier();
   TemplateModifiersUnittest::TestAddModifier();
-  TemplateModifiersUnittest::TestModifierData();
   TemplateModifiersUnittest::TestXSSAlternatives();
 
   printf("DONE\n");

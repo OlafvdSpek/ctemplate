@@ -46,6 +46,8 @@ enum {
     STATEMACHINE_ERROR = 127
 };
 
+#define STATEMACHINE_RECORD_BUFFER_SIZE 256
+
 struct statetable_transitions_s {
   const char *condition;
   int source;
@@ -70,10 +72,14 @@ typedef struct statemachine_ctx_s {
     int next_state;
     statemachine_definition *definition;
     char current_char;
-    char *record_buffer;
-    int record_pos;
-    int record_left;
-    void *user;       /* storage space for the layer above */
+    char record_buffer[STATEMACHINE_RECORD_BUFFER_SIZE];
+    size_t record_pos;
+
+    /* True if we are recording the stream to record_buffer. */
+    int recording;
+
+    /* Storage space for the layer above. */
+    void *user;
 } statemachine_ctx;
 
 void statemachine_definition_populate(statemachine_definition *def,
@@ -92,8 +98,16 @@ void statemachine_definition_delete(statemachine_definition *def);
 int statemachine_get_state(statemachine_ctx *ctx);
 void statemachine_set_state(statemachine_ctx *ctx, int state);
 
-void statemachine_start_record(statemachine_ctx *ctx, char *str, int len);
-void statemachine_stop_record(statemachine_ctx *ctx);
+void statemachine_start_record(statemachine_ctx *ctx);
+const char *statemachine_stop_record(statemachine_ctx *ctx);
+const char *statemachine_record_buffer(statemachine_ctx *ctx);
+
+/* Returns the the number of characters currently stored in the record buffer.
+ */
+static inline size_t statemachine_record_length(statemachine_ctx *ctx) {
+  return ctx->record_pos + 1;
+}
+
 statemachine_ctx *statemachine_new(statemachine_definition *def);
 int statemachine_parse(statemachine_ctx *ctx, const char *str, int size);
 

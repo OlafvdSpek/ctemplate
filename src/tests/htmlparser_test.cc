@@ -54,6 +54,9 @@
 //        that expects javascript, a script block or the parser being in
 //        MODE_JS)
 // js_quoted: True if inside a javascript string literal.
+// js_state: Current javascript state as returned by
+//           HtmlParser::javascript_state().
+//           Possible values: text, q, dq, regexp or comment.
 // value_index: Integer value containing the current character index in the
 //              current value starting from 0.
 // reset: If true, resets the parser state to it's initial values.
@@ -64,7 +67,9 @@
 #include "config_for_unittests.h"
 #include <stdlib.h>
 #include <ctype.h>
+#include <errno.h>
 #include <assert.h>
+#include <string.h>
 #include <string>
 #include <utility>
 #include <vector>
@@ -76,6 +81,7 @@ using std::vector;
 using std::pair;
 using google::ctemplate::PathJoin;
 using HTMLPARSER_NAMESPACE::HtmlParser;
+using HTMLPARSER_NAMESPACE::JavascriptParser;
 
 // This default value is only used when the TEMPLATE_ROOTDIR envvar isn't set
 #ifndef DEFAULT_TEMPLATE_ROOTDIR
@@ -173,6 +179,10 @@ class HtmlparserCppTest {
   // annotations against the html parser state.
   void ValidateFile(string filename);
 
+  void SetUp() {
+    parser_.Reset();
+  }
+
  protected:
   // Structure that stores the mapping between an id and a name.
   struct IdNameMap {
@@ -182,6 +192,10 @@ class HtmlparserCppTest {
 
   // Mapping between the enum and the string representation of the state.
   static const struct IdNameMap kStateMap[];
+
+  // Mapping between the enum and the string representation of the javascript
+  // state.
+  static const struct IdNameMap kJavascriptStateMap[];
 
   // Mapping between the enum and the string representation of the attribute
   // type.
@@ -214,39 +228,45 @@ class HtmlparserCppTest {
   int NameToId(const struct IdNameMap *list, const string &name);
 
   // Validate an annotation string against the current parser state.
-  void ProcessAnnotation(HtmlParser *parser, const string &dir);
+  void ProcessAnnotation(const string &dir);
 
   // Validate the parser state against the provided state.
-  void ValidateState(const HtmlParser *parser, const string &tag);
+  void ValidateState(const string &tag);
 
   // Validate the parser tag name against the provided tag name.
-  void ValidateTag(const HtmlParser *parser, const string &tag);
+  void ValidateTag(const string &tag);
 
   // Validate the parser attribute name against the provided attribute name.
-  void ValidateAttribute(const HtmlParser *parser, const string &attr);
+  void ValidateAttribute(const string &attr);
 
   // Validate the parser attribute value contents against the provided string.
-  void ValidateValue(const HtmlParser *parser, const string &contents);
+  void ValidateValue(const string &contents);
 
   // Validate the parser attribute type against the provided attribute type.
-  void ValidateAttributeType(const HtmlParser *parser, const string &attr);
+  void ValidateAttributeType(const string &attr);
 
   // Validate the parser attribute quoted state against the provided
   // boolean.
-  void ValidateAttributeQuoted(const HtmlParser *parser, const string &quoted);
+  void ValidateAttributeQuoted(const string &quoted);
 
   // Validates the parser in javascript state against the provided boolean.
-  void ValidateInJavascript(const HtmlParser *parser, const string &quoted);
+  void ValidateInJavascript(const string &quoted);
 
   // Validate the current parser javascript quoted state against the provided
   // boolean.
-  void ValidateJavascriptQuoted(const HtmlParser *parser, const string &quoted);
+  void ValidateJavascriptQuoted(const string &quoted);
+
+// Validate the javascript parser state against the provided state.
+  void ValidateJavascriptState(const string &expected_state);
 
   // Validate the current parser value index against the provided index.
-  void ValidateValueIndex(const HtmlParser *parser, const string &value_index);
+  void ValidateValueIndex(const string &value_index);
 
   // Current line number.
   int line_number_;
+
+  // Parser instance
+  HtmlParser parser_;
 };
 
 const int HtmlparserCppTest::kMaxFileSize = 1000000;
@@ -272,6 +292,16 @@ const struct HtmlparserCppTest::IdNameMap
   { HtmlParser::ATTR_URI,     "uri" },
   { HtmlParser::ATTR_JS,      "js" },
   { HtmlParser::ATTR_STYLE,   "style" },
+  { 0, NULL }
+};
+
+const struct HtmlparserCppTest::IdNameMap
+             HtmlparserCppTest::kJavascriptStateMap[] = {
+  { JavascriptParser::STATE_TEXT,    "text" },
+  { JavascriptParser::STATE_Q,       "q" },
+  { JavascriptParser::STATE_DQ,      "dq" },
+  { JavascriptParser::STATE_REGEXP,  "regexp" },
+  { JavascriptParser::STATE_COMMENT, "comment" },
   { 0, NULL }
 };
 
@@ -332,83 +362,96 @@ int HtmlparserCppTest::NameToId(const struct IdNameMap *list,
 }
 
 // Validate the parser state against the provided state.
-void HtmlparserCppTest::ValidateState(const HtmlParser *parser,
-                                      const string &expected_state) {
-  const char* parsed_state = IdToName(kStateMap, parser->state());
+void HtmlparserCppTest::ValidateState(const string &expected_state) {
+  const char* parsed_state = IdToName(kStateMap, parser_.state());
   EXPECT_TRUE(parsed_state != NULL);
   EXPECT_TRUE(!expected_state.empty());
   EXPECT_EQ(expected_state, string(parsed_state));
 }
 
 // Validate the parser tag name against the provided tag name.
-void HtmlparserCppTest::ValidateTag(const HtmlParser *parser,
-                                    const string &expected_tag) {
-  EXPECT_TRUE(parser->tag() != NULL);
-  EXPECT_TRUE(expected_tag == parser->tag());
+void HtmlparserCppTest::ValidateTag(const string &expected_tag) {
+  EXPECT_TRUE(parser_.tag() != NULL);
+  EXPECT_TRUE(expected_tag == parser_.tag());
 }
 
 // Validate the parser attribute name against the provided attribute name.
-void HtmlparserCppTest::ValidateAttribute(const HtmlParser *parser,
-                                     const string &expected_attr) {
-  EXPECT_TRUE(parser->attribute() != NULL);
-  EXPECT_TRUE(expected_attr == parser->attribute());
+void HtmlparserCppTest::ValidateAttribute(const string &expected_attr) {
+  EXPECT_TRUE(parser_.attribute() != NULL);
+  EXPECT_TRUE(expected_attr == parser_.attribute());
 }
 
 // Validate the parser attribute value contents against the provided string.
-void HtmlparserCppTest::ValidateValue(const HtmlParser *parser,
-                                     const string &expected_value) {
-  EXPECT_TRUE(parser->value() != NULL);
-  const string parsed_state(parser->value());
+void HtmlparserCppTest::ValidateValue(const string &expected_value) {
+  EXPECT_TRUE(parser_.value() != NULL);
+  const string parsed_state(parser_.value());
   EXPECT_EQ(expected_value, parsed_state);
 }
 
 // Validate the parser attribute type against the provided attribute type.
-void HtmlparserCppTest::ValidateAttributeType(const HtmlParser *parser,
-                                         const string &expected_attr_type) {
+void HtmlparserCppTest::ValidateAttributeType(
+    const string &expected_attr_type) {
   const char *parsed_attr_type = IdToName(kAttributeTypeMap,
-                                          parser->AttributeType());
+                                          parser_.AttributeType());
   EXPECT_TRUE(parsed_attr_type != NULL);
   EXPECT_TRUE(!expected_attr_type.empty());
-  EXPECT_EQ(expected_attr_type.compare(parsed_attr_type), 0);
+  EXPECT_EQ(expected_attr_type, string(parsed_attr_type));
 }
 
 // Validate the parser attribute quoted state against the provided
 // boolean.
-void HtmlparserCppTest::ValidateAttributeQuoted(const HtmlParser *parser,
-                                           const string &expected_attr_quoted) {
+void HtmlparserCppTest::ValidateAttributeQuoted(
+    const string &expected_attr_quoted) {
   bool attr_quoted_bool = StringToBool(expected_attr_quoted);
-  EXPECT_EQ(parser->IsAttributeQuoted(), attr_quoted_bool);
+  EXPECT_EQ(attr_quoted_bool, parser_.IsAttributeQuoted());
 }
 
 // Validates the parser in javascript state against the provided boolean.
-void HtmlparserCppTest::ValidateInJavascript(const HtmlParser *parser,
-                                     const string &expected_in_js) {
+void HtmlparserCppTest::ValidateInJavascript(const string &expected_in_js) {
   bool in_js_bool = StringToBool(expected_in_js);
-  EXPECT_EQ(parser->InJavascript(), in_js_bool);
+  EXPECT_EQ(in_js_bool, parser_.InJavascript());
 }
 
 // Validate the current parser javascript quoted state against the provided
 // boolean.
-void HtmlparserCppTest::ValidateJavascriptQuoted(const HtmlParser *parser,
-                                           const string &expected_js_quoted) {
+void HtmlparserCppTest::ValidateJavascriptQuoted(
+    const string &expected_js_quoted) {
   bool js_quoted_bool = StringToBool(expected_js_quoted);
-  EXPECT_EQ(parser->IsJavascriptQuoted(), js_quoted_bool);
+  EXPECT_EQ(js_quoted_bool, parser_.IsJavascriptQuoted());
+}
+
+// Validate the javascript parser state against the provided state.
+void HtmlparserCppTest::ValidateJavascriptState(const string &expected_state) {
+  const char* parsed_state = IdToName(kJavascriptStateMap,
+                                      parser_.javascript_state());
+  EXPECT_TRUE(parsed_state != NULL);
+  EXPECT_TRUE(!expected_state.empty());
+  EXPECT_EQ(expected_state, string(parsed_state));
+  //"Unexpected javascript state at line " << line_number_;
+}
+
+static bool safe_strto32(const char* str, int* value) {
+  char* endptr;
+  errno = 0;  // errno only gets set on errors
+  *value = strtol(str, &endptr, 10);
+  if (endptr != str) {
+    while (isspace(*endptr)) ++endptr;
+  }
+  return *str != 0 && *endptr == 0 && errno == 0;
 }
 
 // Validate the current parser value index against the provided index.
-void HtmlparserCppTest::ValidateValueIndex(const HtmlParser *parser,
-                                           const string &expected_value_index) {
+void HtmlparserCppTest::ValidateValueIndex(const string &expected_value_index) {
   int index;
-  index = atoi(expected_value_index.c_str());
-  EXPECT_EQ(parser->ValueIndex(), index);
+  CHECK(safe_strto32(expected_value_index.c_str(), &index));
+  EXPECT_EQ(index, parser_.ValueIndex());
 }
 
 // Validate an annotation string against the current parser state.
 //
 // Split the annotation into a list of key value pairs and call the appropriate
 // handler for each pair.
-void HtmlparserCppTest::ProcessAnnotation(HtmlParser *parser,
-                                         const string &annotation) {
+void HtmlparserCppTest::ProcessAnnotation(const string &annotation) {
   vector< pair< string, string > > pairs;
   SplitStringIntoKeyValuePairs(annotation, '=', ',', &pairs);
 
@@ -420,34 +463,36 @@ void HtmlparserCppTest::ProcessAnnotation(HtmlParser *parser,
     StripWhiteSpace(&iter->second);
 
     if (iter->first.compare("state") == 0) {
-      ValidateState(parser, iter->second);
+      ValidateState(iter->second);
     } else if (iter->first.compare("tag") == 0) {
-      ValidateTag(parser, iter->second);
+      ValidateTag(iter->second);
     } else if (iter->first.compare("attr") == 0) {
-      ValidateAttribute(parser, iter->second);
+      ValidateAttribute(iter->second);
     } else if (iter->first.compare("value") == 0) {
-      ValidateValue(parser, iter->second);
+      ValidateValue(iter->second);
     } else if (iter->first.compare("attr_type") == 0) {
-      ValidateAttributeType(parser, iter->second);
+      ValidateAttributeType(iter->second);
     } else if (iter->first.compare("attr_quoted") == 0) {
-      ValidateAttributeQuoted(parser, iter->second);
+      ValidateAttributeQuoted(iter->second);
     } else if (iter->first.compare("in_js") == 0) {
-      ValidateInJavascript(parser, iter->second);
+      ValidateInJavascript(iter->second);
     } else if (iter->first.compare("js_quoted") == 0) {
-      ValidateJavascriptQuoted(parser, iter->second);
+      ValidateJavascriptQuoted(iter->second);
+    } else if (iter->first.compare("js_state") == 0) {
+      ValidateJavascriptState(iter->second);
     } else if (iter->first.compare("value_index") == 0) {
-      ValidateValueIndex(parser, iter->second);
+      ValidateValueIndex(iter->second);
     } else if (iter->first.compare("reset") == 0) {
       if (StringToBool(iter->second)) {
-        parser->Reset();
+        parser_.Reset();
       }
     } else if (iter->first.compare("reset_mode") == 0) {
       HtmlParser::Mode mode =
            static_cast<HtmlParser::Mode>(NameToId(kResetModeMap, iter->second));
-      parser->ResetMode(mode);
+      parser_.ResetMode(mode);
     } else if (iter->first.compare("insert_text") == 0) {
       if (StringToBool(iter->second)) {
-        parser->InsertText();
+        parser_.InsertText();
       }
     } else {
       CHECK(false); // "Unknown test directive: iter->first"
@@ -461,7 +506,6 @@ void HtmlparserCppTest::ProcessAnnotation(HtmlParser *parser,
 // blocks. It sends the html block to the parser and uses the annotation block
 // to validate the parser state.
 void HtmlparserCppTest::ValidateFile(string filename) {
-  HtmlParser parser;
 
   string buffer;
   ReadToString(filename.c_str(), &buffer);
@@ -480,14 +524,14 @@ void HtmlparserCppTest::ValidateFile(string filename) {
 
   while (start_annotation != string::npos) {
     string html_block(buffer, start_html, start_annotation - start_html);
-    parser.Parse(html_block);
+    parser_.Parse(html_block);
     line_number_ += CountLines(html_block);
 
     start_annotation += strlen(kDirectiveBegin);
 
     string annotation_block(buffer, start_annotation,
                             end_annotation - start_annotation);
-    ProcessAnnotation(&parser, annotation_block);
+    ProcessAnnotation(annotation_block);
     line_number_ += CountLines(annotation_block);
 
     start_html = end_annotation + strlen(kDirectiveEnd);
@@ -524,14 +568,17 @@ int main(int argc, char **argv) {
                               "comments.html",
                               "javascript_block.html",
                               "javascript_attribute.html",
+                              "javascript_regexp.html",
                               "tags.html",
                               "reset.html",
                               "cdata.html" };
 
   for (const char** pfile = file_list;
        pfile < file_list + sizeof(file_list)/sizeof(*file_list);
-       ++pfile)
+       ++pfile) {
+    tester.SetUp();
     tester.ValidateFile(PathJoin(dir, *pfile));
+  }
 
   printf("DONE.\n");
   return 0;

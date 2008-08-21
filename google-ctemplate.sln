@@ -8,11 +8,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_dictionary_unittes
 		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_from_string_unittest", "vsprojects\template_from_string_unittest\template_from_string_unittest.vcproj", "{3EFCA2F1-1F2F-4143-AE6C-8F5E0D09EF9F}"
-	ProjectSection(ProjectDependencies) = postProject
-		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
-	EndProjectSection
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_modifiers_unittest", "vsprojects\template_modifiers_unittest\template_modifiers_unittest.vcproj", "{D9E45FD2-07AC-4EE8-9DA4-26E0427D619E}"
 	ProjectSection(ProjectDependencies) = postProject
 		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
