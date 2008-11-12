@@ -180,6 +180,24 @@ class HtmlParser {
       return htmlparser_attr_type(parser_);
     }
 
+    /* Return the current line number. */
+    int line_number() const {
+      return htmlparser_get_line_number(parser_);
+    }
+
+    /* Set the current line number. */
+    void set_line_number(int line) {
+      return htmlparser_set_line_number(parser_, line);
+    }
+
+    /* Retrieve a human readable error message in case an error occurred.
+     *
+     * NULL is returned if the parser didn't encounter an error.
+     */
+    const char *GetErrorMessage() {
+      return htmlparser_get_error_msg(parser_);
+    }
+
     /* Returns the current state the javascript parser is in.
      *
      * Should only be used for testing.
@@ -230,6 +248,15 @@ class HtmlParser {
       return static_cast<bool>(htmlparser_insert_text(parser_));
     }
 
+    /* Copies the context of the HtmlParser object referenced in source to the
+     * current object.
+     */
+    void CopyFrom(const HtmlParser *source) {
+      assert(this != source);
+      assert(source != NULL);
+      htmlparser_copy(parser_, source->parser_);
+    }
+
     ~HtmlParser() {
       htmlparser_delete(parser_);
     };
@@ -237,6 +264,8 @@ class HtmlParser {
 
   private:
     htmlparser_ctx *parser_;
+    HtmlParser(const HtmlParser&);      // disallow copy
+    void operator=(const HtmlParser&);  // and assign
 };
 
 }  // namespace HTMLPARSER_NAMESPACE

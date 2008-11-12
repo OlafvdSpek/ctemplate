@@ -118,7 +118,7 @@ class CTEMPLATE_DLL_DECL PerExpandData {
   }
 
  private:
-#ifdef WIN32
+#ifdef _MSC_VER
   struct DataHash {
     size_t operator()(const char* s1) const {
       return stdext::hash_compare<const char*>()(s1);

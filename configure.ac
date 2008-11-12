@@ -4,7 +4,7 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 0.91, opensource@google.com)
+AC_INIT(ctemplate, 0.92, opensource@google.com)
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
@@ -32,8 +32,16 @@ AC_COMPILER_CHARACTERISTICS
 # Here are some examples of how to check for the existence of a fn or file
 AC_CHECK_FUNCS(getopt_long)
 ##AC_CHECK_HEADERS(sys/resource.h)
-AC_CHECK_TYPES([u_int16_t])    # defined in most posix systems
-AC_CHECK_TYPES([__uint16])     # defined in some windows systems (vc7)
+
+# These are the types I need.  We look for them in either stdint.h,
+# sys/types.h, or inttypes.h, all of which are part of the default-includes.
+AC_CHECK_TYPES([uint32_t])
+AC_CHECK_TYPES([u_int32_t])
+AC_CHECK_TYPES([__uint32])
+AC_CHECK_TYPES([uint64_t])
+AC_CHECK_TYPES([u_int64_t])
+AC_CHECK_TYPES([__uint64])
+
 AC_HEADER_DIRENT               # for template_unittest.cc, template_regtest.cc
 
 # A lot of the code in this directory depends on pthreads
@@ -89,5 +97,6 @@ AC_CONFIG_FILES([Makefile \
 		 src/google/template_modifiers.h src/google/template_emitter.h \
 		 src/google/template_dictionary.h src/google/template_pathops.h \
 		 src/google/template_namelist.h src/google/per_expand_data.h \
+		 src/google/template_dictionary_interface.h \
 		 ])
 AC_OUTPUT

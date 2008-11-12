@@ -74,7 +74,7 @@
 #include <unistd.h>
 #endif
 #include <stdarg.h>
-#ifndef WIN32
+#ifndef _WIN32
 #include <getopt.h>
 #endif
 #include <string.h>
@@ -129,7 +129,7 @@ static void LogPrintf(int severity, const char* pat, ...) {
 // prints to outfile -- usually stdout or stderr -- and then exits
 static int Usage(const char* argv0, FILE* outfile) {
   fprintf(outfile, "USAGE: %s [-t<dir>] [-d] [-b] "
-          "[-c<template_context>] <template_filename> ...\n", argv0);
+          "[-c<context>] <template_filename> ...\n", argv0);
   fprintf(outfile,
           "       -t --template_dir=<dir>  Root directory of templates\n"
           "       -c --context<context>    TemplateContext (default TC_HTML)\n"
@@ -145,8 +145,8 @@ static int Usage(const char* argv0, FILE* outfile) {
           "modifiers the Auto Escape mode would set use -d to dump templates.\n"
           "Use -b for terse output when you just want to know if the template\n"
           "file has any diffs."
-          "The template_context is a string (e.g. TC_HTML) and should match\n"
-          "what you would provde in Template::GetTemplateWithAutoEscaping.\n");
+          "The context is a string (e.g. TC_HTML) and should match what\n"
+          "you would provde in Template::GetTemplateWithAutoEscaping.\n");
 
   exit(0);
 }
@@ -277,7 +277,7 @@ bool DiffTemplate(const char* filename, TemplateContext context) {
 
 int main(int argc, char **argv) {
 
-#if defined(WIN32)
+#if defined(_WIN32)
   // TODO(csilvers): implement something reasonable for windows
 # define GETOPT(argc, argv)  -1
   int optind = 1;    // first non-opt argument
@@ -287,7 +287,7 @@ int main(int argc, char **argv) {
     {"help", 1, NULL, 'h'},
     {"version", 1, NULL, 'V'},
     {"template_dir", 1, NULL, 't'},
-    {"templat_context", 1, NULL, 'c'},
+    {"context", 1, NULL, 'c'},
     {"dump_templates", 0, NULL, 'd'},
     {"brief", 0, NULL, 'q'},
     {"verbose", 0, NULL, 'v'},

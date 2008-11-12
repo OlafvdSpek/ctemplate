@@ -7,7 +7,7 @@ Summary: Simple but powerful template language for C++
 Version: %VERSION
 Release: %rel
 Group: Development/Libraries
-URL: http://code.google.com/p/ctemplate
+URL: http://code.google.com/p/google-ctemplate
 License: BSD
 Vendor: Google
 Packager: Google Inc. <opensource@google.com>

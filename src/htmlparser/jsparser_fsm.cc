@@ -40,6 +40,24 @@ static const int jsparser_states_external[] = {
   JSPARSER_STATE_TEXT
 };
 
+static const char * jsparser_states_internal_names[] = {
+  "js_text",
+  "js_q",
+  "js_q_e",
+  "js_dq",
+  "js_dq_e",
+  "js_slash",
+  "js_regexp_slash",
+  "js_regexp",
+  "js_regexp_bracket",
+  "js_regexp_bracket_e",
+  "js_regexp_e",
+  "js_comment_ln",
+  "js_comment_ml",
+  "js_comment_ml_close",
+  "js_comment_after"
+};
+
 static const struct statetable_transitions_s jsparser_state_transitions[] = {
   { "[:default:]", JSPARSER_STATE_INT_JS_COMMENT_AFTER, JSPARSER_STATE_INT_JS_TEXT },
   { "/", JSPARSER_STATE_INT_JS_COMMENT_AFTER, JSPARSER_STATE_INT_JS_SLASH },
@@ -82,4 +100,3 @@ static const struct statetable_transitions_s jsparser_state_transitions[] = {
   { "\'", JSPARSER_STATE_INT_JS_TEXT, JSPARSER_STATE_INT_JS_Q },
   { NULL, STATEMACHINE_ERROR, STATEMACHINE_ERROR }
 };
-

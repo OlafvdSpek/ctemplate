@@ -23,6 +23,7 @@ nodist_googleinclude_HEADERS = \
 	src/google/template_pathops.h \
 	src/google/template_modifiers.h \
 	src/google/template_dictionary.h \
+	src/google/template_dictionary_interface.h \
 	src/google/template_emitter.h \
 	src/google/template_namelist.h \
 	src/google/template_from_string.h \
@@ -34,6 +35,7 @@ noinst_HEADERS = \
 	src/google/template_pathops.h.in \
 	src/google/template_modifiers.h.in \
 	src/google/template_dictionary.h.in \
+	src/google/template_dictionary_interface.h.in \
 	src/google/template_emitter.h.in \
 	src/google/template_namelist.h.in \
 	src/google/template_from_string.h.in \
@@ -65,11 +67,13 @@ WINDOWS_PROJECTS = google-ctemplate.sln
 ## but it only seems to take effect for *binary* unittests (argh!)
 TESTS =
 check_SCRIPTS = make_tpl_varnames_h_unittest_sh \
-                diff_tpl_auto_escape_unittest_sh
+                diff_tpl_auto_escape_unittest_sh \
+                generate_fsm_test_sh
 TESTS_ENVIRONMENT = TEMPLATE_ROOTDIR=$(top_srcdir)
 # Every time you add a unittest to check_SCRIPTS, add it here too
 noinst_SCRIPTS = src/tests/make_tpl_varnames_h_unittest.sh \
-                 src/tests/diff_tpl_auto_escape_unittest.sh
+                 src/tests/diff_tpl_auto_escape_unittest.sh \
+                 src/tests/generate_fsm_test.sh
 # Add to this for tests that use data
 TESTDATA =
 
@@ -84,8 +88,9 @@ CTEMPLATE_SYMBOLS = '(ctemplate|template_modifiers|BaseArena|UnsafeArena|[^A-Za-
 
 lib_LTLIBRARIES += libctemplate.la
 WINDOWS_PROJECTS += vsprojects/libctemplate/libctemplate.vcproj
-libctemplate_la_SOURCES = $(googleinclude_HEADERS) \
+libctemplate_la_SOURCES = $(nodist_googleinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
+	src/template_modifiers_internal.h \
 	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
 	src/template_namelist.cc src/template_pathops.cc \
 	src/htmlparser/htmlparser.h src/htmlparser/htmlparser.cc \
@@ -130,7 +135,7 @@ libctemplate_nothreads_debug_la_LDFLAGS = $(libctemplate_nothreads_la_LDFLAGS)
 # mail to google-ctemplate@googlegroups.com!
 ##lib_LTLIBRARIES += libctemplate_testing.la
 noinst_LTLIBRARIES += libctemplate_testing.la
-libctemplate_testing_la_SOURCES = $(googleinclude_HEADERS) \
+libctemplate_testing_la_SOURCES = $(nodist_googleinclude_HEADERS) \
                                   src/tests/template_test_util.h \
                                   src/tests/template_test_util.cc
 libctemplate_testing_la_CXXFLAGS = $(AM_CXXFLAGS)
@@ -146,13 +151,13 @@ libctemplate_testing_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMB
 # Helper apps
 bin_PROGRAMS += make_tpl_varnames_h
 WINDOWS_PROJECTS += vsprojects/make_tpl_varname_h/make_tpl_varname_h.vcproj
-make_tpl_varnames_h_SOURCES = $(googleinclude_HEADERS) \
+make_tpl_varnames_h_SOURCES = $(nodist_googleinclude_HEADERS) \
 	src/make_tpl_varnames_h.cc
 make_tpl_varnames_h_LDADD = libctemplate_nothreads.la
 
 bin_PROGRAMS += diff_tpl_auto_escape
 WINDOWS_PROJECTS += vsprojects/diff_tpl_auto_escape/diff_tpl_auto_escape.vcproj
-diff_tpl_auto_escape_SOURCES = $(googleinclude_HEADERS) \
+diff_tpl_auto_escape_SOURCES = $(nodist_googleinclude_HEADERS) \
 	src/diff_tpl_auto_escape.cc
 diff_tpl_auto_escape_LDADD = libctemplate_nothreads.la
 
@@ -217,6 +222,7 @@ TESTS += template_unittest template_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_unittest/template_unittest.vcproj
 WINDOWS_PROJECTS += vsprojects/template_unittest_static/template_unittest_static.vcproj
 template_unittest_SOURCES = src/config_for_unittests.h \
+                            src/template_modifiers_internal.h \
                             src/tests/template_unittest.cc
 template_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
@@ -258,14 +264,6 @@ TESTDATA += \
    src/tests/template_unittest_test_simple_dict03.out  \
    src/tests/template_unittest_test_valid1_dict01.out 
 
-TESTS += statemachine_test
-WINDOWS_PROJECTS += vsprojects/statemachine_test/statemachine_test.vcproj
-statemachine_test_SOURCES = src/tests/statemachine_test.c \
-                            src/htmlparser/statemachine.cc
-# We force this to be compiled as C code, just to make sure no c++ snuck
-# into statemachine.cc (only the namespace declaration should be c++).
-statemachine_test_CXXFLAGS = -xc
-
 TESTS += htmlparser_test htmlparser_nothreads_test
 WINDOWS_PROJECTS += vsprojects/htmlparser_test/htmlparser_test.vcproj
 htmlparser_test_SOURCES = src/tests/htmlparser_test.cc
@@ -278,12 +276,37 @@ htmlparser_nothreads_test_LDADD = libctemplate_nothreads_debug.la
 TESTDATA += \
    src/tests/htmlparser_testdata/cdata.html \
    src/tests/htmlparser_testdata/comments.html \
+   src/tests/htmlparser_testdata/context.html \
    src/tests/htmlparser_testdata/javascript_attribute.html \
    src/tests/htmlparser_testdata/javascript_block.html \
    src/tests/htmlparser_testdata/javascript_regexp.html \
+   src/tests/htmlparser_testdata/line_count.html \
    src/tests/htmlparser_testdata/reset.html \
    src/tests/htmlparser_testdata/simple.html \
    src/tests/htmlparser_testdata/tags.html
+
+TESTS += statemachine_test
+WINDOWS_PROJECTS += vsprojects/statemachine_test/statemachine_test.vcproj
+statemachine_test_SOURCES = src/tests/statemachine_test.c \
+                            src/htmlparser/statemachine.cc
+# We force this to be compiled as C code, just to make sure no c++ snuck
+# into statemachine.cc (only the namespace declaration should be c++).
+statemachine_test_CXXFLAGS = -xc
+
+TESTS += generate_fsm_c_test
+WINDOWS_PROJECTS += vsprojects/generate_fsm_c_test/generate_fsm_c_test.vcproj
+generate_fsm_c_test_SOURCES = src/tests/generate_fsm_c_test.c
+generate_fsm_c_test_DEPENDENCIES = src/tests/htmlparser_testdata/sample_fsm.c
+generate_fsm_c_test_CXXFLAGS = -xc
+
+generate_fsm_test_sh: $(top_srcdir)/src/tests/generate_fsm_test.sh \
+                      $(top_srcdir)/src/tests/htmlparser_testdata/sample_fsm.config \
+                      $(top_srcdir)/src/tests/htmlparser_testdata/sample_fsm.c \
+                      $(top_srcdir)/src/htmlparser/generate_fsm.py
+	$(top_srcdir)/src/tests/generate_fsm_test.sh $(top_builddir)
+TESTDATA += \
+   src/tests/htmlparser_testdata/sample_fsm.config \
+   src/tests/htmlparser_testdata/sample_fsm.c
 
 make_tpl_varnames_h_unittest_sh: $(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
                                  make_tpl_varnames_h
@@ -321,6 +344,7 @@ libtool: $(LIBTOOL_DEPS)
 EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb \
 	$(SCRIPTS) $(TESTDATA) libtool \
 	src/htmlparser/README src/htmlparser/generate_fsm.py \
+	src/htmlparser/README src/htmlparser/fsm_config.py \
 	src/htmlparser/htmlparser_fsm.config src/htmlparser/htmlparser_fsm.cc \
 	src/htmlparser/jsparser_fsm.config src/htmlparser/jsparser_fsm.cc \
 	src/windows $(WINDOWS_PROJECTS) src/solaris/libstdc++.la contrib

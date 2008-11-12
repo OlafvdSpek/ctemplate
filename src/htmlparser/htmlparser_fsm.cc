@@ -74,6 +74,41 @@ static const int htmlparser_states_external[] = {
   HTMLPARSER_STATE_TEXT
 };
 
+static const char * htmlparser_states_internal_names[] = {
+  "text",
+  "tag_start",
+  "tag_name",
+  "declaration_start",
+  "declaration_body",
+  "comment_open",
+  "comment_body",
+  "comment_dash",
+  "comment_dash_dash",
+  "pi",
+  "pi_may_end",
+  "tag_space",
+  "tag_close",
+  "attr",
+  "attr_space",
+  "value",
+  "value_text",
+  "value_q_start",
+  "value_q",
+  "value_dq_start",
+  "value_dq",
+  "cdata_comment_start",
+  "cdata_comment_start_dash",
+  "cdata_comment_body",
+  "cdata_comment_dash",
+  "cdata_comment_dash_dash",
+  "cdata_text",
+  "cdata_lt",
+  "cdata_may_close",
+  "js_file",
+  "css_file",
+  "null"
+};
+
 static const struct statetable_transitions_s htmlparser_state_transitions[] = {
   { "[:default:]", HTMLPARSER_STATE_INT_NULL, HTMLPARSER_STATE_INT_NULL },
   { "[:default:]", HTMLPARSER_STATE_INT_CSS_FILE, HTMLPARSER_STATE_INT_CSS_FILE },
@@ -158,4 +193,3 @@ static const struct statetable_transitions_s htmlparser_state_transitions[] = {
   { "<", HTMLPARSER_STATE_INT_TEXT, HTMLPARSER_STATE_INT_TAG_START },
   { NULL, STATEMACHINE_ERROR, STATEMACHINE_ERROR }
 };
-

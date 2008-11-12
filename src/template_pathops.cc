@@ -42,7 +42,7 @@
 using std::string;
 
 #ifndef PATH_SEP
-# ifdef WIN32
+# ifdef _WIN32
 #   define PATH_SEP  '\\'
 # else
 #   define PATH_SEP  '/'    // assume a unix-like system
@@ -68,7 +68,7 @@ const char kRootdir[] = { PATH_SEP, '\0' };
 // Windows is bi-slashual: we always write separators using PATH_SEP (\),
 // but accept either PATH_SEP or the unix / as a separator on input.
 inline bool IsPathSep(char c) {
-#ifdef WIN32
+#ifdef _WIN32
   if (c == '/') return true;
 #endif
   return c == PATH_SEP;
@@ -84,7 +84,7 @@ string PathJoin(const string& a, const string& b) {
 }
 
 bool IsAbspath(const string& path) {
-#ifdef WIN32
+#ifdef _WIN32
   if (path.size() > 2 &&          // c:\ is an absolute path on windows
       path[1] == ':' && IsPathSep(path[2]) && isalpha(path[0])) {
     return true;

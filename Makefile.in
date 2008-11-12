@@ -49,6 +49,7 @@ DIST_COMMON = README $(am__configure_deps) $(dist_doc_DATA) \
 	$(top_srcdir)/src/google/per_expand_data.h.in \
 	$(top_srcdir)/src/google/template.h.in \
 	$(top_srcdir)/src/google/template_dictionary.h.in \
+	$(top_srcdir)/src/google/template_dictionary_interface.h.in \
 	$(top_srcdir)/src/google/template_emitter.h.in \
 	$(top_srcdir)/src/google/template_enums.h.in \
 	$(top_srcdir)/src/google/template_from_string.h.in \
@@ -77,7 +78,8 @@ CONFIG_CLEAN_FILES = src/google/template_string.h \
 	src/google/template_from_string.h \
 	src/google/template_modifiers.h src/google/template_emitter.h \
 	src/google/template_dictionary.h src/google/template_pathops.h \
-	src/google/template_namelist.h src/google/per_expand_data.h
+	src/google/template_namelist.h src/google/per_expand_data.h \
+	src/google/template_dictionary_interface.h
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -90,7 +92,8 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" \
 libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES) $(noinst_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-am_libctemplate_la_OBJECTS = libctemplate_la-arena.lo \
+am__objects_1 =
+am_libctemplate_la_OBJECTS = $(am__objects_1) libctemplate_la-arena.lo \
 	libctemplate_la-template.lo \
 	libctemplate_la-template_dictionary.lo \
 	libctemplate_la-template_modifiers.lo \
@@ -100,7 +103,7 @@ am_libctemplate_la_OBJECTS = libctemplate_la-arena.lo \
 	libctemplate_la-statemachine.lo
 libctemplate_la_OBJECTS = $(am_libctemplate_la_OBJECTS)
 am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
-am__objects_1 = libctemplate_debug_la-arena.lo \
+am__objects_2 = $(am__objects_1) libctemplate_debug_la-arena.lo \
 	libctemplate_debug_la-template.lo \
 	libctemplate_debug_la-template_dictionary.lo \
 	libctemplate_debug_la-template_modifiers.lo \
@@ -109,10 +112,10 @@ am__objects_1 = libctemplate_debug_la-arena.lo \
 	libctemplate_debug_la-htmlparser.lo \
 	libctemplate_debug_la-jsparser.lo \
 	libctemplate_debug_la-statemachine.lo
-am_libctemplate_debug_la_OBJECTS = $(am__objects_1)
+am_libctemplate_debug_la_OBJECTS = $(am__objects_2)
 libctemplate_debug_la_OBJECTS = $(am_libctemplate_debug_la_OBJECTS)
 libctemplate_nothreads_la_LIBADD =
-am__objects_2 = libctemplate_nothreads_la-arena.lo \
+am__objects_3 = $(am__objects_1) libctemplate_nothreads_la-arena.lo \
 	libctemplate_nothreads_la-template.lo \
 	libctemplate_nothreads_la-template_dictionary.lo \
 	libctemplate_nothreads_la-template_modifiers.lo \
@@ -121,11 +124,12 @@ am__objects_2 = libctemplate_nothreads_la-arena.lo \
 	libctemplate_nothreads_la-htmlparser.lo \
 	libctemplate_nothreads_la-jsparser.lo \
 	libctemplate_nothreads_la-statemachine.lo
-am_libctemplate_nothreads_la_OBJECTS = $(am__objects_2)
+am_libctemplate_nothreads_la_OBJECTS = $(am__objects_3)
 libctemplate_nothreads_la_OBJECTS =  \
 	$(am_libctemplate_nothreads_la_OBJECTS)
 libctemplate_nothreads_debug_la_LIBADD =
-am__objects_3 = libctemplate_nothreads_debug_la-arena.lo \
+am__objects_4 = $(am__objects_1) \
+	libctemplate_nothreads_debug_la-arena.lo \
 	libctemplate_nothreads_debug_la-template.lo \
 	libctemplate_nothreads_debug_la-template_dictionary.lo \
 	libctemplate_nothreads_debug_la-template_modifiers.lo \
@@ -134,12 +138,12 @@ am__objects_3 = libctemplate_nothreads_debug_la-arena.lo \
 	libctemplate_nothreads_debug_la-htmlparser.lo \
 	libctemplate_nothreads_debug_la-jsparser.lo \
 	libctemplate_nothreads_debug_la-statemachine.lo
-am__objects_4 = $(am__objects_3)
-am_libctemplate_nothreads_debug_la_OBJECTS = $(am__objects_4)
+am__objects_5 = $(am__objects_4)
+am_libctemplate_nothreads_debug_la_OBJECTS = $(am__objects_5)
 libctemplate_nothreads_debug_la_OBJECTS =  \
 	$(am_libctemplate_nothreads_debug_la_OBJECTS)
 libctemplate_testing_la_LIBADD =
-am_libctemplate_testing_la_OBJECTS =  \
+am_libctemplate_testing_la_OBJECTS = $(am__objects_1) \
 	libctemplate_testing_la-template_test_util.lo
 libctemplate_testing_la_OBJECTS =  \
 	$(am_libctemplate_testing_la_OBJECTS)
@@ -154,14 +158,19 @@ am__EXEEXT_1 = template_test_util_test$(EXEEXT) \
 	template_setglobals_nothreads_unittest$(EXEEXT) \
 	template_unittest$(EXEEXT) \
 	template_nothreads_unittest$(EXEEXT) template_regtest$(EXEEXT) \
-	template_nothreads_regtest$(EXEEXT) statemachine_test$(EXEEXT) \
-	htmlparser_test$(EXEEXT) htmlparser_nothreads_test$(EXEEXT)
+	template_nothreads_regtest$(EXEEXT) htmlparser_test$(EXEEXT) \
+	htmlparser_nothreads_test$(EXEEXT) statemachine_test$(EXEEXT) \
+	generate_fsm_c_test$(EXEEXT)
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
-am_diff_tpl_auto_escape_OBJECTS = diff_tpl_auto_escape.$(OBJEXT)
+am_diff_tpl_auto_escape_OBJECTS = $(am__objects_1) \
+	diff_tpl_auto_escape.$(OBJEXT)
 diff_tpl_auto_escape_OBJECTS = $(am_diff_tpl_auto_escape_OBJECTS)
 diff_tpl_auto_escape_DEPENDENCIES = libctemplate_nothreads.la
-am__objects_5 = htmlparser_nothreads_test-htmlparser_test.$(OBJEXT)
-am_htmlparser_nothreads_test_OBJECTS = $(am__objects_5)
+am_generate_fsm_c_test_OBJECTS = generate_fsm_c_test.$(OBJEXT)
+generate_fsm_c_test_OBJECTS = $(am_generate_fsm_c_test_OBJECTS)
+generate_fsm_c_test_LDADD = $(LDADD)
+am__objects_6 = htmlparser_nothreads_test-htmlparser_test.$(OBJEXT)
+am_htmlparser_nothreads_test_OBJECTS = $(am__objects_6)
 htmlparser_nothreads_test_OBJECTS =  \
 	$(am_htmlparser_nothreads_test_OBJECTS)
 htmlparser_nothreads_test_DEPENDENCIES =  \
@@ -171,15 +180,16 @@ am_htmlparser_test_OBJECTS =  \
 htmlparser_test_OBJECTS = $(am_htmlparser_test_OBJECTS)
 htmlparser_test_DEPENDENCIES = libctemplate_debug.la \
 	$(am__DEPENDENCIES_1)
-am_make_tpl_varnames_h_OBJECTS = make_tpl_varnames_h.$(OBJEXT)
+am_make_tpl_varnames_h_OBJECTS = $(am__objects_1) \
+	make_tpl_varnames_h.$(OBJEXT)
 make_tpl_varnames_h_OBJECTS = $(am_make_tpl_varnames_h_OBJECTS)
 make_tpl_varnames_h_DEPENDENCIES = libctemplate_nothreads.la
 am_statemachine_test_OBJECTS = statemachine_test.$(OBJEXT) \
 	statemachine_test-statemachine.$(OBJEXT)
 statemachine_test_OBJECTS = $(am_statemachine_test_OBJECTS)
 statemachine_test_LDADD = $(LDADD)
-am__objects_6 = template_dictionary_nothreads_unittest-template_dictionary_unittest.$(OBJEXT)
-am_template_dictionary_nothreads_unittest_OBJECTS = $(am__objects_6)
+am__objects_7 = template_dictionary_nothreads_unittest-template_dictionary_unittest.$(OBJEXT)
+am_template_dictionary_nothreads_unittest_OBJECTS = $(am__objects_7)
 template_dictionary_nothreads_unittest_OBJECTS =  \
 	$(am_template_dictionary_nothreads_unittest_OBJECTS)
 template_dictionary_nothreads_unittest_DEPENDENCIES =  \
@@ -189,8 +199,8 @@ template_dictionary_unittest_OBJECTS =  \
 	$(am_template_dictionary_unittest_OBJECTS)
 template_dictionary_unittest_DEPENDENCIES = libctemplate_testing.la \
 	libctemplate_debug.la $(am__DEPENDENCIES_1)
-am__objects_7 = template_modifiers_nothreads_unittest-template_modifiers_unittest.$(OBJEXT)
-am_template_modifiers_nothreads_unittest_OBJECTS = $(am__objects_7)
+am__objects_8 = template_modifiers_nothreads_unittest-template_modifiers_unittest.$(OBJEXT)
+am_template_modifiers_nothreads_unittest_OBJECTS = $(am__objects_8)
 template_modifiers_nothreads_unittest_OBJECTS =  \
 	$(am_template_modifiers_nothreads_unittest_OBJECTS)
 template_modifiers_nothreads_unittest_DEPENDENCIES =  \
@@ -200,8 +210,8 @@ template_modifiers_unittest_OBJECTS =  \
 	$(am_template_modifiers_unittest_OBJECTS)
 template_modifiers_unittest_DEPENDENCIES = libctemplate_testing.la \
 	libctemplate_debug.la $(am__DEPENDENCIES_1)
-am__objects_8 = template_nothreads_regtest-template_regtest.$(OBJEXT)
-am_template_nothreads_regtest_OBJECTS = $(am__objects_8)
+am__objects_9 = template_nothreads_regtest-template_regtest.$(OBJEXT)
+am_template_nothreads_regtest_OBJECTS = $(am__objects_9)
 template_nothreads_regtest_OBJECTS =  \
 	$(am_template_nothreads_regtest_OBJECTS)
 template_nothreads_regtest_DEPENDENCIES =  \
@@ -217,8 +227,8 @@ am_template_regtest_OBJECTS =  \
 template_regtest_OBJECTS = $(am_template_regtest_OBJECTS)
 template_regtest_DEPENDENCIES = libctemplate_debug.la \
 	$(am__DEPENDENCIES_1)
-am__objects_9 = template_setglobals_nothreads_unittest-template_setglobals_unittest.$(OBJEXT)
-am_template_setglobals_nothreads_unittest_OBJECTS = $(am__objects_9)
+am__objects_10 = template_setglobals_nothreads_unittest-template_setglobals_unittest.$(OBJEXT)
+am_template_setglobals_nothreads_unittest_OBJECTS = $(am__objects_10)
 template_setglobals_nothreads_unittest_OBJECTS =  \
 	$(am_template_setglobals_nothreads_unittest_OBJECTS)
 template_setglobals_nothreads_unittest_DEPENDENCIES =  \
@@ -228,9 +238,9 @@ template_setglobals_unittest_OBJECTS =  \
 	$(am_template_setglobals_unittest_OBJECTS)
 template_setglobals_unittest_DEPENDENCIES = libctemplate_debug.la \
 	$(am__DEPENDENCIES_1)
-am__objects_10 = template_test_util_nothreads_test-template_dictionary.$(OBJEXT) \
+am__objects_11 = template_test_util_nothreads_test-template_dictionary.$(OBJEXT) \
 	template_test_util_nothreads_test-template_test_util_test.$(OBJEXT)
-am_template_test_util_nothreads_test_OBJECTS = $(am__objects_10)
+am_template_test_util_nothreads_test_OBJECTS = $(am__objects_11)
 template_test_util_nothreads_test_OBJECTS =  \
 	$(am_template_test_util_nothreads_test_OBJECTS)
 template_test_util_nothreads_test_DEPENDENCIES =  \
@@ -272,7 +282,7 @@ SOURCES = $(libctemplate_la_SOURCES) $(libctemplate_debug_la_SOURCES) \
 	$(libctemplate_nothreads_la_SOURCES) \
 	$(libctemplate_nothreads_debug_la_SOURCES) \
 	$(libctemplate_testing_la_SOURCES) \
-	$(diff_tpl_auto_escape_SOURCES) \
+	$(diff_tpl_auto_escape_SOURCES) $(generate_fsm_c_test_SOURCES) \
 	$(htmlparser_nothreads_test_SOURCES) \
 	$(htmlparser_test_SOURCES) $(make_tpl_varnames_h_SOURCES) \
 	$(statemachine_test_SOURCES) \
@@ -293,7 +303,7 @@ DIST_SOURCES = $(libctemplate_la_SOURCES) \
 	$(libctemplate_nothreads_la_SOURCES) \
 	$(libctemplate_nothreads_debug_la_SOURCES) \
 	$(libctemplate_testing_la_SOURCES) \
-	$(diff_tpl_auto_escape_SOURCES) \
+	$(diff_tpl_auto_escape_SOURCES) $(generate_fsm_c_test_SOURCES) \
 	$(htmlparser_nothreads_test_SOURCES) \
 	$(htmlparser_test_SOURCES) $(make_tpl_varnames_h_SOURCES) \
 	$(statemachine_test_SOURCES) \
@@ -456,6 +466,7 @@ nodist_googleinclude_HEADERS = \
 	src/google/template_pathops.h \
 	src/google/template_modifiers.h \
 	src/google/template_dictionary.h \
+	src/google/template_dictionary_interface.h \
 	src/google/template_emitter.h \
 	src/google/template_namelist.h \
 	src/google/template_from_string.h \
@@ -468,6 +479,7 @@ noinst_HEADERS = \
 	src/google/template_pathops.h.in \
 	src/google/template_modifiers.h.in \
 	src/google/template_dictionary.h.in \
+	src/google/template_dictionary_interface.h.in \
 	src/google/template_emitter.h.in \
 	src/google/template_namelist.h.in \
 	src/google/template_from_string.h.in \
@@ -508,8 +520,9 @@ WINDOWS_PROJECTS = google-ctemplate.sln \
 	vsprojects/template_unittest/template_unittest.vcproj \
 	vsprojects/template_unittest_static/template_unittest_static.vcproj \
 	vsprojects/template_regtest/template_regtest.vcproj \
+	vsprojects/htmlparser_test/htmlparser_test.vcproj \
 	vsprojects/statemachine_test/statemachine_test.vcproj \
-	vsprojects/htmlparser_test/htmlparser_test.vcproj
+	vsprojects/generate_fsm_c_test/generate_fsm_c_test.vcproj
 
 # For each of the tests, we test with and without threads
 TESTS = template_test_util_test template_test_util_nothreads_test \
@@ -520,15 +533,18 @@ TESTS = template_test_util_test template_test_util_nothreads_test \
 	template_setglobals_unittest \
 	template_setglobals_nothreads_unittest template_unittest \
 	template_nothreads_unittest template_regtest \
-	template_nothreads_regtest statemachine_test htmlparser_test \
-	htmlparser_nothreads_test
+	template_nothreads_regtest htmlparser_test \
+	htmlparser_nothreads_test statemachine_test \
+	generate_fsm_c_test
 check_SCRIPTS = make_tpl_varnames_h_unittest_sh \
-                diff_tpl_auto_escape_unittest_sh
+                diff_tpl_auto_escape_unittest_sh \
+                generate_fsm_test_sh
 
 TESTS_ENVIRONMENT = TEMPLATE_ROOTDIR=$(top_srcdir)
 # Every time you add a unittest to check_SCRIPTS, add it here too
 noinst_SCRIPTS = src/tests/make_tpl_varnames_h_unittest.sh \
-                 src/tests/diff_tpl_auto_escape_unittest.sh
+                 src/tests/diff_tpl_auto_escape_unittest.sh \
+                 src/tests/generate_fsm_test.sh
 
 # Add to this for tests that use data
 TESTDATA = src/tests/template_unittest_test_autoescape_simple.in \
@@ -555,12 +571,16 @@ TESTDATA = src/tests/template_unittest_test_autoescape_simple.in \
 	src/tests/template_unittest_test_valid1_dict01.out \
 	src/tests/htmlparser_testdata/cdata.html \
 	src/tests/htmlparser_testdata/comments.html \
+	src/tests/htmlparser_testdata/context.html \
 	src/tests/htmlparser_testdata/javascript_attribute.html \
 	src/tests/htmlparser_testdata/javascript_block.html \
 	src/tests/htmlparser_testdata/javascript_regexp.html \
+	src/tests/htmlparser_testdata/line_count.html \
 	src/tests/htmlparser_testdata/reset.html \
 	src/tests/htmlparser_testdata/simple.html \
-	src/tests/htmlparser_testdata/tags.html
+	src/tests/htmlparser_testdata/tags.html \
+	src/tests/htmlparser_testdata/sample_fsm.config \
+	src/tests/htmlparser_testdata/sample_fsm.c
 
 # These are the symbols (classes, mostly) we want to export from our library.
 # Note this regexp applies to the *mangled* name, which is why we have to
@@ -568,8 +588,9 @@ TESTDATA = src/tests/template_unittest_test_autoescape_simple.in \
 # template_modifiers and BaseArena and UnsafeArena perhaps shouldn't be
 # exported, but they're needed -- at least -- for some unittests.
 CTEMPLATE_SYMBOLS = '(ctemplate|template_modifiers|BaseArena|UnsafeArena|[^A-Za-z]Template[^A-Za-z]|TemplateDictionary|TemplateNamelist|TemplateFromString|TemplateString|TemplateState|[^A-Za-z]Strip[^A-Za-z])'
-libctemplate_la_SOURCES = $(googleinclude_HEADERS) \
+libctemplate_la_SOURCES = $(nodist_googleinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
+	src/template_modifiers_internal.h \
 	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
 	src/template_namelist.cc src/template_pathops.cc \
 	src/htmlparser/htmlparser.h src/htmlparser/htmlparser.cc \
@@ -597,18 +618,18 @@ libctemplate_nothreads_debug_la_SOURCES = $(libctemplate_nothreads_la_SOURCES)
 libctemplate_nothreads_debug_la_DEPENDENCIES = $(libctemplate_nothreads_la_DEPENDENCIES)
 libctemplate_nothreads_debug_la_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 libctemplate_nothreads_debug_la_LDFLAGS = $(libctemplate_nothreads_la_LDFLAGS)
-libctemplate_testing_la_SOURCES = $(googleinclude_HEADERS) \
+libctemplate_testing_la_SOURCES = $(nodist_googleinclude_HEADERS) \
                                   src/tests/template_test_util.h \
                                   src/tests/template_test_util.cc
 
 libctemplate_testing_la_CXXFLAGS = $(AM_CXXFLAGS)
 CTEMPLATE_TESTING_SYMBOLS = 'TemporaryRegisterTemplate|TemplateDictionaryPeer'
 libctemplate_testing_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS)
-make_tpl_varnames_h_SOURCES = $(googleinclude_HEADERS) \
+make_tpl_varnames_h_SOURCES = $(nodist_googleinclude_HEADERS) \
 	src/make_tpl_varnames_h.cc
 
 make_tpl_varnames_h_LDADD = libctemplate_nothreads.la
-diff_tpl_auto_escape_SOURCES = $(googleinclude_HEADERS) \
+diff_tpl_auto_escape_SOURCES = $(nodist_googleinclude_HEADERS) \
 	src/diff_tpl_auto_escape.cc
 
 diff_tpl_auto_escape_LDADD = libctemplate_nothreads.la
@@ -663,6 +684,7 @@ template_setglobals_nothreads_unittest_SOURCES = $(template_setglobals_unittest_
 template_setglobals_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_setglobals_nothreads_unittest_LDADD = libctemplate_nothreads_debug.la
 template_unittest_SOURCES = src/config_for_unittests.h \
+                            src/template_modifiers_internal.h \
                             src/tests/template_unittest.cc
 
 template_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
@@ -678,12 +700,6 @@ template_regtest_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
 template_nothreads_regtest_SOURCES = $(template_regtest_SOURCES)
 template_nothreads_regtest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_nothreads_regtest_LDADD = libctemplate_nothreads_debug.la
-statemachine_test_SOURCES = src/tests/statemachine_test.c \
-                            src/htmlparser/statemachine.cc
-
-# We force this to be compiled as C code, just to make sure no c++ snuck
-# into statemachine.cc (only the namespace declaration should be c++).
-statemachine_test_CXXFLAGS = -xc
 htmlparser_test_SOURCES = src/tests/htmlparser_test.cc
 htmlparser_test_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 htmlparser_test_LDFLAGS = $(PTHREAD_CFLAGS)
@@ -691,11 +707,21 @@ htmlparser_test_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
 htmlparser_nothreads_test_SOURCES = $(htmlparser_test_SOURCES)
 htmlparser_nothreads_test_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 htmlparser_nothreads_test_LDADD = libctemplate_nothreads_debug.la
+statemachine_test_SOURCES = src/tests/statemachine_test.c \
+                            src/htmlparser/statemachine.cc
+
+# We force this to be compiled as C code, just to make sure no c++ snuck
+# into statemachine.cc (only the namespace declaration should be c++).
+statemachine_test_CXXFLAGS = -xc
+generate_fsm_c_test_SOURCES = src/tests/generate_fsm_c_test.c
+generate_fsm_c_test_DEPENDENCIES = src/tests/htmlparser_testdata/sample_fsm.c
+generate_fsm_c_test_CXXFLAGS = -xc
 # In addition to the normal stuff, we include all the windows-specific
 # code, and also the code used to generate the html-parser fsm files.
 EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb \
 	$(SCRIPTS) $(TESTDATA) libtool \
 	src/htmlparser/README src/htmlparser/generate_fsm.py \
+	src/htmlparser/README src/htmlparser/fsm_config.py \
 	src/htmlparser/htmlparser_fsm.config src/htmlparser/htmlparser_fsm.cc \
 	src/htmlparser/jsparser_fsm.config src/htmlparser/jsparser_fsm.cc \
 	src/windows $(WINDOWS_PROJECTS) src/solaris/libstdc++.la contrib
@@ -773,6 +799,8 @@ src/google/template_pathops.h: $(top_builddir)/config.status $(top_srcdir)/src/g
 src/google/template_namelist.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_namelist.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 src/google/per_expand_data.h: $(top_builddir)/config.status $(top_srcdir)/src/google/per_expand_data.h.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+src/google/template_dictionary_interface.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_dictionary_interface.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 install-libLTLIBRARIES: $(lib_LTLIBRARIES)
 	@$(NORMAL_INSTALL)
@@ -858,6 +886,9 @@ clean-noinstPROGRAMS:
 diff_tpl_auto_escape$(EXEEXT): $(diff_tpl_auto_escape_OBJECTS) $(diff_tpl_auto_escape_DEPENDENCIES) 
 	@rm -f diff_tpl_auto_escape$(EXEEXT)
 	$(CXXLINK) $(diff_tpl_auto_escape_LDFLAGS) $(diff_tpl_auto_escape_OBJECTS) $(diff_tpl_auto_escape_LDADD) $(LIBS)
+generate_fsm_c_test$(EXEEXT): $(generate_fsm_c_test_OBJECTS) $(generate_fsm_c_test_DEPENDENCIES) 
+	@rm -f generate_fsm_c_test$(EXEEXT)
+	$(LINK) $(generate_fsm_c_test_LDFLAGS) $(generate_fsm_c_test_OBJECTS) $(generate_fsm_c_test_LDADD) $(LIBS)
 htmlparser_nothreads_test$(EXEEXT): $(htmlparser_nothreads_test_OBJECTS) $(htmlparser_nothreads_test_DEPENDENCIES) 
 	@rm -f htmlparser_nothreads_test$(EXEEXT)
 	$(CXXLINK) $(htmlparser_nothreads_test_LDFLAGS) $(htmlparser_nothreads_test_OBJECTS) $(htmlparser_nothreads_test_LDADD) $(LIBS)
@@ -933,6 +964,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diff_tpl_auto_escape.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generate_fsm_c_test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htmlparser_nothreads_test-htmlparser_test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htmlparser_test-htmlparser_test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-arena.Plo@am__quote@
@@ -1010,6 +1042,20 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
+
+generate_fsm_c_test.o: src/tests/generate_fsm_c_test.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT generate_fsm_c_test.o -MD -MP -MF "$(DEPDIR)/generate_fsm_c_test.Tpo" -c -o generate_fsm_c_test.o `test -f 'src/tests/generate_fsm_c_test.c' || echo '$(srcdir)/'`src/tests/generate_fsm_c_test.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/generate_fsm_c_test.Tpo" "$(DEPDIR)/generate_fsm_c_test.Po"; else rm -f "$(DEPDIR)/generate_fsm_c_test.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='src/tests/generate_fsm_c_test.c' object='generate_fsm_c_test.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o generate_fsm_c_test.o `test -f 'src/tests/generate_fsm_c_test.c' || echo '$(srcdir)/'`src/tests/generate_fsm_c_test.c
+
+generate_fsm_c_test.obj: src/tests/generate_fsm_c_test.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT generate_fsm_c_test.obj -MD -MP -MF "$(DEPDIR)/generate_fsm_c_test.Tpo" -c -o generate_fsm_c_test.obj `if test -f 'src/tests/generate_fsm_c_test.c'; then $(CYGPATH_W) 'src/tests/generate_fsm_c_test.c'; else $(CYGPATH_W) '$(srcdir)/src/tests/generate_fsm_c_test.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/generate_fsm_c_test.Tpo" "$(DEPDIR)/generate_fsm_c_test.Po"; else rm -f "$(DEPDIR)/generate_fsm_c_test.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='src/tests/generate_fsm_c_test.c' object='generate_fsm_c_test.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o generate_fsm_c_test.obj `if test -f 'src/tests/generate_fsm_c_test.c'; then $(CYGPATH_W) 'src/tests/generate_fsm_c_test.c'; else $(CYGPATH_W) '$(srcdir)/src/tests/generate_fsm_c_test.c'; fi`
 
 statemachine_test.o: src/tests/statemachine_test.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT statemachine_test.o -MD -MP -MF "$(DEPDIR)/statemachine_test.Tpo" -c -o statemachine_test.o `test -f 'src/tests/statemachine_test.c' || echo '$(srcdir)/'`src/tests/statemachine_test.c; \
@@ -1739,7 +1785,7 @@ check-TESTS: $(TESTS)
 distdir: $(DISTFILES)
 	$(am__remove_distdir)
 	mkdir $(distdir)
-	$(mkdir_p) $(distdir)/doc $(distdir)/m4 $(distdir)/packages $(distdir)/packages/rpm $(distdir)/src $(distdir)/src/google $(distdir)/src/htmlparser $(distdir)/src/solaris $(distdir)/src/tests $(distdir)/src/tests/htmlparser_testdata $(distdir)/vsprojects/diff_tpl_auto_escape $(distdir)/vsprojects/htmlparser_test $(distdir)/vsprojects/libctemplate $(distdir)/vsprojects/make_tpl_varname_h $(distdir)/vsprojects/statemachine_test $(distdir)/vsprojects/template_dictionary_unittest $(distdir)/vsprojects/template_modifiers_unittest $(distdir)/vsprojects/template_regtest $(distdir)/vsprojects/template_setglobals_unittest $(distdir)/vsprojects/template_test_util_test $(distdir)/vsprojects/template_unittest $(distdir)/vsprojects/template_unittest_static
+	$(mkdir_p) $(distdir)/doc $(distdir)/m4 $(distdir)/packages $(distdir)/packages/rpm $(distdir)/src $(distdir)/src/google $(distdir)/src/htmlparser $(distdir)/src/solaris $(distdir)/src/tests $(distdir)/src/tests/htmlparser_testdata $(distdir)/vsprojects/diff_tpl_auto_escape $(distdir)/vsprojects/generate_fsm_c_test $(distdir)/vsprojects/htmlparser_test $(distdir)/vsprojects/libctemplate $(distdir)/vsprojects/make_tpl_varname_h $(distdir)/vsprojects/statemachine_test $(distdir)/vsprojects/template_dictionary_unittest $(distdir)/vsprojects/template_modifiers_unittest $(distdir)/vsprojects/template_regtest $(distdir)/vsprojects/template_setglobals_unittest $(distdir)/vsprojects/template_test_util_test $(distdir)/vsprojects/template_unittest $(distdir)/vsprojects/template_unittest_static
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \
@@ -1982,6 +2028,12 @@ uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
 	uninstall-binSCRIPTS uninstall-dist_docDATA uninstall-info-am \
 	uninstall-libLTLIBRARIES uninstall-nodist_googleincludeHEADERS
 
+
+generate_fsm_test_sh: $(top_srcdir)/src/tests/generate_fsm_test.sh \
+                      $(top_srcdir)/src/tests/htmlparser_testdata/sample_fsm.config \
+                      $(top_srcdir)/src/tests/htmlparser_testdata/sample_fsm.c \
+                      $(top_srcdir)/src/htmlparser/generate_fsm.py
+	$(top_srcdir)/src/tests/generate_fsm_test.sh $(top_builddir)
 
 make_tpl_varnames_h_unittest_sh: $(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
                                  make_tpl_varnames_h

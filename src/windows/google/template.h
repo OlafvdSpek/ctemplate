@@ -34,8 +34,8 @@
 // how to use this class, and to write the templates it takes as input,
 // see doc/howto.html
 
-#ifndef _TEMPLATE_H
-#define _TEMPLATE_H
+#ifndef CTEMPLATE_TEMPLATE_H_
+#define CTEMPLATE_TEMPLATE_H_
 
 #include <time.h>             // for time_t
 #include <string>
@@ -50,7 +50,7 @@
 #include <google/per_expand_data.h>
 #else
 namespace google {
-class TemplateDictionary;
+class TemplateDictionaryInterface;
 class PerExpandData;
 }
 #endif
@@ -202,7 +202,8 @@ class CTEMPLATE_DLL_DECL Template {
   static void ReloadAllIfChanged();
 
   // ClearCache
-  //   Deletes all the template objects in the cache. This should only
+  //   Deletes all the template objects in the cache and all raw
+  //   contents cached from RegisterStringAsTemplate. This should only
   //   be done once, just before exiting the program and after all
   //   template expansions are completed. (If you want to refresh the
   //   cache, the correct method to use is ReloadAllIfChanged, not
@@ -219,7 +220,7 @@ class CTEMPLATE_DLL_DECL Template {
   //   data you want to pass in to template modifers.  If per_expand_data
   //   is NULL, this is exactly the same as Expand().
   bool ExpandWithData(std::string *output_buffer,
-                      const TemplateDictionary *dictionary,
+                      const TemplateDictionaryInterface *dictionary,
                       const ctemplate::PerExpandData* per_expand_data) const;
 
   // Expand
@@ -227,7 +228,7 @@ class CTEMPLATE_DLL_DECL Template {
   //   in the supplied dictionary.  Returns true iff all the template
   //   files load and parse correctly.
   bool Expand(std::string *output_buffer,
-              const TemplateDictionary *dictionary) const {
+              const TemplateDictionaryInterface *dictionary) const {
     return ExpandWithData(output_buffer, dictionary, NULL);
   }
 
@@ -286,6 +287,16 @@ class CTEMPLATE_DLL_DECL Template {
   static Template *GetTemplateCommon(const std::string& filename, Strip strip,
                                      TemplateContext context);
 
+  // BuildTemplateFromContent
+  //   Helper method used by RegisterStringAsTemplate and
+  //   GetTemplateCommon. Creates a template with empty filename
+  //   [since not present on disk] and builds the tree from the provided
+  //   raw contents.  Returns NULL if parsing failed.
+  static Template* BuildTemplateFromContent(Strip strip,
+                                            TemplateContext context,
+                                            const char* content,
+                                            size_t content_len);
+
   // AssureGlobalsInitialized
   //   Initializes the global (static) variables the first time it is
   //   called. After that it simply checks one of the
@@ -319,7 +330,7 @@ class CTEMPLATE_DLL_DECL Template {
 
   // Internal version of Expand, used for recursive calls.
   bool Expand(class ExpandEmitter *expand_emitter,
-              const TemplateDictionary *dictionary,
+              const TemplateDictionaryInterface *dictionary,
               const ctemplate::PerExpandData *per_expand_data) const;
 
   // Internal version of ReloadIfChanged, used when the function already
@@ -413,4 +424,4 @@ class CTEMPLATE_DLL_DECL Template {
 
 }
 
-#endif // _TEMPLATE_H
+#endif // CTEMPLATE_TEMPLATE_H_

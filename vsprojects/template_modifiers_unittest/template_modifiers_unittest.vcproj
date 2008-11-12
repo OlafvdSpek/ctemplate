@@ -150,6 +150,9 @@
 		<Filter
 			Name="Header Files">
 			<File
+				RelativePath="..\..\src\template_modifiers.h">
+			</File>
+			<File
 				RelativePath="..\..\src\base\arena.h">
 			</File>
 			<File
@@ -169,6 +172,9 @@
 			</File>
 			<File
 				RelativePath="..\..\src\windows\google\template_dictionary.h">
+			</File>
+			<File
+				RelativePath="..\..\src\windows\google\template_dictionary_interface.h">
 			</File>
 			<File
 				RelativePath="..\..\src\windows\google\per_expand_data.h">

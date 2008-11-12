@@ -50,11 +50,15 @@
 #include <string.h>
 #include <string>
 #include <vector>
+#include "htmlparser/htmlparser_cpp.h"
+#include "template_modifiers_internal.h"
 #include <google/template_modifiers.h>
 #include <google/per_expand_data.h>
 
 using std::string;
 using std::vector;
+
+using HTMLPARSER_NAMESPACE::HtmlParser;
 
 // Really we should be using uint_16_t or something, but this is good
 // enough, and more portable...
@@ -334,6 +338,9 @@ static inline uint16 UTF8CodeUnit(const char** start, const char *end) {
   *start = code_unit_end;
   return code_unit;
 }
+
+// A good reference is the ECMA standard (3rd ed), section 7.8.4:
+// http://www.ecma-international.org/publications/files/ECMA-ST/Ecma-262.pdf
 void JavascriptEscape::Modify(const char* in, size_t inlen,
                               const PerExpandData*,
                               ExpandEmitter* out, const string& arg) const {
@@ -357,6 +364,7 @@ void JavascriptEscape::Modify(const char* in, size_t inlen,
         // &cache=cache&media=resources:jscriptdeviationsfromes3.pdf
         APPEND("\\x0b");
         break;
+      case '\f': APPEND("\\f"); break;
       case '&': APPEND("\\x26"); break;
       case '<': APPEND("\\x3c"); break;
       case '>': APPEND("\\x3e"); break;
@@ -442,6 +450,11 @@ void UrlQueryEscape::Modify(const char* in, size_t inlen,
 }
 UrlQueryEscape url_query_escape;
 
+// For more information on escaping JSON, see section 2.5 in
+// http://www.ietf.org/rfc/rfc4627.txt.
+// Escaping '&', '<', '>' is optional in the JSON proposed RFC
+// but alleviates concerns with content sniffing if JSON is used
+// in a context where the browser may attempt to interpret HTML.
 void JsonEscape::Modify(const char* in, size_t inlen,
                         const PerExpandData*,
                         ExpandEmitter* out, const string& arg) const {
@@ -455,6 +468,9 @@ void JsonEscape::Modify(const char* in, size_t inlen,
       case '\n': APPEND("\\n"); break;
       case '\r': APPEND("\\r"); break;
       case '\t': APPEND("\\t"); break;
+      case '&': APPEND("\\u0026"); break;
+      case '<': APPEND("\\u003C"); break;
+      case '>': APPEND("\\u003E"); break;
       default: out->Emit(in[i]);
     }
   }
@@ -512,7 +528,8 @@ PrefixLine prefix_line;
 // done without the need for a global initialization method.
 // Be very careful making a change to g_modifiers as modifiers
 // point to other ones within that same array so elements
-// may not be re-ordered easily.
+// may not be re-ordered easily. Also you need to change
+// the global g_am_dirs correspondingly.
 static struct ModifierWithAlternatives {
   ModifierInfo modifier_info;
   ModifierInfo* safe_alt_mods[MAX_SAFE_ALTERNATIVES];
@@ -549,7 +566,8 @@ static struct ModifierWithAlternatives {
   /* 5 */ { ModifierInfo("html_escape_with_arg=url", 'H',
                          XSS_WEB_STANDARD, &validate_url_and_html_escape), {} },
   /* 6 */ { ModifierInfo("javascript_escape", 'j',
-                         XSS_WEB_STANDARD, &javascript_escape), {} },
+                         XSS_WEB_STANDARD, &javascript_escape),
+            {&g_modifiers[7].modifier_info} },  // json_escape
   /* 7 */ { ModifierInfo("json_escape", 'o', XSS_WEB_STANDARD, &json_escape),
             {&g_modifiers[6].modifier_info} },  // javascript_escape
   /* 8 */ { ModifierInfo("pre_escape", 'p', XSS_WEB_STANDARD, &pre_escape),
@@ -752,6 +770,268 @@ const ModifierInfo* FindModifier(const char* modname, size_t modname_len,
     }
     return best_match;
   }
+}
+
+// For escaping variables under the auto-escape mode:
+// Each directive below maps to a distinct sequence of
+// escaping directives (i.e a vector<ModifierAndValue>) applied
+// to a variable during run-time substitution.
+// The directives are stored in a global array (g_mods_ae)
+// initialized under lock in InitializeGlobalModifiers.
+enum AutoModifyDirective {
+  AM_EMPTY,                         // Unused, kept as marker.
+  AM_HTML,
+  AM_HTML_UNQUOTED,
+  AM_JS,
+  AM_JS_NUMBER,
+  AM_URL_HTML,
+  AM_URL_QUERY,
+  AM_STYLE,
+  AM_XML,
+  NUM_ENTRIES_AM,
+};
+
+// Populates the global vector of hard-coded modifiers that
+// Auto-Escape may pick. We point to the appropriate modifier in
+// the global g_modifiers.
+// Reference these globals via the global array g_am_dirs[] for consistency.
+// Note: We allow for more than one ModifierAndValue in the array hence
+// the need to terminate with a Null marker. However currently all the
+// escaping directives have exactly one ModifierAndValue.
+static const ModifierAndValue g_am_empty[] = {
+  ModifierAndValue(NULL, "", 0)
+};
+static const ModifierAndValue g_am_html[] = {
+  ModifierAndValue(&g_modifiers[1].modifier_info, "", 0),
+  ModifierAndValue(NULL, "", 0)
+};
+static const ModifierAndValue g_am_html_unquoted[] = {
+  ModifierAndValue(&g_modifiers[4].modifier_info, "=attribute", 10),
+  ModifierAndValue(NULL, "", 0)
+};
+static const ModifierAndValue g_am_js[] = {
+  ModifierAndValue(&g_modifiers[6].modifier_info, "", 0),
+  ModifierAndValue(NULL, "", 0)
+};
+static const ModifierAndValue g_am_js_number[] = {
+  ModifierAndValue(&g_modifiers[15].modifier_info, "=number", 7),
+  ModifierAndValue(NULL, "", 0)
+};
+static const ModifierAndValue g_am_url_html[] = {
+  ModifierAndValue(&g_modifiers[11].modifier_info, "=html", 5),
+  ModifierAndValue(NULL, "", 0)
+};
+static const ModifierAndValue g_am_url_query[] = {
+  ModifierAndValue(&g_modifiers[9].modifier_info, "", 0),
+  ModifierAndValue(NULL, "", 0)
+};
+static const ModifierAndValue g_am_style[] = {
+  ModifierAndValue(&g_modifiers[0].modifier_info, "", 0),
+  ModifierAndValue(NULL, "", 0)
+};
+static const ModifierAndValue g_am_xml[] = {
+  ModifierAndValue(&g_modifiers[14].modifier_info, "", 0),
+  ModifierAndValue(NULL, "", 0)
+};
+
+static const ModifierAndValue* g_am_dirs[NUM_ENTRIES_AM] = {
+  g_am_empty,                  /* AM_EMPTY */
+  g_am_html,                   /* AM_HTML */
+  g_am_html_unquoted,          /* AM_HTML_UNQUOTED */
+  g_am_js,                     /* AM_JS */
+  g_am_js_number,              /* AM_JS_NUMBER */
+  g_am_url_html,               /* AM_URL_HTML */
+  g_am_url_query,              /* AM_URL_QUERY */
+  g_am_style,                  /* AM_STYLE */
+  g_am_xml,                    /* AM_XML */
+};
+
+string PrettyPrintOneModifier(const ModifierAndValue& modval) {
+  string out;
+  out.append(":");
+  if (modval.modifier_info->short_name)      // short_name is a char.
+    out.append(1, modval.modifier_info->short_name);
+  else
+    out.append(modval.modifier_info->long_name);
+  if (modval.value_len != 0)
+    out.append(modval.value, modval.value_len);
+  return out;
+}
+
+string PrettyPrintModifiers(const vector<const ModifierAndValue*>& modvals,
+                            const string& separator) {
+  string out;
+  for (vector<const ModifierAndValue*>::const_iterator it =
+           modvals.begin(); it != modvals.end();  ++it) {
+    if (it != modvals.begin())
+      out.append(separator);
+    out.append(PrettyPrintOneModifier(**it));
+  }
+  return out;
+}
+
+// Return the sequence of escaping directives to apply for the given context.
+// An empty vector indicates an error occurred. Currently we never need
+// to chain escaping directives hence on success, the vector is always of
+// size 1. This may change in the future.
+const vector<const ModifierAndValue*> GetModifierForHtmlJs(
+    HtmlParser* htmlparser, string* error_msg) {
+  assert(htmlparser);
+  assert(error_msg);
+  vector<const ModifierAndValue*> modvals;
+
+  // Two cases of being inside javascript:
+  // 1. Inside raw javascript (within a <script> tag). If the value
+  //    is quoted we apply javascript_escape, if not we have to coerce
+  //    it to a safe value due to the risk of javascript code execution
+  //    hence apply :J=number. If arbitrary code needs to be inserted
+  //    at run-time, the developer must use :none.
+  // 2. In the value of an attribute that takes javascript such
+  //    as onmouseevent in '<a href="someUrl" onmousevent="{{EVENT}}">'.
+  //    That will be covered in the STATE_VALUE state logic below.
+  if (htmlparser->InJavascript() &&
+      htmlparser->state() != HtmlParser::STATE_VALUE) {
+    if (htmlparser->IsJavascriptQuoted()) {
+      modvals.push_back(g_am_dirs[AM_JS]);
+      assert(modvals.size() == 1);
+      return modvals;
+    } else {
+      modvals.push_back(g_am_dirs[AM_JS_NUMBER]);
+      assert(modvals.size() == 1);
+      return modvals;
+    }
+  }
+  switch (htmlparser->state()) {
+    case HtmlParser::STATE_VALUE:{
+      string attribute_name = htmlparser->attribute();
+      switch (htmlparser->AttributeType()) {
+        case HtmlParser::ATTR_URI:
+          // Case 1: The URL is quoted:
+          // . Apply :U=html if it is a complete URL or :h if it is a fragment.
+          // Case 2: The URL is not quoted:
+          // .  If it is a complete URL, we have no safe modifiers that
+          //   won't break it so we have to fail.
+          // .  If it is a URL fragment, then :u is safe and not likely to
+          //   break the URL.
+          if (!htmlparser->IsAttributeQuoted()) {
+            if (htmlparser->ValueIndex() == 0) {   // Complete URL.
+              error_msg->append("Value of URL attribute \"" + attribute_name +
+                                "\" must be enclosed in quotes.");
+              assert(modvals.empty());
+              return modvals;  // Empty
+            } else {                                // URL fragment.
+              modvals.push_back(g_am_dirs[AM_URL_QUERY]);
+            }
+          } else {
+            // Only validate the URL if we have a complete URL,
+            // otherwise simply html_escape.
+            if (htmlparser->ValueIndex() == 0)
+              modvals.push_back(g_am_dirs[AM_URL_HTML]);
+            else
+              modvals.push_back(g_am_dirs[AM_HTML]);
+          }
+          break;
+        case HtmlParser::ATTR_REGULAR:
+          // If the value is quoted, simply HTML escape, otherwise
+          // apply stricter escaping using H=attribute.
+          if (htmlparser->IsAttributeQuoted())
+            modvals.push_back(g_am_dirs[AM_HTML]);
+          else
+            modvals.push_back(g_am_dirs[AM_HTML_UNQUOTED]);
+          break;
+        case HtmlParser::ATTR_STYLE:
+          // If the value is quoted apply :c, otherwise fail.
+          if (htmlparser->IsAttributeQuoted()) {
+            modvals.push_back(g_am_dirs[AM_STYLE]);
+          } else {
+            error_msg->append("Value of style attribute \"" + attribute_name +
+                              "\" must be enclosed in quotes.");
+            assert(modvals.empty());
+            return modvals;   // Empty
+          }
+          break;
+        case HtmlParser::ATTR_JS:
+          // We require javascript accepting attributes (such as onclick)
+          // to be HTML quoted, otherwise they are vulnerable to
+          // HTML attribute insertion via the use of whitespace.
+          if (!htmlparser->IsAttributeQuoted()) {
+            error_msg->append("Value of javascript attribute \"" +
+                              attribute_name +
+                              "\" must be enclosed in quotes.");
+            assert(modvals.empty());
+            return modvals;   // Empty
+          }
+          // If the variable is quoted apply javascript_escape otherwise
+          // apply javascript_number which will ensure it is safe against
+          // code injection.
+          // Note: We normally need to HTML escape after javascript escape
+          // but the javascript escape implementation provided makes the
+          // HTML escape redundant so simply javascript escape.
+          if (htmlparser->IsJavascriptQuoted())
+            modvals.push_back(g_am_dirs[AM_JS]);
+          else
+            modvals.push_back(g_am_dirs[AM_JS_NUMBER]);
+          break;
+        case HtmlParser::ATTR_NONE:
+          assert("We should be in attribute!" == NULL);
+        default:
+          assert("Should not be able to get here." == NULL);
+          return modvals;  // Empty
+      }
+      // In STATE_VALUE particularly, the parser may get out of sync with
+      // the correct state - that the browser sees - due to the fact that
+      // it does not get to parse run-time content (variables). So we tell
+      // the parser there is content that will be expanded here.
+      // A good example is:
+      //   <a href={{URL}} alt={{NAME}}>
+      // The parser sees <a href= alt=> and interprets 'alt=' to be
+      // the value of href.
+      htmlparser->InsertText();  // Ignore return value.
+      assert(modvals.size() == 1);
+      return modvals;
+    }
+    case HtmlParser::STATE_TAG:{
+      // Apply H=attribute to tag names since they are alphabetic.
+      // Examples of tag names: TITLE, BODY, A and BR.
+      modvals.push_back(g_am_dirs[AM_HTML_UNQUOTED]);
+      assert(modvals.size() == 1);
+      return modvals;
+    }
+    case HtmlParser::STATE_ATTR:{
+      // Apply H=attribute to attribute names since they are alphabetic.
+      // Examples of attribute names: HREF, SRC and WIDTH.
+      modvals.push_back(g_am_dirs[AM_HTML_UNQUOTED]);
+      assert(modvals.size() == 1);
+      return modvals;
+    }
+    case HtmlParser::STATE_COMMENT:
+    case HtmlParser::STATE_TEXT:{
+      modvals.push_back(g_am_dirs[AM_HTML]);
+      assert(modvals.size() == 1);
+      return modvals;
+    }
+    default:{
+      assert("Should not be able to get here." == NULL);
+      return modvals;   // Empty
+    }
+  }
+  assert("Should not be able to get here." == NULL);
+  return modvals;   // Empty
+}
+
+// TODO(jad): Memoize - they don't depend on parser context (from csilvers).
+const vector<const ModifierAndValue*> GetModifierForXml(HtmlParser* htmlparser,
+                                                        string* error_msg) {
+  vector<const ModifierAndValue*> modvals;
+  modvals.push_back(g_am_dirs[AM_XML]);
+  return modvals;
+}
+
+const vector<const ModifierAndValue*> GetModifierForJson(HtmlParser* htmlparser,
+                                                         string* error_msg) {
+  vector<const ModifierAndValue*> modvals;
+  modvals.push_back(g_am_dirs[AM_JS]);
+  return modvals;
 }
 
 }  // namespace template_modifiers

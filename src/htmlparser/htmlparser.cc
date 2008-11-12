@@ -213,6 +213,18 @@ entityfilter_ctx *entityfilter_new()
     return ctx;
 }
 
+/* Copies the context of the entityfilter pointed to by src to the entityfilter
+ * dst.
+ */
+void entityfilter_copy(entityfilter_ctx *dst, entityfilter_ctx *src)
+{
+  assert(src != NULL);
+  assert(dst != NULL);
+  assert(src != dst);
+  memcpy(dst, src, sizeof(entityfilter_ctx));
+}
+
+
 /* Deallocates an entity filter object.
  */
 void entityfilter_delete(entityfilter_ctx *ctx)
@@ -258,7 +270,7 @@ static const char *entity_convert(const char *s, char *output, char terminator)
     struct entityfilter_table_s *t = entityfilter_table;
 
     if (s[0] == '#') {
-      if (s[1] == 'x') { /* hex */
+      if (s[1] == 'x' || s[1] == 'X') { /* hex */
           return parse_hex(s + 2, output);
       } else { /* decimal */
           return parse_dec(s + 1, output);
@@ -543,7 +555,7 @@ static void exit_state_cdata_may_close(statemachine_ctx *ctx, int start,
 void htmlparser_reset_mode(htmlparser_ctx *ctx, int mode)
 {
   assert(ctx != NULL);
-  ctx->statemachine->current_state = 0;
+  statemachine_reset(ctx->statemachine);
   ctx->in_js = 0;
   ctx->tag[0] = '\0';
   ctx->attr[0] = '\0';
@@ -577,6 +589,88 @@ void htmlparser_reset(htmlparser_ctx *ctx)
     htmlparser_reset_mode(ctx, HTMLPARSER_MODE_HTML);
 }
 
+/* Creates a new state machine definition and initializes the events for the
+ * state transitions.
+ *
+ * Although each instance of the parser has it's own private instance of a
+ * statemachine definition, they are still identical across html parser objects
+ * and are never modified after creation. As such, changes to this definition
+ * should not occur outside this function and should not depend on properties
+ * of this particular parser instance as in the future we may opt to use a
+ * single public definition across parser objects.
+ */
+static statemachine_definition *create_statemachine_definition()
+{
+  statemachine_definition *def;
+  def = statemachine_definition_new(HTMLPARSER_NUM_STATES);
+  if (def == NULL)
+    return NULL;
+
+  statemachine_definition_populate(def, htmlparser_state_transitions,
+                                   htmlparser_states_internal_names);
+
+  statemachine_enter_state(def, HTMLPARSER_STATE_INT_TAG_NAME,
+                           enter_tag_name);
+  statemachine_exit_state(def, HTMLPARSER_STATE_INT_TAG_NAME, exit_tag_name);
+
+  statemachine_enter_state(def, HTMLPARSER_STATE_INT_ATTR, enter_attr);
+  statemachine_exit_state(def, HTMLPARSER_STATE_INT_ATTR, exit_attr);
+
+  statemachine_enter_state(def, HTMLPARSER_STATE_INT_TAG_CLOSE, tag_close);
+
+  /* CDATA states. We must list all cdata and javascript states here. */
+  /* TODO(falmeida): Declare this list in htmlparser_fsm.config so it doesn't
+   * go out of sync.
+   */
+  statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_TEXT, in_state_cdata);
+  statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_COMMENT_START,
+                        in_state_cdata);
+  statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_COMMENT_START_DASH,
+                        in_state_cdata);
+  statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_COMMENT_BODY,
+                        in_state_cdata);
+  statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_COMMENT_DASH,
+                        in_state_cdata);
+  statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_COMMENT_DASH_DASH,
+                        in_state_cdata);
+  statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_LT, in_state_cdata);
+  statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_MAY_CLOSE,
+                        in_state_cdata);
+
+  /* For simplification, we treat the javascript mode as if it were cdata. */
+  statemachine_in_state(def, HTMLPARSER_STATE_INT_JS_FILE, in_state_cdata);
+
+  statemachine_enter_state(def, HTMLPARSER_STATE_INT_CDATA_MAY_CLOSE,
+                           enter_state_cdata_may_close);
+  statemachine_exit_state(def, HTMLPARSER_STATE_INT_CDATA_MAY_CLOSE,
+                          exit_state_cdata_may_close);
+  /* value states */
+  statemachine_enter_state(def, HTMLPARSER_STATE_INT_VALUE, enter_value);
+
+  /* Called when we enter the content of the value */
+  statemachine_enter_state(def, HTMLPARSER_STATE_INT_VALUE_TEXT,
+                           enter_value_content);
+  statemachine_enter_state(def, HTMLPARSER_STATE_INT_VALUE_Q,
+                           enter_value_content);
+  statemachine_enter_state(def, HTMLPARSER_STATE_INT_VALUE_DQ,
+                           enter_value_content);
+
+  /* Called when we exit the content of the value */
+  statemachine_exit_state(def, HTMLPARSER_STATE_INT_VALUE_TEXT,
+                          exit_value_content);
+  statemachine_exit_state(def, HTMLPARSER_STATE_INT_VALUE_Q,
+                          exit_value_content);
+  statemachine_exit_state(def, HTMLPARSER_STATE_INT_VALUE_DQ,
+                          exit_value_content);
+
+  statemachine_in_state(def, HTMLPARSER_STATE_INT_VALUE_TEXT, in_state_value);
+  statemachine_in_state(def, HTMLPARSER_STATE_INT_VALUE_Q, in_state_value);
+  statemachine_in_state(def, HTMLPARSER_STATE_INT_VALUE_DQ, in_state_value);
+
+  return def;
+}
+
+
 /* Initializes a new htmlparser instance.
  *
  * Returns a pointer to the new instance or NULL if the initialization fails.
@@ -585,93 +679,56 @@ void htmlparser_reset(htmlparser_ctx *ctx)
  */
 htmlparser_ctx *htmlparser_new()
 {
-    statemachine_ctx *sm;
-    statemachine_definition *def;
-    htmlparser_ctx *html;
+  htmlparser_ctx *html;
 
-    def = statemachine_definition_new(HTMLPARSER_NUM_STATES);
-    if (def == NULL)
-      return NULL;
+  html = CAST(htmlparser_ctx *, calloc(1, sizeof(htmlparser_ctx)));
+  if (html == NULL)
+    return NULL;
 
-    sm = statemachine_new(def);
-    html = CAST(htmlparser_ctx *, calloc(1, sizeof(htmlparser_ctx)));
-    if (html == NULL)
-      return NULL;
+  html->statemachine_def = create_statemachine_definition();
+  if (html->statemachine_def == NULL)
+    return NULL;
 
-    html->statemachine = sm;
-    html->statemachine_def = def;
-    html->jsparser = jsparser_new();
-    if (html->jsparser == NULL)
-      return NULL;
+  html->statemachine = statemachine_new(html->statemachine_def, html);
+  if (html->statemachine == NULL)
+    return NULL;
 
-    html->entityfilter = entityfilter_new();
-    if (html->entityfilter == NULL)
-      return NULL;
+  html->jsparser = jsparser_new();
+  if (html->jsparser == NULL)
+    return NULL;
 
-    sm->user = html;
+  html->entityfilter = entityfilter_new();
+  if (html->entityfilter == NULL)
+    return NULL;
 
-    htmlparser_reset(html);
+  htmlparser_reset(html);
 
-    statemachine_definition_populate(def, htmlparser_state_transitions);
+  return html;
+}
 
-    statemachine_enter_state(def, HTMLPARSER_STATE_INT_TAG_NAME,
-                             enter_tag_name);
-    statemachine_exit_state(def, HTMLPARSER_STATE_INT_TAG_NAME, exit_tag_name);
+/* Copies the context of the htmlparser pointed to by src to the htmlparser dst.
+ *
+ * Also copies over the instances of the state machine, the jsparser and the
+ * entity filter but not the statemachine definition since this one is read
+ * only.
+ */
+void htmlparser_copy(htmlparser_ctx *dst, const htmlparser_ctx *src)
+{
+  dst->value_index = src->value_index;
+  dst->in_js = src->in_js;
+  strcpy(dst->tag, src->tag);
+  strcpy(dst->attr, src->attr);
+  strcpy(dst->value, src->value);
 
-    statemachine_enter_state(def, HTMLPARSER_STATE_INT_ATTR, enter_attr);
-    statemachine_exit_state(def, HTMLPARSER_STATE_INT_ATTR, exit_attr);
+  statemachine_copy(dst->statemachine,
+                    src->statemachine,
+                    dst->statemachine_def,
+                    dst);
 
-    statemachine_enter_state(def, HTMLPARSER_STATE_INT_TAG_CLOSE, tag_close);
+  jsparser_copy(dst->jsparser, src->jsparser);
 
-/* CDATA states. We must list all cdata and javascript states here. */
-/* TODO(falmeida): Declare this list in htmlparser_fsm.config so it doensn't go
- * out of sync. */
-    statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_TEXT, in_state_cdata);
-    statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_COMMENT_START,
-                          in_state_cdata);
-    statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_COMMENT_START_DASH,
-                          in_state_cdata);
-    statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_COMMENT_BODY,
-                          in_state_cdata);
-    statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_COMMENT_DASH,
-                          in_state_cdata);
-    statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_COMMENT_DASH_DASH,
-                          in_state_cdata);
-    statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_LT, in_state_cdata);
-    statemachine_in_state(def, HTMLPARSER_STATE_INT_CDATA_MAY_CLOSE,
-                          in_state_cdata);
+  entityfilter_copy(dst->entityfilter, src->entityfilter);
 
-/* For simplification, we treat the javascript mode as if it were cdata. */
-    statemachine_in_state(def, HTMLPARSER_STATE_INT_JS_FILE, in_state_cdata);
-
-    statemachine_enter_state(def, HTMLPARSER_STATE_INT_CDATA_MAY_CLOSE,
-                             enter_state_cdata_may_close);
-    statemachine_exit_state(def, HTMLPARSER_STATE_INT_CDATA_MAY_CLOSE,
-                            exit_state_cdata_may_close);
-/* value states */
-    statemachine_enter_state(def, HTMLPARSER_STATE_INT_VALUE, enter_value);
-
-/* Called when we enter the content of the value */
-    statemachine_enter_state(def, HTMLPARSER_STATE_INT_VALUE_TEXT,
-                             enter_value_content);
-    statemachine_enter_state(def, HTMLPARSER_STATE_INT_VALUE_Q,
-                             enter_value_content);
-    statemachine_enter_state(def, HTMLPARSER_STATE_INT_VALUE_DQ,
-                             enter_value_content);
-
-/* Called when we exit the content of the value */
-    statemachine_exit_state(def, HTMLPARSER_STATE_INT_VALUE_TEXT,
-                            exit_value_content);
-    statemachine_exit_state(def, HTMLPARSER_STATE_INT_VALUE_Q,
-                            exit_value_content);
-    statemachine_exit_state(def, HTMLPARSER_STATE_INT_VALUE_DQ,
-                            exit_value_content);
-
-    statemachine_in_state(def, HTMLPARSER_STATE_INT_VALUE_TEXT, in_state_value);
-    statemachine_in_state(def, HTMLPARSER_STATE_INT_VALUE_Q, in_state_value);
-    statemachine_in_state(def, HTMLPARSER_STATE_INT_VALUE_DQ, in_state_value);
-
-    return html;
 }
 
 /* Receives an htmlparser context and Returns the current html state.

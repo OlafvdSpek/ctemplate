@@ -55,7 +55,7 @@
 #include <unistd.h>
 #endif
 #include <stdarg.h>
-#ifndef WIN32
+#ifndef _WIN32
 #include <getopt.h>
 #endif
 #include <errno.h>
@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
   bool FLAG_dump_templates = false;
   bool FLAG_log_info = true;
 
-#if defined(WIN32)
+#if defined(_WIN32)
   // TODO(csilvers): implement something reasonable for windows
 # define GETOPT(argc, argv)  -1
   int optind = 1;    // first non-opt argument

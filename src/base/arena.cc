@@ -30,6 +30,7 @@
 // ---
 // Author: Daniel Dulitz
 // Reorganized by Craig Silverstein
+// "Handles" by Ilan Horn
 //
 // This approach to arenas overcomes many of the limitations described
 // in the "Specialized allocators" section of
@@ -51,6 +52,14 @@
 
 _START_GOOGLE_NAMESPACE_
 
+#if defined(HAVE_U_INT64_T)
+typedef u_int64_t uint64;
+#elif defined(HAVE_UINT64_T)
+typedef uint64_t uint64;
+#elif defined(HAVE___UINT64)
+typedef unsigned __int64 uint64;
+#endif
+
 using std::vector;
 
 // We used to only keep track of how much space has been allocated in
@@ -61,11 +70,27 @@ using std::vector;
 // via bytes_allocated()).
 #define ARENASET(x) (x)
 
+// Starting with Visual C++ 2005, WinNT.h includes ARRAYSIZE.
+#if !defined(_MSC_VER) || _MSC_VER < 1400
+#define ARRAYSIZE(a) \
+  ((sizeof(a) / sizeof(*(a))) / \
+   static_cast<size_t>(!(sizeof(a) % sizeof(*(a)))))
+#endif
+
+// These could be made more elaborate.
+#define CHECK(x) assert(x);
+#define DCHECK(x) assert(x);
+#define CHECK_LT(x, y) assert(x < y);
+#define DCHECK_LT(x, y) assert(x < y);
+#define CHECK_GE(x, y) assert(x >= y);
+#define DCHECK_GE(x, y) assert(x >= y);
+
 // ----------------------------------------------------------------------
 // BaseArena::BaseArena()
 // BaseArena::~BaseArena()
 //    Destroying the arena automatically calls Reset()
 // ----------------------------------------------------------------------
+
 
 BaseArena::BaseArena(char* first, const size_t block_size)
   : first_block_we_own_(first ? 1 : 0),
@@ -74,12 +99,15 @@ BaseArena::BaseArena(char* first, const size_t block_size)
     last_alloc_(NULL),
     remaining_(0),
     blocks_alloced_(1),
-    overflow_blocks_(NULL) {
+    overflow_blocks_(NULL),
+    handle_alignment_(1) {
   assert(block_size > kDefaultAlignment);
   if (first)
-    first_blocks_[0] = first;
+    first_blocks_[0].mem = first;
   else
-    first_blocks_[0] = reinterpret_cast<char*>(::operator new(block_size_));
+    first_blocks_[0].mem = reinterpret_cast<char*>(::operator new(block_size_));
+  first_blocks_[0].size = block_size_;
+
   Reset();
 }
 
@@ -88,7 +116,7 @@ BaseArena::~BaseArena() {
   assert(overflow_blocks_ == NULL);    // FreeBlocks() should do that
   // The first X blocks stay allocated always by default.  Delete them now.
   for ( int i = first_block_we_own_; i < blocks_alloced_; ++i )
-    ::operator delete(first_blocks_[i]);
+    free(first_blocks_[i].mem);
 }
 
 // ----------------------------------------------------------------------
@@ -108,8 +136,8 @@ int BaseArena::block_count() const {
 
 void BaseArena::Reset() {
   FreeBlocks();
-  freestart_ = first_blocks_[0];
-  remaining_ = block_size_;
+  freestart_ = first_blocks_[0].mem;
+  remaining_ = first_blocks_[0].size;
   last_alloc_ = NULL;
 
   ARENASET(status_.bytes_allocated_ = block_size_);
@@ -135,15 +163,60 @@ void BaseArena::Reset() {
 // ----------------------------------------------------------------------
 
 void BaseArena::MakeNewBlock() {
-  freestart_ = reinterpret_cast<char*>(::operator new(block_size_));
-  ARENASET(status_.bytes_allocated_ += block_size_);
-  remaining_ = block_size_;
-  if ( blocks_alloced_ < sizeof(first_blocks_)/sizeof(*first_blocks_) ) {
-    first_blocks_[blocks_alloced_++] = freestart_;
+  AllocatedBlock *block = AllocNewBlock(block_size_);
+  freestart_ = block->mem;
+  remaining_ = block->size;
+}
+
+// -------------------------------------------------------------
+// BaseArena::AllocNewBlock()
+//    Adds and returns an AllocatedBlock.
+//    The returned AllocatedBlock* is valid until the next call
+//    to AllocNewBlock or Reset.  (i.e. anything that might
+//    affect overflow_blocks_).
+// -------------------------------------------------------------
+
+BaseArena::AllocatedBlock*  BaseArena::AllocNewBlock(const size_t block_size) {
+  AllocatedBlock *block;
+  // Find the next block.
+  if ( blocks_alloced_ < ARRAYSIZE(first_blocks_) ) {
+    // Use one of the pre-allocated blocks
+    block = &first_blocks_[blocks_alloced_++];
   } else {                   // oops, out of space, move to the vector
-    if (overflow_blocks_ == NULL) overflow_blocks_ = new vector<char*>;
-    overflow_blocks_->push_back(freestart_);
+    if (overflow_blocks_ == NULL) overflow_blocks_ = new vector<AllocatedBlock>;
+    // Adds another block to the vector.
+    overflow_blocks_->resize(overflow_blocks_->size()+1);
+    // block points to the last block of the vector.
+    block = &overflow_blocks_->back();
   }
+
+  block->mem = reinterpret_cast<char*>(malloc(block_size));
+  block->size = block_size;
+
+  ARENASET(status_.bytes_allocated_ += block_size);
+
+  return block;
+}
+
+// ----------------------------------------------------------------------
+// BaseArena::IndexToBlock()
+//    Index encoding is as follows:
+//    For blocks in the first_blocks_ array, we use index of the block in
+//    the array.
+//    For blocks in the overflow_blocks_ vector, we use the index of the
+//    block in iverflow_blocks_, plus the size of the first_blocks_ array.
+// ----------------------------------------------------------------------
+
+const BaseArena::AllocatedBlock *BaseArena::IndexToBlock(int index) const {
+  if (index < ARRAYSIZE(first_blocks_)) {
+    return &first_blocks_[index];
+  }
+  CHECK(overflow_blocks_ != NULL);
+  int index_in_overflow_blocks = index - ARRAYSIZE(first_blocks_);
+  CHECK_GE(index_in_overflow_blocks, 0);
+  CHECK_LT(static_cast<size_t>(index_in_overflow_blocks),
+           overflow_blocks_->size());
+  return &(*overflow_blocks_)[index_in_overflow_blocks];
 }
 
 // ----------------------------------------------------------------------
@@ -170,17 +243,7 @@ void* BaseArena::GetMemoryFallback(const size_t size, const int align_as_int) {
   if (block_size_ == 0 || size > block_size_/4) {
     // then it gets its own block in the arena
     assert(align <= kDefaultAlignment);   // because that's what new gives us
-    void* ret = ::operator new (size);
-    ARENASET(status_.bytes_allocated_ += size);
-    // This block stays separate from the rest of the world; in particular
-    // we don't update last_alloc_ so you can't reclaim space on this block.
-    if ( blocks_alloced_ < sizeof(first_blocks_)/sizeof(*first_blocks_) ) {
-      first_blocks_[blocks_alloced_++] = reinterpret_cast<char*>(ret);
-    } else {                   // oops, out of space, move to the vector
-      if (overflow_blocks_ == NULL) overflow_blocks_ = new vector<char*>;
-      overflow_blocks_->push_back(reinterpret_cast<char*>(ret));
-    }
-    return ret;
+    return AllocNewBlock(size)->mem;
   }
 
   const size_t overage =
@@ -218,14 +281,15 @@ void* BaseArena::GetMemoryFallback(const size_t size, const int align_as_int) {
 
 void BaseArena::FreeBlocks() {
   for ( int i = 1; i < blocks_alloced_; ++i ) {  // keep first block alloced
-    ::operator delete(first_blocks_[i]);
-    first_blocks_[i] = NULL;
+    free(first_blocks_[i].mem);
+    first_blocks_[i].mem = NULL;
+    first_blocks_[i].size = 0;
   }
   blocks_alloced_ = 1;
   if (overflow_blocks_ != NULL) {
-    vector<char *>::iterator it;
+    vector<AllocatedBlock>::iterator it;
     for (it = overflow_blocks_->begin(); it != overflow_blocks_->end(); ++it) {
-      ::operator delete(*it);
+      free(it->mem);
     }
     delete overflow_blocks_;             // These should be used very rarely
     overflow_blocks_ = NULL;
@@ -256,6 +320,82 @@ bool BaseArena::AdjustLastAlloc(void *last_alloc, const size_t newsize) {
   freestart_ = last_alloc_ + newsize;       // where last alloc ends now
   remaining_ -= (freestart_ - old_freestart); // how much new space we've taken
   return true;
+}
+
+// ----------------------------------------------------------------------
+// BaseArena::GetMemoryWithHandle()
+//    First, memory is allocated using GetMemory, using handle_alignment_.
+//    Since using different alignments for different handles would make
+//    the handles incompatible (e.g., we could end up with the same handle
+//    value referencing two different allocations, the alignment is not passed
+//    as an argument to GetMemoryWithHandle, and handle_alignment_ is used
+//    automatically for all GetMemoryWithHandle calls.
+//    Then we go about building a handle to reference the allocated memory.
+//    The block index used for the allocation, along with the offset inside
+//    the block, are encoded into the handle as follows:
+//      (block_index*block_size)+offset
+//    offset is simply the difference between the pointer returned by
+//    GetMemory and the starting pointer of the block.
+//    The above value is then divided by the alignment. As we know that
+//    both offset and the block_size are divisable by the alignment (this is
+//    enforced by set_handle_alignment() for block_size, and by GetMemory()
+//    for the offset), this does not lose any information, but allows to cram
+//    more into the limited space in handle.
+//    If the result does not fit into an unsigned 32-bit integer, we
+//    have run out of space that the handle can represent, and return
+//    an invalid handle. Note that the returned pointer is still usable,
+//    but this allocation cannot be referenced by a handle.
+// ----------------------------------------------------------------------
+
+void* BaseArena::GetMemoryWithHandle(
+    const size_t size, BaseArena::Handle* handle) {
+  CHECK(handle != NULL);
+  void* p = GetMemory(size, handle_alignment_);
+  // Find the index of the block the memory was allocated from. In most
+  // cases, this will be the last block, so the following loop will
+  // iterate exactly once.
+  int block_index;
+  const AllocatedBlock* block = NULL;
+  for (block_index = block_count() - 1; block_index >= 0; --block_index) {
+    block = IndexToBlock(block_index);
+    if ((p >= block->mem) && (p < (block->mem + block->size))) {
+      break;
+    }
+  }
+  CHECK_GE(block_index, 0); // "Failed to find block that was allocated from"
+  CHECK(block != NULL);  // "Failed to find block that was allocated from"
+  const uint64 offset = reinterpret_cast<char*>(p) - block->mem;
+  DCHECK_LT(offset, block_size_);
+  DCHECK((offset % handle_alignment_) == 0);
+  DCHECK((block_size_ % handle_alignment_) == 0);
+  uint64 handle_value =
+      (static_cast<uint64>(block_index) * block_size_ + offset) /
+      handle_alignment_;
+  if (handle_value >= static_cast<uint64>(0xFFFFFFFF)) {
+    // We ran out of space to be able to return a handle, so return an invalid
+    // handle.
+    handle_value = Handle::kInvalidValue;
+  }
+  handle->handle_ = static_cast<uint32>(handle_value);
+  return p;
+}
+
+// ----------------------------------------------------------------------
+// BaseArena::HandleToPointer()
+//    First, the handle value needs to gain back the alignment factor that
+//    was divided out of it by GetMemoryWithHandle. Once this is done, it
+//    becomes trivial to extract the block index and offset in the block out
+//    of it, and calculate the pointer.
+// ----------------------------------------------------------------------
+
+void* BaseArena::HandleToPointer(const Handle& h) const {
+  CHECK(h.valid());
+  uint64 handle = static_cast<uint64>(h.handle_) * handle_alignment_;
+  int block_index = static_cast<int>(handle / block_size_);
+  size_t block_offset = static_cast<size_t>(handle % block_size_);
+  const AllocatedBlock* block = IndexToBlock(block_index);
+  CHECK(block != NULL);
+  return reinterpret_cast<void*>(block->mem + block_offset);
 }
 
 // ----------------------------------------------------------------------

@@ -63,7 +63,7 @@
 #elif defined(HAVE_PTHREAD)
 # include <pthread.h>
   typedef pthread_mutex_t MutexType;
-#elif defined(WIN32)
+#elif defined(_WIN32)
 # define WIN32_LEAN_AND_MEAN  // We only need minimal includes
 # include <windows.h>
   typedef CRITICAL_SECTION MutexType;
@@ -150,7 +150,7 @@ void Mutex::ReaderLock()   { Lock(); }      // we don't have read-write locks
 void Mutex::ReaderUnlock() { Unlock(); }
 #undef SAFE_PTHREAD
 
-#elif defined(WIN32)
+#elif defined(_WIN32)
 
 Mutex::Mutex()             { InitializeCriticalSection(&mutex_); }
 Mutex::~Mutex()            { DeleteCriticalSection(&mutex_); }
