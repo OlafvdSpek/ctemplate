@@ -30,6 +30,7 @@
 // ---
 // Author: Daniel Dulitz
 // Reorganized by Craig Silverstein
+// "Handles" by Ilan Horn
 //
 // Sometimes it is necessary to allocate a large number of small
 // objects.  Doing this the usual way (malloc, new) is slow,
@@ -66,12 +67,21 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef HAVE_STDINT_H
+#include <stdint.h>    // one place u_int32_t might live
+#endif
+#ifdef HAVE_INTTYPES_H
+#include <inttypes.h>  // another place u_int32_t might live
+#endif
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h> // final place u_int32_t might live
+#endif
 #include <vector>
 
 // Annoying stuff for windows -- make sure clients (in this case
 // unittests) can import the class definitions and variables.
 #ifndef CTEMPLATE_DLL_DECL
-# ifdef WIN32
+# ifdef _MSC_VER
 #   define CTEMPLATE_DLL_DECL  __declspec(dllimport)
 # else
 #   define CTEMPLATE_DLL_DECL  /* should be the empty string for non-windows */
@@ -79,6 +89,14 @@
 #endif
 
 _START_GOOGLE_NAMESPACE_
+
+#if defined(HAVE_U_INT32_T)
+typedef u_int32_t uint32;
+#elif defined(HAVE_UINT32_T)
+typedef uint32_t uint32;
+#elif defined(HAVE___UINT32)
+typedef unsigned __int32 uint32;
+#endif
 
 // This class is "thread-compatible": different threads can access the
 // arena at the same time without locking, as long as they use only
@@ -91,10 +109,52 @@ class CTEMPLATE_DLL_DECL BaseArena {
 
   virtual void Reset();
 
+  // A handle to a pointer in an arena. An opaque type, with default
+  // copy and assignment semantics.
+  class Handle {
+   public:
+    static const uint32 kInvalidValue = 0xFFFFFFFF;   // int32-max
+
+    Handle() : handle_(kInvalidValue) { }
+    // Default copy constructors are fine here.
+    bool operator==(const Handle& h) const { return handle_ == h.handle_; }
+    bool operator!=(const Handle& h) const { return handle_ != h.handle_; }
+
+    uint32 hash() const { return handle_; }
+    bool valid() const { return handle_ != kInvalidValue; }
+
+   private:
+    // Arena needs to be able to access the internal data.
+    friend class BaseArena;
+
+    explicit Handle(uint32 handle) : handle_(handle) { }
+
+    uint32 handle_;
+  };
+
   // they're "slow" only 'cause they're virtual (subclasses define "fast" ones)
   virtual char* SlowAlloc(size_t size) = 0;
   virtual void  SlowFree(void* memory, size_t size) = 0;
-  virtual char* SlowRealloc(char* memory, size_t old_size, size_t new_size) =0;
+  virtual char* SlowRealloc(char* memory, size_t old_size, size_t new_size) = 0;
+  virtual char* SlowAllocWithHandle(const size_t size, Handle* handle) = 0;
+
+  // Set the alignment to be used when Handles are requested. This can only
+  // be set for an arena that is empty - it cannot be changed on the fly.
+  // The alignment must be a power of 2 that the block size is divisable by.
+  // The default alignment is 1.
+  // Trying to set an alignment that does not meet the above constraints will
+  // cause a assert-failure.
+  void set_handle_alignment(int align) {
+    assert(align > 0 && 0 == (align & (align - 1)));  // must be power of 2
+    assert(static_cast<size_t>(align) < block_size_);
+    assert((block_size_ % align) == 0);
+    assert(is_empty());
+    handle_alignment_ = align;
+  }
+
+  // Retrieve the memory pointer that the supplied handle refers to.
+  // Calling this with an invalid handle will assert-fail.
+  void* HandleToPointer(const Handle& h) const;
 
   class Status {
    private:
@@ -146,27 +206,51 @@ class CTEMPLATE_DLL_DECL BaseArena {
     return GetMemoryFallback(size, align);
   }
 
-  // This doesn't actually free any memory
+  // This doesn't actually free any memory except for the last piece allocated
   void ReturnMemory(void* memory, const size_t size) {
+    if ( memory == last_alloc_ && size == freestart_ - last_alloc_ ) {
+      remaining_ += size;
+      freestart_ = last_alloc_;
+    }
   }
 
   // This is used by Realloc() -- usually we Realloc just by copying to a
   // bigger space, but for the last alloc we can realloc by growing the region.
   bool AdjustLastAlloc(void* last_alloc, const size_t newsize);
 
+  // Since using different alignments for different handles would make
+  // the handles incompatible (e.g., we could end up with the same handle
+  // value referencing two different allocations, the alignment is not passed
+  // as an argument to GetMemoryWithHandle, and handle_alignment_ is used
+  // automatically for all GetMemoryWithHandle calls.
+  void* GetMemoryWithHandle(const size_t size, Handle* handle);
+
   Status status_;
 
  private:
+  struct AllocatedBlock {
+    char *mem;
+    size_t size;
+  };
+
+  // The returned AllocatedBlock* is valid until the next call to AllocNewBlock
+  // or Reset (i.e. anything that might affect overflow_blocks_).
+  AllocatedBlock *AllocNewBlock(const size_t block_size);
+
+  const AllocatedBlock *IndexToBlock(int index) const;
+
   const int first_block_we_own_;   // 1 if they pass in 1st block, 0 else
   const size_t block_size_;
   char* freestart_;         // beginning of the free space in most recent block
-  char* freestart_when_empty_; // beginning of the free space when we're empty
+  char* freestart_when_empty_;  // beginning of the free space when we're empty
   char* last_alloc_;         // used to make sure ReturnBytes() is safe
   size_t remaining_;
   // STL vector isn't as efficient as it could be, so we use an array at first
   int blocks_alloced_;       // how many of the first_blocks_ have been alloced
-  char* first_blocks_[16];   // the length of this array is arbitrary
-  std::vector<char*>* overflow_blocks_;  // if the first_blocks_ aren't enough
+  AllocatedBlock first_blocks_[16];   // the length of this array is arbitrary
+  // if the first_blocks_ aren't enough, expand into overflow_blocks_.
+  std::vector<AllocatedBlock>* overflow_blocks_;
+  int handle_alignment_; // Alignment to be used when Handles are requested.
 
   void FreeBlocks();         // Frees all except first block
 
@@ -203,17 +287,25 @@ class CTEMPLATE_DLL_DECL UnsafeArena : public BaseArena {
     memset(return_value, 0, size);
     return return_value;
   }
+  // Free does nothing except for the last piece allocated.
   void Free(void* memory, size_t size) {
     ReturnMemory(memory, size);
   }
-  virtual char* SlowAlloc(size_t size) { // "slow" 'cause it's virtual
+  typedef BaseArena::Handle Handle;
+  char* AllocWithHandle(const size_t size, Handle* handle) {
+    return reinterpret_cast<char*>(GetMemoryWithHandle(size, handle));
+  }
+  virtual char* SlowAlloc(size_t size) {  // "slow" 'cause it's virtual
     return Alloc(size);
   }
-  virtual void SlowFree(void* memory, size_t size) { // "slow" 'cause it's virt
+  virtual void SlowFree(void* memory, size_t size) {  // "slow" 'cause it's virt
     Free(memory, size);
   }
   virtual char* SlowRealloc(char* memory, size_t old_size, size_t new_size) {
     return Realloc(memory, old_size, new_size);
+  }
+  virtual char* SlowAllocWithHandle(const size_t size, Handle* handle) {
+    return AllocWithHandle(size, handle);
   }
 
   char* Memdup(const char* s, size_t bytes) {
@@ -226,6 +318,12 @@ class CTEMPLATE_DLL_DECL UnsafeArena : public BaseArena {
     memcpy(newstr, s, bytes);
     newstr[bytes] = '\0';
     return newstr;
+  }
+  Handle MemdupWithHandle(const char* s, size_t bytes) {
+    Handle handle;
+    char* newstr = AllocWithHandle(bytes, &handle);
+    memcpy(newstr, s, bytes);
+    return handle;
   }
   char* Strdup(const char* s) {
     return Memdup(s, strlen(s) + 1);

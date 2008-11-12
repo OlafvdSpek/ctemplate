@@ -75,17 +75,29 @@
 /* Define to 1 if you have the <sys/types.h> header file. */
 #define HAVE_SYS_TYPES_H  1
 
+/* Define to 1 if the system has the type `uint32_t'. */
+#undef HAVE_UINT32_T
+
+/* Define to 1 if the system has the type `uint64_t'. */
+#undef HAVE_UINT64_T
+
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
-/* Define to 1 if the system has the type `u_int16_t'. */
-#undef HAVE_U_INT16_T
+/* Define to 1 if the system has the type `u_int32_t'. */
+#undef HAVE_U_INT32_T
+
+/* Define to 1 if the system has the type `u_int64_t'. */
+#undef HAVE_U_INT64_T
 
 /* define if your compiler has __attribute__ */
 #undef HAVE___ATTRIBUTE__
 
-/* Define to 1 if the system has the type `__uint16'. */
-#define HAVE___UINT16  1
+/* Define to 1 if the system has the type `__uint32. */
+#define HAVE___UINT32  1
+
+/* Define to 1 if the system has the type `__uint64. */
+#define HAVE___UINT64  1
 
 /* The namespace to put the htmlparser code. */
 #define HTMLPARSER_NAMESPACE  google_ctemplate_streamhtmlparser

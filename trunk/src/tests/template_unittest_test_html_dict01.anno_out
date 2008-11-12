@@ -5,7 +5,7 @@
   <!--{{#VAR=BI_NEWLINE}}
 {{/VAR}}
 {{#SEC=MOUSEOVER_FUNCTIONS}}    
-    
+{{#MISSING_INC=MOUSEOVER_JAVASCRIPT}}not_a_template{{/MISSING_INC}}    
     ss = _ss;
 {{/SEC}}</script>{{#VAR=BI_NEWLINE}}
 {{/VAR}}

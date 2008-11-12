@@ -56,6 +56,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "htmlparser_test", "vsprojec
 		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "generate_fsm_c_test", "vsprojects\generate_fsm_c_test\generate_fsm_c_test.vcproj", "{8FB1935F-FC23-465D-8C18-C1466A99D08D}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfiguration) = preSolution
 		Debug = Debug
@@ -72,10 +76,6 @@ Global
 		{9160CC7F-3BC6-49F1-A158-70DF579376CA}.Debug.Build.0 = Debug|Win32
 		{9160CC7F-3BC6-49F1-A158-70DF579376CA}.Release.ActiveCfg = Release|Win32
 		{9160CC7F-3BC6-49F1-A158-70DF579376CA}.Release.Build.0 = Release|Win32
-		{3EFCA2F1-1F2F-4143-AE6C-8F5E0D09EF9F}.Debug.ActiveCfg = Debug|Win32
-		{3EFCA2F1-1F2F-4143-AE6C-8F5E0D09EF9F}.Debug.Build.0 = Debug|Win32
-		{3EFCA2F1-1F2F-4143-AE6C-8F5E0D09EF9F}.Release.ActiveCfg = Release|Win32
-		{3EFCA2F1-1F2F-4143-AE6C-8F5E0D09EF9F}.Release.Build.0 = Release|Win32
 		{D9E45FD2-07AC-4EE8-9DA4-26E0427D619E}.Debug.ActiveCfg = Debug|Win32
 		{D9E45FD2-07AC-4EE8-9DA4-26E0427D619E}.Debug.Build.0 = Debug|Win32
 		{D9E45FD2-07AC-4EE8-9DA4-26E0427D619E}.Release.ActiveCfg = Release|Win32
@@ -116,6 +116,10 @@ Global
 		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.Build.0 = Debug|Win32
 		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.ActiveCfg = Release|Win32
 		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.Build.0 = Release|Win32
+		{8FB1935F-FC23-465D-8C18-C1466A99D08D}.Debug.ActiveCfg = Debug|Win32
+		{8FB1935F-FC23-465D-8C18-C1466A99D08D}.Debug.Build.0 = Debug|Win32
+		{8FB1935F-FC23-465D-8C18-C1466A99D08D}.Release.ActiveCfg = Release|Win32
+		{8FB1935F-FC23-465D-8C18-C1466A99D08D}.Release.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 	EndGlobalSection

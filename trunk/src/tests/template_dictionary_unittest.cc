@@ -126,6 +126,16 @@ class TemplateDictionaryUnittest {
                                                   const char* name, int i) {
     return d->GetTemplateDictionaries(name)[i];
   }
+  static const TemplateDictionaryInterface::IteratorProxy CreateSectionIterator(
+      const TemplateDictionary* d,
+      const char* name) {
+    return d->CreateSectionIterator(name);
+  }
+  static const TemplateDictionaryInterface::IteratorProxy
+      CreateTemplateIterator(const TemplateDictionary* d,
+                             const char* name) {
+        return d->CreateTemplateIterator(name);
+      }
 
  public:
 
@@ -753,6 +763,67 @@ class TemplateDictionaryUnittest {
     ASSERT_STREQ(dump.c_str(), expected);
   }
 
+  static void TestIterator() {
+    // Build up a nice community of TemplateDictionaries.
+    TemplateDictionary farm("Farm");
+    TemplateDictionaryInterface* grey_barn =
+        farm.AddIncludeDictionary("BARN");
+    TemplateDictionaryInterface* duck_pond =
+        farm.AddIncludeDictionary("POND");
+    TemplateDictionaryInterface* cattle_pond =
+        farm.AddIncludeDictionary("POND");
+    TemplateDictionaryInterface* irrigation_pond =
+        farm.AddIncludeDictionary("POND");
+
+    // A section name with repeated sections
+    TemplateDictionaryInterface* lillies = farm.AddSectionDictionary("FLOWERS");
+    TemplateDictionaryInterface* lilacs = farm.AddSectionDictionary("FLOWERS");
+    TemplateDictionaryInterface* daisies = farm.AddSectionDictionary("FLOWERS");
+    // A section name with one repeat
+    TemplateDictionaryInterface* wheat = farm.AddSectionDictionary("WHEAT");
+    // A section name, just shown
+    farm.ShowSection("CORN");
+
+    // Check that the iterators expose all of the dictionaries.
+    TemplateDictionaryInterface::IteratorProxy barns =
+        farm.CreateTemplateIterator("BARN");
+    ASSERT(barns.HasNext());
+    ASSERT(&barns.Next() == grey_barn);
+    ASSERT(!barns.HasNext());
+
+    TemplateDictionaryInterface::IteratorProxy ponds =
+        farm.CreateTemplateIterator("POND");
+    ASSERT(ponds.HasNext());
+    ASSERT(&ponds.Next() == duck_pond);
+    ASSERT(ponds.HasNext());
+    ASSERT(&ponds.Next() == cattle_pond);
+    ASSERT(ponds.HasNext());
+    ASSERT(&ponds.Next() == irrigation_pond);
+    ASSERT(!ponds.HasNext());
+    
+    TemplateDictionaryInterface::IteratorProxy flowers =
+        farm.CreateSectionIterator("FLOWERS");
+    ASSERT(flowers.HasNext());
+    ASSERT(&flowers.Next() == lillies);
+    ASSERT(flowers.HasNext());
+    ASSERT(&flowers.Next() == lilacs);
+    ASSERT(flowers.HasNext());
+    ASSERT(&flowers.Next() == daisies);
+    ASSERT(!flowers.HasNext());
+
+    TemplateDictionaryInterface::IteratorProxy crop =
+        farm.CreateSectionIterator("WHEAT");
+    ASSERT(crop.HasNext());
+    ASSERT(&crop.Next() == wheat);
+    ASSERT(!crop.HasNext());
+
+    TemplateDictionaryInterface::IteratorProxy corn_crop =
+        farm.CreateSectionIterator("CORN");
+    ASSERT(corn_crop.HasNext());
+    ASSERT(&corn_crop.Next());  // ShowSection doesn't give us the dict back
+    ASSERT(!corn_crop.HasNext());
+  }
+
   static void TestMakeCopy(bool use_local_arena) {
     UnsafeArena local_arena(1024);
     UnsafeArena* arena = NULL;
@@ -830,6 +901,8 @@ int main(int argc, char** argv) {
   TemplateDictionaryUnittest::TestSetValueAndShowSection();
   TemplateDictionaryUnittest::TestSetTemplateGlobalValue();
   TemplateDictionaryUnittest::TestAddIncludeDictionary();
+
+  TemplateDictionaryUnittest::TestIterator();
 
   TemplateDictionaryUnittest::TestMakeCopy(true);    // use our own arena
   TemplateDictionaryUnittest::TestMakeCopy(false);   // use fake arena

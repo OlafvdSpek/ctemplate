@@ -40,7 +40,7 @@
 // Annoying stuff for windows -- make sure clients (in this case
 // unittests) can import the class definitions and variables.
 #ifndef CTEMPLATE_DLL_DECL
-# ifdef WIN32
+# ifdef _MSC_VER
 #   define CTEMPLATE_DLL_DECL  __declspec(dllimport)
 # else
 #   define CTEMPLATE_DLL_DECL  /* should be the empty string for non-windows */
@@ -109,18 +109,36 @@ typedef struct entityfilter_ctx_s {
 
 void entityfilter_reset(entityfilter_ctx *ctx);
 entityfilter_ctx *entityfilter_new(void);
+
+/* Deallocates an entity filter object.
+ */
+void entityfilter_delete(entityfilter_ctx *ctx);
+
+/* Copies the context of the entityfilter pointed to by src to the entityfilter
+ * dst.
+ */
+void entityfilter_copy(entityfilter_ctx *dst, entityfilter_ctx *src);
 const char *entityfilter_process(entityfilter_ctx *ctx, char c);
 
 
 /* html parser */
 
+/* Stores the context of the html parser.
+ * If this structure is changed, htmlparser_new(), htmlparser_copy() and
+ * htmlparser_reset() should be updated accordingly.
+ */
 typedef struct htmlparser_ctx_s {
 
   /* Holds a reference to the statemachine context. */
   statemachine_ctx *statemachine;
 
   /* Holds a reference to the statemachine definition in use. Right now this is
-   * only used so we can deallocate it at the end. */
+   * only used so we can deallocate it at the end.
+   *
+   * It should be readonly and contain the same values across jsparser
+   * instances.
+   */
+  /* TODO(falmeida): Change statemachine_def to const. */
   statemachine_definition *statemachine_def;
 
   /* Holds a reference to the javascript parser. */
@@ -154,6 +172,17 @@ CTEMPLATE_DLL_DECL htmlparser_ctx *htmlparser_new(void);
 CTEMPLATE_DLL_DECL int htmlparser_state(htmlparser_ctx *ctx);
 CTEMPLATE_DLL_DECL int htmlparser_parse(htmlparser_ctx *ctx, const char *str, int size);
 
+/* Initializes a new htmlparser instance.
+ *
+ * Returns a pointer to the new instance or NULL if the initialization fails.
+ * Initialization failure is fatal, and if this function fails it may not
+ * deallocate all previsouly allocated memory.
+ */
+
+/* Copies the context of the htmlparser pointed to by src to the htmlparser dst.
+ */
+CTEMPLATE_DLL_DECL void htmlparser_copy(htmlparser_ctx *dst, const htmlparser_ctx *src);
+
 CTEMPLATE_DLL_DECL const char *htmlparser_state_str(htmlparser_ctx *ctx);
 CTEMPLATE_DLL_DECL int htmlparser_is_attr_quoted(htmlparser_ctx *ctx);
 CTEMPLATE_DLL_DECL int htmlparser_in_js(htmlparser_ctx *ctx);
@@ -168,6 +197,25 @@ CTEMPLATE_DLL_DECL int htmlparser_value_index(htmlparser_ctx *ctx);
 CTEMPLATE_DLL_DECL int htmlparser_attr_type(htmlparser_ctx *ctx);
 
 CTEMPLATE_DLL_DECL int htmlparser_insert_text(htmlparser_ctx *ctx);
+
+/* Return the current line number. */
+static inline int htmlparser_get_line_number(htmlparser_ctx *ctx) {
+  return statemachine_get_line_number(ctx->statemachine);
+}
+
+/* Set the current line number. */
+static inline void htmlparser_set_line_number(htmlparser_ctx *ctx, int line) {
+  statemachine_set_line_number(ctx->statemachine, line);
+}
+
+/* Retrieve a human readable error message in case an error occurred.
+ *
+ * NULL is returned if the parser didn't encounter an error.
+ */
+static inline const char *htmlparser_get_error_msg(htmlparser_ctx *ctx) {
+  return statemachine_get_error_msg(ctx->statemachine);
+}
+
 
 CTEMPLATE_DLL_DECL void htmlparser_delete(htmlparser_ctx *ctx);
 

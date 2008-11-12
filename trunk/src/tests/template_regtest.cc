@@ -162,7 +162,7 @@ static void ReadToString(const char* filename, string* s) {
   fclose(fp);
 }
 
-#ifndef WIN32   /* windows defines its own version in windows/port.cc */
+#ifndef _WIN32   /* windows defines its own version in windows/port.cc */
 static void GetNamelist(const char* testdata_dir, vector<string>* namelist) {
   DIR* dir = opendir(testdata_dir);
   struct dirent* dir_entry;

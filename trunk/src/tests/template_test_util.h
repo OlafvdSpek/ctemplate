@@ -99,6 +99,9 @@ class TemplateDictionaryPeer {
   int GetIncludeDictionaries(const std::string& section_name,
                              std::vector<const TemplateDictionary*>* dicts) const;
 
+  // Returns the filename associated with the TemplateDictionary.
+  const char* GetFilename() const;
+
  private:
   const TemplateDictionary* dict_;  // Not owned.
 

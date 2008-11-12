@@ -113,7 +113,7 @@ class @ac_windows_dllexport@ PerExpandData {
   }
 
  private:
-#ifdef WIN32
+#ifdef _MSC_VER
   struct DataHash {
     size_t operator()(const char* s1) const {
       return @ac_cv_cxx_hash_namespace@::hash<const char*>()(s1);

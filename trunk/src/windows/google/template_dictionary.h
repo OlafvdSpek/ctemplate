@@ -53,6 +53,7 @@
 #include <string>
 #include <vector>
 #include <hash_map>
+#include <google/template_dictionary_interface.h>
 #include <google/template_string.h>
 #include <google/template_modifiers.h>
 
@@ -67,7 +68,7 @@ namespace google {
 
 class UnsafeArena;
 
-class CTEMPLATE_DLL_DECL TemplateDictionary {
+class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface {
  public:
   // name is used only for debugging.
   // arena is used to store all names and values.  It can be NULL (the
@@ -257,6 +258,42 @@ class CTEMPLATE_DLL_DECL TemplateDictionary {
                                      int dictnum) const;
   const DictVector& GetTemplateDictionaries(
       const TemplateString& include_name) const;
+
+  // CreateTemplateIerator
+  //   This is SectionIterator exactly, just with a different name to
+  //   self-document the fact the value applies to a template include.
+  // Caller frees return value.
+  virtual TemplateDictionaryInterface::IteratorProxy CreateTemplateIterator(
+      const TemplateString& section_name) const;
+
+  // CreateSectionIterator
+  //   Factory method implementation that constructs a iterator representing the
+  //   set of dictionaries associated with a secion name, if any. This
+  //   implementation checks the local dictionary itself, not the template-wide
+  //   dictionary or the global dictionary.
+  // Caller frees return value.
+  virtual TemplateDictionaryInterface::IteratorProxy CreateSectionIterator(
+      const TemplateString& section_name) const;
+
+  // TemplateDictionary-specific implementation of dictionary iterators.
+  class Iterator : public TemplateDictionaryInterface::Iterator {
+   protected:
+    friend class TemplateDictionary;
+    Iterator(DictVector::const_iterator begin,
+             DictVector::const_iterator end)
+        : begin_(begin), end_(end) {
+    }
+
+   public:
+    virtual ~Iterator() {
+    }
+
+    virtual bool HasNext() const;
+    virtual const TemplateDictionaryInterface& Next();
+   private:
+    DictVector::const_iterator begin_;
+    const DictVector::const_iterator end_;
+  };
 
   // The "name" of the dictionary for debugging output (Dump, etc.)
   // The arena, also set at construction time.

@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include "template_modifiers_internal.h"
 #include <google/template_dictionary.h>
 #include <google/template_emitter.h>
 #include <google/template_modifiers.h>
@@ -302,7 +303,7 @@ class TemplateModifiersUnittest {
     dict.SetEscapedValue("harder JS", "f = 'joo';",
                          template_modifiers::javascript_escape);
     dict.SetEscapedValue("hardest JS",
-                         ("f = 'foo';\r\n\tprint \"\\&foo = \b\", \"foo\""),
+                         ("f = 'foo\f';\r\n\tprint \"\\&foo = \b\", \"foo\""),
                          template_modifiers::javascript_escape);
     dict.SetEscapedValue("close script JS",
                          "//--></script><script>alert(123);</script>",
@@ -319,7 +320,7 @@ class TemplateModifiersUnittest {
     ASSERT_STREQ(peer.GetSectionValue("easy JS"), "joo");
     ASSERT_STREQ(peer.GetSectionValue("harder JS"), "f \\x3d \\x27joo\\x27;");
     ASSERT_STREQ(peer.GetSectionValue("hardest JS"),
-                 "f \\x3d \\x27foo\\x27;\\r\\n\\tprint \\x22\\\\\\x26foo "
+                 "f \\x3d \\x27foo\\f\\x27;\\r\\n\\tprint \\x22\\\\\\x26foo "
                  "\\x3d \\b\\x22, \\x22foo\\x22");
     ASSERT_STREQ(peer.GetSectionValue("close script JS"),
                  "//--\\x3e\\x3c/script\\x3e\\x3cscript\\x3e"
@@ -418,16 +419,24 @@ class TemplateModifiersUnittest {
     dict.SetEscapedValue("harder JSON", "f = \"joo\"; e = 'joo';",
                          template_modifiers::json_escape);
     dict.SetEscapedValue("hardest JSON",
-                         ("f = 'foo';\r\n\t\fprint \"\\&foo = /\b\", \"foo\""),
+                         "f = 'foo<>';\r\n\t\fprint \"\\&foo = /\b\", \"foo\"",
+                         template_modifiers::json_escape);
+    dict.SetEscapedValue("html in JSON", "<html>&nbsp;</html>",
                          template_modifiers::json_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy JSON"), "joo");
     ASSERT_STREQ(peer.GetSectionValue("harder JSON"), "f = \\\"joo\\\"; "
                  "e = 'joo';");
-    ASSERT_STREQ(peer.GetSectionValue("hardest JSON"),
-                 "f = 'foo';\\r\\n\\t\\fprint \\\"\\\\&foo = \\/\\b\\\", "
-                 "\\\"foo\\\"");
+    ASSERT_STREQ(peer.GetSectionValue("html in JSON"),
+                 "\\u003Chtml\\u003E\\u0026nbsp;\\u003C\\/html\\u003E");
+    // There's a bug in MSVC 7.1 where you can't pass a literal string
+    // with more than one \" in it to a macro (!) -- see
+    //    http://marc.info/?t=110853662500001&r=1&w=2
+    // We work around this by assigning the string to a variable first.
+    const char* expected = ("f = 'foo\\u003C\\u003E';\\r\\n\\t\\fprint \\\""
+                            "\\\\\\u0026foo = \\/\\b\\\", \\\"foo\\\"");
+    ASSERT_STREQ(peer.GetSectionValue("hardest JSON"), expected);
   }
 
   static void TestUrlQueryEscape() {
@@ -671,9 +680,9 @@ class TemplateModifiersUnittest {
     ASSERT(CheckXSSAlternative("H", "=pre", "H", "=attribute"));
     ASSERT(!CheckXSSAlternative("H", "=attribute", "H", "=pre"));
 
-    // javascript_escape is an alternative to json_escape but not the opposite.
+    // javascript_escape is an alternative to json_escape and vice versa
     ASSERT(CheckXSSAlternative("json_escape", "", "javascript_escape", ""));
-    ASSERT(!CheckXSSAlternative("javascript_escape", "", "json_escape", ""));
+    ASSERT(CheckXSSAlternative("javascript_escape", "", "json_escape", ""));
 
     // Extended modifier should not match any other except itself.
     ASSERT(!CheckXSSAlternative("x-bla", "", "x-foo", ""));

@@ -324,8 +324,9 @@ previous one:</p>
 </tr>
 
 <tr><td><code>:javascript_escape</code></td><td><code>:j</code></td>
-    <td>javascript-escapes the variable before output
-        (eg <code>"</code> -> <code>\"</code>)</td>
+    <td>javascript-escapes the variable before output (eg
+        <code>"</code> -> <code>\"</code> and
+        <code>&amp;</code> -> <code>\x26</code>)</td>
 </tr>
 
 <tr><td><code>:javascript_escape_with_arg</code></td><td><code>:J</code>
@@ -341,11 +342,9 @@ previous one:</p>
 
 <tr><td><code>:json_escape</code></td><td><code>:o</code></td>
     <td>json-escapes a variable before output as a string in json;
-        similar to javascript escaping, but does not modify
-        characters such
-        as <code>=</code>, <code>&lt;</code> and <code>&gt;</code>.
-        If your application does not reject or escape these characters, 
-        it may be safer to use <code>:javascript_escape</code> instead.
+        HTML characters are escaped using Unicode escape sequences
+        (e.g <code>&amp;</code> -> <code>\u0026</code>) to comply with
+        <a href="http://www.ietf.org/rfc/rfc4627.txt">RFC 4627</a>.
     </td>
 </tr>
 
@@ -919,6 +918,42 @@ it's relative to <A HREF="#managing">template_root</A>.</p>
 not being used for a template-include; in that case, the function is a
 no-op, but is perhaps still useful as self-documenting code.</p>
 
+<p>Another property of template-includes is that they set the indentation level
+for the included template, that is, every line in the included template is
+indented by the same amount as the template-includes line itself.  For
+instance, if you have a template <code>PRINT_STUFF</code> like this:</p>
+<pre>
+print "Hello!"
+print "You are the 10th caller!"
+print "Congratulations!"
+</pre>
+
+<p>and you include it in the template:</p>
+
+<pre>
+   if ShouldPrintStuff():
+     {{>PRINT_STUFF}}
+   else:
+     pass
+</pre>
+
+<p>then when it is expanded, all three print lines will be indented,
+not just the first one:</p>
+
+<pre>
+   if ShouldPrintStuff():
+     print "Hello!"
+     print "You are the 10th caller!"
+     print "Congratulations!"
+   else:
+     pass
+</pre>
+
+<p>Note that this behavior is immaterial when using
+<code>STRIP_WHITESPACE</code>, since in that case all leading
+whitespace is stripped.</p>
+
+
 <h3> <A name="expand">Expanding a Template</A> </h3>
 
 <p>Once you have a template and a template dictionary, it's simplicity
@@ -1031,9 +1066,11 @@ context <code>TC_MANUAL</code> for content intended for the
 non-autoescaping <code>GetTemplate()</code> method.</p>
 
 <p>Future calls to <code>RegisterStringAsTemplate()</code> with the
-same cache key will replace the existing template.
-<code>ReloadIfChanged()</code> has no effect on string-based
-templates.</p>
+same cache key will have no effect, and will return the template
+formed during the first call.  <code>ReloadIfChanged()</code> has no
+effect on string-based templates.  The only way to change the string
+associated with a given filename/key, is to call
+<code>Template::ClearCache()</code>.</p>
 
 <p>(As a special case, if you call
 <code>RegisterStringAsTemplate()</code> with the empty string as the
@@ -1045,7 +1082,7 @@ if at all possible.)</p>
 
 <p>Prefer file-based to string-based templates where possible.
 Updating a file-based template requires merely a data push, rather
-than pushing the new executable and it also makes it easier for
+than pushing the new executable, and it also makes it easier for
 non-programmers to modify the template.  One reason to use
 string-based templates is if you are in an environment where having
 data files could be dangerous&mdash;for instance, you work on a disk

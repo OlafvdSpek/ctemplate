@@ -64,7 +64,6 @@
 #define TEMPLATE_TEMPLATE_MODIFIERS_H_
 
 #include <sys/types.h>   // for size_t
-#include <hash_map>
 #include <string>
 #include <google/template_emitter.h>   // so we can inline operator()
 #include <google/per_expand_data.h>    // so we can inline operator()
@@ -252,6 +251,8 @@ class CTEMPLATE_DLL_DECL UrlQueryEscape : public TemplateModifier { MODIFY_SIGNA
 extern CTEMPLATE_DLL_DECL UrlQueryEscape url_query_escape;
 
 // Escapes " \ / <FF> <CR> <LF> <BS> <TAB> to \" \\ \/ \f \r \n \b \t
+// Also escapes < > & to their corresponding \uXXXX representation
+// (\u003C, \u003E, \u0026 respectively).
 class CTEMPLATE_DLL_DECL JsonEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
 extern CTEMPLATE_DLL_DECL JsonEscape json_escape;
 
@@ -267,68 +268,6 @@ extern CTEMPLATE_DLL_DECL PrefixLine prefix_line;
 
 #undef MODIFY_SIGNATURE_
 
-// -----------------------------------------------------------------
-// These are used by template.cc and when registering new modifiers.
-// (Or more exactly, registering new modifier/value pairs.)
-// They are not intended for any other users.
-
-// A Modifier belongs to an XssClass which determines whether
-// it is an XSS safe addition to a modifier chain or not. This
-// is used by the Auto-Escape mode when determining how to handle
-// extra modifiers provided in template. For example, :j is a safe
-// addition to :h because they are both in the same class (XSS_WEB_STANDARD).
-//
-// XssClass is not exposed in any API and cannot be set in custom
-// modifiers, it is for internal use only (for Auto-Escape). We currently
-// have only two classes.
-//
-// XSS_UNUSED: not used.
-// XSS_WEB_STANDARD: All the curent built-in escaping modifiers.
-// XSS_UNIQUE: Set for all custom modifiers.
-enum XssClass {
-  XSS_UNUSED,
-  XSS_WEB_STANDARD,
-  XSS_UNIQUE,
-};
-
-// TODO(csilvers): collapse this into the TemplateModifier class?
-struct ModifierInfo {
-
-  // longname should end in an '=' iff the modifier takes a value
-  //   (same as in getopt(3)).
-  // To specialize -- add a modifier that applies only when we see the name
-  //   with a particular value -- specify longname like so: "longname=value".
-  //   (See example in the comment-doc below, for AddModifier.)
-  // sn can be '\0' if there is no associated shortname.
-  // m should be NULL *only if* default-registering a user-defined longname
-  //   that the user neglected to register themselves.  In this case, we
-  //   use the null modifier as the actual modifier.
-  // xss_class indicates an equivalence class this modifier is
-  // in, such that any other modifier in the class could be applied
-  // after this modifier without affecting its XSS-safety.  If in
-  // doubt, say XSS_UNIQUE, which is the most conservative choice.
-  ModifierInfo(std::string ln, char sn, XssClass xc, const TemplateModifier *m)
-      : long_name(ln), short_name(sn),
-        modval_required(strchr(ln.c_str(), '=') != NULL),
-        is_registered(m != NULL), xss_class(xc),
-        modifier(m ? m : &null_modifier) { }
-  std::string long_name;
-  char short_name;
-  bool modval_required;           // true iff ln has an '=' in it
-  bool is_registered;             // true for built-in and AddModifier mods
-  XssClass xss_class;
-  const TemplateModifier* modifier;
-};
-
-// Returns whether or not candidate can be safely (w.r.t XSS)
-// used in lieu of our ModifierInfo. This is true iff:
-//   1. Both have the same modifier function OR
-//   2. Candidate's modifier function is in our ModifierInfo's
-//      list (vector) of safe alternative modifier functions.
-// Note that this function is not commutative therefore
-// IsSafeXSSAlternative(a, b) may not be equal to IsSafeXSSAlternative(b, a).
-bool CTEMPLATE_DLL_DECL IsSafeXSSAlternative(const ModifierInfo& our,
-                          const ModifierInfo& candidate);
 
 // Registers a new template modifier.
 // long_name must start with "x-".
@@ -345,12 +284,6 @@ bool CTEMPLATE_DLL_DECL IsSafeXSSAlternative(const ModifierInfo& our,
 // and VAR4 by my_modifierC.  The order of the AddModifier calls is not
 // significant.
 extern CTEMPLATE_DLL_DECL bool AddModifier(const char* long_name, const TemplateModifier* modifier);
-
-// modname is the name of the modifier (shortname or longname).
-// value is the modifier-value (empty string if there is no modval).
-// Returns a pointer into g_modifiers, or NULL if not found.
-extern CTEMPLATE_DLL_DECL const ModifierInfo* FindModifier(const char* modname, size_t modname_len,
-                                 const char* modval, size_t modval_len);
 
 }  // namespace template_modifiers
 

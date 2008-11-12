@@ -57,6 +57,7 @@
 // js_state: Current javascript state as returned by
 //           HtmlParser::javascript_state().
 //           Possible values: text, q, dq, regexp or comment.
+// line_number: Integer value containing the current line count.
 // value_index: Integer value containing the current character index in the
 //              current value starting from 0.
 // reset: If true, resets the parser state to it's initial values.
@@ -73,11 +74,13 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include HASH_MAP_H
 #include "htmlparser/htmlparser_cpp.h"
 #include "google/template_pathops.h"
 
 using std::string;
 using std::vector;
+using HASH_NAMESPACE::hash_map;
 using std::pair;
 using google::ctemplate::PathJoin;
 using HTMLPARSER_NAMESPACE::HtmlParser;
@@ -110,6 +113,21 @@ using HTMLPARSER_NAMESPACE::JavascriptParser;
 
 #define PFATAL(s)  do { perror(s); exit(1); } while (0)
 
+
+namespace HASH_NAMESPACE {
+template<> struct hash<string> {
+  size_t operator()(const string& k) const {
+    return hash<const char*>()(k.c_str());
+  }
+  // Less than operator:
+  bool operator()(const string& a, const string& b) const {
+    return a < b;
+  }
+  // These two public members are required by msvc.  4 and 8 are defaults.
+  static const size_t bucket_size = 4;
+  static const size_t min_buckets = 8;
+};
+}
 
 static int strcount(const string& str, char c) {
   int count = 0;
@@ -179,8 +197,19 @@ class HtmlparserCppTest {
   // annotations against the html parser state.
   void ValidateFile(string filename);
 
+  typedef hash_map<string, HtmlParser *> ContextMap;
+
   void SetUp() {
     parser_.Reset();
+  }
+
+  void TearDown() {
+    // Delete all parser instances from the context map
+    for (ContextMap::iterator iter = contextMap.begin();
+        iter != contextMap.end(); ++iter) {
+      delete iter->second;
+    }
+    contextMap.clear();
   }
 
  protected:
@@ -256,14 +285,17 @@ class HtmlparserCppTest {
   // boolean.
   void ValidateJavascriptQuoted(const string &quoted);
 
-// Validate the javascript parser state against the provided state.
+  // Validate the javascript parser state against the provided state.
   void ValidateJavascriptState(const string &expected_state);
+
+  // Validate the line count against the expected count.
+  void ValidateLine(const string &expected_line);
 
   // Validate the current parser value index against the provided index.
   void ValidateValueIndex(const string &value_index);
 
-  // Current line number.
-  int line_number_;
+  // Map containing the registers where the parser context is saved.
+  ContextMap contextMap;
 
   // Parser instance
   HtmlParser parser_;
@@ -427,7 +459,7 @@ void HtmlparserCppTest::ValidateJavascriptState(const string &expected_state) {
   EXPECT_TRUE(parsed_state != NULL);
   EXPECT_TRUE(!expected_state.empty());
   EXPECT_EQ(expected_state, string(parsed_state));
-  //"Unexpected javascript state at line " << line_number_;
+  //"Unexpected javascript state at line " << parser_.line_number();
 }
 
 static bool safe_strto32(const char* str, int* value) {
@@ -438,6 +470,13 @@ static bool safe_strto32(const char* str, int* value) {
     while (isspace(*endptr)) ++endptr;
   }
   return *str != 0 && *endptr == 0 && errno == 0;
+}
+
+// Validate the line count against the expected count.
+void HtmlparserCppTest::ValidateLine(const string &expected_line) {
+  int line;
+  CHECK(safe_strto32(expected_line.c_str(), &line));
+  EXPECT_EQ(line, parser_.line_number());
 }
 
 // Validate the current parser value index against the provided index.
@@ -480,8 +519,18 @@ void HtmlparserCppTest::ProcessAnnotation(const string &annotation) {
       ValidateJavascriptQuoted(iter->second);
     } else if (iter->first.compare("js_state") == 0) {
       ValidateJavascriptState(iter->second);
+    } else if (iter->first.compare("line_number") == 0) {
+      ValidateLine(iter->second);
     } else if (iter->first.compare("value_index") == 0) {
       ValidateValueIndex(iter->second);
+    } else if (iter->first.compare("save_context") == 0) {
+      if (contextMap.find(iter->second) == contextMap.end()) {
+        contextMap[iter->second] = new HtmlParser();
+      }
+      contextMap[iter->second]->CopyFrom(&parser_);
+    } else if (iter->first.compare("load_context") == 0) {
+      CHECK(contextMap.find(iter->second) != contextMap.end());
+      parser_.CopyFrom(contextMap[iter->second]);
     } else if (iter->first.compare("reset") == 0) {
       if (StringToBool(iter->second)) {
         parser_.Reset();
@@ -510,9 +559,6 @@ void HtmlparserCppTest::ValidateFile(string filename) {
   string buffer;
   ReadToString(filename.c_str(), &buffer);
 
-  // Current line count.
-  line_number_ = 0;
-
   // Start of the current html block.
   size_t start_html = 0;
 
@@ -525,14 +571,14 @@ void HtmlparserCppTest::ValidateFile(string filename) {
   while (start_annotation != string::npos) {
     string html_block(buffer, start_html, start_annotation - start_html);
     parser_.Parse(html_block);
-    line_number_ += CountLines(html_block);
 
     start_annotation += strlen(kDirectiveBegin);
 
     string annotation_block(buffer, start_annotation,
                             end_annotation - start_annotation);
     ProcessAnnotation(annotation_block);
-    line_number_ += CountLines(annotation_block);
+
+    parser_.set_line_number(parser_.line_number() + CountLines(annotation_block));
 
     start_html = end_annotation + strlen(kDirectiveEnd);
     start_annotation = buffer.find(kDirectiveBegin, start_html);
@@ -548,8 +594,15 @@ void HtmlparserCppTest::ValidateFile(string filename) {
 
 int main(int argc, char **argv) {
   HtmlParser html;
+
+  EXPECT_EQ(html.GetErrorMessage(), (const char *)NULL);
   EXPECT_EQ(html.Parse("<a href='http://www.google.com' ''>\n"),
             HtmlParser::STATE_ERROR);
+
+  CHECK(!strcmp(html.GetErrorMessage(),
+                "Unexpected character '\\'' in state 'tag_space'"));
+  html.Reset();
+  EXPECT_EQ(html.GetErrorMessage(), (const char *)NULL);
 
   HtmlparserCppTest tester;
 
@@ -570,14 +623,18 @@ int main(int argc, char **argv) {
                               "javascript_attribute.html",
                               "javascript_regexp.html",
                               "tags.html",
+                              "context.html",
                               "reset.html",
-                              "cdata.html" };
+                              "cdata.html",
+			      "line_count.html",
+			       };
 
   for (const char** pfile = file_list;
        pfile < file_list + sizeof(file_list)/sizeof(*file_list);
        ++pfile) {
     tester.SetUp();
     tester.ValidateFile(PathJoin(dir, *pfile));
+    tester.TearDown();
   }
 
   printf("DONE.\n");

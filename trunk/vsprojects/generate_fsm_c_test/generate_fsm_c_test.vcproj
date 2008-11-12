@@ -2,8 +2,8 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="7.10"
-	Name="make_tpl_varname_h"
-	ProjectGUID="{CFD560F2-1B16-4CEE-985D-B19FDE74513F}"
+	Name="generate_fsm_c_test"
+	ProjectGUID="{8FB1935F-FC23-465D-8C18-C1466A99D08D}"
 	Keyword="Win32Proj">
 	<Platforms>
 		<Platform
@@ -31,10 +31,10 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/make_tpl_varname_h.exe"
+				OutputFile="$(OutDir)/generate_fsm_c_test.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile="$(OutDir)/make_tpl_varname_h.pdb"
+				ProgramDatabaseFile="$(OutDir)/generate_fsm_c_test.pdb"
 				SubSystem="1"
 				TargetMachine="1"/>
 			<Tool
@@ -76,7 +76,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/make_tpl_varname_h.exe"
+				OutputFile="$(OutDir)/generate_fsm_c_test.exe"
 				LinkIncremental="1"
 				GenerateDebugInformation="TRUE"
 				SubSystem="1"
@@ -113,7 +113,7 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
 			<File
-				RelativePath="..\..\src\make_tpl_varnames_h.cc">
+				RelativePath="..\..\src\tests\generate_fsm_c_test.c">
 				<FileConfiguration
 					Name="Debug|Win32">
 					<Tool
@@ -131,48 +131,20 @@
 			</File>
 		</Filter>
 		<Filter
-			Name="Header Files">
-			<File
-				RelativePath="..\..\src\base\arena.h">
-			</File>
+			Name="Header Files"
+			Filter="h;hpp;hxx;hm;inl;inc;xsd"
+			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
 			<File
 				RelativePath="..\..\src\windows\config.h">
 			</File>
 			<File
-				RelativePath="..\..\src\base\mutex.h">
+				RelativePath="..\..\src\config_for_unittests.h">
 			</File>
 			<File
 				RelativePath="..\..\src\windows\port.h">
 			</File>
 			<File
-				RelativePath="..\..\src\windows\google\template.h">
-			</File>
-			<File
-				RelativePath="..\..\src\windows\google\template_dictionary.h">
-			</File>
-			<File
-				RelativePath="..\..\src\windows\google\template_dictionary_interface.h">
-			</File>
-			<File
-				RelativePath="..\..\src\windows\google\per_expand_data.h">
-			</File>
-			<File
-				RelativePath="..\..\src\windows\google\template_emitter.h">
-			</File>
-			<File
-				RelativePath="..\..\src\windows\google\template_enums.h">
-			</File>
-			<File
-				RelativePath="..\..\src\windows\google\template_from_string.h">
-			</File>
-			<File
-				RelativePath="..\..\src\windows\google\template_modifiers.h">
-			</File>
-			<File
-				RelativePath="..\..\src\windows\google\template_namelist.h">
-			</File>
-			<File
-				RelativePath="..\..\src\windows\google\template_pathops.h">
+				RelativePath="..\..\src\htmlparser\statemachine.h">
 			</File>
 		</Filter>
 	</Files>

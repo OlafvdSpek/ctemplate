@@ -203,6 +203,18 @@ void Test_GetIncludeAndSectionDictionaries() {
   }
 }
 
+void Test_TemplateTestUtilTest_GetFilename() {
+  TemplateDictionary parent("test_GetFilename");
+  TemplateDictionary* child = parent.AddIncludeDictionary("INCLUDE_marker");
+  child->SetFilename("included_filename");
+
+  TemplateDictionaryPeer parent_peer(&parent);
+  EXPECT_EQ(NULL, parent_peer.GetFilename());
+
+  TemplateDictionaryPeer child_peer(child);
+  EXPECT_STREQ("included_filename", child_peer.GetFilename());
+}
+
 }  // namespace anonymous
 
 int main(int argc, char **argv) {
@@ -211,6 +223,7 @@ int main(int argc, char **argv) {
   Test_GetSectionDictionaries();
   Test_GetIncludeDictionaries();
   Test_GetIncludeAndSectionDictionaries();
+  Test_TemplateTestUtilTest_GetFilename();
 
   printf("PASS\n");
   return 0;

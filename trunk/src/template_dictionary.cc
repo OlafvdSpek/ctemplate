@@ -44,8 +44,8 @@
 #include <vector>
 #include <map>
 #include HASH_MAP_H             // defined in config.h
-#include "google/template_dictionary.h"
-#include "google/template_modifiers.h"
+#include <google/template_dictionary.h>
+#include <google/template_modifiers.h>
 #include "base/mutex.h"
 #include "base/arena.h"
 
@@ -842,13 +842,45 @@ const char *TemplateDictionary::GetIncludeTemplateName(
     if (d->include_dict_) {
       IncludeDict::const_iterator it = d->include_dict_->find(variable);
       if (it != d->include_dict_->end()) {
-        TemplateDictionary* dict = (*it->second)[dictnum];
+        TemplateDictionary* dict = static_cast<TemplateDictionary*>((*it->second)[dictnum]);
         return dict->filename_ ? dict->filename_ : "";   // map NULL to ""
       }
     }
   }
   assert("Call IsHiddenTemplate before GetIncludeTemplateName" == NULL);
   abort();
+}
+
+//
+// Iterator framework
+// TemplateDictionary::CreateSectionIterator
+// TemplateDictionary::CreateTemplateIterator
+// TemplateDictionary::Iterator::HasNext()
+// TemplateDictionary::Iterator::Next()
+
+TemplateDictionaryInterface::IteratorProxy
+TemplateDictionary::CreateTemplateIterator(
+    const TemplateString& section_name) const {
+  const DictVector& dictionaries = GetTemplateDictionaries(section_name);
+  return IteratorProxy(new Iterator(dictionaries.begin(), dictionaries.end()));
+}
+
+TemplateDictionaryInterface::IteratorProxy
+TemplateDictionary::CreateSectionIterator(
+    const TemplateString& section_name) const {
+  // The call to GetDictionaries does exactly what we want: return either a
+  // vector of dictionaries or the empty vector of dictionaries. Either way,
+  // it's got a begin() and end() iterator.
+  const DictVector& dictionaries = GetDictionaries(section_name);
+  return IteratorProxy(new Iterator(dictionaries.begin(), dictionaries.end()));
+}
+
+bool TemplateDictionary::Iterator::HasNext() const {
+  return begin_ != end_;
+}
+
+const TemplateDictionaryInterface& TemplateDictionary::Iterator::Next() {
+  return **(begin_++);
 }
 
 _END_GOOGLE_NAMESPACE_

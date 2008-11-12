@@ -54,15 +54,22 @@ enum js_state_external_enum {
     JSPARSER_STATE_COMMENT
 };
 
-/* Stores the context of the js scanner.
- * If this file is changed, jsparser_reset() should be updated accordingly.
+/* Stores the context of the javascript parser.
+ *
+ * If this structure is changed, jsparser_new(), jsparser_copy() and
+ * jsparser_reset() should be updated accordingly.
  */
 typedef struct jsparser_ctx_s {
 
   /* Reference to the statemachine context. */
   statemachine_ctx *statemachine;
 
-  /* Reference to the statemachine definition. */
+  /* Reference to the statemachine definition.
+   *
+   * It should be readonly and contain the same values across jsparser
+   * instances.
+   */
+  /* TODO(falmeida): Change statemachine_def to const. */
   statemachine_definition *statemachine_def;
 
   /* Index to the start of the buffer. */
@@ -79,6 +86,14 @@ typedef struct jsparser_ctx_s {
 
 void jsparser_reset(jsparser_ctx *ctx);
 jsparser_ctx *jsparser_new(void);
+
+/* Returns a pointer to a context which is a duplicate of the jsparser src.
+ */
+jsparser_ctx *jsparser_duplicate(jsparser_ctx *src);
+
+/* Copies the context of the jsparser pointed to by src to the jsparser dst.
+ */
+void jsparser_copy(jsparser_ctx *dst, jsparser_ctx *src);
 int jsparser_state(jsparser_ctx *ctx);
 int jsparser_parse(jsparser_ctx *ctx, const char *str, int size);
 

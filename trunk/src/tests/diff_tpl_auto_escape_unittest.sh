@@ -110,6 +110,10 @@ expected_ok_js_verbose=`cat <<EOF | grep -v '^EOF$'
 [VERBOSE] $TMPDIR/ok_js.tpl: Variables Found: Total=2; Diffs=0; NoMods=0
 EOF`
 
+# No differences, TemplateContext set to TC_JS, brief output.
+expected_ok_js_brief=`cat <<EOF | grep -v '^EOF$'
+EOF`
+
 # syntax-check these templates
 echo "TMPDIR is: $TMPDIR"
 $DIFFTPL $TMPDIR/ok1.tpl $TMPDIR/ok2.tpl $TMPDIR/ok3.tpl >/dev/null 2>&1 \
@@ -150,6 +154,11 @@ out=`$DIFFTPL -q $TMPDIR/ok4.tpl 2>&1`
 
 out=`$DIFFTPL -v -c TC_JS $TMPDIR/ok_js.tpl 2>&1`
 [ "$out" != "$expected_ok_js_verbose" ] &&\
-  die "$LINENO: $DIFFTPL: bad output for ok_js [TC_JS]: $out\n"
+  die "$LINENO: $DIFFTPL: bad output for verbose ok_js [TC_JS]: $out\n"
+
+# Same as above but with --context instead of -c cmd-line arg and brief output.
+out=`$DIFFTPL --context TC_JS $TMPDIR/ok_js.tpl 2>&1`
+[ "$out" != "$expected_ok_js_brief" ] &&\
+  die "$LINENO: $DIFFTPL: bad output for brief ok_js [TC_JS]: $out\n"
 
 echo "PASSED"

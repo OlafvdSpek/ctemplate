@@ -147,7 +147,7 @@ RegisterTemplateFilename(INVALID2_FN, "template_unittest_test_invalid2.in");
 RegisterTemplateFilename(NONEXISTENT_FN, "nonexistent__file.tpl");
 
 // deletes all files named *template* in dir
-#ifndef WIN32   // windows will define its own version, in src/windows/port.cc
+#ifndef _WIN32   // windows will define its own version, in src/windows/port.cc
 static void CleanTestDir(const string& dirname) {
   DIR* dir = opendir(dirname.c_str());
   if (!dir) {  // directory doesn't exist or something like that.
@@ -246,6 +246,7 @@ static void AssertCorrectModifiers(TemplateContext template_type,
                                    const string& expected_out) {
   Strip strip = STRIP_WHITESPACE;
   Template *tpl = StringToTemplateWithAutoEscaping(text, strip, template_type);
+  ASSERT(tpl);
   string dump_out, out;
   tpl->DumpToString("bogus_filename", &dump_out);
   string::size_type i, j;
@@ -945,40 +946,56 @@ class TemplateUnittest {
   }
 
   static void TestStringCacheKey() {
+    // If you use these same cache keys somewhere else,
+    // call Template::ClearCache first.
     const string cache_key_a = "cache key a";
     const string cache_key_b = "cache key b";
     const string text = "Test template 1";
+    TemplateDictionary empty_dict("dict");
 
-    Template *tpl, *tpl2;
-    ASSERT(tpl = Template::RegisterStringAsTemplate(
+    // When a string template is registered via RegisterStringAsTemplate,
+    // we can use GetTemplate or GetTemplateWithAutoEscaping for that
+    // same cache-key under any other under any other TemplateContext
+    // or Strip because we cache the contents.
+
+    Template *tpl1, *tpl2;
+    ASSERT(tpl1 = Template::RegisterStringAsTemplate(
                cache_key_a, DO_NOT_STRIP, TC_MANUAL, text));
+    AssertExpandIs(tpl1, &empty_dict, text, true);
 
-    // Tests with standard (non auto-escape) mode.
-    ASSERT(!Template::GetTemplate(
-               cache_key_b, DO_NOT_STRIP));       // different filename
-    ASSERT(!Template::GetTemplate(
-               cache_key_a, STRIP_BLANK_LINES));  // different strip
-    ASSERT(tpl2 = Template::GetTemplate(
-               cache_key_a, DO_NOT_STRIP));
-    ASSERT(tpl2 == tpl);  // same cache_key and strip.
+    // Different strip.
+    ASSERT(tpl2 = Template::GetTemplate(cache_key_a, STRIP_BLANK_LINES));
+    ASSERT(tpl2 != tpl1);
+    AssertExpandIs(tpl2, &empty_dict, text, true);
 
-    // Test mixing standard and auto-escape mode.
-    ASSERT(!Template::GetTemplateWithAutoEscaping(
-               cache_key_a, DO_NOT_STRIP, TC_HTML));  // different mode
-
-    // Tests with auto-escape mode.
-    ASSERT(tpl = Template::RegisterStringAsTemplate(
-               cache_key_a, DO_NOT_STRIP, TC_HTML, text));
+    // Different context, same strip.
     ASSERT(tpl2 = Template::RegisterStringAsTemplate(
-               cache_key_b, DO_NOT_STRIP, TC_HTML, text));
-    ASSERT(tpl2 != tpl);  // different cache_key.
-    ASSERT(!Template::GetTemplateWithAutoEscaping(
-               cache_key_a, STRIP_BLANK_LINES, TC_HTML)); // different strip
-    ASSERT(!Template::GetTemplateWithAutoEscaping(
-               cache_key_a, DO_NOT_STRIP, TC_JS));        // different context
+               cache_key_a, DO_NOT_STRIP, TC_HTML, text));
+    ASSERT(tpl2 != tpl1);
+    AssertExpandIs(tpl2, &empty_dict, text, true);
+
+    // Different context and strip.
+    ASSERT(tpl2 = Template::RegisterStringAsTemplate(
+               cache_key_a, STRIP_WHITESPACE, TC_JS, text));
+    ASSERT(tpl2 != tpl1);
+    AssertExpandIs(tpl2, &empty_dict, text, true);
+
+    // Using GetTemplateWithAutoEscaping on same key, different context
     ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(
                cache_key_a, DO_NOT_STRIP, TC_HTML));
-    ASSERT(tpl2 == tpl);  // same cache_key and strip and context.
+    ASSERT(tpl2 != tpl1);
+    AssertExpandIs(tpl2, &empty_dict, text, true);
+
+    // If we use RegisterStringAsTemplate followed by
+    // GetTemplateWithAutoEscaping (in that order) on the same
+    // strip and context, they should match.
+    ASSERT(tpl1 = Template::RegisterStringAsTemplate(
+               cache_key_b, DO_NOT_STRIP, TC_XML, text));
+    AssertExpandIs(tpl1, &empty_dict, text, true);
+    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(
+               cache_key_b, DO_NOT_STRIP, TC_XML));
+    ASSERT(tpl2 == tpl1);
+    AssertExpandIs(tpl2, &empty_dict, text, true);
 
     // Test the feature that an empty cache-key results in no caching.
     Template* tpl_e1 = Template::RegisterStringAsTemplate(
@@ -988,6 +1005,9 @@ class TemplateUnittest {
     ASSERT(tpl_e1);
     ASSERT(tpl_e2);
     ASSERT(tpl_e1 != tpl_e2);
+    AssertExpandIs(tpl_e1, &empty_dict, text, true);
+    AssertExpandIs(tpl_e2, &empty_dict, text, true);
+
     // One possible bug is if e2 replaced e1.  Try to make sure not.
     TemplateDictionary dict("test");
     AssertExpandIs(tpl_e1, &dict, text, true);  // shouldn't crash...
@@ -995,6 +1015,8 @@ class TemplateUnittest {
     // In this special case, you have to delete the template yourself.
     delete tpl_e2;
     delete tpl_e1;
+
+    Template::ClearCache();
   }
 
   static void TestStringGetTemplate() {
@@ -1025,6 +1047,16 @@ class TemplateUnittest {
     AssertExpandIs(tpl2, &dict, tpltext, true);
     AssertExpandIs(tpl3, &dict, tpltext, true);
 
+    // If we register a new string under the same text, it should be
+    // ignored.
+    Template* tpl_newtext = Template::RegisterStringAsTemplate(
+        "tgt", DO_NOT_STRIP, TC_MANUAL, "this text should be ignored");
+    ASSERT(tpl_newtext == tpl_orig);
+    AssertExpandIs(tpl_newtext, &dict, tpltext, true);
+    Template* tpl_newtext2 = Template::GetTemplate("tgt", DO_NOT_STRIP);
+    ASSERT(tpl_newtext2 == tpl_newtext);
+    AssertExpandIs(tpl_newtext2, &dict, tpltext, true);
+
     // We use filename_ == "" to signify a string-based template.
     // Make sure we didn't somehow pollute the cache entry for ""
     Template* tpl1b = Template::GetTemplate("", DO_NOT_STRIP);
@@ -1032,25 +1064,68 @@ class TemplateUnittest {
 
     // Tests that syntax errors cause us to return NULL
     Template* tpl1c = Template::RegisterStringAsTemplate(
-        "tgt", DO_NOT_STRIP, TC_MANUAL, "{{This has spaces in it}}");
+        "tgt2", DO_NOT_STRIP, TC_MANUAL, "{{This has spaces in it}}");
     ASSERT(!tpl1c);
     Template* tpl2c = Template::RegisterStringAsTemplate(
-        "tgt", DO_NOT_STRIP, TC_MANUAL, "{{#SEC}}foo");
+        "tgt3", DO_NOT_STRIP, TC_MANUAL, "{{#SEC}}foo");
     ASSERT(!tpl2c);
     Template* tpl3c = Template::RegisterStringAsTemplate(
-        "tgt", DO_NOT_STRIP, TC_MANUAL, "{{#S1}}foo{{/S2}}");
+        "tgt4", DO_NOT_STRIP, TC_MANUAL, "{{#S1}}foo{{/S2}}");
     ASSERT(!tpl3c);
     Template* tpl4c = Template::RegisterStringAsTemplate(
-        "tgt", DO_NOT_STRIP, TC_MANUAL, "{{#S1}}foo{{#S2}}bar{{/S1}{{/S2}");
+        "tgt5", DO_NOT_STRIP, TC_MANUAL, "{{#S1}}foo{{#S2}}bar{{/S1}{{/S2}");
     ASSERT(!tpl4c);
     Template* tpl5c = Template::RegisterStringAsTemplate(
-        "tgt", DO_NOT_STRIP, TC_MANUAL, "{{noend");
+        "tgt6", DO_NOT_STRIP, TC_MANUAL, "{{noend");
     ASSERT(!tpl5c);
 
     // ... and that syntax errors leave the original untouched
     Template* tpl6c = Template::GetTemplate("tgt", DO_NOT_STRIP);
     ASSERT(tpl6c == tpl_orig);
     AssertExpandIs(tpl6c, &dict, tpltext, true);
+
+    Template::ClearCache();
+  }
+
+  static void TestStringTemplateInclude() {
+    Template::ClearCache();   // just for exercise.
+    const string cache_key = "TestStringTemplateInclude";
+    const string cache_key_inc = "TestStringTemplateInclude-inc";
+    const string cache_key_indent = "TestStringTemplateInclude-indent";
+    const string text = "<html>{{>INC}}</html>";
+    const string text_inc = "<div>\n<p>\nUser {{USER}}\n</div>";
+
+    Template *tpl, *tpl_inc;
+    ASSERT(tpl = Template::RegisterStringAsTemplate(
+               cache_key, DO_NOT_STRIP, TC_HTML, text));
+
+    ASSERT(tpl_inc = Template::RegisterStringAsTemplate(
+               cache_key_inc, DO_NOT_STRIP, TC_HTML, text_inc));
+
+    TemplateDictionary dict("dict");
+    TemplateDictionary* sub_dict = dict.AddIncludeDictionary("INC");
+    sub_dict->SetFilename(cache_key_inc);
+
+    sub_dict->SetValue("USER", "John<>Doe");
+    string expected = "<html><div>\n<p>\nUser John&lt;&gt;Doe\n</div></html>";
+    AssertExpandIs(tpl, &dict, expected, true);
+
+    // Repeat the same except that now the parent has a template-level
+    // directive (by way of the automatic-line-indenter). The indentation
+    // will happen after html-escaping of individual variables.
+    const string text_indent = "<html>\n  {{>INC}}</html>";
+    ASSERT(tpl = Template::RegisterStringAsTemplate(
+               cache_key_indent, DO_NOT_STRIP, TC_HTML, text_indent));
+    expected =
+        "<html>\n"
+        "  <div>\n"
+        "  <p>\n"
+        "  User John&lt;&gt;Doe\n"
+        "  </div>"
+        "</html>";
+    AssertExpandIs(tpl, &dict, expected, true);
+
+    Template::ClearCache();
   }
 
   static void TestTemplateCache() {
@@ -1144,6 +1219,7 @@ class TemplateUnittest {
     Template* tpl2 = Template::GetTemplate(nonexistent, STRIP_WHITESPACE);
     assert(!tpl2);
 
+    // TODO(csilvers): figure out how to mock time, rather than sleeping
     sleep(1);    // since mtime goes by 1-second increments
     ASSERT(!tpl->ReloadIfChanged());  // false: no reloading needed
     StringToFile("{valid template}", filename);   // no contentful change
@@ -1166,7 +1242,8 @@ class TemplateUnittest {
     unlink(nonexistent.c_str());      // here today...
     sleep(1);
     ASSERT(!tpl2->ReloadIfChanged()); // false: file has disappeared
-    AssertExpandIs(tpl2, &dict, "exists now!", true);  // last non-error value
+    // The old template content should be forgotten
+    ASSERT(NULL == Template::GetTemplate(nonexistent, STRIP_WHITESPACE));
 
     StringToFile("lazarus", nonexistent);
     sleep(1);
@@ -1555,7 +1632,9 @@ class TemplateUnittest {
     AssertCorrectModifiers(TC_XML, text, "VAL:c:xml_escape\n");
     text = "{user={{USER:j}}";   // Correct escaping
     AssertCorrectModifiers(TC_JSON, text, "USER:j\n");
-    text = "{user={{USER:h}}";   // Not XSS equivalent
+    text = "{user={{USER:o}}";   // json_escape is XSS equivalent
+    AssertCorrectModifiers(TC_JSON, text, "USER:o\n");
+    text = "{user={{USER:h}}";   // but html_escape is not
     AssertCorrectModifiers(TC_JSON, text, "USER:h:j\n");
 
     // 3. Larger test with close to every escaping case.
@@ -1746,19 +1825,19 @@ class TemplateUnittest {
     string expected = "file contents";
     AssertExpandIs(tpl, &dict, expected, true);
 
-    // Register new template contents under the same template key
+    // Try to register new template contents under the same template key
     Template::RegisterStringAsTemplate(filename, STRIP_WHITESPACE,
                                        TC_MANUAL, "string contents");
 
     tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);
-    expected = "string contents";
+    expected = "file contents";   // First registrationshould win
     AssertExpandIs(tpl, &dict, expected, true);
 
-    // Confirm string contents survive file-based mtime checks
+    sleep(1);    // since mtime goes by 1-second increments
     StringToFile("new file contents", filename);
-
-    ASSERT(!tpl->ReloadIfChanged()); // no reload - string trumps file
+    ASSERT(tpl->ReloadIfChanged()); // should reload - file wins (came first)
     ASSERT(Template::GetTemplate(filename, STRIP_WHITESPACE) == tpl);
+    expected = "new file contents";   // First registration should win
     AssertExpandIs(tpl, &dict, expected, true);
 
     Template::ReloadAllIfChanged();
@@ -1794,6 +1873,7 @@ int main(int argc, char** argv) {
   TemplateUnittest::TestRegisterStringCollision();
   TemplateUnittest::TestStringCacheKey();
   TemplateUnittest::TestStringGetTemplate();
+  TemplateUnittest::TestStringTemplateInclude();
   TemplateUnittest::TestTemplateCache();
   TemplateUnittest::TestStrip();
   TemplateUnittest::TestReloadIfChanged();

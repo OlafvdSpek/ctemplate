@@ -1,3 +1,18 @@
+Wed Nov 12 11:24:33 2008  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.92 release
+	* BUG FIX: affecting an included string-template with autoescaping (jad)
+	* BUG FIX: long-name cmdline flag in diff_tpl_auto_escape (jad)
+	* Do include-template indenting after applying modifiers (jad)
+	* Add human-readable error messages to the html parser (falmeida)
+	* Create an abstract base class for TemplateDictionary (williasr)
+	* PORTING: Be more careful about Windows #defines and types (csilvers)
+	* PORTING: Make unittest scripts more sh-compatible (falmeida)
+	* Show missing includes in annotated output (ribrdb)
+	* Improvements to javascript escaping (escape \f) (jad)
+	* Improvements to json escaping (escape <>&) (jad)
+	* Avoid raciness by preferring cached to new template-strings (csilvers)
+
 Tue Aug 19 16:20:27 2008  Google Inc. <opensource@google.com>
 
 	* ctemplate: version 0.91 release

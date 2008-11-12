@@ -146,6 +146,9 @@ static inline int js_is_whitespace(char c)
 /* Returns true if the character is part of a javascript identifier. The rules
  * are pretty relaxed here since we don't accept unicode and don't care if the
  * first character doesn't contain numbers or not.
+ *
+ * For more detail on the limitations of having this relaxed set of characters
+ * please see the comments in_state_js_text().
  */
 static inline int js_is_identifier(char c) {
   return (c >= 'a' && c <= 'z') ||
@@ -205,13 +208,14 @@ void jsparser_buffer_append_str(jsparser_ctx *js, const char *str)
 static inline int jsparser_buffer_absolute_pos(jsparser_ctx *js, int pos)
 {
   int absolute_pos;
+  int buffer_len;
   assert(pos < 0);
 
   if(pos <= -JSPARSER_RING_BUFFER_SIZE) {
     return -1;
   }
 
-  int buffer_len = js->buffer_end - js->buffer_start;
+  buffer_len = js->buffer_end - js->buffer_start;
   if (buffer_len < 0) {
     buffer_len += JSPARSER_RING_BUFFER_SIZE;
   }
@@ -424,6 +428,18 @@ static void in_state_js_text(statemachine_ctx *ctx, int start, char chr,
  *
  * Division of an object literal:
  * { a: 1 } /x/.exec('x');
+ *
+ * We only support ascii right now, so unicode characters in identifiers will
+ * be treated as delimiters, effectively breaking the identifier name where
+ * they appear, and this may cause issues in very specific situations. Namely,
+ * if we have a unicode character in an identifier directly preceding a suffix
+ * that matches one of the keywords in regexp_token_prefix[], if this
+ * identifier precedes a / (slash) character:
+ *
+ * var x = test<unicode char>return / 5;
+ *
+ * We will interpret that slash as the start of a regular expression, when in
+ * reality it is a division operator.
  */
 static void enter_state_js_slash(statemachine_ctx *ctx, int start, char chr,
                                  int end)
@@ -524,6 +540,27 @@ static void enter_state_js_comment_after(statemachine_ctx *ctx, int start,
   }
 }
 
+static statemachine_definition *create_statemachine_definition()
+{
+  statemachine_definition *def;
+  def = statemachine_definition_new(JSPARSER_NUM_STATES);
+  if (def == NULL)
+    return NULL;
+
+  /* TODO(falmeida): Check return value. */
+  statemachine_definition_populate(def, jsparser_state_transitions,
+                                   jsparser_states_internal_names);
+
+  statemachine_in_state(def, JSPARSER_STATE_INT_JS_TEXT,
+                        in_state_js_text);
+  statemachine_enter_state(def, JSPARSER_STATE_INT_JS_SLASH,
+                           enter_state_js_slash);
+  statemachine_enter_state(def, JSPARSER_STATE_INT_JS_COMMENT_AFTER,
+                           enter_state_js_comment_after);
+
+  return def;
+}
+
 
 /* Initializes a new jsparser instance.
  *
@@ -536,38 +573,57 @@ static void enter_state_js_comment_after(statemachine_ctx *ctx, int start,
 
 jsparser_ctx *jsparser_new()
 {
-    statemachine_ctx *sm;
-    statemachine_definition *def;
     jsparser_ctx *js;
-
-    def = statemachine_definition_new(JSPARSER_NUM_STATES);
-    if (def == NULL)
-      return NULL;
-
-    sm = statemachine_new(def);
-    if (sm == NULL)
-      return NULL;
 
     js = CAST(jsparser_ctx *, calloc(1, sizeof(jsparser_ctx)));
     if (js == NULL)
       return NULL;
 
-    js->statemachine = sm;
-    js->statemachine_def = def;
-    sm->user = js;
+    js->statemachine_def = create_statemachine_definition();
+    if (js->statemachine_def == NULL)
+      return NULL;
+
+    js->statemachine = statemachine_new(js->statemachine_def, js);
+    if (js->statemachine == NULL)
+      return NULL;
 
     jsparser_reset(js);
 
-    statemachine_definition_populate(def, jsparser_state_transitions);
-
-    statemachine_in_state(def, JSPARSER_STATE_INT_JS_TEXT,
-                          in_state_js_text);
-    statemachine_enter_state(def, JSPARSER_STATE_INT_JS_SLASH,
-                             enter_state_js_slash);
-    statemachine_enter_state(def, JSPARSER_STATE_INT_JS_COMMENT_AFTER,
-                             enter_state_js_comment_after);
-
     return js;
+}
+
+/* Returns a pointer to a context which is a duplicate of the jsparser src.
+ */
+jsparser_ctx *jsparser_duplicate(jsparser_ctx *src)
+{
+  jsparser_ctx *dst;
+  assert(src != NULL);
+
+  dst = jsparser_new();
+  if (dst == NULL)
+    return NULL;
+
+  jsparser_copy(dst, src);
+
+  return dst;
+}
+
+/* Copies the context of the jsparser pointed to by src to the jsparser dst.
+ *
+ * The state machine definition is preserved since it is read only.
+ */
+void jsparser_copy(jsparser_ctx *dst, jsparser_ctx *src)
+{
+
+  dst->buffer_start = src->buffer_start;
+  dst->buffer_end = src->buffer_end;
+  memcpy(dst->buffer, src->buffer, sizeof(src->buffer));
+
+  statemachine_copy(dst->statemachine,
+                    src->statemachine,
+                    dst->statemachine_def,
+                    dst);
+
 }
 
 void jsparser_reset(jsparser_ctx *ctx)

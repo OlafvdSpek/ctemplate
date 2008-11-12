@@ -42,7 +42,7 @@
 
 #include "config.h"
 
-#ifdef WIN32
+#ifdef _WIN32
 
 #define WIN32_LEAN_AND_MEAN  /* We always want minimal includes */
 #include <windows.h>
@@ -51,18 +51,20 @@
 #include <stdio.h>           /* read in vsnprintf decl. before redifining it */
 #include <stdarg.h>          /* template_dictionary.cc uses va_copy */
 #include <string.h>          /* for _strnicmp */
-#include <string>
-#include <vector>
+/* Note: the C++ #includes are all together at the bottom.  This file is
+ * used by both C and C++ code, so we put all the C++ together.
+ */
 
-// 4244: otherwise we get problems when substracting two size_t's to an int
-// 4251: it's complaining about a private struct I've chosen not to dllexport
-// 4355: we use this in a constructor, but we do it safely
-// 4715: for some reason VC++ stopped realizing you can't return after abort()
-// 4800: we know we're casting ints/char*'s to bools, and we're ok with that
-// 4996: Yes, we're ok using "unsafe" functions like fopen() and strerror()
+/* 4244: otherwise we get problems when substracting two size_t's to an int
+ * 4251: it's complaining about a private struct I've chosen not to dllexport
+ * 4355: we use this in a constructor, but we do it safely
+ * 4715: for some reason VC++ stopped realizing you can't return after abort()
+ * 4800: we know we're casting ints/char*'s to bools, and we're ok with that
+ * 4996: Yes, we're ok using "unsafe" functions like fopen() and strerror()
+ */
 #pragma warning(disable:4244 4251 4355 4715 4800 4996)
 
-// file I/O
+/* file I/O */
 #define PATH_MAX 1024
 #define access  _access
 #define getcwd  _getcwd
@@ -73,24 +75,25 @@
 #define close   _close
 #define popen   _popen
 #define pclose  _pclose
-#define R_OK    04           // read-only (for access())
+#define R_OK    04           /* read-only (for access()) */
 #define S_ISDIR(m)  (((m) & _S_IFMT) == _S_IFDIR)
 
-// Not quite as lightweight as a hard-link, but more than good enough for us.
+/* Not quite as lightweight as a hard-link, but more than good enough for us. */
 #define link(oldpath, newpath)  CopyFileA(oldpath, newpath, false)
 
 #define strcasecmp   _stricmp
 #define strncasecmp  _strnicmp
 
-// In windows-land, hash<> is called hash_compare<> (from xhash.h)
+/* In windows-land, hash<> is called hash_compare<> (from xhash.h) */
 #define hash  hash_compare
 
-// Sleep is in ms, on windows
+/* Sleep is in ms, on windows */
 #define sleep(secs)  Sleep((secs) * 1000)
 
-// We can't just use _vsnprintf and _snprintf as drop-in-replacements,
-// because they don't always NUL-terminate. :-(  We also can't use the
-// name vsnprintf, since windows defines that (but not snprintf (!)).
+/* We can't just use _vsnprintf and _snprintf as drop-in-replacements,
+ * because they don't always NUL-terminate. :-(  We also can't use the
+ * name vsnprintf, since windows defines that (but not snprintf (!)).
+ */
 extern CTEMPLATE_DLL_DECL int snprintf(char *str, size_t size,
                                        const char *format, ...);
 extern int CTEMPLATE_DLL_DECL safe_vsnprintf(char *str, size_t size,
@@ -98,20 +101,30 @@ extern int CTEMPLATE_DLL_DECL safe_vsnprintf(char *str, size_t size,
 #define vsnprintf(str, size, format, ap)  safe_vsnprintf(str, size, format, ap)
 #define va_copy(dst, src)  (dst) = (src)
 
-extern CTEMPLATE_DLL_DECL std::string TmpFile(const char* basename);
-
-// Windows doesn't support specifying the number of buckets as a
-// hash_map constructor arg, so we leave this blank.
+/* Windows doesn't support specifying the number of buckets as a
+ * hash_map constructor arg, so we leave this blank.
+ */
 #define CTEMPLATE_SMALL_HASHTABLE
 
 #define DEFAULT_TEMPLATE_ROOTDIR  ".."
 
 
-// These are functions we have to override because they're O/S-specific
+/* These are functions we have to override because they're O/S-specific */
+#ifdef __cplusplus
+#include <string>
+#include <vector>
+
+extern CTEMPLATE_DLL_DECL std::string TmpFile(const char* basename);
 void CTEMPLATE_DLL_DECL CleanTestDir(const std::string& dirname);
 void CTEMPLATE_DLL_DECL GetNamelist(const char* testdata_dir,
                                     std::vector<std::string>* namelist);
+#endif  /* __cplusplus */
 
-#endif  /* WIN32 */
+#ifndef __cplusplus
+/* I don't see how to get inlining for C code in MSVC.  Ah well. */
+#define inline
+#endif
+
+#endif  /* _WIN32 */
 
 #endif  /* CTEMPLATE_WINDOWS_PORT_H_ */
