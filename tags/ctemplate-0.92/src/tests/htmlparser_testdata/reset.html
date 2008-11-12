@@ -1,0 +1,12 @@
+<html>
+  <body>
+    <?state state=text, attr_type=none?>
+    <b font="<?state state=value, tag=b, attr=font, attr_quoted=true,
+      in_js=false, attr_type=regular ?>
+<?state reset=true ?>
+<?state state=text, attr_type=none ?>
+<b <?state state=tag, tag=b ?>
+<?state reset_mode=js ?>
+var unquoted =<?state js_quoted=false, in_js=true ?>;
+var single_quoted ='<?state js_quoted=true, in_js=true ?>';
+var unquoted =<?state js_quoted=false, in_js=true ?>;
