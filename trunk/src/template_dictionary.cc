@@ -53,8 +53,9 @@ _START_GOOGLE_NAMESPACE_
 
 using std::vector;
 using std::string;
-using std::pair;
 using std::map;
+using std::pair;
+using std::make_pair;
 using HASH_NAMESPACE::hash_map;
 using template_modifiers::TemplateModifier;
 
@@ -96,19 +97,22 @@ static const char* const kAnnotateOutput = "__ctemplate_annotate_output__";
 // ----------------------------------------------------------------------
 
 template<typename ValueType>   // ValueType should be small (pointer, int)
-void TemplateDictionary::HashInsert(
-    hash_map<TemplateString, ValueType, TemplateString::Hash>* m,
-    TemplateString key, ValueType value) {
+void TemplateDictionary::HashInsert(hash_map<TemplateId, ValueType,
+                                             ctemplate::TemplateIdHasher>* m,
+                                    TemplateString key, ValueType value) {
   // Unfortunately, insert() doesn't actually replace if key is already
   // in the map.  Thus, in that case (insert().second == false), we need
   // to overwrite the old value.  Since we don't define operator=, the
   // easiest legal way to overwrite is to use the copy-constructor with
   // placement-new.
-  pair<typename hash_map<TemplateString,ValueType,TemplateString::Hash>::iterator,
-       bool> r = m->insert(pair<TemplateString,ValueType>(key, value));
+  const TemplateId id = key.GetGlobalId();
+  pair<typename hash_map<TemplateId, ValueType,
+                         ctemplate::TemplateIdHasher>::iterator, bool> r
+      = m->insert(pair<TemplateId,ValueType>(id, value));
   if (r.second == false) {   // key already exists, so overwrite
     new (&r.first->second) ValueType(value);
   }
+  AddToIdToNameMap(id, key);  // allows us to do the hash-key -> name mapping
 }
 
 
@@ -234,29 +238,35 @@ TemplateDictionary* TemplateDictionary::InternalMakeCopy(
     // same template_global_dict_ owner that we do.
     // Note: we always use our own arena, even when we have a parent.
     newdict = new TemplateDictionary(name_of_copy, arena,
-                                     parent_dict_, template_global_dict_owner_);
+                                     parent_dict_,
+                                     template_global_dict_owner_);
   }
 
   // Copy the variable dictionary
   if (variable_dict_) {
+    LazilyCreateDict(&newdict->variable_dict_);
     for (VariableDict::const_iterator it = variable_dict_->begin();
          it != variable_dict_->end(); ++it) {
-      newdict->SetValue(it->first, it->second);
+      newdict->variable_dict_->insert(make_pair(it->first,
+                                                newdict->Memdup(it->second)));
     }
   }
   // ...and the template-global-dict, if we have one (only root-level tpls do)
   if (template_global_dict_) {
+    LazilyCreateDict(&newdict->template_global_dict_);
     for (VariableDict::const_iterator it = template_global_dict_->begin();
          it != template_global_dict_->end(); ++it) {
-      newdict->SetTemplateGlobalValue(it->first, it->second);
+      newdict->template_global_dict_->insert(
+          make_pair(it->first,
+                    newdict->Memdup(it->second)));
     }
   }
   if (section_dict_) {
     LazilyCreateDict(&newdict->section_dict_);
     for (SectionDict::iterator it = section_dict_->begin();
-         it != section_dict_->end();  ++it) {
+         it != section_dict_->end(); ++it) {
       DictVector* dicts = new DictVector;
-      HashInsert(newdict->section_dict_, newdict->Memdup(it->first), dicts);
+      newdict->section_dict_->insert(make_pair(it->first, dicts));
       for (DictVector::iterator it2 = it->second->begin();
            it2 != it->second->end(); ++it2) {
         TemplateDictionary* subdict = *it2;
@@ -271,7 +281,7 @@ TemplateDictionary* TemplateDictionary::InternalMakeCopy(
     for (IncludeDict::iterator it = include_dict_->begin();
          it != include_dict_->end();  ++it) {
       DictVector* dicts = new DictVector;
-      HashInsert(newdict->include_dict_, newdict->Memdup(it->first), dicts);
+      newdict->include_dict_->insert(make_pair(it->first, dicts));
       for (DictVector::iterator it2 = it->second->begin();
            it2 != it->second->end(); ++it2) {
         TemplateDictionary* subdict = *it2;
@@ -364,14 +374,14 @@ int TemplateDictionary::StringAppendV(char* space, char** out,
 void TemplateDictionary::SetValue(const TemplateString variable,
                                   const TemplateString value) {
   LazilyCreateDict(&variable_dict_);
-  HashInsert(variable_dict_, Memdup(variable), Memdup(value));
+  HashInsert(variable_dict_, variable, Memdup(value));
 }
 
 void TemplateDictionary::SetIntValue(const TemplateString variable, int value) {
   char buffer[64];   // big enough for any int
   int valuelen = snprintf(buffer, sizeof(buffer), "%d", value);
   LazilyCreateDict(&variable_dict_);
-  HashInsert(variable_dict_, Memdup(variable), Memdup(buffer, valuelen));
+  HashInsert(variable_dict_, variable, Memdup(buffer, valuelen));
 }
 
 void TemplateDictionary::SetFormattedValue(const TemplateString variable,
@@ -389,10 +399,10 @@ void TemplateDictionary::SetFormattedValue(const TemplateString variable,
   // If it fit into scratch, great, otherwise we need to copy into arena
   if (buffer == scratch) {
     scratch = arena_->Shrink(scratch, buflen+1);   // from 1024 to |value+\0|
-    HashInsert(variable_dict_, Memdup(variable), TemplateString(scratch, buflen));
+    HashInsert(variable_dict_, variable, TemplateString(scratch, buflen));
   } else {
     arena_->Shrink(scratch, 0);   // reclaim arena space we didn't use
-    HashInsert(variable_dict_, Memdup(variable), Memdup(buffer, buflen));
+    HashInsert(variable_dict_, variable, Memdup(buffer, buflen));
     delete[] buffer;
   }
 }
@@ -435,7 +445,7 @@ void TemplateDictionary::SetTemplateGlobalValue(const TemplateString variable,
   assert(template_global_dict_owner_ != NULL);
   LazilyCreateDict(&template_global_dict_owner_->template_global_dict_);
   HashInsert(template_global_dict_owner_->template_global_dict_,
-             Memdup(variable), Memdup(value));
+             variable, Memdup(value));
 }
 
 // ----------------------------------------------------------------------
@@ -443,13 +453,13 @@ void TemplateDictionary::SetTemplateGlobalValue(const TemplateString variable,
 //    Sets a value in the global dict.  Note this is a static method.
 // ----------------------------------------------------------------------
 
-/*static*/ void TemplateDictionary::SetGlobalValue(const TemplateString variable,
-                                                   const TemplateString value) {
+/*static*/ void TemplateDictionary::SetGlobalValue(
+    const TemplateString variable,
+    const TemplateString value) {
   // We can't use memdup here, since we're a static method.  We do a strdup,
   // which is fine, since global_dict_ lives the entire program anyway.
-  char* variable_copy = new char[variable.length_ + 1];
-  memcpy(variable_copy, variable.ptr_, variable.length_);
-  variable_copy[variable.length_] = '\0';
+  // It's unnecessary to copy the variable, since HashInsert takes care of
+  // that for us.
   char* value_copy = new char[value.length_ + 1];
   memcpy(value_copy, value.ptr_, value.length_);
   value_copy[value.length_] = '\0';
@@ -459,7 +469,7 @@ void TemplateDictionary::SetTemplateGlobalValue(const TemplateString variable,
     global_dict_ = SetupGlobalDictUnlocked();
 
   HashInsert(global_dict_,
-             TemplateString(variable_copy, variable.length_),
+             variable,
              TemplateString(value_copy, value.length_));
 }
 
@@ -476,13 +486,14 @@ TemplateDictionary* TemplateDictionary::AddSectionDictionary(
     const TemplateString section_name) {
   DictVector* dicts = NULL;
   LazilyCreateDict(&section_dict_);
-  const SectionDict::iterator it = section_dict_->find(section_name);
+  const SectionDict::iterator it = section_dict_->find(
+      section_name.GetGlobalId());
   if (it == section_dict_->end()) {
     dicts = new DictVector;
     // Since most lists will remain under 8 or 16 entries but will frequently
     // be more than four, this prevents copying from 1->2->4->8.
     dicts->reserve(8);
-    HashInsert(section_dict_, Memdup(section_name), dicts);
+    HashInsert(section_dict_, section_name, dicts);
   } else {
     dicts = it->second;
   }
@@ -498,13 +509,13 @@ TemplateDictionary* TemplateDictionary::AddSectionDictionary(
 
 void TemplateDictionary::ShowSection(const TemplateString section_name) {
   LazilyCreateDict(&section_dict_);
-  if (section_dict_->find(section_name) == section_dict_->end()) {
+  if (section_dict_->find(section_name.GetGlobalId()) == section_dict_->end()) {
     TemplateDictionary* empty_dict =
       new TemplateDictionary("empty dictionary", arena_, this,
                              template_global_dict_owner_);
     DictVector* sub_dict = new DictVector;
     sub_dict->push_back(empty_dict);
-    HashInsert(section_dict_, Memdup(section_name), sub_dict);
+    HashInsert(section_dict_, section_name, sub_dict);
   }
 }
 
@@ -548,10 +559,11 @@ TemplateDictionary* TemplateDictionary::AddIncludeDictionary(
     const TemplateString include_name) {
   DictVector* dicts = NULL;
   LazilyCreateDict(&include_dict_);
-  const IncludeDict::iterator it = include_dict_->find(include_name);
+  const IncludeDict::iterator it = include_dict_->find(
+      include_name.GetGlobalId());
   if (it == include_dict_->end()) {
     dicts = new DictVector;
-    HashInsert(include_dict_, Memdup(include_name), dicts);
+    HashInsert(include_dict_, include_name, dicts);
   } else {
     dicts = it->second;
   }
@@ -576,6 +588,34 @@ TemplateDictionary* TemplateDictionary::AddIncludeDictionary(
 
 void TemplateDictionary::SetFilename(const TemplateString filename) {
   filename_ = Memdup(filename).ptr_;
+}
+
+// ----------------------------------------------------------------------
+// TemplateDictionary::AddToIdToNameMap()
+//    We have a problem when we try to dump the contents of the
+//    dictionary, because instead of storing the keys to global_dict_
+//    etc as strings, we store them as integer id's.  We need this
+//    map, from id->string, to be able to dump.  This should be called
+//    every time we add a string to a TemplateDictionary hashtable.
+// ----------------------------------------------------------------------
+
+/*static*/ void TemplateDictionary::AddToIdToNameMap(TemplateId id,
+                                                     const TemplateString& str) {
+  // If str.id_ is set, that means we were added to the id-to-name map
+  // at TemplateString constructor time, when the id_ was set.  So we
+  // don't need to bother again here.
+  if (str.id_ != 0) {
+    return;
+  }
+  // Verify that if this id is already in the map, it's there with our
+  // contents.  If not, that would mean a hash collision (since our
+  // id's are hash values).
+  assert(TemplateString::IdToString(id) == kStsEmpty ||
+         memcmp(str.ptr_, TemplateString::IdToString(id).ptr_,
+                str.length_) == 0);
+
+  TemplateString str_with_id(str.ptr_, str.length_, str.is_immutable(), id);
+  str_with_id.AddToGlobalIdToNameMap();
 }
 
 // ----------------------------------------------------------------------
@@ -612,7 +652,9 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
       ReaderMutexLock ml(&g_static_mutex);
       for (GlobalDict::const_iterator it = global_dict_->begin();
            it != global_dict_->end();  ++it) {
-        sorted_global_dict[string(it->first.ptr_, it->first.length_)] =
+        const TemplateString key = TemplateString::IdToString(it->first);
+        assert(key.ptr_ != NULL);
+        sorted_global_dict[string(key.ptr_, key.length_)] =
             string(it->second.ptr_, it->second.length_);
       }
     }
@@ -632,7 +674,9 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
     map<string, string> sorted_template_dict;
     for (VariableDict::const_iterator it = template_global_dict_->begin();
          it != template_global_dict_->end();  ++it) {
-      sorted_template_dict[string(it->first.ptr_, it->first.length_)] =
+      const TemplateString key = TemplateString::IdToString(it->first);
+      assert(key.ptr_ != NULL);
+      sorted_template_dict[string(key.ptr_, key.length_)] =
           string(it->second.ptr_, it->second.length_);
     }
     for (map<string,string>::const_iterator it = sorted_template_dict.begin();
@@ -658,7 +702,9 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
     map<string, string> sorted_variable_dict;
     for (VariableDict::const_iterator it = variable_dict_->begin();
          it != variable_dict_->end();  ++it) {
-      sorted_variable_dict[string(it->first.ptr_, it->first.length_)] =
+      const TemplateString key = TemplateString::IdToString(it->first);
+      assert(key.ptr_ != NULL);
+      sorted_variable_dict[string(key.ptr_, key.length_)] =
           string(it->second.ptr_, it->second.length_);
     }
     for (map<string,string>::const_iterator it = sorted_variable_dict.begin();
@@ -672,8 +718,9 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
     map<string, const DictVector*> sorted_section_dict;
     for (SectionDict::const_iterator it = section_dict_->begin();
          it != section_dict_->end();  ++it) {
-      sorted_section_dict[string(it->first.ptr_, it->first.length_)] =
-          it->second;
+      const TemplateString key = TemplateString::IdToString(it->first);
+      assert(key.ptr_ != NULL);
+      sorted_section_dict[string(key.ptr_, key.length_)] = it->second;
     }
     for (map<string, const DictVector*>::const_iterator it =
              sorted_section_dict.begin();
@@ -695,8 +742,9 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
     map<string, const DictVector*> sorted_include_dict;
     for (IncludeDict::const_iterator it = include_dict_->begin();
          it != include_dict_->end();  ++it) {
-      sorted_include_dict[string(it->first.ptr_, it->first.length_)] =
-          it->second;
+      const TemplateString key = TemplateString::IdToString(it->first);
+      assert(key.ptr_ != NULL);
+      sorted_include_dict[string(key.ptr_, key.length_)] = it->second;
     }
     for (map<string, const DictVector*>::const_iterator it =
              sorted_include_dict.begin();
@@ -765,7 +813,8 @@ const char *TemplateDictionary::GetSectionValue(
     const TemplateString& variable) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->variable_dict_) {
-      VariableDict::const_iterator it = d->variable_dict_->find(variable);
+      VariableDict::const_iterator it
+          = d->variable_dict_->find(variable.GetGlobalId());
       if (it != d->variable_dict_->end())
         return it->second.ptr_;
     }
@@ -775,7 +824,8 @@ const char *TemplateDictionary::GetSectionValue(
   assert(template_global_dict_owner_ != NULL);
   if (template_global_dict_owner_->template_global_dict_) {
     VariableDict::const_iterator it =
-        template_global_dict_owner_->template_global_dict_->find(variable);
+        template_global_dict_owner_->template_global_dict_->find(
+            variable.GetGlobalId());
     if (it != template_global_dict_owner_->template_global_dict_->end())
       return it->second.ptr_;
   }
@@ -783,7 +833,7 @@ const char *TemplateDictionary::GetSectionValue(
   // No match in dict tree or template-global dict.  Last chance: global dict.
   {
     ReaderMutexLock ml(&g_static_mutex);
-    GlobalDict::const_iterator it = global_dict_->find(variable);
+    GlobalDict::const_iterator it = global_dict_->find(variable.GetGlobalId());
     const char* retval = "";    // what we'll return if global lookup fails
     if (it != global_dict_->end())
       retval = it->second.ptr_;
@@ -794,7 +844,7 @@ const char *TemplateDictionary::GetSectionValue(
 bool TemplateDictionary::IsHiddenSection(const TemplateString& name) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->section_dict_)
-      if (d->section_dict_->find(name) != d->section_dict_->end())
+      if (d->section_dict_->find(name.GetGlobalId()) != d->section_dict_->end())
         return false;
   }
   return true;
@@ -804,7 +854,8 @@ const TemplateDictionary::DictVector& TemplateDictionary::GetDictionaries(
     const TemplateString& section_name) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->section_dict_) {
-      SectionDict::const_iterator it = d->section_dict_->find(section_name);
+      SectionDict::const_iterator it = d->section_dict_->find(
+          section_name.GetGlobalId());
       if (it != d->section_dict_->end())
         return *it->second;
     }
@@ -816,7 +867,7 @@ const TemplateDictionary::DictVector& TemplateDictionary::GetDictionaries(
 bool TemplateDictionary::IsHiddenTemplate(const TemplateString& name) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->include_dict_) {
-      if (d->include_dict_->find(name) != d->include_dict_->end())
+      if (d->include_dict_->find(name.GetGlobalId()) != d->include_dict_->end())
         return false;
     }
   }
@@ -827,7 +878,8 @@ const TemplateDictionary::DictVector& TemplateDictionary::GetTemplateDictionarie
     const TemplateString& variable) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->include_dict_) {
-      IncludeDict::const_iterator it = d->include_dict_->find(variable);
+      IncludeDict::const_iterator it = d->include_dict_->find(
+          variable.GetGlobalId());
       if (it != d->include_dict_->end())
         return *it->second;
     }
@@ -840,7 +892,8 @@ const char *TemplateDictionary::GetIncludeTemplateName(
     const TemplateString& variable, int dictnum) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->include_dict_) {
-      IncludeDict::const_iterator it = d->include_dict_->find(variable);
+      IncludeDict::const_iterator it = d->include_dict_->find(
+          variable.GetGlobalId());
       if (it != d->include_dict_->end()) {
         TemplateDictionary* dict = static_cast<TemplateDictionary*>((*it->second)[dictnum]);
         return dict->filename_ ? dict->filename_ : "";   // map NULL to ""
@@ -851,12 +904,13 @@ const char *TemplateDictionary::GetIncludeTemplateName(
   abort();
 }
 
-//
-// Iterator framework
-// TemplateDictionary::CreateSectionIterator
-// TemplateDictionary::CreateTemplateIterator
+// ----------------------------------------------------------------------
+// TemplateDictionary::CreateSectionIterator()
+// TemplateDictionary::CreateTemplateIterator()
 // TemplateDictionary::Iterator::HasNext()
 // TemplateDictionary::Iterator::Next()
+//    Iterator framework.
+// ----------------------------------------------------------------------
 
 TemplateDictionaryInterface::IteratorProxy
 TemplateDictionary::CreateTemplateIterator(

@@ -4,7 +4,7 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 0.92, opensource@google.com)
+AC_INIT(ctemplate, 0.93, opensource@google.com)
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
@@ -37,12 +37,22 @@ AC_CHECK_FUNCS(getopt_long)
 # sys/types.h, or inttypes.h, all of which are part of the default-includes.
 AC_CHECK_TYPES([uint32_t])
 AC_CHECK_TYPES([u_int32_t])
-AC_CHECK_TYPES([__uint32])
+AC_CHECK_TYPES([__int32])
 AC_CHECK_TYPES([uint64_t])
 AC_CHECK_TYPES([u_int64_t])
-AC_CHECK_TYPES([__uint64])
+AC_CHECK_TYPES([__int64])
 
 AC_HEADER_DIRENT               # for template_unittest.cc, template_regtest.cc
+
+# We need to do byte-swapping efficiently to hash efficiently in
+# template_string.cc.  Different architectures do this differently.
+AC_CHECK_HEADERS(byteswap.h)              # Linux (GNU in general)
+AC_CHECK_HEADERS(libkern/OSByteOrder.h)   # OS X
+AC_CHECK_HEADERS(sys/byteorder.h)         # Solaris 10
+AC_CHECK_HEADERS(endian.h)                # Linux
+AC_CHECK_HEADERS(machine/endian.h)        # OS X
+AC_CHECK_HEADERS(sys/endian.h)            # FreeBSD
+AC_CHECK_HEADERS(sys/isa_defs.h)          # Solaris 10
 
 # A lot of the code in this directory depends on pthreads
 ACX_PTHREAD
@@ -72,6 +82,15 @@ if test "$ac_cv___attribute__" == "yes"; then
    AC_SUBST(ac_google_attribute, 1)
 else
    AC_SUBST(ac_google_attribute, 0)
+fi
+if test "$ac_cv_type_u_int64_t" == "yes"; then
+   AC_SUBST(ac_cv_uint64, u_int64_t)
+elif test "$ac_cv_type_uint64_t" == "yes"; then
+   AC_SUBST(ac_cv_uint64, uint64_t)
+elif test "$ac_cv_type___int64" == "yes"; then
+   AC_SUBST(ac_cv_uint64, unsigned __int64)
+else
+   AC_SUBST(ac_cv_uint64, unsigned long long)   # best we can do
 fi
 
 # In unix (that is, using this script), this dll-export stuff will always

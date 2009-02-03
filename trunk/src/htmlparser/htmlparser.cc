@@ -58,7 +58,7 @@ namespace HTMLPARSER_NAMESPACE {
 #endif
 
 /* Generated state machine definition. */
-#include "htmlparser_fsm.cc"
+#include "htmlparser_fsm.h"
 
 #define is_js_attribute(attr) ((attr)[0] == 'o' && (attr)[1] == 'n')
 #define is_style_attribute(attr) (strcmp((attr), "style") == 0)
@@ -550,6 +550,11 @@ static void exit_state_cdata_may_close(statemachine_ctx *ctx, int start,
  * Available modes:
  *  HTMLPARSER_MODE_HTML - Parses html text
  *  HTMLPARSER_MODE_JS - Parses javascript files
+ *  HTMLPARSER_MODE_CSS - Parses CSS files. No actual parsing is actually done
+ *                        but htmlparser_in_css() always returns true.
+ *  HTMLPARSER_MODE_HTML_IN_TAG - Parses an attribute list inside a tag. To
+ *                                be used in a template expanded in the
+ *                                following context: <a $template>
  *
  */
 void htmlparser_reset_mode(htmlparser_ctx *ctx, int mode)
@@ -570,6 +575,12 @@ void htmlparser_reset_mode(htmlparser_ctx *ctx, int mode)
     case HTMLPARSER_MODE_JS:
       ctx->statemachine->current_state = HTMLPARSER_STATE_INT_JS_FILE;
       ctx->in_js = 1;
+      break;
+    case HTMLPARSER_MODE_CSS:
+      ctx->statemachine->current_state = HTMLPARSER_STATE_INT_CSS_FILE;
+      break;
+    case HTMLPARSER_MODE_HTML_IN_TAG:
+      ctx->statemachine->current_state = HTMLPARSER_STATE_INT_TAG_SPACE;
       break;
     default:
       assert("Invalid mode in htmlparser_reset_mode()." == NULL);
@@ -841,6 +852,23 @@ const char *htmlparser_attr(htmlparser_ctx *ctx)
     return ctx->attr;
   else
     return NULL;
+}
+
+/* Returns true if the parser is currently inside a CSS construct.
+ */
+int htmlparser_in_css(htmlparser_ctx *ctx) {
+  int state = statemachine_get_state(ctx->statemachine);
+  const char *tag = htmlparser_tag(ctx);
+  int external_state = state_external(state);
+
+  if (state == HTMLPARSER_STATE_INT_CSS_FILE ||
+      (external_state == HTMLPARSER_STATE_VALUE &&
+       htmlparser_attr_type(ctx) == HTMLPARSER_ATTR_STYLE) ||
+      (tag && strcmp(tag, "style") == 0)) {
+    return 1;
+  } else {
+    return 0;
+  }
 }
 
 /* Returns the contents of the current attribute value.

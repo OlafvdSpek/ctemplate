@@ -34,8 +34,8 @@
 #
 # Tool to convert a template file (.tpl) into a C++ header
 # file with a const string defining the same template.  This string
-# can then be used to create/retrieve a template using the
-# Template::RegisterStringAsTemplate() (see template.h).
+# can then be used to create/retrieve a template using
+# Template::StringToTemplate()/StringToTemplateCache() (see template.h).
 #
 # Usage: template-converter <template_name> < infile > outfile
 #

@@ -79,6 +79,29 @@ TESTDATA =
 
 ## vvvv RULES TO MAKE THE LIBRARIES, BINARIES, AND UNITTESTS
 
+# These files are auto-generated via generate_fsm.py.  Since we don't want
+# to require python to build ctemplate, we include these in the dist
+src/htmlparser/htmlparser_fsm.h: src/htmlparser/generate_fsm.py src/htmlparser/fsm_config.py src/htmlparser/htmlparser_fsm.config
+	$(top_srcdir)/src/htmlparser/generate_fsm.py $(top_srcdir)/src/htmlparser/htmlparser_fsm.config > $@
+
+src/htmlparser/jsparser_fsm.h: src/htmlparser/generate_fsm.py src/htmlparser/fsm_config.py src/htmlparser/jsparser_fsm.config
+	$(top_srcdir)/src/htmlparser/generate_fsm.py $(top_srcdir)/src/htmlparser/jsparser_fsm.config > $@
+
+src/tests/statemachine_test_fsm.h: src/htmlparser/generate_fsm.py src/htmlparser/fsm_config.py src/tests/statemachine_test_fsm.config
+	$(top_srcdir)/src/htmlparser/generate_fsm.py $(top_srcdir)/src/tests/statemachine_test_fsm.config > $@
+
+# This is a required hack for auto-generated .h files: cf the automake info pages
+# NOTE: since we put these .h files in BUILT_SOURCES, we don't need to put
+# them in as deps for the binaries that use them.  In fact, it's important
+# that we don't; instead we put them in EXTRA_DIST.  This mean, in practice,
+# they'll go at the end of the distribution tarfile, which means they'll
+# have a later timestamp than the .config files that generate them, which
+# means users won't try to rebuild them.  Ah, the joys of automake.
+BUILT_SOURCES = src/htmlparser/htmlparser_fsm.h \
+                src/htmlparser/jsparser_fsm.h \
+                src/tests/statemachine_test_fsm.h
+
+
 # These are the symbols (classes, mostly) we want to export from our library.
 # Note this regexp applies to the *mangled* name, which is why we have to
 # be careful where we want to assert [^A-Za-z].  (Particularly bad on Darwin.)
@@ -92,14 +115,12 @@ libctemplate_la_SOURCES = $(nodist_googleinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/template_modifiers_internal.h \
 	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
+	src/template_string.cc \
 	src/template_namelist.cc src/template_pathops.cc \
 	src/htmlparser/htmlparser.h src/htmlparser/htmlparser.cc \
 	src/htmlparser/jsparser.h src/htmlparser/jsparser.cc \
 	src/htmlparser/statemachine.h src/htmlparser/statemachine.cc \
 	src/htmlparser/htmlparser_cpp.h
-# These .cc files are #included directly by {html,js}parser.cc
-libctemplate_la_DEPENDENCIES = src/htmlparser/jsparser_fsm.cc \
-	src/htmlparser/htmlparser_fsm.cc
 libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG $(AM_CXXFLAGS)
 libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) -export-symbols-regex $(CTEMPLATE_SYMBOLS)
 libctemplate_la_LIBADD = $(PTHREAD_LIBS)
@@ -164,6 +185,17 @@ diff_tpl_auto_escape_LDADD = libctemplate_nothreads.la
 bin_SCRIPTS += src/template-converter
 
 # For each of the tests, we test with and without threads
+
+TESTS += compile_test compile_nothreads_test
+WINDOWS_PROJECTS += vsprojects/compile_test/compile_test.vcproj
+compile_test_SOURCES = $(nodist_googleinclude_HEADERS) \
+                       src/tests/compile_test.cc
+compile_test_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
+compile_test_LDFLAGS = $(PTHREAD_CFLAGS)
+compile_test_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
+compile_nothreads_test_SOURCES = $(compile_test_SOURCES)
+compile_nothreads_test_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
+compile_nothreads_test_LDADD = libctemplate_nothreads_debug.la
 
 TESTS += template_test_util_test template_test_util_nothreads_test
 WINDOWS_PROJECTS += vsprojects/template_test_util_test/template_test_util_test.vcproj
@@ -280,7 +312,7 @@ TESTDATA += \
    src/tests/htmlparser_testdata/javascript_attribute.html \
    src/tests/htmlparser_testdata/javascript_block.html \
    src/tests/htmlparser_testdata/javascript_regexp.html \
-   src/tests/htmlparser_testdata/line_count.html \
+   src/tests/htmlparser_testdata/position.html \
    src/tests/htmlparser_testdata/reset.html \
    src/tests/htmlparser_testdata/simple.html \
    src/tests/htmlparser_testdata/tags.html
@@ -299,11 +331,13 @@ generate_fsm_c_test_SOURCES = src/tests/generate_fsm_c_test.c
 generate_fsm_c_test_DEPENDENCIES = src/tests/htmlparser_testdata/sample_fsm.c
 generate_fsm_c_test_CXXFLAGS = -xc
 
+# This is something only maintainers need (since they're the only ones
+# who generate .h or .c files from .config files).
 generate_fsm_test_sh: $(top_srcdir)/src/tests/generate_fsm_test.sh \
                       $(top_srcdir)/src/tests/htmlparser_testdata/sample_fsm.config \
                       $(top_srcdir)/src/tests/htmlparser_testdata/sample_fsm.c \
                       $(top_srcdir)/src/htmlparser/generate_fsm.py
-	$(top_srcdir)/src/tests/generate_fsm_test.sh $(top_builddir)
+	$(top_srcdir)/src/tests/generate_fsm_test.sh $(top_srcdir)
 TESTDATA += \
    src/tests/htmlparser_testdata/sample_fsm.config \
    src/tests/htmlparser_testdata/sample_fsm.c
@@ -341,10 +375,14 @@ libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
 # In addition to the normal stuff, we include all the windows-specific
 # code, and also the code used to generate the html-parser fsm files.
+# NOTE: BUILT_SOURCES should come after the .config files, so they
+# come later (and thus end up with a later timestamp) when we tar/untar.
 EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb \
 	$(SCRIPTS) $(TESTDATA) libtool \
-	src/htmlparser/README src/htmlparser/generate_fsm.py \
-	src/htmlparser/README src/htmlparser/fsm_config.py \
-	src/htmlparser/htmlparser_fsm.config src/htmlparser/htmlparser_fsm.cc \
-	src/htmlparser/jsparser_fsm.config src/htmlparser/jsparser_fsm.cc \
+	src/htmlparser/README \
+	src/htmlparser/generate_fsm.py src/htmlparser/fsm_config.py \
+	src/tests/statemachine_test_fsm.config \
+	src/htmlparser/htmlparser_fsm.config \
+	src/htmlparser/jsparser_fsm.config \
+	$(BUILT_SOURCES) \
 	src/windows $(WINDOWS_PROJECTS) src/solaris/libstdc++.la contrib

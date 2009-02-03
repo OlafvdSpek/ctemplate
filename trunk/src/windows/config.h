@@ -15,12 +15,18 @@
 /* the location of <hash_set> */
 #define HASH_SET_H  <hash_set>
 
+/* Define to 1 if you have the <byteswap.h> header file. */
+#undef HAVE_BYTESWAP_H
+
 /* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
    */
 #undef HAVE_DIRENT_H
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
+
+/* Define to 1 if you have the <endian.h> header file. */
+#undef HAVE_ENDIAN_H
 
 /* Define to 1 if you have the `getopt_long' function. */
 #undef HAVE_GETOPT_LONG
@@ -33,6 +39,12 @@
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
+
+/* Define to 1 if you have the <libkern/OSByteOrder.h> header file. */
+#undef HAVE_LIBKERN_OSBYTEORDER_H
+
+/* Define to 1 if you have the <machine/endian.h> header file. */
+#undef HAVE_MACHINE_ENDIAN_H
 
 /* Define to 1 if you have the <memory.h> header file. */
 #define HAVE_MEMORY_H  1
@@ -61,9 +73,18 @@
 /* Define to 1 if you have the <string.h> header file. */
 #define HAVE_STRING_H  1
 
+/* Define to 1 if you have the <sys/byteorder.h> header file. */
+#undef HAVE_SYS_BYTEORDER_H
+
 /* Define to 1 if you have the <sys/dir.h> header file, and it defines `DIR'.
    */
 #undef HAVE_SYS_DIR_H
+
+/* Define to 1 if you have the <sys/endian.h> header file. */
+#undef HAVE_SYS_ENDIAN_H
+
+/* Define to 1 if you have the <sys/isa_defs.h> header file. */
+#undef HAVE_SYS_ISA_DEFS_H
 
 /* Define to 1 if you have the <sys/ndir.h> header file, and it defines `DIR'.
    */
@@ -94,10 +115,10 @@
 #undef HAVE___ATTRIBUTE__
 
 /* Define to 1 if the system has the type `__uint32. */
-#define HAVE___UINT32  1
+#define HAVE___INT32  1
 
 /* Define to 1 if the system has the type `__uint64. */
-#define HAVE___UINT64  1
+#define HAVE___INT64  1
 
 /* The namespace to put the htmlparser code. */
 #define HTMLPARSER_NAMESPACE  google_ctemplate_streamhtmlparser

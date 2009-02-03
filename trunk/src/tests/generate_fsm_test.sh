@@ -47,17 +47,20 @@ GENERATE_FSM="$TEST_SRCDIR/src/htmlparser/generate_fsm.py"
 EXPECTED="`cat $OUTPUT_FILE`"
 if [ -z "$EXPECTED" ]; then die "Error reading $OUTPUT_FILE"; fi
 
-GENERATED="`python $GENERATE_FSM $INPUT_FILE`"
-if [ -z "$GENERATED" ]; then die "Error running $GENERATE_FSM"; fi
+# We could test different versions of python here, if we wanted
+for PYTHON in "python"; do
+  GENERATED="`$PYTHON $GENERATE_FSM $INPUT_FILE`"
+  if [ -z "$GENERATED" ]; then die "Error running $GENERATE_FSM"; fi
 
-if [ "$EXPECTED" != "$GENERATED" ]; then
-  echo "Test failed" 1>&2
-  echo "-- EXPECTED --" 1>&2
-  echo "$EXPECTED" 1>&2
-  echo "-- GENERATED --"  1>&2
-  echo "$GENERATED" 1>&2
-  echo "--"
-  exit 1
-fi
+  if [ "$EXPECTED" != "$GENERATED" ]; then
+    echo "Test failed ($PYTHON $GENERATE_FSM $INPUT_FILE)" 1>&2
+    echo "-- EXPECTED --" 1>&2
+    echo "$EXPECTED" 1>&2
+    echo "-- GENERATED --"  1>&2
+    echo "$GENERATED" 1>&2
+    echo "--"
+    exit 1
+  fi
+done
 
 echo "PASS"

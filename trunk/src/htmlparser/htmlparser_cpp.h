@@ -64,6 +64,8 @@ class HtmlParser {
       STATE_ATTR = HTMLPARSER_STATE_ATTR,
       STATE_VALUE = HTMLPARSER_STATE_VALUE,
       STATE_COMMENT = HTMLPARSER_STATE_COMMENT,
+      STATE_JS_FILE = HTMLPARSER_STATE_JS_FILE,
+      STATE_CSS_FILE = HTMLPARSER_STATE_CSS_FILE,
       STATE_ERROR = HTMLPARSER_STATE_ERROR
     };
 
@@ -79,7 +81,9 @@ class HtmlParser {
     /* Parser modes */
     enum Mode {
       MODE_HTML = HTMLPARSER_MODE_HTML,
-      MODE_JS = HTMLPARSER_MODE_JS
+      MODE_JS = HTMLPARSER_MODE_JS,
+      MODE_CSS = HTMLPARSER_MODE_CSS,
+      MODE_HTML_IN_TAG = HTMLPARSER_MODE_HTML_IN_TAG
     };
 
     HtmlParser() {
@@ -150,6 +154,15 @@ class HtmlParser {
       return static_cast<bool>(htmlparser_in_js(parser_));
     }
 
+    /* Returns true if the parser is currently inside a CSS construct.
+     *
+     * Currently this can be either a STYLE tag, a STYLE attribute or the fact
+     * that the parser was reset using MODE_CSS using ResetMode().
+     */
+    bool InCss() const {
+      return static_cast<bool>(htmlparser_in_css(parser_));
+    }
+
     /* Returns true if the current attribute is quoted */
     bool IsAttributeQuoted() const {
       return static_cast<bool>(htmlparser_is_attr_quoted(parser_));
@@ -190,6 +203,16 @@ class HtmlParser {
       return htmlparser_set_line_number(parser_, line);
     }
 
+    /* Return the current column number. */
+    int column_number() const {
+      return htmlparser_get_column_number(parser_);
+    }
+
+    /* Set the current line number. */
+    void set_column_number(int column) {
+      return htmlparser_set_column_number(parser_, column);
+    }
+
     /* Retrieve a human readable error message in case an error occurred.
      *
      * NULL is returned if the parser didn't encounter an error.
@@ -214,6 +237,11 @@ class HtmlParser {
      * Available modes:
      *  MODE_HTML - Parses html text
      *  MODE_JS - Parses javascript files
+     *  MODE_CSS - Parses CSS files. No actual parsing is actually done
+     *             but InCss() always returns true.
+     *  MODE_HTML_IN_TAG - Parses an attribute list inside a tag. To
+     *                     be used in a template expanded in the
+     *                     following context: <a $template>
      */
     void ResetMode(enum Mode mode) {
       return htmlparser_reset_mode(parser_, mode);

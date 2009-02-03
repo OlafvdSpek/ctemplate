@@ -111,7 +111,7 @@ as <code>11/20/2005</code>, are <b>dictionary values</b>.</p>
        application code to decide how to format the value for
        <code>DATE</code>, and to insert the date into the dictionary
        already formatted. </li>
-  <li> Not all dictionary values must be used by a templete.
+  <li> Not all dictionary values must be used by a template.
        <code>DATE</code> is entirely ignored. </li>
   <li> Not all template elements may exist in the dictionary.  In this
        example, <code>{{META_TAGS}}</code> is not found in the
@@ -122,7 +122,7 @@ as <code>11/20/2005</code>, are <b>dictionary values</b>.</p>
 
 <h3> Templates </h3>
 
-<p> The template language has five types of markers:</p>
+<p> The template language has six types of markers:</p>
 <ol>
   <li> VARIABLE markers, which are replaced by text based on
        dictionary values.  All markers in the above example are
@@ -165,6 +165,13 @@ as <code>11/20/2005</code>, are <b>dictionary values</b>.</p>
        <code>{{=&lt; &gt;=}} &lt;! Now markers are delimited by braces &gt;
              &lt;=| |=&gt;   |! And now markers are delimited by bars! |
        </code></li>
+
+  <li> PRAGMA markers, which invoke additional built-in template
+       features when processing the template. Pragma markers look like
+       this: <code>{{%PRAGMA [name="value"...]}}</code>. Currently,
+       AUTOESCAPE is the only pragma defined, see
+       <a href="#AutoEscape">Auto Escape Mode</a> for using it to
+       enable Auto-Escape for a given template.</li>
 </ol>
 
 <p>These marker types each have their own namespace.  For readability,
@@ -480,7 +487,7 @@ code for a custom modifier:</p>
 </pre>
 
 
-<h3><A NAME="special_sections">Special Section Names</A></h3>
+<h3> <A NAME="special_sections">Special Section Names</A> </h3>
 
 <p>Section names may have a special meaning in the template system.
 Right now, there's one such name.</p>
@@ -533,7 +540,7 @@ never do it.</p>
 there are more, only the last is automatically expanded.</p>
 
 
-<h3><A NAME="AutoEscape">Auto Escape Mode</A></h3>
+<h3> <A NAME="AutoEscape">Auto Escape Mode</A> </h3>
 
 <p>The Auto Escape mode helps protect against cross-site scripting (XSS)
 attacks in web-applications by automatically applying escaping
@@ -541,13 +548,53 @@ modifiers to your variables. Refer to
 <a href="auto_escape.html">Guide to using Auto Escape</a> for
 an overview of Auto Escape as well as its limitations.</p>
 
-<p>To use the Auto Escape mode, call
-<code>google::Template::GetTemplateWithAutoEscaping()</code> instead of
-<code>google::Template::GetTemplate()</code>.  In addition to the template
-name, you will have to specify the <i>context</i> your template is in,
-usually <code>TC_HTML</code>.  See <code>template.h</code> for the
-possible values and their meanings.</p>
+<p>Auto Escape may be enabled in one of two ways:</p>
 
+<ol>
+  <li> <p>Programmatically: Load a template by calling
+       <code>google::Template::GetTemplateWithAutoEscaping()</code>
+       instead of <code>google::Template::GetTemplate()</code>.  The given
+       template - as well as all templates it may include - will be
+       automatically escaped.  In addition to the template name, you
+       will have to specify the <i>context</i> your template is in,
+       usually <code>TC_HTML</code>.  See <code>template.h</code> for
+       the possible values and their meanings.</p></li>
+
+  <li> <p>In Template: Add the AUTOESCAPE pragma marker to the desired
+       template.  That template will then be automatically escaped,
+       independently of the templates it may include or it may be
+       included from. The AUTOESCAPE pragma must be placed at the top
+       of the template and has the following syntax:</p>
+       <pre>
+       {{%AUTOESCAPE context="CONTEXT" [state="STATE"]}}
+       </pre>
+
+       <p>Description of the pragma:</p>
+       <ul>
+         <li> The context attribute is one of <code>HTML</code>,
+              <code>JAVASCRIPT</code>, <code>CSS</code>,
+              <code>JSON</code> or <code>XML</code> and has the same
+              meaning as the corresponding context given to
+              <code>google::Template::GetTemplateWithAutoEscaping()</code>.</li>
+         <li> The state attribute is commonly omitted.  It accepts the 
+              value <code>IN_TAG</code> in the <code>HTML</code> context
+              to indicate that the template only contains (one or more)
+              HTML attribute name and value pairs that are part of an
+              HTML tag formed in a parent template.
+       </ul>
+
+       <p>Example: To enable Auto Escape for an HTML template, add
+       this pragma at the top of the template:</p>
+       <pre>
+       {{%AUTOESCAPE context="HTML"}}
+       </pre>
+
+       <p>This method is particularly convenient when gradually
+       migrating an existing web-application to Auto Escape.
+       Note that the pragma is ignored when the template is obtained
+       via a call to <code>google::Template::GetTemplateWithAutoEscaping()</code>.
+       </p></li>
+</ol>
 
 <h3> <A NAME="inheritence">Details on Dictionary Lookup</A> </h3>
 
@@ -981,9 +1028,9 @@ If <code>output</code> was not empty before calling
 <code>ExpandWithData()</code>, that allows you to pass in per-expand
 data.  It's called like this:</p>
 <pre>
-   Template* tpl = Template::GetTemplate(...);
+   Template* tpl = google::Template::GetTemplate(...);
    TemplateDictionary dict(...);
-   ctemplate::PerExpandData per_expand_data;
+   google::ctemplate::PerExpandData per_expand_data;
    string output;
    tpl->ExpandWithData(&amp;output, &amp;dict, &amp;per_expand_data);
 </pre>
@@ -1047,38 +1094,36 @@ the appropriate method on a PerExpandData object:</p>
 </ul>
 
 
-<h3> Getting a Template From a String Rather Than a File </h3>
+<h3> <A name="string">Getting a Template From a String Rather Than a File</A> </h3>
 
 <p>The <code>Template</code> class includes a
-<code>RegisterStringAsTemplate()</code> static method for when you
+<code>StringToTemplate()</code> static method for when you
 want your template to be built into the executable rather than read
-from a file.  <code>RegisterStringAsTemplate()</code> inserts a string
-into the internal template cache and returns the newly constructed
-<code>Template</code> object or NULL if there was an error during
-parsing.  Later calls to <code>GetTemplate()</code> or
-<code>GetTemplateWithAutoEscaping()</code> with the same <i>(filename,
-strip, context)</i> key will retrieve the same <code>Template</code>
-object&mdash;including those performed implicitly by
-<code>{{>include}}</code>.  The <code>filename</code> passed to
-<code>RegisterStringAsTemplate()</code> is only used to form the cache
-key and no file operations are actually performed.  You should use the
-context <code>TC_MANUAL</code> for content intended for the
-non-autoescaping <code>GetTemplate()</code> method.</p>
+from a file.  <code>StringToTemplate()</code> parses the string you
+pass in as if it were a template file, and returns a
+<code>Template*</code> object (assuming the parsing was successful).
+This object is not cached nor is it owned by the template system; you
+should delete it when you are done.</p>
 
-<p>Future calls to <code>RegisterStringAsTemplate()</code> with the
-same cache key will have no effect, and will return the template
-formed during the first call.  <code>ReloadIfChanged()</code> has no
-effect on string-based templates.  The only way to change the string
+<p>Another string-to-template method is the static method
+<code>StringToTemplateCache</code>.  Unlike
+<code>StringToTemplate</code>, it does not return a
+<code>Template*</code>, instead it inserts the parsed string into the
+internal template cache, where it can be retrieved via the normal
+<code>GetTemplate</code> call.  This is useful when you want to
+retrieve this template repeatedly in different contexts, and also when
+you want to include this template inside another template (for
+instance, via <code>{{>TEMPLATE_THAT_COMES_FROM_A_STRING}}</code>).
+The latter is possible because <code>StringToTemplateCache</code>
+takes a "key", which you can later pass in to
+<code>TemplateDictionary::SetFilename()</code> in order to set up the
+template-include.</p>
+
+<p>Future calls to <code>StringToTemplateCache()</code> with the same
+key will have no effect.  <code>ReloadIfChanged()</code> has no effect
+on string-based templates.  The only way to change the string
 associated with a given filename/key, is to call
-<code>Template::ClearCache()</code>.</p>
-
-<p>(As a special case, if you call
-<code>RegisterStringAsTemplate()</code> with the empty string as the
-cache key, it will create and return a template without caching it.
-In that case, and that case only, the caller takes responsibility for
-deleting the template object.  Because the memory ownership issue is
-confusing in this case, it's recommended that you avoid this feature
-if at all possible.)</p>
+<code>google::Template::ClearCache()</code>.</p>
 
 <p>Prefer file-based to string-based templates where possible.
 Updating a file-based template requires merely a data push, rather
@@ -1115,7 +1160,7 @@ different.  Computing the values is slow.  Here's how you can use
 </ol>
 
 
-<h2><A NAME="Security">Security Considerations</h2>
+<h2> <A NAME="Security">Security Considerations</A> </h2>
 
 <p>Like all web applications, programs that use the Google Template System
 to create HTML documents can be vulnerable to Cross-Site-Scripting (XSS)

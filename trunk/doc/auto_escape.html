@@ -196,14 +196,14 @@ the failure.</p>
 
 <tr bgcolor="AliceBlue">
   <td>In STYLE attribute</td><td>Yes</td>
-  <td><pre>&lt;div style="{{STYLE}}"&gt;</pre></td>
-  <td>Escape <code>STYLE</code> using 
+  <td><pre>&lt;div style="color:{{COLOR}};"&gt;</pre></td>
+  <td>Escape <code>COLOR</code> using 
       <code>:cleanse_css</code></td>
 </tr>
 
 <tr bgcolor="AliceBlue">
   <td>In STYLE attribute</td><td>No</td>
-  <td><pre>&lt;div style={{STYLE}}&gt;</pre></td>
+  <td><pre>&lt;div style=color:{{COLOR}};&gt;</pre></td>
   <td><em>Fail template initialization</em></td>
 </tr>
 
@@ -238,7 +238,7 @@ the failure.</p>
   <td>In all other attributes</td><td>No</td>
   <td><pre>&lt;table border={{BORDER}}&gt;</pre></td>
   <td>Escape <code>BORDER</code> using 
-      <code>::html_escape_with_arg=attribute</code></td>
+      <code>:html_escape_with_arg=attribute</code></td>
 </tr>
 
 <tr bgcolor="AntiqueWhite">
@@ -254,7 +254,14 @@ the failure.</p>
   <td>Escape <code>VALUE</code> using 
       <code>:javascript_escape_with_arg=number</code></td>
 </tr>
-    
+
+<tr bgcolor="AliceBlue">
+  <td>In a &lt;style&gt; tag</td><td>Any</td>
+  <td><pre>&lt;style&gt;font-size={{FONTSIZE}};&lt;/style&gt;</pre></td>
+  <td>Escape <code>FONTSIZE</code> using 
+      <code>:cleanse_css</code></td>
+</tr>
+
 </table>
 
 <p><h4>Comments:</h4>
@@ -351,7 +358,7 @@ restrictions governing the use of this template system.</p>
         <tr><td>TC_XML</td>
             <td><code>:xml_escape</code></td></tr>
         <tr><td>TC_CSS</td>
-            <td>Same escaping as for TC_HTML</code></td></tr>
+            <td><code>:cleanse_css</code></td></tr>
         </table></li>
         
   <li> <p>New restrictions on the use of <code>BI_SPACE</code> and

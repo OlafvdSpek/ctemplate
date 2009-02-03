@@ -11,8 +11,13 @@
     <body blah='<?state state=value, tag=body, attr=blah, attr_type=regular
       ?>'>
 
+      <style>
+        <?state in_css=true?>
+      </style>
+      <?state in_css=false?>
+
       <h1 onclick="<?state state=value, tag=h1, attr=onclick, attr_type=js,
-        in_js=true ?>">
+        in_js=true ?>" style="<?state in_css=true?>" <?state in_css=false?>>
         <?state state=text, tag=h1?>
       </h1>
 

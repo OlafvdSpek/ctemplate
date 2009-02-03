@@ -53,144 +53,18 @@ namespace HTMLPARSER_NAMESPACE {
 
 #define MAX_CHAR_8BIT 256
 
-/* Makes all outgoing transitions from state source to point dest.
- */
-static void statetable_fill(int **st, int source, int dest)
-{
-    int c;
-
-    assert(st != NULL);
-    for (c = 0; c < MAX_CHAR_8BIT; c++)
-        st[source][CAST(unsigned char, c)] = dest;
-}
-
-/* Creates a transition from state source to state dest for input chr.
- */
-static void statetable_set(int **st, int source, char chr, int dest)
-{
-    assert(st != NULL);
-    st[source][CAST(unsigned char, chr)] = dest;
-}
-
-/* Creates a transition from state source to state dest for the range of
- * characters between start_chr and end_chr.
- */
-static void statetable_set_range(int **st, int source, char start_chr,
-                                 char end_chr, int dest)
-{
-    int c;
-
-    assert(st != NULL);
-    for (c = start_chr; c <= end_chr; c++)
-        statetable_set(st, source, c, dest);
-}
-
-/* Creates a transition between state source and dest for an input element
- * that matches the bracket expression expr.
- *
- * The bracket expression is similar to grep(1) or regular expression bracket
- * expressions but it does not support the negation (^) modifier or named
- * character classes like [:alpha:] or [:alnum:].
- */
-static void statetable_set_expression(int **st, int source, const char *expr,
-                                      int dest)
-{
-    const char *next;
-
-    assert(st != NULL);
-    while (*expr != '\0') {
-        next = expr + 1;
-        if (*next == '-') {
-            next++;
-            if (*next != '\0') {
-                statetable_set_range(st, source, *expr, *next, dest);
-                expr = next;
-            } else {
-                statetable_set(st, source, '-', dest);
-                statetable_set(st, source, *expr, dest);
-                return;
-            }
-        } else {
-            statetable_set(st, source, *expr, dest);
-        }
-        expr++;
-    }
-}
-
-/* Receives a rule list specified by struct statetable_transitions_s and
- * populates the state table.
- *
- * Example:
- *  struct state_transitions_s transitions[] {
- *      "[:default:]", STATE_I_COMMENT_OPEN, STATE_I_COMMENT,
- *      ">",           STATE_I_COMMENT_OPEN, STATE_I_TEXT,
- *      "-",           STATE_I_COMMENT_OPEN, STATE_I_COMMENT_IN,
- *      NULL, NULL, NULL
- *  };
- *
- * The rules are evaluated in reverse order. :default: is a special expression
- * that matches any input character and if used must be the first rule for a
- * specific state.
- *
- * Also receives an optional argument state_names pointing to a list of strings
- * containing human readable state names. These strings are used when reporting
- * error messages.
+/* Populates the statemachine definition.
  */
 void statemachine_definition_populate(statemachine_definition *def,
-                                      const struct statetable_transitions_s *tr,
-                                      const char **state_names)
+                                      const int* const* transition_table,
+                                      const char* const* state_names)
 {
   assert(def != NULL);
-  assert(tr != NULL);
+  assert(transition_table != NULL);
 
-  while (tr->condition != 0) {
-    if (strcmp(tr->condition, "[:default:]") == 0)
-      statetable_fill(def->transition_table, tr->source, tr->destination);
-    else
-      statetable_set_expression(def->transition_table, tr->source,
-                                tr->condition, tr->destination);
-    tr++;
-  }
+  def->transition_table = transition_table;
 
   def->state_names = state_names;
-}
-
-/* Initializes a new statetable with a predefined limit of states.
- * Returns the state table object or NULL if the initialization failed, in
- * which case there is no guarantees that this statetable was fully deallocated
- * from memory. */
-static int **statetable_new(int states)
-{
-    int i;
-    int c;
-    /* TODO(falmeida): Just receive statemachine_definition directly */
-    int **state_table;
-    state_table = CAST(int **, malloc(states * sizeof(int **)));
-    if (!state_table)
-      return NULL;
-
-    for (i = 0; i < states; i++) {
-        state_table[i] = CAST(int *, malloc(MAX_CHAR_8BIT * sizeof(int)));
-        if (!state_table[i])
-          return NULL;
-
-        for (c = 0; c < MAX_CHAR_8BIT; c++)
-            state_table[i][c] = STATEMACHINE_ERROR;
-    }
-    return state_table;
-}
-
-/* Called to deallocate the state table array.
- */
-static void statetable_delete(int **state_table, int states)
-{
-    int i;
-
-    assert(state_table != NULL);
-    for (i = 0; i < states; i++)
-        free(state_table[i]);
-
-    free(state_table);
 }
 
 /* Add's the callback for the event in_state that is called when the
@@ -254,11 +128,6 @@ statemachine_definition *statemachine_definition_new(int states)
     if (def == NULL)
       return NULL;
 
-    def->transition_table = statetable_new(states);
-    if (def->transition_table == NULL)
-      return NULL;
-
-
     def->in_state_events = CAST(state_event_function *,
                                 calloc(states, sizeof(state_event_function)));
     if (def->in_state_events == NULL)
@@ -285,7 +154,6 @@ statemachine_definition *statemachine_definition_new(int states)
 void statemachine_definition_delete(statemachine_definition *def)
 {
     assert(def != NULL);
-    statetable_delete(def->transition_table, def->num_states);
     free(def->in_state_events);
     free(def->enter_state_events);
     free(def->exit_state_events);
@@ -350,7 +218,8 @@ void statemachine_reset(statemachine_ctx *ctx)
   ctx->record_buffer[0] = '\0';
   ctx->record_pos = 0;
   ctx->recording = 0;
-  ctx->lineno = 1;
+  ctx->line_number = 1;
+  ctx->column_number = 1;
 }
 
 /* Initializes a new statemachine. Receives a statemachine definition object
@@ -515,7 +384,7 @@ static void statemachine_set_transition_error_message(statemachine_ctx *ctx)
 int statemachine_parse(statemachine_ctx *ctx, const char *str, int size)
 {
     int i;
-    int **state_table = ctx->definition->transition_table;
+    const int* const* state_table = ctx->definition->transition_table;
     statemachine_definition *def;
 
     assert(ctx !=NULL &&
@@ -571,9 +440,12 @@ int statemachine_parse(statemachine_ctx *ctx, const char *str, int size)
  * ctx->next_state and we need this functionality */
 
         ctx->current_state = ctx->next_state;
+        ctx->column_number++;
 
-        if (*str == '\n')
-          ctx->lineno++;
+        if (*str == '\n') {
+          ctx->line_number++;
+          ctx->column_number = 1;
+        }
         str++;
     }
 

@@ -3,13 +3,20 @@
 #include "config_for_unittests.h"
 #include <stdio.h>
 #include <assert.h>
+#include <string>
 #include <vector>
+#include "base/arena.h"
 #include "tests/template_test_util.h"
 #include <google/template_dictionary.h>
+#include <google/template_string.h>
 
 using std::vector;
+using std::string;
 using GOOGLE_NAMESPACE::TemplateDictionary;
 using GOOGLE_NAMESPACE::TemplateDictionaryPeer;
+using GOOGLE_NAMESPACE::TemplateString;
+using GOOGLE_NAMESPACE::StaticTemplateString;
+using GOOGLE_NAMESPACE::UnsafeArena;
 
 namespace {
 
@@ -215,6 +222,29 @@ void Test_TemplateTestUtilTest_GetFilename() {
   EXPECT_STREQ("included_filename", child_peer.GetFilename());
 }
 
+StaticTemplateString GetTestTemplateString(UnsafeArena* arena) {
+  string will_go_out_of_scope("VALUE");
+  // We want to ensure that the STS_INIT_FOR_TEST macro:
+  // - Can produce a StaticTemplateString (guard again its format changing).
+  // - Produces a StaticTemplateString that is still valid after the string
+  //   used to initialize it goes out-of-scope.
+  StaticTemplateString sts = STS_INIT_FOR_TEST(will_go_out_of_scope.c_str(),
+                                               will_go_out_of_scope.length(),
+                                               arena);
+  return sts;
+}
+
+void Test_TemplateUtilTest_InitStaticTemplateStringForTest() {
+  UnsafeArena arena(1024);
+  StaticTemplateString kValue = GetTestTemplateString(&arena);
+
+  TemplateDictionary dict("test_GetSectionValue");
+  dict.SetValue(kValue, "value");
+
+  TemplateDictionaryPeer peer(&dict);
+  EXPECT_STREQ("value", peer.GetSectionValue(kValue));
+}
+
 }  // namespace anonymous
 
 int main(int argc, char **argv) {
@@ -224,6 +254,7 @@ int main(int argc, char **argv) {
   Test_GetIncludeDictionaries();
   Test_GetIncludeAndSectionDictionaries();
   Test_TemplateTestUtilTest_GetFilename();
+  Test_TemplateUtilTest_InitStaticTemplateStringForTest();
 
   printf("PASS\n");
   return 0;

@@ -42,6 +42,12 @@
 _START_GOOGLE_NAMESPACE_
 
 class TemplateDictionary;
+class TemplateString;
+
+// Call this to create a StaticTemplateString for testing when the ptr is
+// not guaranteed to be allocated for the entire length of the test.
+#define STS_INIT_FOR_TEST(ptr, len, arena) \
+  { { arena->Memdup(ptr, len), len, TemplateString(ptr, len).GetGlobalId() } };
 
 class TemporaryRegisterTemplate {
  public:
@@ -72,10 +78,10 @@ class TemplateDictionaryPeer {
       : dict_(dict) {}
 
   // Returns the value for the named variable.
-  const char* GetSectionValue(const std::string& variable) const;
+  const char* GetSectionValue(const TemplateString& variable) const;
 
   // Returns true if the named section is hidden.
-  bool IsHiddenSection(const std::string& name) const;
+  bool IsHiddenSection(const TemplateString& name) const;
 
   // Retrieves TemplateDictionary instances for the given section name.  The
   // caller does not assume ownership of the returned TemplateDictionary
@@ -85,7 +91,7 @@ class TemplateDictionaryPeer {
   // NOTE: This method assumes that old-style template dictionaries are not in
   // use.  That is, it assumes that all section dictionaries have been added
   // with AddSectionDictionary rather than AddOldstyleSectionDictionary.
-  int GetSectionDictionaries(const std::string& section_name,
+  int GetSectionDictionaries(const TemplateString& section_name,
                              std::vector<const TemplateDictionary*>* dicts) const;
 
   // Retrieves included TemplateDictionary instances for the given name.  The
@@ -96,7 +102,7 @@ class TemplateDictionaryPeer {
   // NOTE: This method assumes that old-style template dictionaries are not in
   // use.  That is, it assumes that all section dictionaries have been added
   // with AddIncludeDictionary rather than AddOldstyleIncludeDictionary.
-  int GetIncludeDictionaries(const std::string& section_name,
+  int GetIncludeDictionaries(const TemplateString& section_name,
                              std::vector<const TemplateDictionary*>* dicts) const;
 
   // Returns the filename associated with the TemplateDictionary.

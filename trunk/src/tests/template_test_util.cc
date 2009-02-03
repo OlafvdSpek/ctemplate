@@ -34,6 +34,7 @@
 #include "tests/template_test_util.h"
 #include <google/template_dictionary.h>
 #include <google/template_namelist.h>
+#include <google/template_string.h>
 
 #include <string>
 #include <vector>
@@ -57,17 +58,19 @@ TemporaryRegisterTemplate::~TemporaryRegisterTemplate() {
   TemplateNamelist::namelist_ = old_namelist_;
 }
 
-const char* TemplateDictionaryPeer::GetSectionValue(const string& variable)
+const char* TemplateDictionaryPeer::GetSectionValue(
+    const TemplateString& variable)
     const {
   return dict_->GetSectionValue(variable);
 }
 
-bool TemplateDictionaryPeer::IsHiddenSection(const string& name) const {
+bool TemplateDictionaryPeer::IsHiddenSection(
+    const TemplateString& name) const {
   return dict_->IsHiddenSection(name);
 }
 
 int TemplateDictionaryPeer::GetSectionDictionaries(
-    const string& section_name,
+    const TemplateString& section_name,
     vector<const TemplateDictionary*>* dicts) const {
   dicts->clear();
   if (dict_->IsHiddenSection(section_name))
@@ -83,7 +86,7 @@ int TemplateDictionaryPeer::GetSectionDictionaries(
 }
 
 int TemplateDictionaryPeer::GetIncludeDictionaries(
-    const string& section_name,
+    const TemplateString& section_name,
     vector<const TemplateDictionary*>* dicts) const {
   dicts->clear();
   if (dict_->IsHiddenTemplate(section_name))

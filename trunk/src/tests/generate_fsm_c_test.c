@@ -48,6 +48,7 @@ enum states  {
 int main()
 {
   (void)stringparser_states_internal_names;
+  (void)stringparser_state_transitions;
   printf("DONE.\n");
   exit(0);
 }

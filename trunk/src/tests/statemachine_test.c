@@ -43,6 +43,17 @@
 using namespace HTMLPARSER_NAMESPACE;
 #endif
 
+enum {
+  SIMPLE_STATE_A,
+  SIMPLE_STATE_B,
+  SIMPLE_STATE_C,
+  SIMPLE_STATE_D,
+  SIMPLE_STATE_ERROR_TEST
+};
+
+/* Include the test state machine definition. */
+#include "statemachine_test_fsm.h"
+
 /* Taken from google templates */
 
 #define ASSERT(cond)  do {                                      \
@@ -80,10 +91,6 @@ using namespace HTMLPARSER_NAMESPACE;
 /* To simply the tests */
 #define statemachine_parse_str(a,b) statemachine_parse(a, b, (int)strlen(b));
 
-enum state_list {
-    A, B, C, D, E, F, ERROR
-};
-
 /* Simple state machine test. */
 int test_simple()
 {
@@ -92,34 +99,21 @@ int test_simple()
   def = statemachine_definition_new(NUM_STATES);
   sm = statemachine_new(def, NULL);
 
-  struct statetable_transitions_s transitions[] = {
-    { "[:default:]", A, A },
-    { "1", A, B },
-    { "[:default:]", B, B },
-    { "1", B, C },
-    { "2", B, A },
-    { "[:default:]", C, C },
-    { "1", C, D },
-    { "2", C, B },
-    { "[:default:]", D, D },
-    { "2", D, C },
-    { NULL, ERROR, ERROR }
-  };
-
-  statemachine_definition_populate(def, transitions, NULL);
-  ASSERT(sm->current_state == A);
+  statemachine_definition_populate(def, simple_state_transitions,
+                                   simple_states_internal_names);
+  ASSERT(sm->current_state == SIMPLE_STATE_A);
 
   statemachine_parse(sm, "001", 3);
-  ASSERT(sm->current_state == B);
+  ASSERT(sm->current_state == SIMPLE_STATE_B);
 
   statemachine_parse(sm, "001", 3);
-  ASSERT(sm->current_state == C);
+  ASSERT(sm->current_state == SIMPLE_STATE_C);
 
   statemachine_parse(sm, "2", 1);
-  ASSERT(sm->current_state == B);
+  ASSERT(sm->current_state == SIMPLE_STATE_B);
 
   statemachine_parse(sm, "11", 2);
-  ASSERT(sm->current_state == D);
+  ASSERT(sm->current_state == SIMPLE_STATE_D);
 
   statemachine_delete(sm);
   return 0;
@@ -131,29 +125,18 @@ int test_error()
   statemachine_definition *def;
   statemachine_ctx *sm;
   int res;
-  const char *state_names[] = {
-    "A",
-    "B",
-    "C"
-  };
-  struct statetable_transitions_s transitions[] = {
-    { "[:default:]", A, A },
-    { "1", A, B },
-    { "1", B, C },
-    { "2", B, A },
-    { NULL, ERROR, ERROR }
-  };
 
   def = statemachine_definition_new(NUM_STATES);
   sm = statemachine_new(def, NULL);
 
-  statemachine_definition_populate(def, transitions, NULL);
-  ASSERT(sm->current_state == A);
+  statemachine_definition_populate(def, simple_state_transitions,
+                                   NULL);
+  ASSERT(sm->current_state == SIMPLE_STATE_A);
 
   ASSERT(statemachine_get_error_msg(sm) == NULL);
 
-  res = statemachine_parse_str(sm, "001");
-  ASSERT(sm->current_state == B);
+  res = statemachine_parse_str(sm, "00E");
+  ASSERT(sm->current_state == SIMPLE_STATE_ERROR_TEST);
   ASSERT(sm->current_state == res);
 
   res = statemachine_parse(sm, "3", 1);
@@ -169,17 +152,18 @@ int test_error()
   def = statemachine_definition_new(NUM_STATES);
   sm = statemachine_new(def, NULL);
 
-  statemachine_definition_populate(def, transitions, state_names);
-  ASSERT(sm->current_state == A);
+  statemachine_definition_populate(def, simple_state_transitions,
+                                   simple_states_internal_names);
+  ASSERT(sm->current_state == SIMPLE_STATE_A);
 
-  res = statemachine_parse_str(sm, "001");
-  ASSERT(sm->current_state == B);
+  res = statemachine_parse_str(sm, "00E");
+  ASSERT(sm->current_state == SIMPLE_STATE_ERROR_TEST);
   ASSERT(sm->current_state == res);
 
   res = statemachine_parse(sm, "3", 1);
   ASSERT(res == STATEMACHINE_ERROR);
   ASSERT_STREQ(statemachine_get_error_msg(sm),
-               "Unexpected character '3' in state 'B'");
+               "Unexpected character '3' in state 'error_test'");
 
   statemachine_delete(sm);
 
@@ -187,6 +171,7 @@ int test_error()
 }
 
 /* Tests htmlparser_start_record() and htmlparser_end_record() logic. */
+
 int test_record()
 {
   statemachine_definition *def;
@@ -198,19 +183,13 @@ int test_record()
   def = statemachine_definition_new(NUM_STATES);
   sm = statemachine_new(def, NULL);
 
-  struct statetable_transitions_s transitions[] = {
-    { "[:default:]", A, A },
-    { "1", A, B },
-    { "[:default:]", B, B },
-    { "2", B, A },
-    { NULL, ERROR, ERROR }
-  };
+  statemachine_definition_populate(def, simple_state_transitions,
+                                   simple_states_internal_names);
 
-  statemachine_definition_populate(def, transitions, NULL);
-  ASSERT(sm->current_state == A);
+  ASSERT(sm->current_state == SIMPLE_STATE_A);
 
   res = statemachine_parse_str(sm, "001");
-  ASSERT(sm->current_state == B);
+  ASSERT(sm->current_state == SIMPLE_STATE_B);
   ASSERT(sm->current_state == res);
 
   statemachine_start_record(sm);
@@ -271,34 +250,22 @@ int test_no_ascii()
   def = statemachine_definition_new(NUM_STATES);
   sm = statemachine_new(def, NULL);
 
-  struct statetable_transitions_s transitions[] = {
-    { "[:default:]", A, A },
-    { "\xf1", A, B },
-    { "[:default:]", B, B },
-    { "\xf1", B, C },
-    { "\xf2", B, A },
-    { "[:default:]", C, C },
-    { "\xf1", C, D },
-    { "\xf2", C, B },
-    { "[:default:]", D, D },
-    { "\xf2", D, C },
-    { NULL, ERROR, ERROR }
-  };
+  statemachine_definition_populate(def, simple_state_transitions,
+                                   simple_states_internal_names);
 
-  statemachine_definition_populate(def, transitions, NULL);
-  ASSERT(sm->current_state == A);
+  ASSERT(sm->current_state == SIMPLE_STATE_A);
 
   statemachine_parse(sm, "\xf0\xf0\xf1", 3);
-  ASSERT(sm->current_state == B);
+  ASSERT(sm->current_state == SIMPLE_STATE_B);
 
   statemachine_parse(sm, "\xf0\xf0\xf1", 3);
-  ASSERT(sm->current_state == C);
+  ASSERT(sm->current_state == SIMPLE_STATE_C);
 
   statemachine_parse(sm, "\xf2", 1);
-  ASSERT(sm->current_state == B);
+  ASSERT(sm->current_state == SIMPLE_STATE_B);
 
   statemachine_parse(sm, "\xf1\xf1", 2);
-  ASSERT(sm->current_state == D);
+  ASSERT(sm->current_state == SIMPLE_STATE_D);
 
   statemachine_delete(sm);
   return 0;
@@ -314,101 +281,38 @@ int test_copy()
   def = statemachine_definition_new(NUM_STATES);
   sm1 = statemachine_new(def, NULL);
 
-  struct statetable_transitions_s transitions[] = {
-    { "[:default:]", A, A },
-    { "1", A, B },
-    { "[:default:]", B, B },
-    { "1", B, C },
-    { "2", B, A },
-    { "[:default:]", C, C },
-    { "1", C, D },
-    { "2", C, B },
-    { "[:default:]", D, D },
-    { "2", D, C },
-    { NULL, ERROR, ERROR }
-  };
+  statemachine_definition_populate(def, simple_state_transitions,
+                                   simple_states_internal_names);
 
-  statemachine_definition_populate(def, transitions, NULL);
-  ASSERT(sm1->current_state == A);
+  ASSERT(sm1->current_state == SIMPLE_STATE_A);
 
   sm2 = statemachine_duplicate(sm1, def, NULL);
-  ASSERT(sm2->current_state == A);
+  ASSERT(sm2->current_state == SIMPLE_STATE_A);
 
   statemachine_parse(sm1, "001", 3);
-  ASSERT(sm1->current_state == B);
-  ASSERT(sm2->current_state == A);
+  ASSERT(sm1->current_state == SIMPLE_STATE_B);
+  ASSERT(sm2->current_state == SIMPLE_STATE_A);
 
 
   statemachine_parse(sm1, "001", 3);
   statemachine_parse(sm2, "001", 3);
-  ASSERT(sm1->current_state == C);
-  ASSERT(sm2->current_state == B);
+  ASSERT(sm1->current_state == SIMPLE_STATE_C);
+  ASSERT(sm2->current_state == SIMPLE_STATE_B);
 
   sm3 = statemachine_duplicate(sm2, def, NULL);
-  ASSERT(sm3->current_state == B);
+  ASSERT(sm3->current_state == SIMPLE_STATE_B);
 
   statemachine_parse(sm1, "001", 3);
   statemachine_parse(sm2, "001", 3);
   statemachine_parse(sm3, "002", 3);
-  ASSERT(sm1->current_state == D);
-  ASSERT(sm2->current_state == C);
-  ASSERT(sm3->current_state == A);
+  ASSERT(sm1->current_state == SIMPLE_STATE_D);
+  ASSERT(sm2->current_state == SIMPLE_STATE_C);
+  ASSERT(sm3->current_state == SIMPLE_STATE_A);
 
   statemachine_delete(sm1);
   statemachine_delete(sm2);
   statemachine_delete(sm3);
 
-  return 0;
-}
-
-/* Tests for setting various expressions in state table */
-int test_set_expression()
-{
-  statemachine_definition *def;
-  statemachine_ctx *sm;
-  def = statemachine_definition_new(NUM_STATES);
-  sm = statemachine_new(def, NULL);
-
-  struct statetable_transitions_s transitions[] = {
-    { "[:default:]", A, A },
-    { "1", A, B },
-    { "A-Z:-", A, C },
-
-    { "a-z-", B, D },
-    { "0-9", B, D },
-    { ",\n\r", B, D },
-
-    { NULL, ERROR, ERROR }
-  };
-
-  statemachine_definition_populate(def, transitions, NULL);
-  ASSERT(def->transition_table[A]['\n'] == A);
-
-  ASSERT(def->transition_table[A]['1'] == B);
-  ASSERT(def->transition_table[A]['A'] == C);
-  ASSERT(def->transition_table[A]['D'] == C);
-  ASSERT(def->transition_table[A]['Z'] == C);
-  ASSERT(def->transition_table[A]['-'] == C);
-  ASSERT(def->transition_table[A][':'] == C);
-
-  /* Ensuring that the NULL entry does not
-     accidentally get set */
-  ASSERT(def->transition_table[A][0] == A);
-
-  ASSERT(def->transition_table[B]['f'] == D);
-  ASSERT(def->transition_table[B]['-'] == D);
-
-  ASSERT(def->transition_table[B]['0'] == D);
-  ASSERT(def->transition_table[B]['3'] == D);
-  ASSERT(def->transition_table[B]['9'] == D);
-
-  ASSERT(def->transition_table[B][','] == D);
-  ASSERT(def->transition_table[B]['\n'] == D);
-  ASSERT(def->transition_table[B]['\r'] == D);
-
-  ASSERT(def->transition_table[B][0] == 127);
-
-  statemachine_delete(sm);
   return 0;
 }
 
@@ -465,7 +369,6 @@ int main(int argc, char **argv)
   test_record();
   test_no_ascii();
   test_copy();
-  test_set_expression();
   test_encode_char();
   printf("DONE.\n");
   return 0;

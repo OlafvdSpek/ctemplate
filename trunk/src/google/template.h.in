@@ -166,26 +166,37 @@ class @ac_windows_dllexport@ Template {
   //   this root-directory is prepended to the filename.
   static bool SetTemplateRootDirectory(const std::string& directory);
 
-  // RegisterStringAsTemplate
-  //   Inserts a template into the cache with key FILENAME, to be
-  //   later retrieved by GetTemplate.  Returns the constructed
-  //   template, or NULL on error.
-  //   NOTE: As a special case, if you pass in the empty string as
-  //         "filename", this routine will create and return a
-  //         template, but not cache it.  In this case, and this case
-  //         only, the caller is responsible for deleting the returned
-  //         Template object.  I recommend you avoid this confusing case.
-  static Template *RegisterStringAsTemplate(const std::string& filename,
-                                            Strip strip,
-                                            TemplateContext context,
-                                            const char* content,
-                                            size_t content_len);
-  static Template *RegisterStringAsTemplate(const std::string& filename,
-                                            Strip strip,
-                                            TemplateContext context,
-                                            const std::string& content) {
-    return RegisterStringAsTemplate(filename, strip, context,
-                                    content.data(), content.length());
+  // Parses the string as a template file (e.g. "Hello {{WORLD}}"),
+  // and returns the generated Template object, or NULL on parse
+  // error.  It is the caller's responsibility to free the template
+  // when done.  NOTE: since there is no 'key' associated with these
+  // templates, you cannot use include them inside another template
+  // (via "{{>TEMPLATE_THAT_COMES_FROM_A_STRING}}").  If you need that
+  // functionality, use StringToTemplateCache.
+  static Template* StringToTemplate(const char* content, size_t content_len,
+                                    Strip strip, TemplateContext context);
+  static Template* StringToTemplate(const std::string& content,
+                                    Strip strip, TemplateContext context) {
+    return StringToTemplate(content.data(), content.length(), strip, context);
+  }
+
+  // Parses the string as a template file (e.g. "Hello {{WORLD}}"),
+  // and inserts it into the template cache, so it can later be
+  // retrieved by GetTemplate.  The user specifies a key, which is
+  // passed in to GetTemplate.  (Note the user does not specify strip
+  // or context; those will be specified later in the GetTemplate
+  // call.)  The template system will manage memory for this template.
+  // Returns true if the template was successfully parsed and
+  // submitted to the template cache, or false otherwise.  In particular,
+  // we return false if a string was already cached with the given key.
+  // NOTE: to include this template from within another template (via
+  // "{{>TEMPLATE_THAT_COMES_FROM_A_STRING}}"), the argument you pass
+  // to TemplateDictionary::SetFilename() is the key you used to register
+  // the string-template.
+  static bool StringToTemplateCache(const std::string& key,
+                                    const char* content, size_t content_len);
+  static bool StringToTemplateCache(const std::string& key, const std::string& content) {
+    return StringToTemplateCache(key, content.data(), content.length());
   }
 
   // ReloadAllIfChanged
@@ -198,7 +209,7 @@ class @ac_windows_dllexport@ Template {
 
   // ClearCache
   //   Deletes all the template objects in the cache and all raw
-  //   contents cached from RegisterStringAsTemplate. This should only
+  //   contents cached from StringToTemplateCache. This should only
   //   be done once, just before exiting the program and after all
   //   template expansions are completed. (If you want to refresh the
   //   cache, the correct method to use is ReloadAllIfChanged, not
@@ -268,29 +279,13 @@ class @ac_windows_dllexport@ Template {
   friend class SectionTemplateNode;  // for access to set_state(), ParseState
   friend class TemplateTemplateNode; // for recursive call to Expand()
 
-  typedef std::pair<std::string, int> TemplateCacheKey;
-
-  // Used by GetTemplate and RegisterStringAsTemplate. Constructs the
-  // key to look-up this template in the template cache. The key is
-  // comprised of the name (filename or string identifier), the Strip
-  // and the TemplateContext.
-  static TemplateCacheKey GetTemplateCacheKey(const std::string& name, Strip strip,
-                                              TemplateContext context);
-
   // Performs the actual work for both factory methods
   // GetTemplate and GetTemplateWithAutoEscaping.
+  // See description of member variable selective_autoescape_ for
+  // information on Selective Auto-Escape.
   static Template *GetTemplateCommon(const std::string& filename, Strip strip,
-                                     TemplateContext context);
-
-  // BuildTemplateFromContent
-  //   Helper method used by RegisterStringAsTemplate and
-  //   GetTemplateCommon. Creates a template with empty filename
-  //   [since not present on disk] and builds the tree from the provided
-  //   raw contents.  Returns NULL if parsing failed.
-  static Template* BuildTemplateFromContent(Strip strip,
-                                            TemplateContext context,
-                                            const char* content,
-                                            size_t content_len);
+                                     TemplateContext context,
+                                     bool selective_autoescape);
 
   // AssureGlobalsInitialized
   //   Initializes the global (static) variables the first time it is
@@ -315,12 +310,24 @@ class @ac_windows_dllexport@ Template {
   //   readability without adding to the expanded output.
   //   If context is not TC_MANUAL we enable auto-escaping
   //   for that template and any template it includes.
-  Template(const std::string& filename, Strip strip, TemplateContext context);
+  Template(const std::string& filename, Strip strip, TemplateContext context,
+           bool selective_autoescape);
+
+  // MaybeInitHtmlParser
+  //   In TemplateContexts where the HTML parser is needed, we initialize it
+  //   in the appropriate mode. Also we do a sanity check (cannot fail) on the
+  //   template filename. This function is called at most once for a Template.
+  //   In_tag is only meaningful for TC_HTML: It is true for templates that
+  //   start inside an HTML tag and hence are expected to contain HTML attribute
+  //   name/value pairs only. It is false for standard HTML templates.
+  void MaybeInitHtmlParser(bool in_tag);
 
   // BuildTree
   //   Parses the contents of the file (retrieved via ReloadIfChanged)
   //   and stores the resulting parse structure in tree_.  Returns true
-  //   iff the tree-builder encountered no errors.
+  //   iff the tree-builder encountered no errors.  Note: takes
+  //   ownership of input_buffer, and will delete it.  It should have
+  //   been created via new[].
   bool BuildTree(const char *input_buffer, const char* input_buffer_end);
 
   // Internal version of Expand, used for recursive calls.
@@ -398,9 +405,22 @@ class @ac_windows_dllexport@ Template {
 
   // TC_MANUAL indicates the template is not in auto-escaping mode.
   // other values imply auto-escape mode is enabled.
-  const TemplateContext initial_context_;
+  TemplateContext initial_context_;
   // Non-null if template was initialized in auto_escape mode.
   @ac_htmlparser_namespace@::HtmlParser *htmlparser_;
+
+  // We now support two types of Auto-Escape:
+  // 1. Full-on Auto-Escape where a template and all its included templates
+  //    get auto-escaped. This is the case when the top-level template is
+  //    obtained via GetTemplateWithAutoEscaping, or for string Templates
+  //    via StringToTemplate with an auto-escape template context.
+  // 2. Selective Auto-Escape where only templates which contain the AUTOESCAPE
+  //    pragma {{%AUTOESCAPE ...}} are auto-escaped. The top-level template
+  //    must be obtained via GetTemplate, or for string Templates, via
+  //    StringToTemplate with TC_MANUAL template context.
+  // In the first case, selective_autoescape_ is false, in the second case
+  // it is true. Note: It is propagated as-is from parent to included template.
+  const bool selective_autoescape_;
 
  private:
   // These are helper routines to StripFile.  I would make them static

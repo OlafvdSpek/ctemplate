@@ -94,7 +94,7 @@ _START_GOOGLE_NAMESPACE_
 typedef u_int32_t uint32;
 #elif defined(HAVE_UINT32_T)
 typedef uint32_t uint32;
-#elif defined(HAVE___UINT32)
+#elif defined(HAVE___INT32)
 typedef unsigned __int32 uint32;
 #endif
 

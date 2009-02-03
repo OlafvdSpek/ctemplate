@@ -20,8 +20,9 @@
 
     <!-- Style element with attributes -->
     <style a=b>
-      <b><?state state=text, tag=style, in_js=false?></b>
+      <b><?state state=text, tag=style, in_js=false, in_css=true?></b>
     </style>
+    <?state in_css=false?>
   </head>
 <body>
 <?state state=text, in_js=false ?>
@@ -41,7 +42,7 @@
     <b>
     <?state state=text, tag=textarea ?>
       <i>
-      <?state state=text, tag=textarea ?>
+      <?state state=text, tag=textarea, in_css=false ?>
       <!--
         <?state state=text, tag=textarea ?>
         </textarea>

@@ -30,8 +30,8 @@
 // ---
 // Author:   Frank H. Jernigan
 //
-// This file is deprecated; use Template::RegisterStringAsTemplate
-// instead.
+// This file is deprecated; use Template::StringToTemplate or
+// Template:StringToTemplateCache instead.
 
 #ifndef TEMPLATE_FROM_STRING_H
 #define TEMPLATE_FROM_STRING_H
@@ -48,15 +48,19 @@
 
 namespace google {
 
-// DEPRECATED. Don't use this; use Template::RegisterStringAsTemplate
-// instead.
+// DEPRECATED. Don't use this; use Template::StringToTemplate or
+// StringToTemplateCache instead.
 class CTEMPLATE_DLL_DECL TemplateFromString {
  public:
   static Template *GetTemplate(const std::string& cache_key,
                                const std::string& template_text,
                                Strip strip) {
-    return Template::RegisterStringAsTemplate(cache_key, strip, TC_MANUAL,
-                                              template_text);
+    if (cache_key.empty()) {
+      return Template::StringToTemplate(template_text, strip, TC_MANUAL);
+    } else {
+      Template::StringToTemplateCache(cache_key, template_text);
+      return Template::GetTemplate(cache_key, strip);
+    }
   }
 };
 
