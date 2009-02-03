@@ -11,6 +11,12 @@
 # doesn't define PTHREAD_RWLOCK_INITIALIZER.  Therefore, we don't test
 # that particularly macro.  It's probably best if you don't use that
 # macro in your code either.
+#
+# Note: Cygwin (as of 12/1/08) has a bug in pthread_rwlock, where
+# if you try to acquire a read-lock twice, you get EDEADLCK, where
+# it should succeed.  It would be nice to test for that, but we
+# can't do runtime checks here.  So we just manually fail for CYGWIN.
+# TODO(csilvers): do better.
 
 AC_DEFUN([AC_RWLOCK],
 [AC_CACHE_CHECK(support for pthread_rwlock_* functions,
@@ -18,7 +24,10 @@ ac_rwlock,
 [AC_LANG_SAVE
  AC_LANG_C
  AC_TRY_COMPILE([#define _XOPEN_SOURCE 500
-                 #include <pthread.h>],
+                 #include <pthread.h>
+                 #ifdef __CYGWIN32__
+                 # error Cygwin has a bug in pthread_rwlock; disabling
+                 #endif],
 		[pthread_rwlock_t l; pthread_rwlock_init(&l, NULL);
                  pthread_rwlock_rdlock(&l); 
                  return 0;],

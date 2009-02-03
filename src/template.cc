@@ -89,6 +89,8 @@ using template_modifiers::PrettyPrintOneModifier;
 
 namespace {
 
+typedef pair<string, int> TemplateCacheKey;
+
 // Mutexes protecting the globals below.  First protects
 // template_root_directory_, second protects g_parsed_template_cache
 // as well as g_raw_template_content_cache.
@@ -118,19 +120,32 @@ const char * const kDefaultTemplateDirectory = ctemplate::kCWD;   // "./"
 // Note this name is syntactically impossible for a user to accidentally use.
 const char * const kMainSectionName = "__{{MAIN}}__";
 
+// A TemplateString object that precomputes its hash. This can be
+// useful in places like template filling code, where we'd like to
+// hash the string once then reuse it many times.  This should not be
+// used for filling any part of a template dictionary, since we don't
+// map the id to its corresponding string or manage memory for the
+// string - it is for lookups *only*.
+class HashedTemplateString : public TemplateString {
+ public:
+  HashedTemplateString(const char* s, size_t slen) : TemplateString(s, slen) {
+    CacheGlobalId();
+  }
+};
+
 // Type, var, and mutex used to store template objects in the internal cache
 class TemplateCacheHash {
  public:
   hash<const char *> string_hash_;
   TemplateCacheHash() : string_hash_() {}
-  size_t operator()(const pair<string, int>& p) const {
+  size_t operator()(const TemplateCacheKey& p) const {
     // Using + here is silly, but should work ok in practice
     return string_hash_(p.first.c_str()) + p.second;
   }
   // Less operator for MSVC's hash containers.  We make int be the
   // primary key, unintuitively, because it's a bit faster.
-  bool operator()(const pair<string, int>& a,
-                  const pair<string, int>& b) const {
+  bool operator()(const TemplateCacheKey& a,
+                  const TemplateCacheKey& b) const {
     return (a.second == b.second
             ? a.first < b.first
             : a.second < b.second);
@@ -139,14 +154,14 @@ class TemplateCacheHash {
   static const size_t bucket_size = 4;
   static const size_t min_buckets = 8;
 };
-typedef hash_map<pair<string, int>, Template*, TemplateCacheHash>
+typedef hash_map<TemplateCacheKey, Template*, TemplateCacheHash>
   TemplateCache;
 static TemplateCache *g_parsed_template_cache;
 
-// Caches the raw contents of a string template, i.e. a template obtained
-// from RegisterStringAsTemplate. The key is the 'filename' given
-// (without a conversion to an absolute naming) and the value is a pointer
-// to the string containing the contents.
+// Caches the raw contents of a string template, i.e. a template
+// created via StringToTemplateCache. The key is the key given
+// (without a conversion to an absolute naming) and the value is a
+// pointer to the string containing the contents.
 // We need to define our own hash fn because hash<string> isn't standard.
 class RawTemplateCacheHash {
  public:
@@ -190,6 +205,226 @@ static int kVerbosity = 0;   // you can change this by hand to get vlogs
 #define EMIT_CLOSE_ANNOTATION(emitter, name) \
   (emitter)->Emit("{{/" name "}}", 5 + sizeof(name)-1);
 
+
+// ----------------------------------------------------------------------
+// PragmaId
+// PragmaDefinition
+// PragmaMarker
+//   Functionality to support the PRAGMA marker in the template, i.e
+//   the {{%IDENTIFIER [name1="value1" [name2="value2"]...]}} syntax:
+//     . IDENTIFIER as well as all attribute names are case-insensitive
+//       whereas attribute values are case-sensitive.
+//     . No extraneous whitespace is allowed (e.g. between name and '=').
+//     . Double quotes inside an attribute value need to be backslash
+//       escaped, i.e. " -> \". We unescape them during parsing.
+//
+//   The only identifier currently supported is AUTOESCAPE which is
+//   used to auto-escape a given template. Its syntax is:
+//   {{%AUTOESCAPE context="context" [state="state"]}} where:
+//     . context is one of: "HTML", "JAVASCRIPT", "CSS", "XML", "JSON".
+//     . state may be omitted or equivalently, it may be set to "default".
+//       It also accepts the value "IN_TAG" in the HTML context to
+//       indicate the template contains HTML attribute name/value
+//       pairs that are enclosed in a tag specified in a parent template.
+//       e.g: Consider the parent template:
+//              <a href="/bla" {{>INC}}>text</a>
+//            and the included template:
+//              class="{{CLASS}}" target="{{TARGET}}"
+//       Then, for the included template to be auto-escaped properly, it
+//       must have the pragma: {{%AUTOESCAPE context="HTML" state="IN_TAG"}}.
+//       This is a very uncommon template structure.
+//
+//   To add a new pragma identifier, you'll have to at least:
+//     1. Add a new id for it in PragmaId enum.
+//     2. Add the corresponding definition in static g_pragmas array
+//     3. If you accept more than 2 attributes, increase the size
+//        of attribute_names in the PragmaDefinition struct.
+//     4. Add handling of that pragma in SectionTemplateNode::GetNextToken()
+//        and possibly SectionTemplateNode::AddPragmaNode()
+// ----------------------------------------------------------------------
+
+// PragmaId
+//   Identify all the pragma identifiers we support. Currently only
+//   one (for AutoEscape). PI_ERROR is only for internal error reporting,
+//   and is not a valid pragma identifier.
+enum PragmaId { PI_UNUSED, PI_ERROR, PI_AUTOESCAPE, NUM_PRAGMA_IDS };
+
+// Each pragma definition has a unique identifier as well as a list of
+// attribute names it accepts. This allows initial error checking while
+// parsing a pragma definition. Such error checking will need supplementing
+// with more pragma-specific logic in SectionTemplateNode::GetNextToken().
+static struct PragmaDefinition {
+  PragmaId pragma_id;
+  const char* identifier;
+  const char* attribute_names[2];  // Increase as needed.
+} g_pragmas[NUM_PRAGMA_IDS] = {
+  /* PI_UNUSED     */ { PI_UNUSED, NULL, {} },
+  /* PI_ERROR      */ { PI_ERROR, NULL, {} },
+  /* PI_AUTOESCAPE */ { PI_AUTOESCAPE, "AUTOESCAPE", {"context", "state"} }
+};
+
+// PragmaMarker
+//   Functionality to parse the {{%...}} syntax and extract the
+//   provided attribute values. We store the PragmaId as well
+//   as a vector of all the attribute names and values provided.
+class PragmaMarker {
+ public:
+  // Constructs a PragmaMarker object from the PRAGMA marker
+  // {{%ID [[name1=\"value1"] ...]}}. On error (unable to parse
+  // the marker), returns an error description in error_msg. On
+  // success, error_msg is cleared.
+  PragmaMarker(const char* token_start, const char* token_end,
+               string* error_msg);
+
+  // Returns the attribute value for the corresponding attribute name
+  // or NULL if none is found (as is the case with optional attributes).
+  // Ensure you only call it on attribute names registered in g_pragmas
+  // for that PragmaId.
+  const string* GetAttributeValue(const char* attribute_name) const;
+
+ private:
+  // Checks that the identifier given matches one of the pragma
+  // identifiers we know of, in which case returns the corresponding
+  // PragmaId. In case of error, returns PI_ERROR.
+  static PragmaId GetPragmaId(const char* id, size_t id_len);
+
+  // Parses an attribute value enclosed in double quotes and updates
+  // value_end to point at ending double quotes. Returns the attribute
+  // value. If an error occurred, error_msg is set with information.
+  // It is cleared on success.
+  // Unescapes backslash-escaped double quotes ('\"' -> '"') if present.
+  static string ParseAttributeValue(const char* value_start,
+                                    const char** value_end,
+                                    string* error_msg);
+
+  // Returns true if the attribute name is an accepted one for that
+  // given PragmaId. Otherwise returns false.
+  static bool IsValidAttribute(PragmaId pragma_id, const char* name,
+                               size_t namelen);
+
+  PragmaId pragma_id_;
+  // A vector of attribute (name, value) pairs.
+  vector<pair<string, string> > names_and_values_;
+};
+
+PragmaId PragmaMarker::GetPragmaId(const char* id, size_t id_len) {
+  for (int i = 0; i < NUM_PRAGMA_IDS; ++i) {
+    if (g_pragmas[i].identifier == NULL)  // PI_UNUSED, PI_ERROR
+      continue;
+    if ((strlen(g_pragmas[i].identifier) == id_len) &&
+        (strncasecmp(id, g_pragmas[i].identifier, id_len) == 0))
+      return g_pragmas[i].pragma_id;
+  }
+  return PI_ERROR;
+}
+
+bool PragmaMarker::IsValidAttribute(PragmaId pragma_id, const char* name,
+                                    size_t namelen) {
+  const int kMaxAttributes = sizeof(g_pragmas[0].attribute_names) /
+      sizeof(*g_pragmas[0].attribute_names);
+  for (int i = 0; i < kMaxAttributes; ++i) {
+    const char* attr_name = g_pragmas[pragma_id].attribute_names[i];
+    if (attr_name == NULL)
+      break;
+    if ((strlen(attr_name) == namelen) &&
+        (strncasecmp(attr_name, name, namelen) == 0))
+      // We found the given name in our accepted attribute list.
+      return true;
+  }
+  return false;  // We did not find the name.
+}
+
+const string* PragmaMarker::GetAttributeValue(const char* attribute_name) const {
+  // Developer error if assert triggers.
+  assert(IsValidAttribute(pragma_id_, attribute_name, strlen(attribute_name)));
+  for (vector<pair<string, string> >::const_iterator it =
+           names_and_values_.begin(); it != names_and_values_.end(); ++it) {
+    if (strcasecmp(attribute_name, it->first.c_str()) == 0)
+      return &it->second;
+  }
+  return NULL;
+}
+
+string PragmaMarker::ParseAttributeValue(const char* value_start,
+                                         const char** value_end,
+                                         string* error_msg) {
+  assert(error_msg);
+  if (*value_start != '"') {
+    error_msg->append("Attribute value is not enclosed in double quotes.");
+    return "";
+  }
+  const char* current = ++value_start;   // Advance past the leading '"'
+  const char* val_end;
+  do {
+    if (current >= *value_end ||
+        ((val_end =
+          (const char*)memchr(current, '"', *value_end - current)) == NULL)) {
+      error_msg->append("Attribute value not terminated.");
+      return "";
+    }
+    current = val_end + 1;              // Advance past the current '"'
+  } while (val_end[-1] == '\\');
+
+  string attribute_value(value_start, val_end - value_start);
+  // Now replace \" with "
+  size_t found;
+  while ((found = attribute_value.find("\\\"")) != string::npos)
+    attribute_value.erase(found, 1);
+  *value_end = val_end;
+  error_msg->clear();
+  return attribute_value;
+}
+
+PragmaMarker::PragmaMarker(const char* token_start, const char* token_end,
+                           string* error_msg) {
+  assert(error_msg);
+  string error;
+  const char* identifier_end =
+      (const char*)memchr(token_start, ' ', token_end - token_start);
+  if (identifier_end == NULL)
+    identifier_end = token_end;
+  pragma_id_ = PragmaMarker::GetPragmaId(token_start,
+                                         identifier_end - token_start);
+  if (pragma_id_ == PI_ERROR) {
+    error = "Unrecognized pragma identifier.";
+  } else {
+    const char* val_end;
+    // Loop through attribute name/value pairs.
+    for (const char* nameval = identifier_end; nameval < token_end;
+         nameval = val_end + 1) {
+      // Either after identifier or afer a name/value pair. Must be whitespace.
+      if (*nameval++ != ' ') {
+        error = "Extraneous text.";
+        break;
+      }
+      const char* val = (const char*)memchr(nameval, '=', token_end - nameval);
+      if (val == NULL || val == nameval) {
+        error = "Missing attribute name or value";
+        break;
+      }
+      const string attribute_name(nameval, val - nameval);
+      if (!PragmaMarker::IsValidAttribute(pragma_id_, attribute_name.data(),
+                                          attribute_name.length())) {
+        error = "Unrecognized attribute name: " + attribute_name;
+        break;
+      }
+      ++val;  // Advance past '='
+      val_end = token_end;
+      const string attribute_value = ParseAttributeValue(val, &val_end, &error);
+      if (!error.empty())  // Failed to parse attribute value.
+        break;
+      names_and_values_.push_back(pair<const string, const string>(
+                                      attribute_name, attribute_value));
+    }
+  }
+  if (error.empty())   // Success
+    error_msg->clear();
+  else                 // Error
+    error_msg->append("In PRAGMA directive '" +
+                      string(token_start, token_end - token_start) +
+                      "' Error: " + error);
+}
+
 // ----------------------------------------------------------------------
 // memmatch()
 //    Return a pointer to the first occurrences of the given
@@ -219,6 +454,7 @@ static const char *memmatch(const char *haystack, size_t haystack_len,
 // ----------------------------------------------------------------------
 // FilenameValidForContext()
 // GetTemplateContext()
+// GetTemplateContextFromPragma()
 // GetModifierForContext()
 // FindLongestMatch()
 // CheckInHTMLProper()
@@ -291,6 +527,27 @@ static TemplateContext GetTemplateContext(TemplateContext my_context,
   return my_context;
 }
 
+// Returns the TemplateContext corresponding to the "context" attribute
+// of the AUTOESCAPE pragma. Returns TC_MANUAL to indicate an error,
+// meaning an invalid context was given in the pragma.
+static TemplateContext GetTemplateContextFromPragma(
+    const PragmaMarker& pragma) {
+  const string* context = pragma.GetAttributeValue("context");
+  if (context == NULL)
+    return TC_MANUAL;
+  if (*context == "HTML")
+    return TC_HTML;
+  else if (*context == "JAVASCRIPT")
+    return TC_JS;
+  else if (*context == "CSS")
+    return TC_CSS;
+  else if (*context == "JSON")
+    return TC_JSON;
+  else if (*context == "XML")
+    return TC_XML;
+  return TC_MANUAL;
+}
+
 // Based on the state of the parser, determines the appropriate escaping
 // directive and returns a pointer to the corresponding
 // global ModifierAndValue vector. Called when a variable template node
@@ -304,7 +561,7 @@ static const vector<const ModifierAndValue*> GetModifierForContext(
   vector<const ModifierAndValue*> modvals;
   string error_msg;
 
-  switch(my_context) {
+  switch (my_context) {
     case TC_NONE:
       // In this context, we return an empty vector, no directives needed.
       assert(modvals.empty());
@@ -315,8 +572,12 @@ static const vector<const ModifierAndValue*> GetModifierForContext(
     case TC_JSON:
       modvals = template_modifiers::GetModifierForJson(htmlparser, &error_msg);
       break;
+    case TC_CSS:
+      assert(htmlparser);  // Parser is active in CSS
+      modvals = template_modifiers::GetModifierForCss(htmlparser, &error_msg);
+      break;
     default:
-      // Remaining contexts -TC_HTML/TC_JS/TC_CSS- the parser must be valid
+      // Must be in TC_HTML or TC_JS. Parser is active in these modes.
       assert(AUTO_ESCAPE_PARSING_CONTEXT(my_context));
       assert(htmlparser);
       modvals = template_modifiers::GetModifierForHtmlJs(htmlparser,
@@ -478,12 +739,13 @@ static void WriteOneHeaderEntry(string *outstring,
     if (variable == kMainSectionName || variable.find("BI_") == 0) {
       // We don't want to write entries for __MAIN__ or the built-ins
     } else {
-      *outstring += (string("const char * const ")
-                     + prefix
-                     + variable
-                     + " = \""
-                     + variable
-                     + "\";\n");
+      const TemplateId id = TemplateString(variable).GetGlobalId();
+      char idstr[64];   // enough for any 64-bit number
+      snprintf(idstr, sizeof(idstr), "%llu", id);
+      *outstring += (string("static const StaticTemplateString ") +
+                     prefix + variable + " = STS_INIT_WITH_HASH(" +
+                     prefix + variable + ", \"" + variable + "\", " +
+                     idstr + "LLU);\n");
     }
     vars_seen[variable] = true;
   }
@@ -497,14 +759,16 @@ static void WriteOneHeaderEntry(string *outstring,
 //    string is the name of the variable holding the value or the
 //    template name, resp.  For section types, the string is the name
 //    of the section, used to retrieve the hidden/visible state and
-//    the associated list of dictionaries, if any.
+//    the associated list of dictionaries, if any. For pragma type,
+//    the string is the full text of the marker and is only used for
+//    debug information.
 // ----------------------------------------------------------------------
 
 enum TemplateTokenType { TOKENTYPE_UNUSED,        TOKENTYPE_TEXT,
                          TOKENTYPE_VARIABLE,      TOKENTYPE_SECTION_START,
                          TOKENTYPE_SECTION_END,   TOKENTYPE_TEMPLATE,
                          TOKENTYPE_COMMENT,       TOKENTYPE_SET_DELIMITERS,
-                         TOKENTYPE_NULL };
+                         TOKENTYPE_PRAGMA,        TOKENTYPE_NULL };
 
 }  // anonymous namespace
 
@@ -518,6 +782,8 @@ enum TemplateTokenType { TOKENTYPE_UNUSED,        TOKENTYPE_TEXT,
 //                             the template filename
 //   TOKENTYPE_COMMENT       - the empty string, not used
 //   TOKENTYPE_SET_DELIMITERS- the empty string, not used
+//   TOKENTYPE_PRAGMA        - identifier and optional set of name/value pairs
+//                           - exactly as given in the template
 //   TOKENTYPE_NULL          - the empty string
 // All non-comment tokens may also have modifiers, which follow the name
 // of the token: the syntax is {{<PREFIX><NAME>:<mod>:<mod>:<mod>...}}
@@ -554,9 +820,11 @@ struct TemplateToken {
   //   2. The escaping modifiers are XSS-equivalent to the ones we computed.
   //
   // If the in-template modifiers are not found to be safe, we add
-  // the escaping modifiers we determine missing and issue a warning in the
-  // logs. This is done based on a longest match search between the two
-  // modifiers vectors, refer to comment in FindLongestMatch.
+  // the escaping modifiers we determine missing. This is done based on a
+  // longest match search between the two modifiers vectors, refer to comment
+  // in FindLongestMatch. We also issue a warning in the log, unless the
+  // in-template modifiers were all not escaping related (e.g. custom)
+  // since that case is similar to that of not providing any modifiers.
   void UpdateModifier(const vector<const ModifierAndValue*>& auto_modvals) {
     // Common case: no modifiers given in template. Assign our own. No warning.
     if (modvals.empty()) {
@@ -576,17 +844,31 @@ struct TemplateToken {
       return;             // We have a complete match, nothing to do.
     } else {              // Copy missing ones and issue warning.
       assert(longest_match >= 0 && longest_match < auto_modvals.size());
-      string before = PrettyPrintTokenModifiers(modvals); // for logging
+      // We only log if one or more of the in-template modifiers was
+      // escaping-related which we infer from the XssClass. Currently,
+      // all escaping modifiers are in XSS_WEB_STANDARD except for 'none'
+      // but that one is handled above.
+      bool do_log = false;
+      for (vector<ModifierAndValue>::const_iterator it = modvals.begin();
+           it != modvals.end(); ++it) {
+        if (it->modifier_info->xss_class ==
+            template_modifiers::XSS_WEB_STANDARD) {
+          do_log = true;
+          break;
+        }
+      }
+      string before = PrettyPrintTokenModifiers(modvals);  // for logging
       for (vector<const ModifierAndValue*>::const_iterator it
                = auto_modvals.begin() + longest_match;
            it != auto_modvals.end(); ++it) {
         modvals.push_back(**it);
       }
-      LOG(WARNING)
-          << "Token: " << string(text, textlen)
-          << " has missing in-template modifiers. You gave " << before
-          << " and we computed " << PrettyPrintModifiers(auto_modvals, "")
-          << ". We changed to " << PrettyPrintTokenModifiers(modvals) << endl;
+      if (do_log)
+        LOG(WARNING)
+            << "Token: " << string(text, textlen)
+            << " has missing in-template modifiers. You gave " << before
+            << " and we computed " << PrettyPrintModifiers(auto_modvals, "")
+            << ". We changed to " << PrettyPrintTokenModifiers(modvals) << endl;
     }
   }
 };
@@ -750,7 +1032,8 @@ class TextTemplateNode : public TemplateNode {
 class VariableTemplateNode : public TemplateNode {
  public:
   explicit VariableTemplateNode(const TemplateToken& token)
-      : token_(token) {
+      : token_(token),
+        variable_(token_.text, token_.textlen) {
     VLOG(2) << "Constructing VariableTemplateNode: "
             << string(token_.text, token_.textlen) << endl;
   }
@@ -783,6 +1066,7 @@ class VariableTemplateNode : public TemplateNode {
 
  private:
   const TemplateToken token_;
+  const HashedTemplateString variable_;
 };
 
 bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
@@ -793,8 +1077,7 @@ bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
     EMIT_OPEN_ANNOTATION(output_buffer, "VAR", token_.ToString());
   }
 
-  const TemplateString var(token_.text, token_.textlen);
-  const char *value = dictionary->GetSectionValue(var);
+  const char *value = dictionary->GetSectionValue(variable_);
 
   if (AnyMightModify(token_.modvals, per_expand_data)) {
     EmitModifiedString(token_.modvals, value, strlen(value),
@@ -812,6 +1095,46 @@ bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
 }
 
 // ----------------------------------------------------------------------
+// PragmaTemplateNode
+//   It simply stores the text given inside the pragma marker
+//   {{%...}} for possible use in DumpToString().
+// ----------------------------------------------------------------------
+
+class PragmaTemplateNode : public TemplateNode {
+ public:
+  explicit PragmaTemplateNode(const TemplateToken& token)
+      : token_(token) {
+    VLOG(2) << "Constructing PragmaTemplateNode: "
+            << string(token_.text, token_.textlen) << endl;
+  }
+  virtual ~PragmaTemplateNode() {
+    VLOG(2) << "Deleting PragmaTemplateNode: "
+            << string(token_.text, token_.textlen) << endl;
+  }
+
+  // A no-op for pragma nodes.
+  virtual bool Expand(ExpandEmitter *output_buffer,
+                      const TemplateDictionaryInterface *,
+                      const PerExpandData *) const {
+    return true;
+  };
+
+  // A no-op for pragma nodes.
+  virtual void WriteHeaderEntries(string *outstring,
+                                  const string& filename) const { }
+
+  // Appends a representation of the pragma node to a string. We output
+  // the full text given in {{%...}} verbatim.
+  virtual void DumpToString(int level, string *out) const {
+    assert(out);
+    AppendTokenWithIndent(level, out, "Pragma Node: -->|", token_, "|<--\n");
+  }
+
+ private:
+  TemplateToken token_;  // The text of the pragma held by this node.
+};
+
+// ----------------------------------------------------------------------
 // TemplateTemplateNode
 //    Holds a variable to be replaced by an expanded (included)
 //    template whose filename is the value of the variable in the
@@ -822,7 +1145,7 @@ bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
 //    . In Auto Escape mode, TemplateContext is determined based on the
 //      parent's context and possibly the state of the parser when we
 //      encounter the template-include directive. It is then passed on to
-//      GetTemplateWithAutoEscape when this included template is initialized.
+//      GetTemplateWithAutoEscaping when this included template is initialized.
 //    The indentation_ string is used by the PrefixLine modifier so be
 //    careful not to perform any operation on it that might invalidate
 //    its character array (indentation_.data()).
@@ -837,8 +1160,12 @@ class TemplateTemplateNode : public TemplateNode {
  public:
   explicit TemplateTemplateNode(const TemplateToken& token, Strip strip,
                                 TemplateContext context,
+                                bool selective_autoescape,
                                 const string& indentation)
-      : token_(token), strip_(strip), initial_context_(context),
+      : token_(token),
+        variable_(token_.text, token_.textlen),
+        strip_(strip), initial_context_(context),
+        selective_autoescape_(selective_autoescape),
         indentation_(indentation) {
     VLOG(2) << "Constructing TemplateTemplateNode: "
             << string(token_.text, token_.textlen) << endl;
@@ -881,8 +1208,10 @@ class TemplateTemplateNode : public TemplateNode {
 
  private:
   TemplateToken token_;   // text is the name of a template file.
+  const HashedTemplateString variable_;
   Strip strip_;       // Flag to pass from parent template to included template.
   const enum TemplateContext initial_context_;  // for auto-escaping.
+  const bool selective_autoescape_;  // Propagates from top-level template down.
   const string indentation_;   // Used by ModifierAndValue for g_prefix_line.
 
   // A helper used for expanding one child dictionary.
@@ -898,18 +1227,17 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
                                   const TemplateDictionaryInterface *dictionary,
                                   const PerExpandData *per_expand_data)
     const {
-  const TemplateString variable(token_.text, token_.textlen);
-  if (dictionary->IsHiddenTemplate(variable)) {
+  if (dictionary->IsHiddenTemplate(variable_)) {
     // if this "template include" section is "hidden", do nothing
     return true;
   }
 
   TemplateDictionaryInterface::IteratorProxy di =
-      dictionary->CreateTemplateIterator(variable);
+      dictionary->CreateTemplateIterator(variable_);
 
   if (!di.HasNext()) {  // empty dict means 'expand once using containing dict'
     const char* const filename =
-        dictionary->GetIncludeTemplateName(variable, 0);
+        dictionary->GetIncludeTemplateName(variable_, 0);
     // If the filename wasn't set then treat it as if it were "hidden", i.e, do
     // nothing
     if (filename && *filename) {
@@ -926,7 +1254,7 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
     // each expansion having its own template dictionary.  That's also
     // why we pass in the dictionary-index as an argument.
     const char* const filename = dictionary->GetIncludeTemplateName(
-        variable, dict_num);
+        variable_, dict_num);
     // If the filename wasn't set then treat it as if it were "hidden", i.e, do
     // nothing
     if (filename && *filename) {
@@ -945,13 +1273,9 @@ bool TemplateTemplateNode::ExpandOnce(
   bool error_free = true;
   Template *included_template;
   // pass the flag values from the parent template to the included template
-  if (AUTO_ESCAPE_MODE(initial_context_)) {
-    included_template = Template::GetTemplateWithAutoEscaping(filename,
-                                                              strip_,
-                                                              initial_context_);
-  } else {
-    included_template = Template::GetTemplate(filename, strip_);
-  }
+  included_template = Template::GetTemplateCommon(filename, strip_,
+                                                  initial_context_,
+                                                  selective_autoescape_);
 
   // if there was a problem retrieving the template, bail!
   if (!included_template) {
@@ -1051,6 +1375,7 @@ class SectionTemplateNode : public TemplateNode {
 
  private:
   const TemplateToken token_;   // text is the name of the section
+  const HashedTemplateString variable_;
   NodeList node_list_;  // The list of subnodes in the section
   // A sub-section named "OURNAME_separator" is special.  If we see it
   // when parsing our section, store a pointer to it for ease of use.
@@ -1073,6 +1398,7 @@ class SectionTemplateNode : public TemplateNode {
   //    / - End a section
   //    > - A template file variable (the "include" directive)
   //    ! - A template comment
+  //    % - A pragma such as AUTOESCAPE
   //    = - Change marker delimiters (from the default of '{{' and '}}')
   //    <alnum or _> - A scalar variable
   // One more thing. Before a name token is returned, if it happens to be
@@ -1093,11 +1419,12 @@ class SectionTemplateNode : public TemplateNode {
 
   // The specific methods called used by AddSubnode to add the
   // different types of nodes to this section node.
-  // Currently only reason to fail (return false) is if the
-  // HTML parser failed to parse in auto-escape mode. Note that we do
-  // not attempt to parse if the HTML Parser state shows an error already.
+  // Currently only reasons to fail (return false) are if the
+  // HTML parser failed to parse in auto-escape mode or the
+  // PRAGMA marker was invalid in the template.
   bool AddTextNode(const TemplateToken* token, Template* my_template);
   bool AddVariableNode(TemplateToken* token, Template* my_template);
+  bool AddPragmaNode(TemplateToken* token, Template* my_template);
   bool AddTemplateNode(TemplateToken* token, Template* my_template,
                        const string& indentation);
   bool AddSectionNode(const TemplateToken* token, Template* my_template);
@@ -1106,7 +1433,9 @@ class SectionTemplateNode : public TemplateNode {
 // --- constructor and destructor, Expand, Dump, and WriteHeaderEntries
 
 SectionTemplateNode::SectionTemplateNode(const TemplateToken& token)
-    : token_(token), separator_section_(NULL), indentation_("\n") {
+    : token_(token),
+      variable_(token_.text, token_.textlen),
+      separator_section_(NULL), indentation_("\n") {
   VLOG(2) << "Constructing SectionTemplateNode: "
           << string(token_.text, token_.textlen) << endl;
 }
@@ -1165,19 +1494,17 @@ bool SectionTemplateNode::Expand(
     ExpandEmitter *output_buffer,
     const TemplateDictionaryInterface *dictionary,
     const PerExpandData *per_expand_data) const {
-  const TemplateString variable(token_.text, token_.textlen);
-
   // The section named __{{MAIN}}__ is special: you always expand it
   // exactly once using the containing (main) dictionary.
   if (token_.text == kMainSectionName) {
     return ExpandOnce(output_buffer, dictionary, per_expand_data,
                                   true);
-  } else if (dictionary->IsHiddenSection(variable)) {
+  } else if (dictionary->IsHiddenSection(variable_)) {
     return true;      // if this section is "hidden", do nothing
   }
 
-  TemplateDictionaryInterface::IteratorProxy di = 
-      dictionary->CreateSectionIterator(variable);
+  TemplateDictionaryInterface::IteratorProxy di =
+      dictionary->CreateSectionIterator(variable_);
 
   // If there are no child dictionaries, that means we should expand with the
   // current dictionary instead. This corresponds to the situation where
@@ -1275,35 +1602,54 @@ bool SectionTemplateNode::AddVariableNode(TemplateToken* token,
   TemplateContext initial_context = my_template->initial_context_;
 
   if (AUTO_ESCAPE_MODE(initial_context)) {
-      // Determines modifiers for the variable in auto escape mode.
-      string variable_name(token->text, token->textlen);
-      // We declare in the documentation that if the user changes the
-      // value of these variables, they must only change it to a value
-      // that's "equivalent" from the point of view of an html parser.
-      // So it's ok to hard-code in that these are " " and "\n",
-      // respectively, even though in theory the user could change them
-      // (to say, BI_NEWLINE == "\r\n").
-      if (variable_name == "BI_SPACE" || variable_name == "BI_NEWLINE") {
-        if (AUTO_ESCAPE_PARSING_CONTEXT(initial_context)) {
-          assert(htmlparser);
-          if (htmlparser->state() == HtmlParser::STATE_ERROR ||
-              htmlparser->Parse(variable_name == "BI_SPACE" ? " " : "\n") ==
-              HtmlParser::STATE_ERROR)
-            success = false;
-        }
-      } else {
-        vector<const ModifierAndValue*> modvals =
-            GetModifierForContext(initial_context, htmlparser, my_template);
-        // In TC_NONE auto-escape does not add modifiers, it does for all
-        // other auto-escape contexts.
-        if (modvals.empty() && initial_context != TC_NONE)
+    // Determines modifiers for the variable in auto escape mode.
+    string variable_name(token->text, token->textlen);
+    // We declare in the documentation that if the user changes the
+    // value of these variables, they must only change it to a value
+    // that's "equivalent" from the point of view of an html parser.
+    // So it's ok to hard-code in that these are " " and "\n",
+    // respectively, even though in theory the user could change them
+    // (to say, BI_NEWLINE == "\r\n").
+    if (variable_name == "BI_SPACE" || variable_name == "BI_NEWLINE") {
+      if (AUTO_ESCAPE_PARSING_CONTEXT(initial_context)) {
+        assert(htmlparser);
+        if (htmlparser->state() == HtmlParser::STATE_ERROR ||
+            htmlparser->Parse(variable_name == "BI_SPACE" ? " " : "\n") ==
+            HtmlParser::STATE_ERROR)
           success = false;
-        else
-          token->UpdateModifier(modvals);
       }
+    } else {
+      vector<const ModifierAndValue*> modvals =
+          GetModifierForContext(initial_context, htmlparser, my_template);
+      // In TC_NONE auto-escape does not add modifiers, it does for all
+      // other auto-escape contexts.
+      if (modvals.empty() && initial_context != TC_NONE)
+        success = false;
+      else
+        token->UpdateModifier(modvals);
+    }
   }
   node_list_.push_back(new VariableTemplateNode(*token));
   return success;
+}
+
+// AddPragmaNode
+//   Create a pragma node from the given token and add it
+//   to the node list.
+//   The AUTOESCAPE pragma is only allowed at the top of a template
+//   file (above any non-comment node) to minimize the chance of the
+//   HTML parser being out of sync with the template text. So we check
+//   that the section is the MAIN section and we are the first node.
+//   Note: Since currently we only support one pragma, we apply the check
+//   always but when other pragmas are added we'll need to propagate the
+//   Pragma identifier from GetNextToken().
+bool SectionTemplateNode::AddPragmaNode(TemplateToken* token,
+                                        Template* my_template) {
+  if (token_.text != kMainSectionName || !node_list_.empty())
+    return false;
+
+  node_list_.push_back(new PragmaTemplateNode(*token));
+  return true;
 }
 
 // AddSectionNode
@@ -1336,11 +1682,24 @@ bool SectionTemplateNode::AddTemplateNode(TemplateToken* token,
   assert(token);
   bool success = true;
   TemplateContext initial_context = my_template->initial_context_;
-  // Safe to call even outside auto-escape (TC_MANUAL).
-  TemplateContext context = GetTemplateContext(initial_context,
-                                               my_template->htmlparser_);
 
-  if (AUTO_ESCAPE_MODE(initial_context)) {
+  // With selective auto-escape, initial context of the included template
+  // is always TC_MANUAL. Then, if that included template has the
+  // AUTOESCAPE pragma, its context will get changed during tree building.
+  // Will full-on auto-escape, the initial_context is determined from
+  // the parent template and the state of the parser.
+  TemplateContext context = TC_MANUAL;
+  if (!my_template->selective_autoescape_)
+    context = GetTemplateContext(initial_context, my_template->htmlparser_);
+
+  // For Selective Auto-Escape, we decided not to meddle with template
+  // includes as we do not know whether the included template is
+  // independently being auto-escaped via a PRAGMA marker. We also do not
+  // check if the included template is included in an acceptable context
+  // since it may unnecessarily hamper the ability to auto-escape that
+  // template.
+  if (!my_template->selective_autoescape_ &&
+      AUTO_ESCAPE_MODE(initial_context)) {
     // Auto-Escape supports specifying modifiers at the template-include
     // level in which case it checks them for XSS-correctness and modifies
     // them as needed. Unlike the case of Variable nodes, we only modify
@@ -1361,6 +1720,7 @@ bool SectionTemplateNode::AddTemplateNode(TemplateToken* token,
         token->UpdateModifier(modvals);
       context = TC_NONE;
     }
+
     if (AUTO_ESCAPE_PARSING_CONTEXT(initial_context)) {
       assert(my_template->htmlparser_);
       // In Auto-Escape context where HTML parsing happens we require that
@@ -1378,8 +1738,10 @@ bool SectionTemplateNode::AddTemplateNode(TemplateToken* token,
     }
   }
   // pass the flag values from my_template to the new node
-  node_list_.push_back(new TemplateTemplateNode(*token, my_template->strip_,
-                                                context, indentation));
+  node_list_.push_back(
+      new TemplateTemplateNode(*token, my_template->strip_, context,
+                               my_template->selective_autoescape_,
+                               indentation));
   return success;
 }
 
@@ -1476,6 +1838,17 @@ bool SectionTemplateNode::AddSubnode(Template *my_template) {
         LOG(ERROR) << "Invalid delimiter-setting command."
                    << "\nFound: " << string(token.text, token.textlen)
                    << "\nIn: " << string(token_.text, token_.textlen) << endl;
+        my_template->set_state(TS_ERROR);
+      }
+      break;
+    case TOKENTYPE_PRAGMA:
+      // We can do nothing and simply drop the pragma of the file as is done
+      // for comments. But, there is value in keeping it for debug purposes
+      // (via DumpToString) so add it as a pragma node.
+      if (!this->AddPragmaNode(&token, my_template)) {
+        LOG_TEMPLATE_NAME(ERROR, my_template);
+        LOG(ERROR) << "Pragma marker must be at the top of the template: '"
+                   << string(token.text, token.textlen) << "'" << endl;
         my_template->set_state(TS_ERROR);
       }
       break;
@@ -1630,6 +2003,10 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
           ttype = TOKENTYPE_TEMPLATE;
           ++token_start;
           break;
+        case '%':
+          ttype = TOKENTYPE_PRAGMA;
+          ++token_start;
+          break;
         default:
           // the assumption that the next char is alnum or _ will be
           // tested below in the call to IsValidName().
@@ -1648,9 +2025,38 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
              << "'" << string(token_start, ps->bufend-token_start) << "'");
       }
 
+      if (ttype == TOKENTYPE_PRAGMA) {
+        string error_msg;
+        const PragmaMarker pragma(token_start, token_end, &error_msg);
+        if (!error_msg.empty())
+          FAIL(error_msg);
+        TemplateContext context = GetTemplateContextFromPragma(pragma);
+        if (context == TC_MANUAL)  // TC_MANUAL is used to indicate error.
+          FAIL("Invalid context in Pragma directive.");
+        const string* parser_state = pragma.GetAttributeValue("state");
+        bool in_tag = false;
+        if (parser_state != NULL) {
+          if (context == TC_HTML && *parser_state == "IN_TAG")
+            in_tag = true;
+          else if (*parser_state != "default")
+            FAIL("Unsupported state '" + *parser_state +
+                 "'in Pragma directive.");
+        }
+        // The pragma has no effect on full-on auto-escaping.
+        if (my_template->selective_autoescape_) {
+          // Only an AUTOESCAPE pragma can change the initial_context
+          // away from TC_MANUAL and we do not support multiple such pragmas.
+          assert(my_template->initial_context_ == TC_MANUAL);
+          my_template->initial_context_ = context;
+          my_template->MaybeInitHtmlParser(in_tag);
+        }
+        // ParseState change will happen below.
+      }
+
       // Comments are a special case, since they don't have a name or action.
       // The set-delimiters command is the same way.
-      if (ttype == TOKENTYPE_COMMENT || ttype == TOKENTYPE_SET_DELIMITERS) {
+      if (ttype == TOKENTYPE_COMMENT || ttype == TOKENTYPE_SET_DELIMITERS ||
+          ttype == TOKENTYPE_PRAGMA) {
         ps->phase = Template::ParseState::GETTING_TEXT;
         ps->bufstart = token_end + ps->current_delimiters.end_marker_len;
         // If requested, remove any unescaped linefeed following a comment
@@ -1753,24 +2159,102 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
 
 
 // ----------------------------------------------------------------------
+// Template::StringToTemplate()
+// Template::StringToTemplateCache()
+//    StringToTemplate reads a string representing a template (eg
+//    "Hello {{WORLD}}"), and parses it to a Template*.  It returns
+//    the parsed template, or NULL if there was a parsing error.
+//    StringToTemplateCache does the same, but then inserts the
+//    resulting Template* into the template cache, for future retrieval
+//    via GetTemplate.  You pass in the key to use with GetTemplate.
+//    It returns a bool indicating success or failure of template
+//    creation/insertion.  (Insertion will fail if a string or file
+//    with that key already exists in the cache.)
+// ----------------------------------------------------------------------
+
+Template* Template::StringToTemplate(const char* content, size_t content_len,
+                                     Strip strip, TemplateContext context) {
+  // An empty filename_ keeps ReloadIfChangedLocked from performing
+  // file operations.
+
+  // Enable selective autoescape if called with TC_MANUAL context, otherwise
+  // disable since full-on autoescape is in effect.
+  const bool selective_autoescape = (context == TC_MANUAL);
+  Template *tpl = new Template("", strip, context, selective_autoescape);
+
+  // But we have to do the "loading" and parsing ourselves:
+
+  // BuildTree deletes the buffer when done, so we need a copy for it.
+  char* buffer = new char[content_len];
+  memcpy(buffer, content, content_len);
+  tpl->StripBuffer(&buffer, &content_len);
+  if ( tpl->BuildTree(buffer, buffer + content_len) ) {
+    assert(tpl->state() == TS_READY);
+  } else {
+    assert(tpl->state() != TS_READY);
+    delete tpl;
+    return NULL;
+  }
+  return tpl;
+}
+
+bool Template::StringToTemplateCache(const string& key,
+                                     const char* content, size_t content_len) {
+  // If the key is already in the cache, we just return false.
+  {
+    MutexLock ml(&g_cache_mutex);
+    if (g_raw_template_content_cache == NULL)
+      g_raw_template_content_cache = new RawTemplateContentCache;
+    else if (g_raw_template_content_cache->find(key) !=
+             g_raw_template_content_cache->end())
+      return false;
+  }
+
+  // This is just a sanity check to make sure the content is legal.
+  // We pick an arbitrary strip and context, since it doesn't matter.
+  // (Well, technically, a template can be valid under some
+  // auto-escape contexts, but not others, but this should catch the
+  // vast majority of problems.)  Do this without needing the lock.
+  Template* tpl = StringToTemplate(content, content_len,
+                                   DO_NOT_STRIP, TC_MANUAL);
+  if (tpl == NULL)
+    return false;
+  delete tpl;
+
+  MutexLock ml(&g_cache_mutex);
+  pair<RawTemplateContentCache::iterator, bool> it_and_insert =
+      g_raw_template_content_cache->insert(pair<string,string*>(key, NULL));
+  if (it_and_insert.second == false)   // key was already in the hashtable
+    return false;                      // we've already cached this content
+
+  it_and_insert.first->second = new string(content, content_len);
+  return true;
+}
+
+// ----------------------------------------------------------------------
 // Template::Template()
 // Template::~Template()
+// Template::MaybeInitHtmlParser()
 // Template::AssureGlobalsInitialized()
 // Template::GetTemplate()
 // Template::GetTemplateWithAutoEscaping()
-// Template::TemplateCacheKey()
 // Template::GetTemplateCommon()
 //   Calls ReloadIfChanged to load the template the first time.
 //   The constructor is private; GetTemplate() is the factory
 //   method used to actually construct a new template if needed.
+//   GetTemplateCommon() first looks in the two caches -- the
+//   cache of parsed template trees, and the cache of raw
+//   template-file contents -- before trying to load the
+//   template-file from disk.
 // ----------------------------------------------------------------------
 
 Template::Template(const string& filename, Strip strip,
-                   TemplateContext context)
+                   TemplateContext context, bool selective_autoescape)
     : filename_(filename), filename_mtime_(0), strip_(strip),
       state_(TS_EMPTY), template_text_(NULL), template_text_len_(0),
       tree_(NULL), parse_state_(), mutex_(new Mutex),
-      initial_context_(context), htmlparser_(NULL) {
+      initial_context_(context), htmlparser_(NULL),
+      selective_autoescape_(selective_autoescape) {
   // Make sure template_root_directory_, etc. are initted before any possibility
   // of calling Expand() or other Template classes that access globals.
   AssureGlobalsInitialized();
@@ -1786,13 +2270,9 @@ Template::Template(const string& filename, Strip strip,
     strip_ = STRIP_BLANK_LINES;
   }
 
-  // TC_MANUAL and remaining Auto-Escape contexts don't need a parser.
-  if (AUTO_ESCAPE_PARSING_CONTEXT(initial_context_)) {
-    htmlparser_ = new HtmlParser();
-    if (initial_context_ == TC_JS)
-      htmlparser_->ResetMode(HtmlParser::MODE_JS);
-    FilenameValidForContext(filename_, initial_context_);
-  }
+  // Initializes the parser as needed. In_tag is false, it can only
+  // be enabled via the state attribute of the AUTOESCAPE pragma.
+  MaybeInitHtmlParser(false);
   ReloadIfChangedLocked();
 }
 
@@ -1807,6 +2287,36 @@ Template::~Template() {
   delete htmlparser_;
 }
 
+// In TemplateContexts where the HTML parser is needed, we initialize it in
+// the appropriate mode. Also we do a sanity check (cannot fail) on the
+// template filename. This function should at most be called once per template.
+//
+// In_tag is only meaningful for TC_HTML: It is true for templates that
+// start inside an HTML tag and hence are expected to contain HTML attribute
+// name/value pairs only. It is false for standard HTML templates.
+// Note that GetTemplateWithAutoEscaping does not support marking a top-level
+// HTML template as being inside a tag, there should be no reason to do so.
+// Hence, this is currently only possible through the AUTOESCAPE pragma.
+void Template::MaybeInitHtmlParser(bool in_tag) {
+  assert(!htmlparser_);
+  if (AUTO_ESCAPE_PARSING_CONTEXT(initial_context_)) {
+    htmlparser_ = new HtmlParser();
+    switch (initial_context_) {
+      case TC_JS:
+        htmlparser_->ResetMode(HtmlParser::MODE_JS);
+        break;
+      case TC_CSS:
+        htmlparser_->ResetMode(HtmlParser::MODE_CSS);
+        break;
+      default:
+        if (in_tag)
+          htmlparser_->ResetMode(HtmlParser::MODE_HTML_IN_TAG);
+        break;
+    }
+    FilenameValidForContext(filename_, initial_context_);
+  }
+}
+
 // NOTE: This function must be called by any static function that
 // accesses any of the variables set here.
 void Template::AssureGlobalsInitialized() {
@@ -1818,7 +2328,8 @@ void Template::AssureGlobalsInitialized() {
 
 // This factory method disables auto-escape mode for backwards compatibility.
 Template *Template::GetTemplate(const string& filename, Strip strip) {
-  return GetTemplateCommon(filename, strip, TC_MANUAL);
+  // Selective auto-escaping is enabled.
+  return GetTemplateCommon(filename, strip, TC_MANUAL, true);
 }
 
 // This factory method is called only when the auto-escape mode
@@ -1828,22 +2339,25 @@ Template *Template::GetTemplateWithAutoEscaping(const string& filename,
                                                 TemplateContext context) {
   // Must provide a valid context to enable auto-escaping.
   assert(AUTO_ESCAPE_MODE(context));
-  return GetTemplateCommon(filename, strip, context);
+  // Selective auto-escaping is disabled, we are in full-on auto-escaping.
+  return GetTemplateCommon(filename, strip, context, false);
 }
 
-// With the addition of the auto-escape mode, the cache key includes
-// the TemplateContext as well to allow the same template to
-// be initialized in both modes and have their copies separate. It also
-// allows for the less likely case of the same template initialized
-// with different TemplateContexts.
-// For simplicity, the TemplateContext is folded in with Strip to
-// form a single integer. Both are very small and definitely fit in the
-// first 16 bits [lower 8 for Strip, upper 8 for TemplateContext].
-Template::TemplateCacheKey
-Template::GetTemplateCacheKey(const string& name,
-                              Strip strip, TemplateContext context) {
+// With (full-on) Auto-Escaping, it is possible that the same template needs to
+// be initialized with different TemplateContexts. We allow that by giving them
+// each their own separate Template cached copy.
+// For simplicity, the TemplateContext is folded in with Strip to form a
+// single integer which fits in a 16-bit integer: Lowest 8 bits for Strip,
+// next 8 bits for TemplateContext.
+// Note that selective auto-escape cannot clash with full-on auto-escape
+// because in the former the initial context is TC_MANUAL and in the latter
+// it cannot be TC_MANUAL.
+static TemplateCacheKey GetTemplateCacheKey(const string& name,
+                                            Strip strip,
+                                            TemplateContext context) {
   int strip_and_context  = strip + (context << 8);
-  return pair<string, int>(name, strip_and_context);
+  assert(strip_and_context < (1 << 16));
+  return TemplateCacheKey(name, strip_and_context);
 }
 
 // Protected factory method.
@@ -1851,14 +2365,15 @@ Template::GetTemplateCacheKey(const string& name,
 // (g_parsed_template_cache), we created a new Template (via constructor)
 // and stored it in that cache. Now we first check if we have raw contents
 // for that filename in which case we create a new instance using
-// RegisterStringAsTemplate instead.
+// StringToTemplateCache instead.
 // The motivation is that under auto-escape, if an included template has
 // template-level modifiers (say {{>INC:x-mod}}, we set its context to
 // TC_NONE. That context would not exist if the template was registered
 // as a string. We now cache the contents so we can regenerate a template
 // with these contents for any other TemplateContext. See bug 1456190.
 Template *Template::GetTemplateCommon(const string& filename, Strip strip,
-                                      TemplateContext context) {
+                                      TemplateContext context,
+                                      bool selective_autoescape) {
   // No need to have the cache-mutex acquired for this step
   string abspath(ctemplate::PathJoin(template_root_directory(), filename));
 
@@ -1868,21 +2383,21 @@ Template *Template::GetTemplateCommon(const string& filename, Strip strip,
     if (g_parsed_template_cache == NULL)
       g_parsed_template_cache = new TemplateCache;
 
-    TemplateCacheKey template_cache_key = GetTemplateCacheKey(abspath, strip,
-                                                              context);
+    TemplateCacheKey template_cache_key =
+        GetTemplateCacheKey(abspath, strip, context);
     tpl = (*g_parsed_template_cache)[template_cache_key];
     if (!tpl) {
       if (g_raw_template_content_cache &&
           (g_raw_template_content_cache->find(filename) !=
            g_raw_template_content_cache->end())) {
         string* content = (*g_raw_template_content_cache)[filename];
-        tpl = BuildTemplateFromContent(strip, context,
-                                       content->data(), content->length());
+        tpl = StringToTemplate(content->data(), content->length(),
+                               strip, context);
         // If we failed to get a template, cannot proceed.
         if (tpl == NULL)
           return tpl;
       } else {
-        tpl = new Template(abspath, strip, context);
+        tpl = new Template(abspath, strip, context, selective_autoescape);
       }
       (*g_parsed_template_cache)[template_cache_key] = tpl;
     }
@@ -1913,85 +2428,6 @@ Template *Template::GetTemplateCommon(const string& filename, Strip strip,
   }
 }
 
-// Helper method used by RegisterStringAsTemplate and
-// GetTemplateCommon. Creates a template with empty filename
-// -since not present on disk- and builds the tree from the
-// provided raw contents. Returns NULL if the parsing failed.
-Template* Template::BuildTemplateFromContent(Strip strip,
-                                             TemplateContext context,
-                                             const char* content,
-                                             size_t content_len) {
-  // An empty filename_ keeps ReloadIfChangedLocked from performing
-  // file operations.
-  Template *tpl = new Template("", strip, context);
-
-  // But we have to do the "loading" and parsing ourselves:
-
-  // BuildTree deletes the buffer when done, so we need a copy for it.
-  char* buffer = new char[content_len];
-  memcpy(buffer, content, content_len);
-  tpl->StripBuffer(&buffer, &content_len);
-  if ( tpl->BuildTree(buffer, buffer + content_len) ) {
-    assert(tpl->state() == TS_READY);
-  } else {
-    assert(tpl->state() != TS_READY);
-    delete tpl;
-    return NULL;
-  }
-  return tpl;
-}
-
-// Create a string based template.  If the filename is not empty, we
-// cache both the (parsed) template as well as the raw contents under
-// 'filename'.  If the filename is not empty, and is found in the
-// cache (either cache) the cached contents are used in preference to
-// the passed-in contents.  This avoids data-race problems when
-// RegisterStringAsTemplate is called simultaneously with the same
-// filename in different threads.  If you want to change the contents
-// associated with a filename, the only way to do so is to call
-// ClearCache().
-// TODO(csilvers): change this function to return a bool instead,
-//                 so people don't use RegisterStringAsTemplate()
-//                 when they should be using GetTemplate().
-Template *Template::RegisterStringAsTemplate(const string& filename,
-                                             Strip strip,
-                                             TemplateContext context,
-                                             const char* content,
-                                             size_t content_len) {
-  // As an special feature, if the cache-name is "", it means "don't
-  // cache this at all."  If you do this, you're responsible for
-  // deleting the resulting template.
-  if (filename.empty()) {
-    return BuildTemplateFromContent(strip, context, content, content_len);
-  }
-
-  string abspath(ctemplate::PathJoin(template_root_directory(), filename));
-
-  MutexLock ml(&g_cache_mutex);
-  if (g_parsed_template_cache == NULL)
-    g_parsed_template_cache = new TemplateCache;
-
-  TemplateCacheKey template_cache_key = GetTemplateCacheKey(abspath, strip,
-                                                            context);
-  Template* tpl = (*g_parsed_template_cache)[template_cache_key];
-  if (!tpl) {
-    // OK, the parsed content isn't cached, let's see if the raw contents is.
-    if (g_raw_template_content_cache == NULL)
-      g_raw_template_content_cache = new RawTemplateContentCache;
-    string* immutable_content = (*g_raw_template_content_cache)[filename];
-    if (!immutable_content) {
-      immutable_content = new string(content, content_len);
-      (*g_raw_template_content_cache)[filename] = immutable_content;
-    }
-    // Now we have raw content; let's build and cache the parsed content.
-    tpl = BuildTemplateFromContent(strip, context,
-                                   immutable_content->data(),
-                                   immutable_content->length());
-    (*g_parsed_template_cache)[template_cache_key] = tpl;
-  }
-  return tpl;
-}
-
 // ----------------------------------------------------------------------
 // Template::BuildTree()
 // Template::WriteHeaderEntry()
@@ -2012,11 +2448,11 @@ Template *Template::RegisterStringAsTemplate(const string& filename,
 bool Template::BuildTree(const char* input_buffer,
                          const char* input_buffer_end) {
   set_state(TS_EMPTY);
-  // Assign an arbitrary name to the top-level node
   parse_state_.bufstart = input_buffer;
   parse_state_.bufend = input_buffer_end;
   parse_state_.phase = ParseState::GETTING_TEXT;
   parse_state_.current_delimiters = Template::MarkerDelimiters();
+  // Assign an arbitrary name to the top-level node
   SectionTemplateNode *top_node = new SectionTemplateNode(
       TemplateToken(TOKENTYPE_SECTION_START,
                     kMainSectionName, strlen(kMainSectionName), NULL));
@@ -2048,6 +2484,7 @@ bool Template::BuildTree(const char* input_buffer,
 
 void Template::WriteHeaderEntries(string *outstring) const {
   if (state() == TS_READY) {   // only write header entries for 'good' tpls
+    outstring->append("#include <google/template_string.h>\n");
     tree_->WriteHeaderEntries(outstring, template_file());
   }
 }
@@ -2453,41 +2890,27 @@ void Template::ReloadAllIfChanged() {
 // ----------------------------------------------------------------------
 
 void Template::ClearCache() {
-  // We clear the cache by swapping it with an empty cache.  This lets
-  // us delete the items in the cache at our leisure without needing
-  // to hold g_cache_mutex. Same steps for deleting the cached raw contents.
-  TemplateCache tmp_cache;
-  RawTemplateContentCache tmp_content_cache;
-  bool delete_cache = false;
-  bool delete_contents = false;
-  {
-    // this protects the static g_parsed_template_cache
-    // and g_raw_template_content_cache
-    MutexLock ml(&g_cache_mutex);
-    if (g_parsed_template_cache != NULL) {
-      // now g_parsed_template_cache is empty
-      g_parsed_template_cache->swap(tmp_cache);
-      delete_cache = true;
-    }
-    if (g_raw_template_content_cache != NULL) {
-      // now g_raw_template_content_cache is empty
-      g_raw_template_content_cache->swap(tmp_content_cache);
-      delete_contents = true;
-    }
-  }
-  if (delete_cache) {   // Now delete everything we've removed from the cache.
-    for (TemplateCache::const_iterator iter = tmp_cache.begin();
-         iter != tmp_cache.end();
+  // If deleting (while holding the lock) is too slow, we could store all
+  // the pointers in a vector, and then delete them at our leisure.
+  // Another possibility is to swap with an empty, tmp map and then delete
+  // from the tmp map at our leisure, but this crashes on MSVC 8 (buggy swap?)
+  MutexLock ml(&g_cache_mutex);
+  if (g_parsed_template_cache != NULL) {
+    for (TemplateCache::iterator iter = g_parsed_template_cache->begin();
+         iter != g_parsed_template_cache->end();
          ++iter) {
       delete iter->second;
     }
+    g_parsed_template_cache->clear();
   }
-  if (delete_contents) {  // and everything we've removed from the content cache
-    for (RawTemplateContentCache::const_iterator iter =
-             tmp_content_cache.begin();
-         iter != tmp_content_cache.end(); ++iter) {
+  if (g_raw_template_content_cache != NULL) {
+    for (RawTemplateContentCache::iterator iter =
+             g_raw_template_content_cache->begin();
+         iter != g_raw_template_content_cache->end();
+         ++iter) {
       delete iter->second;
     }
+    g_raw_template_content_cache->clear();
   }
 }
 

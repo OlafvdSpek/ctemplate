@@ -338,6 +338,12 @@ static TemplateDictionary* MakeDict1() {
   dict->SetValue("AE_JS_BAD", "your text'is clever'thanks");
   dict->SetValue("AE_USERNAME_GOOD", "Mr. Nice");
   dict->SetValue("AE_USERNAME_BAD", "Doctor<script>alert(2)</script>Evil");
+  dict->SetValue("AE_START_EDGE", "left");
+  dict->SetValue("AE_END_EDGE", ";:center()$$");  // Some invalid chars.
+  dict->SetValue("AE_FONT_SIZE_PC", "120%");
+  dict->SetValue("AE_FONT_SIZE_PT", "12pt");
+  dict->SetValue("AE_MAUVE_RGB", "#FF7BD5");
+  dict->SetValue("AE_ITALIC", "italic");
 
   // This won't see any of the vars *we* set
   TemplateDictionary* footer_dict = dict->AddIncludeDictionary("FOOTER");
@@ -390,16 +396,13 @@ static void TestExpand(const vector<Testdata>::const_iterator& begin,
     Template* tpl_ws = Template::GetTemplate(one_test->input_template_name,
                                              STRIP_WHITESPACE);
 
-    // Test RegisterStringAsTemplate too
-    Template* tplstr_none = Template::RegisterStringAsTemplate(
-        one_test->input_template_name + "_str", DO_NOT_STRIP, TC_MANUAL,
-        one_test->input_template);
-    Template* tplstr_lines = Template::RegisterStringAsTemplate(
-        one_test->input_template_name + "_str", STRIP_BLANK_LINES, TC_MANUAL,
-        one_test->input_template);
-    Template* tplstr_ws = Template::RegisterStringAsTemplate(
-        one_test->input_template_name + "_str", STRIP_WHITESPACE, TC_MANUAL,
-        one_test->input_template);
+    // Test TemplateToString while we're at it.
+    Template* tplstr_none = Template::StringToTemplate(
+        one_test->input_template, DO_NOT_STRIP, TC_MANUAL);
+    Template* tplstr_lines = Template::StringToTemplate(
+        one_test->input_template, STRIP_BLANK_LINES, TC_MANUAL);
+    Template* tplstr_ws = Template::StringToTemplate(
+        one_test->input_template, STRIP_WHITESPACE, TC_MANUAL);
 
     for (vector<string>::const_iterator out = one_test->output.begin();
          out != one_test->output.end(); ++out) {
@@ -429,7 +432,7 @@ static void TestExpand(const vector<Testdata>::const_iterator& begin,
       tplstr_lines->Expand(&output_strlines, dict);
       tplstr_ws->Expand(&output_strws, dict);
 
-      delete dict;   // it's our responsibility
+      delete dict;          // it's our responsibility
 
       // "out" is the output for STRIP_WHITESPACE mode.
       ASSERT_STRING_EQ(*out, output_ws);
@@ -469,6 +472,9 @@ static void TestExpand(const vector<Testdata>::const_iterator& begin,
       ASSERT_STRING_EQ(*out, output);
       delete dict;   // it's our responsibility
     }
+    delete tplstr_none;   // these are our responsibility too
+    delete tplstr_lines;
+    delete tplstr_ws;
   }
 }
 

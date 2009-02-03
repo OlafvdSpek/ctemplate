@@ -53,7 +53,7 @@ namespace HTMLPARSER_NAMESPACE {
 #endif /* __cplusplus */
 
 /* Generated state machine definition. */
-#include "jsparser_fsm.cc"
+#include "jsparser_fsm.h"
 
 /* List of keywords that can precede a regular expression literal. Taken from:
  * http://www.mozilla.org/js/language/js20-2000-07/rationale/syntax.html

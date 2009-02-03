@@ -206,20 +206,18 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // require default constructor to be public for that to compile, and
   // we'd rather now allow that.
   template<typename ValueType>
-  static void HashInsert(
-      stdext::hash_map<TemplateString, ValueType, TemplateString::Hash>* m,
-      TemplateString key, ValueType value);
+  static void HashInsert(stdext::hash_map<TemplateId, ValueType,
+                                  ctemplate::TemplateIdHasher>* m,
+                         TemplateString key, ValueType value);
 
-  typedef std::vector<TemplateDictionary *>  DictVector;
-  typedef stdext::hash_map<TemplateString, TemplateString, TemplateString::Hash>
-      VariableDict;
-  typedef stdext::hash_map<TemplateString, DictVector*, TemplateString::Hash>
-      SectionDict;
-  typedef stdext::hash_map<TemplateString, DictVector*, TemplateString::Hash>
-      IncludeDict;
+  // TODO(csilvers): change this to TemplateDictionary when
+  //                 we Get*Dictionaries() no longer returns a DictVector
+  typedef std::vector<TemplateDictionary *> DictVector;
+  typedef stdext::hash_map<TemplateId, TemplateString, ctemplate::TemplateIdHasher> VariableDict;
+  typedef stdext::hash_map<TemplateId, DictVector*, ctemplate::TemplateIdHasher> SectionDict;
+  typedef stdext::hash_map<TemplateId, DictVector*, ctemplate::TemplateIdHasher> IncludeDict;
   // This is used only for global_dict_, which is just like a VariableDict
-  typedef stdext::hash_map<TemplateString, TemplateString, TemplateString::Hash>
-      GlobalDict;
+  typedef stdext::hash_map<TemplateId, TemplateString, ctemplate::TemplateIdHasher> GlobalDict;
 
   // Constructor created for all children dictionaries. This includes
   // both a pointer to the parent dictionary and also the the
@@ -237,12 +235,19 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // Utility functions for copying a string into the arena.
   TemplateString Memdup(const char* s, size_t slen);
   TemplateString Memdup(const TemplateString& s) {
+    if (s.is_immutable()) {
+      return s;
+    }
     return Memdup(s.ptr_, s.length_);
   }
 
   // Used for recursive MakeCopy calls.
   TemplateDictionary* InternalMakeCopy(const std::string& name_of_copy,
                                        UnsafeArena* arena);
+
+  // Must be called whenever we add a value to one of the dictionaries above,
+  // to ensure that we can reconstruct the id -> string mapping.
+  static void AddToIdToNameMap(TemplateId id, const TemplateString& str);
 
   // Used to do the formatting for the SetFormatted*() functions
   static int StringAppendV(char* space, char** out,

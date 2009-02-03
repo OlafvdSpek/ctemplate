@@ -57,7 +57,9 @@
 // js_state: Current javascript state as returned by
 //           HtmlParser::javascript_state().
 //           Possible values: text, q, dq, regexp or comment.
+// in_css: True if currently inside a CSS section or attribute.
 // line_number: Integer value containing the current line count.
+// column_number: Integer value containing the current column count.
 // value_index: Integer value containing the current character index in the
 //              current value starting from 0.
 // reset: If true, resets the parser state to it's initial values.
@@ -131,7 +133,7 @@ template<> struct hash<string> {
 
 static int strcount(const string& str, char c) {
   int count = 0;
-  for (char* p = strchr(str.c_str(), c); p; p = strchr(p+1, c))
+  for (const char* p = strchr(str.c_str(), c); p; p = strchr(p+1, c))
     count++;
   return count;
 }
@@ -243,7 +245,10 @@ class HtmlparserCppTest {
   static const char kDirectiveEnd[];
 
   // Count the number of lines in a string.
-  static int CountLines(const string &str);
+  static int UpdateLines(const string &str, int line);
+
+  // Count the number of columns in a string.
+  static int UpdateColumns(const string &str, int column);
 
   // Converts a string to a boolean.
   static bool StringToBool(const string &value);
@@ -288,8 +293,14 @@ class HtmlparserCppTest {
   // Validate the javascript parser state against the provided state.
   void ValidateJavascriptState(const string &expected_state);
 
+  // Validates the parser css state against the provided boolean.
+  void ValidateInCss(const string &quoted);
+
   // Validate the line count against the expected count.
   void ValidateLine(const string &expected_line);
+
+  // Validate the line count against the expected count.
+  void ValidateColumn(const string &expected_column);
 
   // Validate the current parser value index against the provided index.
   void ValidateValueIndex(const string &value_index);
@@ -308,12 +319,14 @@ const char HtmlparserCppTest::kDirectiveEnd[] = "?>";
 
 const struct HtmlparserCppTest::IdNameMap
              HtmlparserCppTest::kStateMap[] = {
-  { HtmlParser::STATE_TEXT,    "text" },
-  { HtmlParser::STATE_TAG,     "tag" },
-  { HtmlParser::STATE_ATTR,    "attr" },
-  { HtmlParser::STATE_VALUE,   "value" },
-  { HtmlParser::STATE_COMMENT, "comment" },
-  { HtmlParser::STATE_ERROR,   "error" },
+  { HtmlParser::STATE_TEXT,     "text" },
+  { HtmlParser::STATE_TAG,      "tag" },
+  { HtmlParser::STATE_ATTR,     "attr" },
+  { HtmlParser::STATE_VALUE,    "value" },
+  { HtmlParser::STATE_COMMENT,  "comment" },
+  { HtmlParser::STATE_JS_FILE,  "js_file" },
+  { HtmlParser::STATE_CSS_FILE, "css_file" },
+  { HtmlParser::STATE_ERROR,    "error" },
   { 0, NULL }
 };
 
@@ -339,16 +352,36 @@ const struct HtmlparserCppTest::IdNameMap
 
 const struct HtmlparserCppTest::IdNameMap
              HtmlparserCppTest::kResetModeMap[] = {
-  { HtmlParser::MODE_HTML,    "html" },
-  { HtmlParser::MODE_JS,      "js" },
+  { HtmlParser::MODE_HTML,                "html" },
+  { HtmlParser::MODE_JS,                  "js" },
+  { HtmlParser::MODE_CSS,                 "css" },
+  { HtmlParser::MODE_HTML_IN_TAG,         "html_in_tag" },
   { 0, NULL }
 };
 
 
 // Count the number of lines in a string.
-int HtmlparserCppTest::CountLines(const string &str) {
-  return strcount(str, '\n');
+int HtmlparserCppTest::UpdateLines(const string &str, int line) {
+  return strcount(str, '\n') + line;
 }
+
+// Count the number of columns in a string.
+int HtmlparserCppTest::UpdateColumns(const string &str, int column) {
+  // Number of bytes since the last newline.
+  size_t last_newline = str.rfind('\n');
+
+  // If no newline was found, we just sum up all the characters in the
+  // annotation.
+  if (last_newline == string::npos) {
+    return static_cast<int>(column + str.size() +
+                            strlen(kDirectiveBegin) + strlen(kDirectiveEnd));
+  // If a newline was found, the new column count becomes the number of
+  // characters after the last newline.
+  } else {
+    return static_cast<int>(str.size() + strlen(kDirectiveEnd) - last_newline);
+  }
+}
+
 
 // Converts a string to a boolean.
 bool HtmlparserCppTest::StringToBool(const string &value) {
@@ -410,7 +443,7 @@ void HtmlparserCppTest::ValidateTag(const string &expected_tag) {
 // Validate the parser attribute name against the provided attribute name.
 void HtmlparserCppTest::ValidateAttribute(const string &expected_attr) {
   EXPECT_TRUE(parser_.attribute() != NULL);
-  EXPECT_TRUE(expected_attr == parser_.attribute());
+  EXPECT_EQ(expected_attr, parser_.attribute());
 }
 
 // Validate the parser attribute value contents against the provided string.
@@ -462,6 +495,12 @@ void HtmlparserCppTest::ValidateJavascriptState(const string &expected_state) {
   //"Unexpected javascript state at line " << parser_.line_number();
 }
 
+// Validates the parser css state against the provided boolean.
+void HtmlparserCppTest::ValidateInCss(const string &expected_in_css) {
+  bool in_css_bool = StringToBool(expected_in_css);
+  EXPECT_EQ(in_css_bool, parser_.InCss());
+}
+
 static bool safe_strto32(const char* str, int* value) {
   char* endptr;
   errno = 0;  // errno only gets set on errors
@@ -477,6 +516,14 @@ void HtmlparserCppTest::ValidateLine(const string &expected_line) {
   int line;
   CHECK(safe_strto32(expected_line.c_str(), &line));
   EXPECT_EQ(line, parser_.line_number());
+}
+
+// Validate the line count against the expected count.
+void HtmlparserCppTest::ValidateColumn(const string &expected_column) {
+  int column;
+  CHECK(safe_strto32(expected_column.c_str(), &column));
+  EXPECT_EQ(column, parser_.column_number());
+  //"Unexpected column count at line " << parser_.line_number();
 }
 
 // Validate the current parser value index against the provided index.
@@ -519,8 +566,12 @@ void HtmlparserCppTest::ProcessAnnotation(const string &annotation) {
       ValidateJavascriptQuoted(iter->second);
     } else if (iter->first.compare("js_state") == 0) {
       ValidateJavascriptState(iter->second);
+    } else if (iter->first.compare("in_css") == 0) {
+      ValidateInCss(iter->second);
     } else if (iter->first.compare("line_number") == 0) {
       ValidateLine(iter->second);
+    } else if (iter->first.compare("column_number") == 0) {
+      ValidateColumn(iter->second);
     } else if (iter->first.compare("value_index") == 0) {
       ValidateValueIndex(iter->second);
     } else if (iter->first.compare("save_context") == 0) {
@@ -578,7 +629,11 @@ void HtmlparserCppTest::ValidateFile(string filename) {
                             end_annotation - start_annotation);
     ProcessAnnotation(annotation_block);
 
-    parser_.set_line_number(parser_.line_number() + CountLines(annotation_block));
+    // Update line and column count.
+    parser_.set_line_number(UpdateLines(annotation_block,
+                                        parser_.line_number()));
+    parser_.set_column_number(UpdateColumns(annotation_block,
+                                            parser_.column_number()));
 
     start_html = end_annotation + strlen(kDirectiveEnd);
     start_annotation = buffer.find(kDirectiveBegin, start_html);
@@ -626,7 +681,7 @@ int main(int argc, char **argv) {
                               "context.html",
                               "reset.html",
                               "cdata.html",
-			      "line_count.html",
+			      "position.html",
 			       };
 
   for (const char** pfile = file_list;

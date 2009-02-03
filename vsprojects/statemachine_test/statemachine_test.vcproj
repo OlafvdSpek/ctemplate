@@ -3,7 +3,7 @@
 	ProjectType="Visual C++"
 	Version="7.10"
 	Name="statemachine_test"
-	ProjectGUID="{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}"
+	ProjectGUID="{A105C0FF-C28A-480B-8298-A66AB4F1F0CD}"
 	Keyword="Win32Proj">
 	<Platforms>
 		<Platform

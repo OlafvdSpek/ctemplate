@@ -3,6 +3,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libctemplate", "vsprojects\
 	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "compile_test", "vsprojects\compile_test\compile_test.vcproj", "{4B263748-5F0F-468C-8C5C-ED2682BB6BE3}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
+	EndProjectSection
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_dictionary_unittest", "vsprojects\template_dictionary_unittest\template_dictionary_unittest.vcproj", "{9160CC7F-3BC6-49F1-A158-70DF579376CA}"
 	ProjectSection(ProjectDependencies) = postProject
 		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
@@ -47,11 +52,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_test_util_test", "
 		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "statemachine_test", "vsprojects\statemachine_test\statemachine_test.vcproj", "{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "statemachine_test", "vsprojects\statemachine_test\statemachine_test.vcproj", "{A105C0FF-C28A-480B-8298-A66AB4F1F0CD}"
 	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "htmlparser_test", "vsprojects\htmlparser_test\htmlparser_test.vcproj", "{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "htmlparser_test", "vsprojects\htmlparser_test\htmlparser_test.vcproj", "{B105C0FF-C28A-480B-8298-A66AB4F1F0CD}"
 	ProjectSection(ProjectDependencies) = postProject
 		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
 	EndProjectSection
@@ -72,6 +77,10 @@ Global
 		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}.Debug.Build.0 = Debug|Win32
 		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}.Release.ActiveCfg = Release|Win32
 		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}.Release.Build.0 = Release|Win32
+		{4B263748-5F0F-468C-8C5C-ED2682BB6BE3}.Debug.ActiveCfg = Debug|Win32
+		{4B263748-5F0F-468C-8C5C-ED2682BB6BE3}.Debug.Build.0 = Debug|Win32
+		{4B263748-5F0F-468C-8C5C-ED2682BB6BE3}.Release.ActiveCfg = Release|Win32
+		{4B263748-5F0F-468C-8C5C-ED2682BB6BE3}.Release.Build.0 = Release|Win32
 		{9160CC7F-3BC6-49F1-A158-70DF579376CA}.Debug.ActiveCfg = Debug|Win32
 		{9160CC7F-3BC6-49F1-A158-70DF579376CA}.Debug.Build.0 = Debug|Win32
 		{9160CC7F-3BC6-49F1-A158-70DF579376CA}.Release.ActiveCfg = Release|Win32
@@ -108,14 +117,14 @@ Global
 		{87132061-D584-4388-A80B-D8560F8D0895}.Debug.Build.0 = Debug|Win32
 		{87132061-D584-4388-A80B-D8560F8D0895}.Release.ActiveCfg = Release|Win32
 		{87132061-D584-4388-A80B-D8560F8D0895}.Release.Build.0 = Release|Win32
-		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.ActiveCfg = Debug|Win32
-		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.Build.0 = Debug|Win32
-		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.ActiveCfg = Release|Win32
-		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.Build.0 = Release|Win32
-		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.ActiveCfg = Debug|Win32
-		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.Build.0 = Debug|Win32
-		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.ActiveCfg = Release|Win32
-		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.Build.0 = Release|Win32
+		{A105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.ActiveCfg = Debug|Win32
+		{A105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.Build.0 = Debug|Win32
+		{A105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.ActiveCfg = Release|Win32
+		{A105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.Build.0 = Release|Win32
+		{B105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.ActiveCfg = Debug|Win32
+		{B105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.Build.0 = Debug|Win32
+		{B105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.ActiveCfg = Release|Win32
+		{B105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.Build.0 = Release|Win32
 		{8FB1935F-FC23-465D-8C18-C1466A99D08D}.Debug.ActiveCfg = Debug|Win32
 		{8FB1935F-FC23-465D-8C18-C1466A99D08D}.Debug.Build.0 = Debug|Win32
 		{8FB1935F-FC23-465D-8C18-C1466A99D08D}.Release.ActiveCfg = Release|Win32

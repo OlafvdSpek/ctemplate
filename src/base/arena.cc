@@ -56,7 +56,7 @@ _START_GOOGLE_NAMESPACE_
 typedef u_int64_t uint64;
 #elif defined(HAVE_UINT64_T)
 typedef uint64_t uint64;
-#elif defined(HAVE___UINT64)
+#elif defined(HAVE___INT64)
 typedef unsigned __int64 uint64;
 #endif
 

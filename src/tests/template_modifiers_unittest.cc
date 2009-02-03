@@ -34,6 +34,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <string>
+#include <vector>
 #include "template_modifiers_internal.h"
 #include <google/template_dictionary.h>
 #include <google/template_emitter.h>
@@ -41,6 +43,7 @@
 #include "tests/template_test_util.h"
 
 using std::string;
+using std::vector;
 
 _START_GOOGLE_NAMESPACE_
 
@@ -93,6 +96,42 @@ class TemplateModifiersUnittest {
     dict.SetEscapedValue("invalid snippet",
                          "<b><A HREF='foo'\nid=\"bar\t\t&&{\vbaz\">",
                          template_modifiers::snippet_escape);
+    dict.SetEscapedValue("snippet with italics",
+                         "<i>foo<br> &amp; b<wbr>&shy;ar</i>",
+                         template_modifiers::snippet_escape);
+    dict.SetEscapedValue("unclosed snippet",
+                         "<b>foo",
+                         template_modifiers::snippet_escape);
+    dict.SetEscapedValue("snippet with interleaving",
+                         "<b><i>foo</b></i>",
+                         template_modifiers::snippet_escape);
+    dict.SetEscapedValue("unclosed interleaving",
+                         "<b><i><b>foo</b>",
+                         template_modifiers::snippet_escape);
+    dict.SetEscapedValue("unclosed",
+                         "<b><i>foo",
+                         template_modifiers::snippet_escape);
+    dict.SetEscapedValue("unterminated 1",
+                         "foo<",
+                         template_modifiers::snippet_escape);
+    dict.SetEscapedValue("unterminated 2",
+                         "foo<b",
+                         template_modifiers::snippet_escape);
+    dict.SetEscapedValue("unterminated 3",
+                         "foo</",
+                         template_modifiers::snippet_escape);
+    dict.SetEscapedValue("unterminated 4",
+                         "foo</b",
+                         template_modifiers::snippet_escape);
+    dict.SetEscapedValue("unterminated 5",
+                         "<b>foo</b",
+                         template_modifiers::snippet_escape);
+    dict.SetEscapedValue("close b i",
+                         "<i><b>foo",
+                         template_modifiers::snippet_escape);
+    dict.SetEscapedValue("close i b",
+                         "<b><i>foo",
+                         template_modifiers::snippet_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy snippet"), "foo");
@@ -101,6 +140,23 @@ class TemplateModifiersUnittest {
     ASSERT_STREQ(peer.GetSectionValue("invalid snippet"),
                  "<b>&lt;A HREF=&#39;foo&#39; id=&quot;bar  &&amp;{ "
                  "baz&quot;&gt;</b>");
+    ASSERT_STREQ(peer.GetSectionValue("snippet with italics"),
+                 "<i>foo<br> &amp; b<wbr>&shy;ar</i>");
+    ASSERT_STREQ(peer.GetSectionValue("unclosed snippet"),
+                 "<b>foo</b>");
+    ASSERT_STREQ(peer.GetSectionValue("snippet with interleaving"),
+                 "<b><i>foo</b></i>");
+    ASSERT_STREQ(peer.GetSectionValue("unclosed interleaving"),
+                 "<b><i>&lt;b&gt;foo</b></i>");
+    ASSERT_STREQ(peer.GetSectionValue("unclosed"),
+                 "<b><i>foo</i></b>");
+    ASSERT_STREQ(peer.GetSectionValue("unterminated 1"), "foo&lt;");
+    ASSERT_STREQ(peer.GetSectionValue("unterminated 2"), "foo&lt;b");
+    ASSERT_STREQ(peer.GetSectionValue("unterminated 3"), "foo&lt;/");
+    ASSERT_STREQ(peer.GetSectionValue("unterminated 4"), "foo&lt;/b");
+    ASSERT_STREQ(peer.GetSectionValue("unterminated 5"), "<b>foo&lt;/b</b>");
+    ASSERT_STREQ(peer.GetSectionValue("close b i"), "<i><b>foo</b></i>");
+    ASSERT_STREQ(peer.GetSectionValue("close i b"), "<b><i>foo</i></b>");
   }
 
   static void TestPreEscape() {
@@ -687,6 +743,48 @@ class TemplateModifiersUnittest {
     // Extended modifier should not match any other except itself.
     ASSERT(!CheckXSSAlternative("x-bla", "", "x-foo", ""));
   }
+
+  // This is a basic sanity check for the GetDefaultModifierForXXX() functions.
+  // More testing happens in AutoEscaper code which uses them.
+  static void TestDefaultModifiersForContext() {
+    const template_modifiers::ModifierAndValue* modval;
+    string print_mods;
+
+    const vector<const template_modifiers::ModifierAndValue*> modvals_html =
+        template_modifiers::GetDefaultModifierForHtml();
+    ASSERT(1 == modvals_html.size());
+    print_mods = template_modifiers::PrettyPrintModifiers(modvals_html, ";");
+    ASSERT_STREQ(":h", print_mods.c_str());
+    modval = modvals_html.front();
+    ASSERT(modval->modifier_info->modifier ==
+           &template_modifiers::html_escape);
+
+    const vector<const template_modifiers::ModifierAndValue*> modvals_js =
+        template_modifiers::GetDefaultModifierForJs();
+    ASSERT(1 == modvals_js.size());
+    print_mods = template_modifiers::PrettyPrintModifiers(modvals_js, ";");
+    ASSERT_STREQ(":j", print_mods.c_str());
+    modval = modvals_js.front();
+    ASSERT(modval->modifier_info->modifier ==
+           &template_modifiers::javascript_escape);
+
+    const vector<const template_modifiers::ModifierAndValue*> modvals_xml =
+        template_modifiers::GetDefaultModifierForXml();
+    ASSERT(1 == modvals_xml.size());
+    print_mods = template_modifiers::PrettyPrintModifiers(modvals_xml, ";");
+    ASSERT_STREQ(":xml_escape", print_mods.c_str());
+    modval = modvals_xml.front();
+    ASSERT(modval->modifier_info->modifier == &template_modifiers::xml_escape);
+
+    const vector<const template_modifiers::ModifierAndValue*> modvals_json =
+        template_modifiers::GetDefaultModifierForJson();
+    ASSERT(1 == modvals_json.size());
+    print_mods = template_modifiers::PrettyPrintModifiers(modvals_json, ";");
+    ASSERT_STREQ(":j", print_mods.c_str());
+    modval = modvals_json.front();
+    ASSERT(modval->modifier_info->modifier ==
+           &template_modifiers::javascript_escape);
+  }
 };
 
 _END_GOOGLE_NAMESPACE_
@@ -710,6 +808,7 @@ int main(int argc, char** argv) {
   TemplateModifiersUnittest::TestFindModifier();
   TemplateModifiersUnittest::TestAddModifier();
   TemplateModifiersUnittest::TestXSSAlternatives();
+  TemplateModifiersUnittest::TestDefaultModifiersForContext();
 
   printf("DONE\n");
   return 0;

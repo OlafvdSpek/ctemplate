@@ -84,6 +84,7 @@ DLLDEF_DEFINES="\
          -e "s!@ac_google_namespace@!$GOOGLE_NAMESPACE!g" \
          -e "s!@ac_google_start_namespace@!$_START_GOOGLE_NAMESPACE_!g" \
          -e "s!@ac_htmlparser_namespace@!$HTMLPARSER_NAMESPACE!g" \
+         -e "s!@ac_cv_uint64@!unsigned __int64!g" \
          -e "s!\\bhash\\b!hash_compare!g" \
          "$file" > "$outfile"
   done

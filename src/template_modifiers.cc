@@ -127,7 +127,9 @@ PreEscape pre_escape;
 void SnippetEscape::Modify(const char* in, size_t inlen,
                            const PerExpandData*,
                            ExpandEmitter* out, const string& arg) const {
-  bool inside_b = false;
+  enum { NONE, B, I, B_THEN_I, I_THEN_B } state = NONE;
+  static const char* kCloser[] =
+      { "", "</b>", "</i>", "</i></b>", "</b></i>" };
   const char * const end = in + inlen;
   for (const char *c = in; c < end; ++c) {
     switch (*c) {
@@ -160,15 +162,27 @@ void SnippetEscape::Modify(const char* in, size_t inlen,
       }
       case '<': {
         const char* valid_tag = NULL;
-        if (!strncmp(c, "<b>", 3) && !inside_b) {
-          inside_b = true;
+        const char* const next_char = c + 1;
+        const int chars_left = end - next_char;
+        if ((chars_left >= 2) && !memcmp(next_char, "b>", 2)
+            && (state == NONE || state == I)) {
+          state = (state == I) ? I_THEN_B : B;
           valid_tag = "<b>";
-        } else if (!strncmp(c, "</b>", 4) && inside_b) {
-          inside_b = false;
+        } else if ((chars_left >= 2) && !memcmp(next_char, "i>", 2)
+                   && (state == NONE || state == B)) {
+          state = (state == B) ? B_THEN_I : I;
+          valid_tag = "<i>";
+        } else if ((chars_left >= 3) && !memcmp(next_char, "/b>", 3)
+                   && (state != NONE && state != I)) {
+          state = (state == B) ? NONE : I;
           valid_tag = "</b>";
-        } else if (!strncmp(c, "<br>", 4)) {
+        } else if ((chars_left >= 3) && !memcmp(next_char, "/i>", 3)
+                   && (state != NONE && state != B)) {
+          state = (state == I) ? NONE : B;
+          valid_tag = "</i>";
+        } else if ((chars_left >= 3) && !memcmp(next_char, "br>", 3)) {
           valid_tag = "<br>";
-        } else if (!strncmp(c, "<wbr>", 5)) {
+        } else if ((chars_left >= 4) && !memcmp(next_char, "wbr>", 4)) {
           valid_tag = "<wbr>";
         }
         if (valid_tag) {
@@ -185,8 +199,8 @@ void SnippetEscape::Modify(const char* in, size_t inlen,
       }
     }
   }
-  if (inside_b) {
-    APPEND("</b>");
+  if (state != NONE) {
+    out->Emit(kCloser[state]);
   }
 }
 SnippetEscape snippet_escape;
@@ -874,7 +888,7 @@ string PrettyPrintModifiers(const vector<const ModifierAndValue*>& modvals,
 // An empty vector indicates an error occurred. Currently we never need
 // to chain escaping directives hence on success, the vector is always of
 // size 1. This may change in the future.
-const vector<const ModifierAndValue*> GetModifierForHtmlJs(
+vector<const ModifierAndValue*> GetModifierForHtmlJs(
     HtmlParser* htmlparser, string* error_msg) {
   assert(htmlparser);
   assert(error_msg);
@@ -1006,7 +1020,11 @@ const vector<const ModifierAndValue*> GetModifierForHtmlJs(
     }
     case HtmlParser::STATE_COMMENT:
     case HtmlParser::STATE_TEXT:{
-      modvals.push_back(g_am_dirs[AM_HTML]);
+      // Apply :h to regular HTML text and :c if within a style tag.
+      if (htmlparser->InCss())
+        modvals.push_back(g_am_dirs[AM_STYLE]);
+      else
+        modvals.push_back(g_am_dirs[AM_HTML]);
       assert(modvals.size() == 1);
       return modvals;
     }
@@ -1019,19 +1037,51 @@ const vector<const ModifierAndValue*> GetModifierForHtmlJs(
   return modvals;   // Empty
 }
 
-// TODO(jad): Memoize - they don't depend on parser context (from csilvers).
-const vector<const ModifierAndValue*> GetModifierForXml(HtmlParser* htmlparser,
+// TODO(jad): Memoize all GetModifierForXXX functions below.
+//            They don't depend on parser context (from csilvers).
+vector<const ModifierAndValue*> GetModifierForCss(HtmlParser* htmlparser,
+                                                  string* error_msg) {
+  vector<const ModifierAndValue*> modvals;
+  modvals.push_back(g_am_dirs[AM_STYLE]);
+  return modvals;
+}
+
+vector<const ModifierAndValue*> GetModifierForXml(HtmlParser* htmlparser,
                                                         string* error_msg) {
   vector<const ModifierAndValue*> modvals;
   modvals.push_back(g_am_dirs[AM_XML]);
   return modvals;
 }
 
-const vector<const ModifierAndValue*> GetModifierForJson(HtmlParser* htmlparser,
+vector<const ModifierAndValue*> GetModifierForJson(HtmlParser* htmlparser,
                                                          string* error_msg) {
   vector<const ModifierAndValue*> modvals;
   modvals.push_back(g_am_dirs[AM_JS]);
   return modvals;
+}
+
+vector<const ModifierAndValue*> GetDefaultModifierForHtml() {
+  vector<const ModifierAndValue*> modvals;
+  modvals.push_back(g_am_dirs[AM_HTML]);
+  return modvals;
+}
+
+vector<const ModifierAndValue*> GetDefaultModifierForJs() {
+  vector<const ModifierAndValue*> modvals;
+  modvals.push_back(g_am_dirs[AM_JS]);
+  return modvals;
+}
+
+vector<const ModifierAndValue*> GetDefaultModifierForCss() {
+  return GetModifierForCss(NULL, NULL);
+}
+
+vector<const ModifierAndValue*> GetDefaultModifierForXml() {
+  return GetModifierForXml(NULL, NULL);
+}
+
+vector<const ModifierAndValue*> GetDefaultModifierForJson() {
+  return GetModifierForJson(NULL, NULL);
 }
 
 }  // namespace template_modifiers

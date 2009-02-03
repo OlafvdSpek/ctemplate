@@ -156,11 +156,12 @@ extern CTEMPLATE_DLL_DECL const ModifierInfo* FindModifier(
 // :<modifier1>[=<val1>]<seperator>[:<modifier2>][=<val2>]...
 // If the modifier does not have a short_name, we print its long_name instead.
 // The separator may be an empty string.
-extern std::string PrettyPrintModifiers(
+extern CTEMPLATE_DLL_DECL std::string PrettyPrintModifiers(
     const std::vector<const ModifierAndValue*>& modvals,
     const std::string& separator);
 
-extern std::string PrettyPrintOneModifier(const ModifierAndValue& modval);
+extern CTEMPLATE_DLL_DECL std::string PrettyPrintOneModifier(
+    const ModifierAndValue& modval);
 
 // Returns the appropriate escaping directives to escape content in an
 // HTML or Javascript context. HTML and Javascript contexts exercise
@@ -170,14 +171,26 @@ extern std::string PrettyPrintOneModifier(const ModifierAndValue& modval);
 // Currently, on success, we always return a vector of length 1, meaning
 // we never need to chain escaping directives. However, this is subject
 // to change.
-extern const std::vector<const ModifierAndValue*> GetModifierForHtmlJs(
+extern CTEMPLATE_DLL_DECL
+std::vector<const ModifierAndValue*> GetModifierForHtmlJs(
+    HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, std::string* error_msg);
+
+// Returns the appropriate escaping directives to escape content
+// in a CSS context.
+// Currently always returns cleanse_css and hence does not require the
+// parser nor can it fail. This will change once the parser is able to
+// distinguish between different CSS contexts, in particular CSS properties
+// that take URLs, which require a different escaping function (non-existent).
+extern CTEMPLATE_DLL_DECL
+std::vector<const ModifierAndValue*> GetModifierForCss(
     HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, std::string* error_msg);
 
 // Returns the appropriate escaping directives to escape content
 // in an XML context.
 // Currently always returns xml_escape and hence does not require the
 // parser nor can it fail. This may change once the parser can parse XML.
-extern const std::vector<const ModifierAndValue*> GetModifierForXml(
+extern CTEMPLATE_DLL_DECL
+std::vector<const ModifierAndValue*> GetModifierForXml(
     HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, std::string* error_msg);
 
 // Returns the appropriate escaping directives to escape content
@@ -185,8 +198,40 @@ extern const std::vector<const ModifierAndValue*> GetModifierForXml(
 // Currently always returns javascript_escape and hence does not require the
 // parser nor can it fail. This may change once the parser can parse
 // and distinguish different contexts within JSON.
-extern const std::vector<const ModifierAndValue*> GetModifierForJson(
+extern CTEMPLATE_DLL_DECL
+std::vector<const ModifierAndValue*> GetModifierForJson(
     HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, std::string* error_msg);
+
+// Return the default escaping directives to escape content for the given
+// context. These methods are useful when the caller does not have
+// access to a parser or when the parsed failed to parse.
+
+// GetDefaultModifierForHtml
+// GetDefaultModifierForJs
+// GetDefaultModifierForCss
+// GetDefaultModifierForXxml
+// GetDefaultModifierForJson
+//   These functions are different from the GetModifierForXXX functions
+//   in that they do not take a parser and cannot fail. They simply
+//   return the most common escaping directive for the context they refer to.
+//
+//   Some of these contexts (currently HTML and Javascript) have more than
+//   one escaping directive associated with them and so we usually rely on
+//   the current state of the parser to determine which directive to chose.
+//   However, in some cases, the parser may fail to parse a given input
+//   and so we may want to select the most likely escaping directive that
+//   applies to the given context. Hence we use these functions instead of
+//   the corresponding GetModifierForXXX ones.
+extern CTEMPLATE_DLL_DECL
+std::vector<const ModifierAndValue*> GetDefaultModifierForHtml();
+extern CTEMPLATE_DLL_DECL
+std::vector<const ModifierAndValue*> GetDefaultModifierForJs();
+extern CTEMPLATE_DLL_DECL
+std::vector<const ModifierAndValue*> GetDefaultModifierForCss();
+extern CTEMPLATE_DLL_DECL
+std::vector<const ModifierAndValue*> GetDefaultModifierForXml();
+extern CTEMPLATE_DLL_DECL
+std::vector<const ModifierAndValue*> GetDefaultModifierForJson();
 
 }  // namespace template_modifiers
 

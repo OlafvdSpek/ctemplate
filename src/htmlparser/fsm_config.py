@@ -37,11 +37,13 @@
 
 __author__ = 'falmeida@google.com (Filipe Almeida)'
 
-from UserDict import DictMixin
+class OrderedDict:
+  """Ordered dictionary implementation."""
 
-
-class OrderedDict(DictMixin):
-  """Ordered dictionary implementation based on a DictMixin."""
+  # Define the minimum functionality we need for our application.
+  # Easiser would be to subclass from UserDict.DictMixin, and only
+  # define __getitem__, __setitem__, __delitem__, and keys, but that's
+  # not as portable.  We don't need to define much more, so we just do.
 
   def __init__(self):
     self._dict = {}
@@ -53,7 +55,6 @@ class OrderedDict(DictMixin):
   def __setitem__(self, key, value):
     if key not in self._keys:
       self._keys.append(key)
-
     self._dict[key] = value
 
   def __delitem__(self, key):
@@ -63,6 +64,17 @@ class OrderedDict(DictMixin):
   def keys(self):
     return self._keys
 
+  # Below are all we have to define in addition to what DictMixin would need
+  def __len__(self):
+    return len(self.keys())
+
+  def __contains__(self, key):
+    return self.has_key(key)
+
+  def __iter__(self):
+    # It's not as portable -- though it would be more space-efficient -- to do
+    #   for k in self.keys(): yield k
+    return iter(self.keys())
 
 class State(object):
   """Contains information about a specific state."""
