@@ -62,12 +62,14 @@
 // column_number: Integer value containing the current column count.
 // value_index: Integer value containing the current character index in the
 //              current value starting from 0.
+// is_url_start: True if if this is the first character of a url attribute.
 // reset: If true, resets the parser state to it's initial values.
 // reset_mode: Similar to reset but receives an argument that changes the
 //             parser mode into either mode html or mode js.
 // insert_text: Executes HtmlParser::InsertText() if the argument is true.
 
 #include "config_for_unittests.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <errno.h>
@@ -82,7 +84,6 @@
 
 using std::string;
 using std::vector;
-using HASH_NAMESPACE::hash_map;
 using std::pair;
 using google::ctemplate::PathJoin;
 using HTMLPARSER_NAMESPACE::HtmlParser;
@@ -116,6 +117,7 @@ using HTMLPARSER_NAMESPACE::JavascriptParser;
 #define PFATAL(s)  do { perror(s); exit(1); } while (0)
 
 
+#ifndef HAVE_UNORDERED_MAP    // tr1's hash has built-in support for string
 namespace HASH_NAMESPACE {
 template<> struct hash<string> {
   size_t operator()(const string& k) const {
@@ -130,6 +132,7 @@ template<> struct hash<string> {
   static const size_t min_buckets = 8;
 };
 }
+#endif
 
 static int strcount(const string& str, char c) {
   int count = 0;
@@ -199,7 +202,11 @@ class HtmlparserCppTest {
   // annotations against the html parser state.
   void ValidateFile(string filename);
 
-  typedef hash_map<string, HtmlParser *> ContextMap;
+#ifdef HAVE_UNORDERED_MAP
+  typedef HASH_NAMESPACE::unordered_map<string, HtmlParser *> ContextMap;
+#else
+  typedef HASH_NAMESPACE::hash_map<string, HtmlParser *> ContextMap;
+#endif
 
   void SetUp() {
     parser_.Reset();
@@ -304,6 +311,9 @@ class HtmlparserCppTest {
 
   // Validate the current parser value index against the provided index.
   void ValidateValueIndex(const string &value_index);
+
+  // Validate the parser is_url_start value against the provided one.
+  void ValidateIsUrlStart(const string &expected_is_url_start);
 
   // Map containing the registers where the parser context is saved.
   ContextMap contextMap;
@@ -533,6 +543,14 @@ void HtmlparserCppTest::ValidateValueIndex(const string &expected_value_index) {
   EXPECT_EQ(index, parser_.ValueIndex());
 }
 
+// Validate the parser is_url_start value against the provided one.
+void HtmlparserCppTest::ValidateIsUrlStart(
+    const string &expected_is_url_start) {
+  bool is_url_start_bool = StringToBool(expected_is_url_start);
+  EXPECT_EQ(is_url_start_bool, parser_.IsUrlStart());
+  // << "Unexpected is_url_start value at line " << parser_.line_number();
+}
+
 // Validate an annotation string against the current parser state.
 //
 // Split the annotation into a list of key value pairs and call the appropriate
@@ -574,6 +592,8 @@ void HtmlparserCppTest::ProcessAnnotation(const string &annotation) {
       ValidateColumn(iter->second);
     } else if (iter->first.compare("value_index") == 0) {
       ValidateValueIndex(iter->second);
+    } else if (iter->first.compare("is_url_start") == 0) {
+      ValidateIsUrlStart(iter->second);
     } else if (iter->first.compare("save_context") == 0) {
       if (contextMap.find(iter->second) == contextMap.end()) {
         contextMap[iter->second] = new HtmlParser();

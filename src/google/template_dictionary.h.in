@@ -50,9 +50,10 @@
 #include <stdlib.h>      // for NULL
 #include <stdarg.h>      // for StringAppendV()
 #include <sys/types.h>   // for size_t
+#include <functional>    // for less<>
+#include <map>
 #include <string>
 #include <vector>
-#include @ac_cv_cxx_hash_map@
 #include <google/template_dictionary_interface.h>
 #include <google/template_string.h>
 #include <google/template_modifiers.h>
@@ -62,6 +63,56 @@
 @ac_google_start_namespace@
 
 class UnsafeArena;
+template<typename A, int B, typename C, typename D> class small_map;
+template<typename NormalMap> class small_map_default_init;  // in small_map.h
+
+template <class T> class ArenaAllocator {
+ public:
+  typedef T value_type;
+  typedef size_t size_type;
+  typedef ptrdiff_t difference_type;
+
+  typedef T* pointer;
+  typedef const T* const_pointer;
+  typedef T& reference;
+  typedef const T& const_reference;
+  pointer address(reference r) const  { return &r; }
+  const_pointer address(const_reference r) const  { return &r; }
+  size_type max_size() const  { return size_t(-1) / sizeof(T); }
+
+  // DO NOT USE! The default constructor is for gcc3 compatibility only.
+  ArenaAllocator() : arena_(0) { }
+  ArenaAllocator(UnsafeArena* arena) : arena_(arena) { }
+  ~ArenaAllocator() { }
+
+  pointer allocate(size_type n, std::allocator<void>::const_pointer /*hint*/ = 0);
+  void deallocate(pointer p, size_type n);
+  void construct(pointer p, const T & val) {
+    new(reinterpret_cast<void*>(p)) T(val);
+  }
+  void destroy(pointer p) { p->~T(); }
+
+  UnsafeArena* arena(void) const { return arena_; }
+
+  template<class U> struct rebind {
+    typedef ArenaAllocator<U> other;
+  };
+
+  template<class U> ArenaAllocator(const ArenaAllocator<U>& other)
+    : arena_(other.arena()) { }
+
+  template<class U> bool operator==(const ArenaAllocator<U>& other) const {
+    return arena_ == other.arena();
+  }
+
+  template<class U> bool operator!=(const ArenaAllocator<U>& other) const {
+    return arena_ != other.arena();
+  }
+
+ protected:
+  static const int kAlignment;
+  UnsafeArena* arena_;
+};
 
 class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInterface {
  public:
@@ -72,6 +123,10 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
   explicit TemplateDictionary(const std::string& name,
                               UnsafeArena* arena=NULL);
   ~TemplateDictionary();
+
+  // If you want to be explicit, you can use NO_ARENA as a synonym to NULL.
+  static UnsafeArena* const NO_ARENA;
+
   const char* name() const { return name_; }
 
   // Returns a recursive copy of this dictionary.  This dictionary
@@ -112,6 +167,17 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
   // fairly rare, we don't provide variants.
   void SetTemplateGlobalValue(const TemplateString variable,
                               const TemplateString value);
+
+  // These routines are like SetValue and SetTemplateGlobalValue, but
+  // they do not make a copy of the input data. THE CALLER IS
+  // RESPONSIBLE FOR ENSURING THE PASSED-IN STRINGS LIVE FOR AT LEAST
+  // AS LONG AS THIS DICTIONARY! In general, they yield a quite minor
+  // performance increase for significant increased code fragility,
+  // so do not use them unless you really need the speed improvements.
+  void SetValueWithoutCopy(const TemplateString variable,
+                           const TemplateString value);
+  void SetTemplateGlobalValueWithoutCopy(const TemplateString variable,
+                                         const TemplateString value);
 
 
   // --- Routines for SECTIONS
@@ -192,27 +258,51 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
   friend class VariableTemplateNode;  // for access to GetSectionValue(), etc.
   // For unittesting code using a TemplateDictionary.
   friend class TemplateDictionaryPeer;
-  // TODO(csilvers): get these classes to use the peer class
-  friend class TemplateDictionaryUnittest;
-  friend class TemplateSetGlobalsUnittest;
+
+  // We need this functor to tell small_map how to create a map<> when
+  // it decides to do so: we want it to create that map on the arena.
+  class map_arena_init;
+
+  typedef std::vector<TemplateDictionary*,
+                      ArenaAllocator<TemplateDictionary*> >
+      DictVector;
+  // The '4' here is the size where small_map switches from vector<> to map<>.
+  typedef small_map<std::map<TemplateId, TemplateString, std::less<TemplateId>,
+                             ArenaAllocator<std::pair<const TemplateId, TemplateString> > >,
+                    4, std::equal_to<TemplateId>, map_arena_init>
+      VariableDict;
+  typedef small_map<std::map<TemplateId, DictVector*, std::less<TemplateId>,
+                             ArenaAllocator<std::pair<const TemplateId, DictVector*> > >,
+                    4, std::equal_to<TemplateId>, map_arena_init>
+      SectionDict;
+  typedef small_map<std::map<TemplateId, DictVector*, std::less<TemplateId>,
+                             ArenaAllocator<std::pair<const TemplateId, DictVector*> > >,
+                    4, std::equal_to<TemplateId>, map_arena_init>
+      IncludeDict;
+  // This is used only for global_dict_, which is just like a VariableDict
+  // but does not bother with an arena (since this memory lives forever).
+  typedef small_map< std::map<TemplateId, TemplateString, std::less<TemplateId> >,
+                     4, std::equal_to<TemplateId>,
+                     small_map_default_init<
+                       std::map<TemplateId, TemplateString,
+                                std::less<TemplateId> > > >
+      GlobalDict;
+
+  // These are helper functions to allocate the parts of the dictionary
+  // on the arena.
+  template<typename T> inline void LazilyCreateDict(T** dict);
+  inline DictVector* CreateDictVector();
+  inline TemplateDictionary* CreateTemplateSubdict(
+      const std::string& name, UnsafeArena* arena, TemplateDictionary* parent_dict,
+      TemplateDictionary* template_global_dict_owner);
 
   // This is a helper function to insert <key,value> into m.
-  // Normally, we'd just use m[key] == value, but hash_map rules
+  // Normally, we'd just use m[key] = value, but map rules
   // require default constructor to be public for that to compile, and
-  // we'd rather now allow that.
-  template<typename ValueType>
-  static void HashInsert(@ac_cv_cxx_hash_namespace@::hash_map<TemplateId, ValueType,
-                                  ctemplate::TemplateIdHasher>* m,
-                         TemplateString key, ValueType value);
-
-  // TODO(csilvers): change this to TemplateDictionary when
-  //                 we Get*Dictionaries() no longer returns a DictVector
-  typedef std::vector<TemplateDictionary *> DictVector;
-  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateId, TemplateString, ctemplate::TemplateIdHasher> VariableDict;
-  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateId, DictVector*, ctemplate::TemplateIdHasher> SectionDict;
-  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateId, DictVector*, ctemplate::TemplateIdHasher> IncludeDict;
-  // This is used only for global_dict_, which is just like a VariableDict
-  typedef @ac_cv_cxx_hash_namespace@::hash_map<TemplateId, TemplateString, ctemplate::TemplateIdHasher> GlobalDict;
+  // for some types we'd rather not allow that.  HashInsert also inserts
+  // the key into an id(key)->key map, to allow for id-lookups later.
+  template<typename MapType, typename ValueType>
+  static void HashInsert(MapType* m, TemplateString key, ValueType value);
 
   // Constructor created for all children dictionaries. This includes
   // both a pointer to the parent dictionary and also the the
@@ -237,8 +327,11 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
   }
 
   // Used for recursive MakeCopy calls.
-  TemplateDictionary* InternalMakeCopy(const std::string& name_of_copy,
-                                       UnsafeArena* arena);
+  TemplateDictionary* InternalMakeCopy(
+      const std::string& name_of_copy,
+      UnsafeArena* arena,
+      TemplateDictionary* parent_dict,
+      TemplateDictionary* template_global_dict_owner);
 
   // Must be called whenever we add a value to one of the dictionaries above,
   // to ensure that we can reconstruct the id -> string mapping.
@@ -249,21 +342,19 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
                            const char* format, va_list ap);
 
   // How Template::Expand() and its children access the template-dictionary.
+  // These fill the API required by TemplateDictionaryInterface.
   // TODO(csilvers): have GetSectionValue return a TemplateString.
-  const char *GetSectionValue(const TemplateString& variable) const;
-  bool IsHiddenSection(const TemplateString& name) const;
-  const DictVector& GetDictionaries(const TemplateString& section_name) const;
-  bool IsHiddenTemplate(const TemplateString& name) const;
-  const char *GetIncludeTemplateName(const TemplateString& variable,
-                                     int dictnum) const;
-  const DictVector& GetTemplateDictionaries(
-      const TemplateString& include_name) const;
+  virtual const char *GetSectionValue(const TemplateString& variable) const;
+  virtual bool IsHiddenSection(const TemplateString& name) const;
+  virtual bool IsHiddenTemplate(const TemplateString& name) const;
+  virtual const char *GetIncludeTemplateName(const TemplateString& variable,
+                                             int dictnum) const;
 
-  // CreateTemplateIerator
+  // CreateTemplateIterator
   //   This is SectionIterator exactly, just with a different name to
   //   self-document the fact the value applies to a template include.
   // Caller frees return value.
-  virtual TemplateDictionaryInterface::IteratorProxy CreateTemplateIterator(
+  virtual TemplateDictionaryInterface::Iterator* CreateTemplateIterator(
       const TemplateString& section_name) const;
 
   // CreateSectionIterator
@@ -272,28 +363,30 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
   //   implementation checks the local dictionary itself, not the template-wide
   //   dictionary or the global dictionary.
   // Caller frees return value.
-  virtual TemplateDictionaryInterface::IteratorProxy CreateSectionIterator(
+  virtual TemplateDictionaryInterface::Iterator* CreateSectionIterator(
       const TemplateString& section_name) const;
 
   // TemplateDictionary-specific implementation of dictionary iterators.
+  template <typename T>   // T is TemplateDictionary::const_iterator
   class Iterator : public TemplateDictionaryInterface::Iterator {
    protected:
     friend class TemplateDictionary;
-    Iterator(DictVector::const_iterator begin,
-             DictVector::const_iterator end)
-        : begin_(begin), end_(end) {
-    }
-
+    Iterator(T begin, T end) : begin_(begin), end_(end) { }
    public:
-    virtual ~Iterator() {
-    }
-
+    virtual ~Iterator() { }
     virtual bool HasNext() const;
     virtual const TemplateDictionaryInterface& Next();
    private:
-    DictVector::const_iterator begin_;
-    const DictVector::const_iterator end_;
+    T begin_;
+    const T end_;
   };
+
+  // A small helper factory function for Iterator
+  template <typename T>
+  static Iterator<typename T::const_iterator>* MakeIterator(const T& dv) {
+    return new Iterator<typename T::const_iterator>(dv.begin(), dv.end());
+  }
+
 
   // The "name" of the dictionary for debugging output (Dump, etc.)
   // The arena, also set at construction time.

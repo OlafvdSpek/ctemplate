@@ -129,6 +129,77 @@ attr_quoted=true ?>'>
 
 <?state state=text?>
 
+<!-- is_url_start tests -->
+
+<a href="<?state is_url_start=true?>"></a>
+<a href="http://<?state is_url_start=false?>"></a>
+<a href="http://www.google.com?q=<?state is_url_start=false?>"></a>
+<b font="<?state is_url_start=false?>"></b>
+<b font="http://www.google.com?q=<?state is_url_start=false?>"></b>
+<?state is_url_start=false?>
+
+<!-- <?state is_url_start=false?> -->
+
+<!-- Tag opening tests -->
+
+<a <?state state=tag?>></a><?state state=text?>
+<br <?state state=tag?>></br><?state state=text?>
+< br <?state state=text?>></br><?state state=text?>
+<< <?state state=text?>><?state state=text?>
+<  <?state state=text?> alt="<?state state=text?>">
+</blah <?state state=tag?>><?state state=text?>
+<<i<?state state=tag?>><?state state=text?></i>
+
+
+<!-- We do allow numbers to open html tags, which is not how most browsers
+behave. We still test this anyway. -->
+<0 <?state state=tag?>><?state state=text?>
+<1 <?state state=tag?>><?state state=text?>
+
+<!-- meta redirect url tests. -->
+<meta http-equiv="refresh" content="5;URL=<?state attr_type=uri, is_url_start=true?>">
+<meta http-equiv="refresh" content="10;URL=<?state attr_type=uri, is_url_start=true?>">
+<meta http-equiv="refresh" content="5 ;URL=<?state attr_type=uri, is_url_start=true?>">
+<meta http-equiv="refresh" content=" 5 ;URL=<?state attr_type=uri, is_url_start=true?>">
+<?state attr_type=none, is_url_start=false?>
+<meta http-equiv="refresh" content=" 5 ;    url   =   <?state attr_type=uri, is_url_start=true?>">
+<meta http-equiv="refresh" content="5;Url=<?state attr_type=uri, is_url_start=true?>">
+<meta http-equiv="refresh" content="5;UrL=<?state attr_type=uri, is_url_start=true?>">
+<meta http-equiv="refresh" content="5;uRL=<?state attr_type=uri, is_url_start=true?>">
+<?state attr_type=none, is_url_start=false?>
+<meta http-equiv="refresh" content="5;uRL=http://<?state attr_type=uri, is_url_start=false?>">
+<meta http-equiv="refresh" content="5 ; URL=http://www.google.com/<?state attr_type=uri, is_url_start=false?>">
+<meta http-equiv="refresh" content="5;URL=/<?state attr_type=uri, is_url_start=false?>">
+<meta http-equiv="refresh" content="5;URL=../<?state attr_type=uri, is_url_start=false?>">
+<meta http-equiv="refresh" content="             123456789    ;    url    =  ../<?state attr_type=uri, is_url_start=false?>">
+
+<!-- Quoted url's -->
+<meta http-equiv="refresh" content="5;URL = '<?state attr_type=uri, is_url_start=true?>">
+<meta http-equiv="refresh" content='5;URL = "<?state attr_type=uri, is_url_start=true?>"'>
+<meta http-equiv="refresh" content="5;URL = ' <?state attr_type=uri, is_url_start=false?>">
+<meta http-equiv="refresh" content='5;URL = " <?state attr_type=uri, is_url_start=false?>"'>
+
+<?state attr_type=none, is_url_start=false?>
+
+<meta http-equiv="refresh" content="5x;URL=<?state attr_type=regular, is_url_start=false?>">
+<meta http-equiv="refresh" content="<?state attr_type=regular, is_url_start=false?>">
+<meta http-equiv="refresh" content="5<?state attr_type=regular, is_url_start=false?>">
+<meta http-equiv="refresh" content="5;<?state attr_type=regular, is_url_start=false?>">
+<?state attr_type=none, is_url_start=false?>
+<meta http-equiv="refresh" content="5;U<?state attr_type=regular, is_url_start=false?>">
+<meta http-equiv="refresh" content="5;UR<?state attr_type=regular, is_url_start=false?>">
+<meta http-equiv="refresh" content="5;URL<?state attr_type=regular, is_url_start=false?>">
+<meta http-equiv="refresh" content="5;URL <?state attr_type=regular, is_url_start=false?>">
+<?state attr_type=none, is_url_start=false?>
+<meta http-equiv="refresh" content="5x;URL= <?state attr_type=regular, is_url_start=false?>">
+<meta http-equiv="refresh" content="5;UR L <?state attr_type=regular, is_url_start=false?>">
+<meta http-equiv="refresh" content="URL = <?state attr_type=regular, is_url_start=false?>">
+
+<meta http-equiv="refresh" content="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA <?state attr_type=regular?>">
+
+<!-- Tests regarding our specific implementation -->
+<meta content="5;URL=<?state attr_type=uri, is_url_start=true?>">
+
 </body>
 
 </html>

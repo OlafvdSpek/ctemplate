@@ -207,7 +207,7 @@ then the section text will occur in the output twice.  The first time,
 all variables/etc. in the section will be evaluated taking into
 account the first dictionary.  The second time, all
 variables/etc. will be evaluated taking into account the second
-dictionary.  (See <A HREF="#inheritence">below</A> for a definition of
+dictionary.  (See <A HREF="#inheritance">below</A> for a definition of
 "taking into account.")</p>
 
 <p>A <i>template-include</i> is a special type of section, so the
@@ -332,7 +332,7 @@ previous one:</p>
 
 <tr><td><code>:javascript_escape</code></td><td><code>:j</code></td>
     <td>javascript-escapes the variable before output (eg
-        <code>"</code> -> <code>\"</code> and
+        <code>&quot;</code> -> <code>\x27</code> and
         <code>&amp;</code> -> <code>\x26</code>)</td>
 </tr>
 
@@ -429,6 +429,14 @@ the <code>url_escape_with_arg</code> modifier:</p>
 <tr><td><code>=javascript</code></td>
     <td>Same as <code>=html</code>, but using javascript escaping
     instead of html escaping.</td>
+</tr>
+
+<tr><td><code>=css</code></td>
+    <td>Same as <code>=html</code> but using CSS escaping instead
+    of html escaping so that the variable can be safely inserted
+    within a CSS <code>@import</code> statement or a CSS property.
+    The characters in [\r\n()&#39;&quot;&lt;&gt;*\] are transformed
+    into %-style escapes.</td>
 </tr>
 
 <tr><td><code>=query</code></td>
@@ -548,55 +556,103 @@ modifiers to your variables. Refer to
 <a href="auto_escape.html">Guide to using Auto Escape</a> for
 an overview of Auto Escape as well as its limitations.</p>
 
-<p>Auto Escape may be enabled in one of two ways:</p>
+<p>Auto Escape is enabled on a template-by-template basis. Simply add
+the AUTOESCAPE pragma to the desired template. That template will then
+be automatically escaped, independently of the templates it may include
+or it may be included from. The AUTOESCAPE pragma must be placed at the
+top of the template and has the following syntax:</p>
 
-<ol>
-  <li> <p>Programmatically: Load a template by calling
-       <code>google::Template::GetTemplateWithAutoEscaping()</code>
-       instead of <code>google::Template::GetTemplate()</code>.  The given
-       template - as well as all templates it may include - will be
-       automatically escaped.  In addition to the template name, you
-       will have to specify the <i>context</i> your template is in,
-       usually <code>TC_HTML</code>.  See <code>template.h</code> for
-       the possible values and their meanings.</p></li>
+<pre>
+  {{%AUTOESCAPE context="CONTEXT" [state="STATE"]}}
+</pre>
 
-  <li> <p>In Template: Add the AUTOESCAPE pragma marker to the desired
-       template.  That template will then be automatically escaped,
-       independently of the templates it may include or it may be
-       included from. The AUTOESCAPE pragma must be placed at the top
-       of the template and has the following syntax:</p>
-       <pre>
-       {{%AUTOESCAPE context="CONTEXT" [state="STATE"]}}
-       </pre>
+<p>Description of the pragma:</p>
+<ul>
+  <li> The context attribute is one of <code>HTML</code>,
+       <code>JAVASCRIPT</code>, <code>CSS</code>,
+       <code>JSON</code> or <code>XML</code>. It must correspond
+       to the context in which the browser will interpret this
+       template. <b>Warning:</b> Setting the wrong context will
+       result in wrong escaping applied to all variables in
+       the given template. In particular, if the template starts with
+       a <code>&lt;script&gt;</code> tag, its context is
+       <code>HTML</code> and not <code>JAVASCRIPT</code>. Auto-Escape
+       will recognize the <code>&lt;script&gt;</code> tag and hence
+       properly Javascript-escape the variables within it. Similarly,
+       if the template starts with a <code>&lt;style&gt;</code> tag,
+       its context is <code>HTML</code> and not <code>CSS</code>.
+</li>
+  <li> The state attribute is commonly omitted.  It accepts the
+       value <code>IN_TAG</code> in the <code>HTML</code> context
+       to indicate that the template only contains (one or more)
+       HTML attribute name and value pairs that are part of an
+       HTML tag formed in a parent template.
+</ul>
 
-       <p>Description of the pragma:</p>
-       <ul>
-         <li> The context attribute is one of <code>HTML</code>,
-              <code>JAVASCRIPT</code>, <code>CSS</code>,
-              <code>JSON</code> or <code>XML</code> and has the same
-              meaning as the corresponding context given to
-              <code>google::Template::GetTemplateWithAutoEscaping()</code>.</li>
-         <li> The state attribute is commonly omitted.  It accepts the 
-              value <code>IN_TAG</code> in the <code>HTML</code> context
-              to indicate that the template only contains (one or more)
-              HTML attribute name and value pairs that are part of an
-              HTML tag formed in a parent template.
-       </ul>
+<h4>Examples</h4>
 
-       <p>Example: To enable Auto Escape for an HTML template, add
-       this pragma at the top of the template:</p>
-       <pre>
-       {{%AUTOESCAPE context="HTML"}}
-       </pre>
+<p>The table below shows four small sample templates along with their
+corresponding AUTOESCAPE pragma. The two most common contexts are
+<code>HTML</code> and <code>JAVASCRIPT</code>. We also show a sample
+template for the <code>CSS</code> context as well as a sample template
+for the <code>IN_TAG</code> state of <code>HTML</code>
+(although it is expected to be rarely used).</p>
 
-       <p>This method is particularly convenient when gradually
-       migrating an existing web-application to Auto Escape.
-       Note that the pragma is ignored when the template is obtained
-       via a call to <code>google::Template::GetTemplateWithAutoEscaping()</code>.
-       </p></li>
-</ol>
+<p>
+<table id="AutoescapePragmaEx" border=1 cellpadding=3>
+  <tr>
+    <th>HTML</th>
+    <th>JAVASCRIPT</th>
+    <th>CSS</th>
+    <th>HTML IN_TAG (uncommon)</th>
+  </tr>
+  <tr valign="top">
+    <td>
+    <pre>
+    {{%AUTOESCAPE context="HTML"}}
 
-<h3> <A NAME="inheritence">Details on Dictionary Lookup</A> </h3>
+    &lt;body&gt;
+      &lt;p&gt;Hello {{USER}}&lt;/p&gt;
+      &lt;p&gt;&lt;a href="{{URL}}"&gt;Your Account&lt;/a&gt;&lt;/p&gt;
+    &lt;/body&gt;
+    </pre>
+    </td>
+    <td>
+    <pre>
+    {{%AUTOESCAPE context="JAVASCRIPT"}}
+
+    function showMessage(user, msg) {
+      alert("Hello: " + user + " Message: " + msg);
+    }
+
+    var user = '{{USER}}';
+    var msg = '{{MSG}}';
+    showMessage(user, msg);
+    </pre>
+    </td>
+    <td>
+    <pre>
+    {{%AUTOESCAPE context="CSS"}}
+
+    P.abstract {
+      text-align:{{EDGE}};
+      font-size:{{FONT_SIZE_PC}};
+    }
+    .italic {font-style:{{ITALIC}}}
+    </pre>
+    </td>
+    <td>
+    <pre>
+    {{%AUTOESCAPE context="HTML" state="IN_TAG"}}
+
+    class="{{CLASS}}" id="{{ID}}"
+    </pre>
+    </td>
+  </tr>
+</table>
+</p>
+
+<h3> <A NAME="inheritance">Details on Dictionary Lookup</A> </h3>
 
 <p>The dictionary structure is a tree: there's a 'main' dictionary,
 and then sub-dictionaries for each section or include-template.  Even
@@ -654,7 +710,7 @@ values for your convenience.  All system variables are prefixed with
        be suppressed.  (See below.) </li>
 </ul>
 
-<p>As is usual for inheritence, if a user explicitly assigns a value
+<p>As is usual for inheritance, if a user explicitly assigns a value
 to these variable-names in its own dictionary, this overrides the
 inherited value.  So, <code>dict->SetValue("BI_SPACE",
 "&amp;nbsp;")</code> causes <code>BI_SPACE</code> to have the value
@@ -664,11 +720,11 @@ expanding <code>dict</code>.</p>
 <p>Note that only variables can be inherited from the global
 dictionary, not section dictionaries or include-file dictionaries.</p>
 
-<p>A couple of small implementation notes: global inheritence is "last
+<p>A couple of small implementation notes: global inheritance is "last
 chance", so if a section's parent dictionary redefined
 <code>BI_SPACE</code>, say, the section dictionary inherits the
 parent-dict value, not the global-dict value.  Second, variable
-inheritence happens at expand time, not at dictionary-create time.  So
+inheritance happens at expand time, not at dictionary-create time.  So
 if you create a section dictionary, and then afterwards set a variable
 in its parent dictionary (or in the global dictionary), the section
 <i>will</i> inherit that variable value, if it doesn't define the
@@ -688,19 +744,12 @@ all template code in namespace <code>google</code>.
 
 <h3> Loading A Template </h3>
 
-<p>There are two routines to load a template depending on whether
-you would like to leverage the Auto Escape mode of execution or not.
-<ul>
-    <li> For the Standard mode, use <code>google::Template::GetTemplate()</code>.
-    <li> For the Auto Escape mode, use
-         <code>google::Template::GetTemplateWithAutoEscaping()</code>.
-</ul>
-
-Both are defined in <code>template.h</code>.  They are static,
-factory methods that load
+<p>The main routine to load a template is
+<code>google::Template::GetTemplate()</code>, defined in
+<code>template.h</code>.  This is a static, factory method, that loads
 a template from either disk or from an internal template cache, and
-return a pointer to a <code>Template</code> object.  Besides a
-filename to load from, these routines take a 'strip' argument which
+returns a pointer to a <code>Template</code> object.  Besides a
+filename to load from, this routine takes a 'strip' argument which
 defines how to expand whitespace found in a template file.  It can
 have one of the following values:</p>
 
@@ -728,30 +777,7 @@ have one of the following values:</p>
        to force a space or newline in a particular situation.
 </ul>
 
-In addition, <code>GetTemplateWithAutoEscaping</code> requires an initial
-context <code>context</code> which determines the initial state of its
-HTML parsing. You only need to provide the context of the top-level
-template, any included template will have the context automatically computed.
-The context can have one of the following values:</p>
-
-<ul>
-   <li><code>TC_HTML</code>: The template contains HTML code which is not
-       required to be a complete HTML page just content the browser
-       interprets in the context of HTML parsing.
-       This should be the most common context to use.
-  <li><code>TC_CSS</code>: The template contains CSS (cascaded style-sheet).
-       If your template starts with a &lt;style&gt; tag, it is of type
-       <code>TC_HTML</code> not <code>TC_CSS</code>. A <code>TC_CSS</code>
-       template is typically associated with a <code>text/css</code>
-        content-type header.
-  <li><code>TC_JS</code>: The template contains raw javascript.
-       If your template starts with &lt;script&gt; tag, it is of type
-       <code>TC_HTML</code> not <code>TC_JS</code>. <code>TC_JS</code>
-       is typically associated with a content-type of
-       <code>text/javascript</code>.
-</ul>
-
-<p>Both factory methods returns NULL if the template cannot be found,
+<p>This factory method returns NULL if the template cannot be found,
 or if there is a syntax error trying to load it.</p>
 
 <p>Besides loading templates, the application can also ask the
@@ -911,7 +937,7 @@ value)</code>.</p>
    // Instead of the above 'if' statement, we could have done this:
    if (username[0] != '\0') {
       dict->ShowSection("CHANGE_USER");       // adds a single, empty dictionary
-      dict->SetValue("USERNAME", username);   // take advantage of inheritence
+      dict->SetValue("USERNAME", username);   // take advantage of inheritance
    } else {
       // don't need to do anything; we want a hidden section, which is the default
    }
@@ -934,7 +960,7 @@ value)</code>.</p>
 <p>Template-include markers are much like section markers, so
 <code>SetIncludeDictionary(name)</code> acts, not surprisingly,
 exactly like <code>SetSectionDictionary(name)</code>.  However, since
-variable inheritence doesn't work across include boundaries, there is
+variable inheritance doesn't work across include boundaries, there is
 no template-include equivalent to <code>ShowSection()</code> or
 <code>SetValueAndShowSection()</code>.</p>
 
@@ -1092,6 +1118,18 @@ the appropriate method on a PerExpandData object:</p>
        <code>TemplateModifier</code> to avoid unnecessary
        work.<br><br> </li>
 </ul>
+
+<h4> Custom Emitters </h4>
+
+<p>By default, <code>Expand()</code> and <code>ExpandWithData</code>
+expand the template into a string.  If you wish, you can expand the
+data into another container -- perhaps directly to disk, or to a
+network socket -- as well.  To do this, you must define your own
+subclass of <code>ExpandEmitter</code>, which is defined in
+<code>template_emitter.h</code>.  This is a very simple class that
+just wraps an "append" method.  Once you have defined a new
+ExpandEmitter, you can pass in an ExpandEmitter pointer to
+<code>Expand()</code> or <code>ExpandWithData()</code>.</p>
 
 
 <h3> <A name="string">Getting a Template From a String Rather Than a File</A> </h3>

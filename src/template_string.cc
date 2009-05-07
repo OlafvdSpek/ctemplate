@@ -61,8 +61,6 @@
 #include <sys/isa_defs.h>     // _BIG_ENDIAN/_LITTLE_ENDIAN on Solaris 10
 #endif
 
-using HASH_NAMESPACE::hash_set;
-
 #if defined(HAVE_U_INT32_T)
 typedef u_int32_t uint32;
 #elif defined(HAVE_UINT32_T)
@@ -85,7 +83,7 @@ typedef unsigned __int64 uint64;
 // we do what we can to make this as efficient as possible.
 #if defined(HAVE_BYTESWAP_H)
 # include <byteswap.h>              // GNU (especially linux)
-# define BSWAP32(x)  bswap32(x)
+# define BSWAP32(x)  bswap_32(x)
 #elif defined(HAVE_LIBKERN_OSBYTEORDER_H)
 # include <libkern/OSByteOrder.h>   // OS X
 # define BSWAP32(x)  OSSwapInt32(x)
@@ -134,6 +132,7 @@ _START_GOOGLE_NAMESPACE_
 //   - has a more complex final mix to combine the 32-bit hashes into
 //     64-bits,
 //   - uses a fixed seed
+// This is not static because template_string_test accesses it directly.
 uint64 MurmurHash64(const char* ptr, size_t len) {
   const uint32 kMultiplyVal = 0x5bd1e995;
   const int kShiftVal = 24;
@@ -230,10 +229,23 @@ struct TemplateStringHasher {
 
 /*static*/ const ctemplate::TemplateIdHasher TemplateStringHasher::hasher = {};
 
-typedef hash_set<TemplateString, TemplateStringHasher> TemplateStringSet;
+#ifdef HAVE_UNORDERED_MAP
+typedef HASH_NAMESPACE::unordered_set<TemplateString, TemplateStringHasher>
+    TemplateStringSet;
+#else
+typedef HASH_NAMESPACE::hash_set<TemplateString, TemplateStringHasher>
+    TemplateStringSet;
+#endif
+
 TemplateStringSet* template_string_set;
 UnsafeArena* arena;
 }  // namespace
+
+namespace ctemplate {
+size_t StringHash::Hash(const char* s, size_t slen) const {
+  return static_cast<size_t>(MurmurHash64(s, slen));
+}
+}
 
 void TemplateString::AddToGlobalIdToNameMap() {
   // shouldn't be calling this if we don't have an id.

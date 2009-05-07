@@ -69,6 +69,11 @@ bool TemplateDictionaryPeer::IsHiddenSection(
   return dict_->IsHiddenSection(name);
 }
 
+bool TemplateDictionaryPeer::IsHiddenTemplate(
+    const TemplateString& name) const {
+  return dict_->IsHiddenTemplate(name);
+}
+
 int TemplateDictionaryPeer::GetSectionDictionaries(
     const TemplateString& section_name,
     vector<const TemplateDictionary*>* dicts) const {
@@ -76,11 +81,11 @@ int TemplateDictionaryPeer::GetSectionDictionaries(
   if (dict_->IsHiddenSection(section_name))
     return 0;
 
-  const TemplateDictionary::DictVector& dict_vector =
-      dict_->GetDictionaries(section_name);
-
-  for (size_t i = 0; i < dict_vector.size(); ++i)
-    dicts->push_back(dict_vector[i]);
+  TemplateDictionaryInterface::Iterator* di =
+      dict_->CreateSectionIterator(section_name);
+  while (di->HasNext())
+    dicts->push_back(static_cast<const TemplateDictionary*>(&di->Next()));
+  delete di;
 
   return static_cast<int>(dicts->size());
 }
@@ -92,13 +97,18 @@ int TemplateDictionaryPeer::GetIncludeDictionaries(
   if (dict_->IsHiddenTemplate(section_name))
     return 0;
 
-  const TemplateDictionary::DictVector& dict_vector =
-      dict_->GetTemplateDictionaries(section_name);
-
-  for (size_t i = 0; i < dict_vector.size(); ++i)
-    dicts->push_back(dict_vector[i]);
+  TemplateDictionaryInterface::Iterator* di =
+      dict_->CreateTemplateIterator(section_name);
+  while (di->HasNext())
+    dicts->push_back(static_cast<const TemplateDictionary*>(&di->Next()));
+  delete di;
 
   return static_cast<int>(dicts->size());
+}
+
+const char* TemplateDictionaryPeer::GetIncludeTemplateName(
+    const TemplateString& variable, int dictnum) const {
+  return dict_->GetIncludeTemplateName(variable, dictnum);
 }
 
 const char* TemplateDictionaryPeer::GetFilename() const {

@@ -4,7 +4,7 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 0.93, opensource@google.com)
+AC_INIT(ctemplate, 0.94, opensource@google.com)
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
@@ -70,14 +70,23 @@ AC_DEFINE_GOOGLE_NAMESPACE(google)
 # Figures out where hash_map and hash_set live, and what namespace they use
 AC_CXX_STL_HASH
 
-## Check out ../autoconf/ for other macros you can call to do useful stuff
+# If we found tr1/unordered_map, prefer unordered_map/unordered_set to
+# hash_map/hash_set.
+if test "$ac_cv_cxx_have_unordered_map" = yes; then
+   ac_cv_cxx_hash_map_class="$ac_cv_cxx_hash_namespace::unordered_map"
+   ac_cv_cxx_hash_set_class="$ac_cv_cxx_hash_namespace::unordered_set"
+else
+   ac_cv_cxx_hash_map_class="$ac_cv_cxx_hash_namespace::hash_map"
+   ac_cv_cxx_hash_set_class="$ac_cv_cxx_hash_namespace::hash_set"
+fi
 
 AC_SUBST(ac_google_namespace)
 AC_SUBST(ac_google_start_namespace)
 AC_SUBST(ac_google_end_namespace)
-AC_SUBST(ac_cv_cxx_hash_namespace)
 AC_SUBST(ac_cv_cxx_hash_map)
 AC_SUBST(ac_cv_cxx_hash_set)
+AC_SUBST(ac_cv_cxx_hash_map_class)
+AC_SUBST(ac_cv_cxx_hash_set_class)
 if test "$ac_cv___attribute__" == "yes"; then
    AC_SUBST(ac_google_attribute, 1)
 else
@@ -114,6 +123,7 @@ AC_CONFIG_FILES([Makefile \
                  src/google/template_string.h src/google/template_enums.h \
 		 src/google/template.h src/google/template_from_string.h \
 		 src/google/template_modifiers.h src/google/template_emitter.h \
+		 src/google/template_annotator.h \
 		 src/google/template_dictionary.h src/google/template_pathops.h \
 		 src/google/template_namelist.h src/google/per_expand_data.h \
 		 src/google/template_dictionary_interface.h \

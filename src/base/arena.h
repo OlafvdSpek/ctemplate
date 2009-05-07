@@ -226,6 +226,7 @@ class CTEMPLATE_DLL_DECL BaseArena {
   void* GetMemoryWithHandle(const size_t size, Handle* handle);
 
   Status status_;
+  size_t remaining_;
 
  private:
   struct AllocatedBlock {
@@ -244,7 +245,6 @@ class CTEMPLATE_DLL_DECL BaseArena {
   char* freestart_;         // beginning of the free space in most recent block
   char* freestart_when_empty_;  // beginning of the free space when we're empty
   char* last_alloc_;         // used to make sure ReturnBytes() is safe
-  size_t remaining_;
   // STL vector isn't as efficient as it could be, so we use an array at first
   int blocks_alloced_;       // how many of the first_blocks_ have been alloced
   AllocatedBlock first_blocks_[16];   // the length of this array is arbitrary
@@ -355,6 +355,9 @@ class CTEMPLATE_DLL_DECL UnsafeArena : public BaseArena {
 
   // We make a copy so you can keep track of status at a given point in time
   Status status() const { return status_; }
+
+  // Number of bytes remaining before the arena has to allocate another block.
+  size_t bytes_until_next_allocation() const { return remaining_; }
 
  private:
   UnsafeArena(const UnsafeArena&);     // disallow copying

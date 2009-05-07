@@ -61,18 +61,17 @@
 #endif
 #include <string>
 #include <vector>         // for MissingListType, SyntaxListType
-#include HASH_SET_H       // (defined in config.h)  for NameListType
 #include "google/template.h"
 #include "google/template_pathops.h"
-#include "google/template_emitter.h"
+#include "google/template_annotator.h"
 #include "google/template_dictionary.h"
+#include "google/template_emitter.h"
 #include "google/template_modifiers.h"
 #include "google/template_namelist.h"
 #include "google/template_string.h"
 
 using std::vector;
 using std::string;
-using HASH_NAMESPACE::hash_set;
 using GOOGLE_NAMESPACE::ExpandEmitter;
 using GOOGLE_NAMESPACE::Template;
 using GOOGLE_NAMESPACE::TemplateDictionary;
@@ -91,6 +90,7 @@ using GOOGLE_NAMESPACE::TC_JSON;
 using GOOGLE_NAMESPACE::TC_XML;
 using GOOGLE_NAMESPACE::TC_MANUAL;
 using GOOGLE_NAMESPACE::TC_NONE;
+using GOOGLE_NAMESPACE::TC_UNUSED;
 namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;   // an interior namespace
 namespace template_modifiers = GOOGLE_NAMESPACE::template_modifiers;
 
@@ -98,6 +98,12 @@ using ctemplate::PerExpandData;
 
 static const StaticTemplateString kHello = STS_INIT(kHello, "Hello");
 static const StaticTemplateString kWorld = STS_INIT(kWorld, "World");
+
+static const char* kPragmaHtml = "{{%AUTOESCAPE context=\"HTML\"}}\n";
+static const char* kPragmaJs   = "{{%AUTOESCAPE context=\"JAVASCRIPT\"}}\n";
+static const char* kPragmaCss  = "{{%AUTOESCAPE context=\"CSS\"}}\n";
+static const char* kPragmaXml  = "{{%AUTOESCAPE context=\"XML\"}}\n";
+static const char* kPragmaJson = "{{%AUTOESCAPE context=\"JSON\"}}\n";
 
 // How many threads to use for our threading test.
 // This is a #define instead of a const int so we can use it in array-sizes
@@ -160,12 +166,49 @@ bool IntEqVerbose(int a, int b) {
   return true;
 }
 
+// This test emitter writes to a string, but writes X's of the right
+// length, rather than the actual content passed in.
+class SizeofEmitter : public ExpandEmitter {
+  string* const outbuf_;
+ public:
+  SizeofEmitter(string* outbuf) : outbuf_(outbuf) {}
+  virtual void Emit(char c) { Emit(&c, 1); }
+  virtual void Emit(const string& s) { Emit(s.data(), s.length()); }
+  virtual void Emit(const char* s) { Emit(s, strlen(s)); }
+  virtual void Emit(const char*, size_t slen) { outbuf_->append(slen, 'X'); }
+};
+
 }  // unnamed namespace
 
 RegisterTemplateFilename(VALID1_FN, "template_unittest_test_valid1.in");
 RegisterTemplateFilename(INVALID1_FN, "template_unittest_test_invalid1.in");
 RegisterTemplateFilename(INVALID2_FN, "template_unittest_test_invalid2.in");
 RegisterTemplateFilename(NONEXISTENT_FN, "nonexistent__file.tpl");
+
+// Returns the proper AUTOESCAPE pragma that corresponds to the
+// given TemplateContext.
+static string GetPragmaForContext(TemplateContext context) {
+  switch(context) {
+    case TC_HTML:
+      return kPragmaHtml;
+    case TC_JS:
+      return kPragmaJs;
+    case TC_CSS:
+      return kPragmaCss;
+    case TC_JSON:
+      return kPragmaJson;
+    case TC_XML:
+      return kPragmaXml;
+    case TC_NONE:
+      return "";  // NONE is now synonymous with TC_MANUAL
+    case TC_MANUAL:
+      return "";  // No AUTOESCAPE pragma.
+    case TC_UNUSED:
+      ASSERT(false);  // Developer error, this TC is not to be used.
+  }
+  ASSERT(false);  // Developer error - invalid TemplateContext.
+  return "";
+}
 
 // deletes all files named *template* in dir
 #ifndef _WIN32   // windows will define its own version, in src/windows/port.cc
@@ -216,19 +259,20 @@ static Template* StringToTemplate(const string& s, Strip strip) {
   return Template::GetTemplate(StringToTemplateFile(s), strip);
 }
 
-// This writes s to a file and then loads it into a template object.
+// This writes s to a file with the AUTOESCAPE pragma corresponding
+// to the given TemplateContext and then loads it into a template object.
 static Template* StringToTemplateWithAutoEscaping(const string& s,
                                                   Strip strip,
                                                   TemplateContext context) {
-  return Template::GetTemplateWithAutoEscaping(StringToTemplateFile(s), strip,
-                                               context);
+  string text = GetPragmaForContext(context) + s;
+  return Template::GetTemplate(StringToTemplateFile(text), strip);
 }
 
 // This is esp. useful for calling from within gdb.
 // The gdb nice-ness is balanced by the need for the caller to delete the buf.
 
 static const char* ExpandIs(Template* tpl, const TemplateDictionary *dict,
-                            const PerExpandData* per_expand_data,
+                            PerExpandData* per_expand_data,
                             bool expected) {
   string outstring;
   ASSERT(expected == tpl->ExpandWithData(&outstring, dict, per_expand_data));
@@ -240,7 +284,7 @@ static const char* ExpandIs(Template* tpl, const TemplateDictionary *dict,
 
 static void AssertExpandWithDataIs(Template* tpl,
                                    const TemplateDictionary *dict,
-                                   const PerExpandData* per_expand_data,
+                                   PerExpandData* per_expand_data,
                                    const string& is, bool expected) {
   const char* buf = ExpandIs(tpl, dict, per_expand_data, expected);
   if (strcmp(buf, is.c_str())) {
@@ -519,14 +563,13 @@ class TemplateUnittest {
                            "{{SNIPPET_VAR:H=snippet}} lo", STRIP_WHITESPACE);
     AssertExpandIs(tpl, &dict, "hi yo_yo # <b>foo & bar</b> lo", true);
 
-    // Test with custom modifier
+    // Test with custom modifiers [regular or XssSafe should not matter].
     ASSERT(template_modifiers::AddModifier("x-test",
                                            &template_modifiers::html_escape));
     ASSERT(template_modifiers::AddModifier("x-test-arg=",
                                            &template_modifiers::html_escape));
-    ASSERT(
-        template_modifiers::AddModifier("x-test-arg=snippet",
-                                        &template_modifiers::snippet_escape));
+    ASSERT(template_modifiers::AddXssSafeModifier(
+               "x-test-arg=snippet", &template_modifiers::snippet_escape));
 
     tpl = StringToTemplate("hi {{VAR:x-test}} lo", STRIP_WHITESPACE);
     AssertExpandIs(tpl, &dict, "hi yo&amp;yo lo", true);
@@ -866,6 +909,18 @@ class TemplateUnittest {
     ASSERT_STREQ(output.c_str(), "premadehilo");
   }
 
+  static void TestExpandWithCustomEmitter() {
+    Template* tpl = StringToTemplate("{{VAR}} {{VAR}}", STRIP_WHITESPACE);
+    TemplateDictionary dict("test_expand");
+    dict.SetValue("VAR", "this song is just six words long");
+    string output;
+    SizeofEmitter e(&output);
+    ASSERT(tpl->Expand(&e, &dict));
+    ASSERT_STREQ("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+                 "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                 output.c_str());
+  }
+
   // Tests annotation, in particular inheriting annotation among children
   // This should be called first, so the filenames don't change as we add
   // more tests.
@@ -904,6 +959,46 @@ class TemplateUnittest {
              (FLAGS_test_tmpdir + slash_tpl).c_str());
     AssertExpandWithDataIs(tpl, &dict, &per_expand_data, expected, true);
 
+    // Test ability to set custom annotator.
+    CustomTestAnnotator custom_annotator;
+    per_expand_data.SetAnnotator(&custom_annotator);
+    snprintf(expected, sizeof(expected),
+             "{{EVENT=1}}{{#FILE=%s003}}"
+             "{{EVENT=2}}{{#SEC=__{{MAIN}}__}}boo!\n"
+             "{{EVENT=3}}{{#INC=INC}}"
+             "{{EVENT=4}}{{#FILE=%s001}}"
+             "{{EVENT=5}}{{#SEC=__{{MAIN}}__}}include "
+             "{{EVENT=6}}{{#SEC=ISEC}}file"
+             "{{EVENT=7}}{{/SEC}}\n"
+             "{{EVENT=8}}{{/SEC}}"
+             "{{EVENT=9}}{{/FILE}}"
+             "{{EVENT=10}}{{/INC}}"
+             "{{EVENT=11}}{{#INC=INC}}"
+             "{{EVENT=12}}{{#FILE=%s002}}"
+             "{{EVENT=13}}{{#SEC=__{{MAIN}}__}}include #2\n"
+             "{{EVENT=14}}{{/SEC}}"
+             "{{EVENT=15}}{{/FILE}}"
+             "{{EVENT=16}}{{/INC}}\nhi "
+             "{{EVENT=17}}{{#SEC=SEC}}lo"
+             "{{EVENT=18}}{{/SEC}} bar "
+             "{{EVENT=19}}{{#VAR=VAR:x-foo<not registered>}}var"
+             "{{EVENT=20}}{{/VAR}}"
+             "{{EVENT=21}}{{/SEC}}"
+             "{{EVENT=22}}{{/FILE}}",
+             (FLAGS_test_tmpdir + slash_tpl).c_str(),
+             (FLAGS_test_tmpdir + slash_tpl).c_str(),
+             (FLAGS_test_tmpdir + slash_tpl).c_str());
+    // We can't use AssertExpandWithDataIs() on our deliberately stateful
+    // test annotator because it internally does a second expansion
+    // assuming no state change between calls.
+    string custom_outstring;
+    ASSERT(tpl->ExpandWithData(&custom_outstring, &dict, &per_expand_data));
+    ASSERT_STREQ(custom_outstring.c_str(), expected);
+
+    // Unset annotator and continue with next test as test of ability
+    // to revert to built-in annotator.
+    per_expand_data.SetAnnotator(NULL);
+
     per_expand_data.SetAnnotateOutput(slash_tpl.c_str());
     snprintf(expected, sizeof(expected),
              "{{#FILE=%s003}}{{#SEC=__{{MAIN}}__}}boo!\n"
@@ -923,6 +1018,49 @@ class TemplateUnittest {
     AssertExpandWithDataIs(tpl, &dict, &per_expand_data,
                            "boo!\ninclude file\ninclude #2\n\nhi lo bar var",
                            true);
+
+    // Test that even if we set an annotator we shouldn't get annotation
+    // if it is not turned on with SetAnnotateOutput().
+    per_expand_data.SetAnnotator(&custom_annotator);
+    AssertExpandWithDataIs(tpl, &dict, &per_expand_data,
+                           "boo!\ninclude file\ninclude #2\n\nhi lo bar var",
+                           true);
+
+    // Test annotation of "missing include" condition.
+    Template* one_inc_tpl =
+        StringToTemplate("File contents: {{>INC}}\n", DO_NOT_STRIP);
+    TemplateDictionary dict_missing_file("dict_with_missing_file");
+    dict_missing_file.AddIncludeDictionary("INC")->SetFilename("missing.tpl");
+
+    per_expand_data.SetAnnotateOutput("");
+    per_expand_data.SetAnnotator(NULL);
+    snprintf(expected, sizeof(expected),
+             "{{#FILE=%s004}}{{#SEC=__{{MAIN}}__}}File contents: "
+             "{{#MISSING_INC=INC}}missing.tpl{{/MISSING_INC}}\n"
+             "{{/SEC}}{{/FILE}}",
+             (FLAGS_test_tmpdir + slash_tpl).c_str());
+    // We expect a false return value because of the missing file.
+    AssertExpandWithDataIs(one_inc_tpl, &dict_missing_file, &per_expand_data,
+                           expected, false);
+
+    // Same missing include test with custom annotator
+    custom_annotator.Reset();
+    per_expand_data.SetAnnotator(&custom_annotator);
+    snprintf(expected, sizeof(expected),
+             "{{EVENT=1}}{{#FILE=%s004}}"
+             "{{EVENT=2}}{{#SEC=__{{MAIN}}__}}File contents: "
+             "{{EVENT=3}}{{#MISSING_INC=INC}}missing.tpl"
+             "{{EVENT=4}}{{/MISSING_INC}}\n"
+             "{{EVENT=5}}{{/SEC}}"
+             "{{EVENT=6}}{{/FILE}}",
+             (FLAGS_test_tmpdir + slash_tpl).c_str());
+    // See comment above on why we can't use AssertExpandWithDataIs() for
+    // our stateful test annotator.
+    custom_outstring.clear();
+    ASSERT(!one_inc_tpl->ExpandWithData(&custom_outstring,
+                                        &dict_missing_file,
+                                        &per_expand_data));
+    ASSERT_STREQ(custom_outstring.c_str(), expected);
   }
 
   static void TestTemplateExpansionModifier() {
@@ -989,15 +1127,12 @@ class TemplateUnittest {
     // If you use these same cache keys somewhere else,
     // call Template::ClearCache first.
     const string cache_key_a = "cache key a";
-    const string cache_key_b = "cache key b";
     const string text = "Test template 1";
     TemplateDictionary empty_dict("dict");
 
     // When a string template is registered via StringToTemplateCache,
-    // we can use GetTemplate or GetTemplateWithAutoEscaping for that
-    // same cache-key under any other under any other TemplateContext
-    // or Strip because we cache the contents.
-
+    // we can use GetTemplate for that same cache-key under any other
+    // Strip because we cache the contents.
     Template *tpl1, *tpl2;
     ASSERT(Template::StringToTemplateCache(cache_key_a, text));
     tpl1 = Template::GetTemplate(cache_key_a, DO_NOT_STRIP);
@@ -1005,18 +1140,6 @@ class TemplateUnittest {
 
     // Different strip.
     ASSERT(tpl2 = Template::GetTemplate(cache_key_a, STRIP_BLANK_LINES));
-    ASSERT(tpl2 != tpl1);
-    AssertExpandIs(tpl2, &empty_dict, text, true);
-
-    // Different context, same strip.
-    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(
-               cache_key_a, DO_NOT_STRIP, TC_HTML));
-    ASSERT(tpl2 != tpl1);
-    AssertExpandIs(tpl2, &empty_dict, text, true);
-
-    // Different context and strip.
-    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(
-               cache_key_a, STRIP_WHITESPACE, TC_JS));
     ASSERT(tpl2 != tpl1);
     AssertExpandIs(tpl2, &empty_dict, text, true);
 
@@ -1032,23 +1155,18 @@ class TemplateUnittest {
 
     Template* tpl1 = Template::GetTemplate("tgt", DO_NOT_STRIP);
     Template* tpl2 = Template::GetTemplate("tgt", STRIP_WHITESPACE);
-    Template* tpl3 = Template::GetTemplateWithAutoEscaping(
-        "tgt", DO_NOT_STRIP, TC_HTML);
-    ASSERT(tpl1 && tpl2 && tpl3);
+    ASSERT(tpl1 && tpl2);
     ASSERT(tpl1 != tpl2);
-    ASSERT(tpl1 != tpl3);
-    ASSERT(tpl2 != tpl3);
     AssertExpandIs(tpl1, &dict, tpltext, true);
     AssertExpandIs(tpl2, &dict, tpltext, true);
-    AssertExpandIs(tpl3, &dict, tpltext, true);
 
     // If we register a new string under the same text, it should be
     // ignored.
     ASSERT(!Template::StringToTemplateCache("tgt", tpltext));
     ASSERT(!Template::StringToTemplateCache("tgt", "new text"));
-    Template* tpl4 = Template::GetTemplate("tgt", DO_NOT_STRIP);
-    ASSERT(tpl4 == tpl1);
-    AssertExpandIs(tpl4, &dict, tpltext, true);
+    Template* tpl3 = Template::GetTemplate("tgt", DO_NOT_STRIP);
+    ASSERT(tpl3 == tpl1);
+    AssertExpandIs(tpl3, &dict, tpltext, true);
 
     // Tests that syntax errors cause us to return NULL
     ASSERT(!Template::StringToTemplateCache("tgt2", "{{This has spaces}}"));
@@ -1076,9 +1194,7 @@ class TemplateUnittest {
     ASSERT(Template::StringToTemplateCache(cache_key_inc, text_inc));
     ASSERT(Template::StringToTemplateCache(cache_key_indent, text_indent));
 
-    Template *tpl = Template::GetTemplateWithAutoEscaping(cache_key,
-                                                          DO_NOT_STRIP,
-                                                          TC_HTML);
+    Template *tpl = Template::GetTemplate(cache_key, DO_NOT_STRIP);
     ASSERT(tpl);
 
     TemplateDictionary dict("dict");
@@ -1086,25 +1202,46 @@ class TemplateUnittest {
     sub_dict->SetFilename(cache_key_inc);
 
     sub_dict->SetValue("USER", "John<>Doe");
-    string expected = "<html><div>\n<p>\nUser John&lt;&gt;Doe\n</div></html>";
+    string expected = "<html><div>\n<p>\nUser John<>Doe\n</div></html>";
     AssertExpandIs(tpl, &dict, expected, true);
 
     // Repeat the same except that now the parent has a template-level
-    // directive (by way of the automatic-line-indenter). The indentation
-    // will happen after html-escaping of individual variables.
-    tpl = Template::GetTemplateWithAutoEscaping(cache_key_indent,
-                                                DO_NOT_STRIP, TC_HTML);
+    // directive (by way of the automatic-line-indenter).
+    tpl = Template::GetTemplate(cache_key_indent, DO_NOT_STRIP);
     ASSERT(tpl);
     expected =
         "<html>\n"
         "  <div>\n"
         "  <p>\n"
-        "  User John&lt;&gt;Doe\n"
+        "  User John<>Doe\n"
         "  </div>"
         "</html>";
     AssertExpandIs(tpl, &dict, expected, true);
 
     Template::ClearCache();
+  }
+
+  static void TestRemoveStringFromTemplateCache() {
+    Template::ClearCache();   // just for exercise.
+    const string cache_key = "TestRemoveStringFromTemplateCache";
+    const string text = "<html>here today...</html>";
+
+    TemplateDictionary dict("test");
+    ASSERT(Template::StringToTemplateCache(cache_key, text));
+    Template* tpl = Template::GetTemplate(cache_key, DO_NOT_STRIP);
+    ASSERT(tpl);
+    AssertExpandIs(tpl, &dict, text, true);
+    tpl = Template::GetTemplate(cache_key, STRIP_WHITESPACE);
+    ASSERT(tpl);
+    AssertExpandIs(tpl, &dict, text, true);
+
+    Template::RemoveStringFromTemplateCache(cache_key);
+    tpl = Template::GetTemplate(cache_key, DO_NOT_STRIP);
+    ASSERT(!tpl);
+    tpl = Template::GetTemplate(cache_key, STRIP_WHITESPACE);
+    ASSERT(!tpl);
+    tpl = Template::GetTemplate(cache_key, STRIP_BLANK_LINES);
+    ASSERT(!tpl);
   }
 
   static void TestTemplateCache() {
@@ -1114,7 +1251,6 @@ class TemplateUnittest {
     Template *tpl, *tpl2;
     ASSERT(tpl = Template::GetTemplate(filename_a, DO_NOT_STRIP));
 
-    // Tests with standard (non auto-escape) mode.
     ASSERT(tpl2 = Template::GetTemplate(filename_b, DO_NOT_STRIP));
     ASSERT(tpl2 != tpl);  // different filenames.
     ASSERT(tpl2 = Template::GetTemplate(filename_a, STRIP_BLANK_LINES));
@@ -1123,29 +1259,6 @@ class TemplateUnittest {
     ASSERT(tpl2 != tpl);  // different filenames and strip.
     ASSERT(tpl2 = Template::GetTemplate(filename_a, DO_NOT_STRIP));
     ASSERT(tpl2 == tpl);  // same filename and strip.
-
-    // Test mixing standard and auto-escape mode.
-    ASSERT(tpl = Template::GetTemplate(filename_a, DO_NOT_STRIP));
-    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(filename_a, DO_NOT_STRIP,
-                                                        TC_HTML));
-    ASSERT(tpl2 != tpl);  // different mode.
-
-    // Tests with auto-escape mode.
-    ASSERT(tpl = Template::GetTemplateWithAutoEscaping(filename_a, DO_NOT_STRIP,
-                                                       TC_HTML));
-    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(filename_b, DO_NOT_STRIP,
-                                                        TC_HTML));
-    ASSERT(tpl2 != tpl);  // different filenames.
-    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(filename_a,
-                                                        STRIP_BLANK_LINES,
-                                                        TC_HTML));
-    ASSERT(tpl2 != tpl);  // different strip.
-    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(filename_a, DO_NOT_STRIP,
-                                                        TC_JS));
-    ASSERT(tpl2 != tpl);  // different context.
-    ASSERT(tpl2 = Template::GetTemplateWithAutoEscaping(filename_a, DO_NOT_STRIP,
-                                                        TC_HTML));
-    ASSERT(tpl2 == tpl);  // same filename and strip and context.
   }
 
   // Tests that the various strip values all do the expected thing.
@@ -1167,6 +1280,7 @@ class TemplateUnittest {
       {"{{FOO}}\n\t{{>ONE_INC}}  \nb", "foo\n\t  \nb", "foo\nb", "foob"},
       {"{{FOO}}\n{{>ONE_INC}}{{>TWO_INC}}\nb", "foo\n\nb", "foo\n\nb", "foob"},
       {"{{FOO}}\n  {{#SEC}}\ntext \n  {{/SEC}}\n", "foo\n  \n", "foo\n", "foo"},
+      {"{{%AUTOESCAPE context=\"HTML\"}}\nBLA", "\nBLA", "BLA", "BLA"},
       // These test strip-whitespace
       {"foo\nbar\n", "foo\nbar\n", "foo\nbar\n", "foobar"},
       {"{{FOO}}\nbar\n", "foo\nbar\n", "foo\nbar\n", "foobar"},
@@ -1246,6 +1360,55 @@ class TemplateUnittest {
     tpl2 = Template::GetTemplate(nonexistent, STRIP_WHITESPACE);
     AssertExpandIs(tpl, &dict, "{all-changed}", true);
     AssertExpandIs(tpl2, &dict, "lazarus2", true);
+
+    //
+    // Tests to ensure selective Auto-Escape works correctly across reloads.
+    //
+    TemplateDictionary dict2("user");
+    dict2.SetValue("USER", "<bla>");  // Escaped differently by JS and HTML.
+
+    const string kHtmlPragma("{{%AUTOESCAPE context=\"HTML\"}}\n");
+    const string kJsPragma("{{%AUTOESCAPE context=\"JAVASCRIPT\"}}\n");
+    const string kHtmltext("<p>{{USER}}");          // some HTML
+    const string kHtmltextOther("<span>{{USER}}");  // different HTML
+    const string kJstext("a = '{{USER}}'");         // some Javascript
+
+    // Case 1: Change template from non auto-escaped to HTML auto-escaped.
+    filename = StringToTemplateFile(kHtmltext);
+    tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);
+    sleep(1);
+    StringToFile(kHtmlPragma + kHtmltext, filename);
+    AssertExpandIs(tpl, &dict2, "<p><bla>", true);   // haven't reloaded
+    ASSERT(tpl->ReloadIfChanged());   // true: content changed
+    AssertExpandIs(tpl, &dict2, "<p>&lt;bla&gt;", true);   // reloaded & escaped
+    tpl2 = Template::GetTemplate(filename, STRIP_WHITESPACE);
+    AssertExpandIs(tpl2, &dict2, "<p>&lt;bla&gt;", true);   // same as tpl
+
+    // Case 2: Change template content, same auto-escape context.
+    sleep(1);
+    StringToFile(kHtmlPragma + kHtmltextOther, filename);
+    ASSERT(tpl->ReloadIfChanged());   // true: content changed
+    AssertExpandIs(tpl, &dict2, "<span>&lt;bla&gt;", true);   // reloaded
+    tpl2 = Template::GetTemplate(filename, STRIP_WHITESPACE);
+    AssertExpandIs(tpl2, &dict2, "<span>&lt;bla&gt;", true);   // same as tpl
+
+    // Case 3: Change auto-escape context to Javascript.
+    sleep(1);
+    StringToFile(kJsPragma + kJstext, filename);
+    AssertExpandIs(tpl, &dict2, "<span>&lt;bla&gt;", true);  // haven't reloaded
+    ASSERT(tpl->ReloadIfChanged());   // true: content changed
+    AssertExpandIs(tpl, &dict2, "a = '\\x3cbla\\x3e'", true);   // reloaded
+    tpl2 = Template::GetTemplate(filename, STRIP_WHITESPACE);
+    AssertExpandIs(tpl2, &dict2, "a = '\\x3cbla\\x3e'", true);  // same as tpl
+
+    // Case 4: Change template from auto-escaped to non auto-escaped.
+    sleep(1);
+    StringToFile(kHtmltext, filename);
+    AssertExpandIs(tpl, &dict2, "a = '\\x3cbla\\x3e'", true);
+    ASSERT(tpl->ReloadIfChanged());   // true: content changed
+    AssertExpandIs(tpl, &dict2, "<p><bla>", true);  // reloaded => not escaped
+    tpl2 = Template::GetTemplate(filename, STRIP_WHITESPACE);
+    AssertExpandIs(tpl2, &dict2, "<p><bla>", true);   // same as tpl
   }
 
   static void TestTemplateRootDirectory() {
@@ -1546,6 +1709,10 @@ class TemplateUnittest {
     // 2b: Correct modifiers, nothing to change.
     text = "Hello {{USER:h}}";
     AssertCorrectModifiers(TC_HTML, text, "USER:h\n");
+    text = "Hello {{USER:U=html}}";  // :U=html is a valid replacement for .h
+    AssertCorrectModifiers(TC_HTML, text, "USER:U=html\n");
+    text = "Hello {{USER:H=url}}";   // :H=url (a.k.a. U=html) is valid too
+    AssertCorrectModifiers(TC_HTML, text, "USER:H=url\n");
     text = "Hello {{USER:h:j}}";   // Extra :j, honor it.
     AssertCorrectModifiers(TC_HTML, text, "USER:h:j\n");
     text = "<a href=\"{{URL:U=html}}\">bla</a>";
@@ -1558,6 +1725,8 @@ class TemplateUnittest {
     AssertCorrectModifiers(TC_HTML, text, "ID:j\n");
     text = "<a href=\"url\" onclick=\"doX({{ID:J=number}});\">";
     AssertCorrectModifiers(TC_HTML, text, "ID:J=number\n");
+    text = "<style>@import url(\"{{URL:U=css}}\")</style>";  // correct :U=css
+    AssertCorrectModifiers(TC_HTML, text, "URL:U=css\n");
 
     // 2c: Incorrect modifiers, add our own.
     text = "Hello {{USER:j}}";                          // Missing :h
@@ -1633,7 +1802,9 @@ class TemplateUnittest {
     // 2i: TC_CSS, TC_XML and TC_JSON
     text = "H1{margin-{{START_EDGE}}:0;\n text-align:{{END_EDGE}}\n}";
     AssertCorrectModifiers(TC_CSS, text, "START_EDGE:c\nEND_EDGE:c\n");
-    text = "body{background:url('{{URL:U=html}}')}";  // Will add :c.
+    text = "body{background:url('{{URL:U=css}}')}";  // :U=css valid substitute
+    AssertCorrectModifiers(TC_CSS, text, "URL:U=css\n");
+    text = "body{background:url('{{URL:U=html}}')}";  // Not valid, will add :c.
     AssertCorrectModifiers(TC_CSS, text, "URL:U=html:c\n");
     text = "<PARAM name=\"{{VAL:xml_escape}}\">";   // Correct escaping
     AssertCorrectModifiers(TC_XML, text, "VAL:xml_escape\n");
@@ -1652,9 +1823,28 @@ class TemplateUnittest {
     text = "{user={{USER:h}}";   // but html_escape is not
     AssertCorrectModifiers(TC_JSON, text, "USER:h:j\n");
 
+    // 2j: Variables with XssSafe Custom modifiers are untouched.
+    ASSERT(template_modifiers::AddXssSafeModifier(
+               "x-test-cm",  &template_modifiers::html_escape));
+    text = "Hello {{USER:x-test-cm}}";              // Missing :h
+    AssertCorrectModifiers(TC_HTML, text, "USER:x-test-cm\n");
+    text = "Hello {{USER:x-test-cm:j}}";            // Extra :j
+    AssertCorrectModifiers(TC_HTML, text, "USER:x-test-cm:j\n");
+    text = "Hello {{USER:x-test-cm:x-foo}}";        // Non-safe modifier
+    AssertCorrectModifiers(TC_HTML, text, "USER:x-test-cm:x-foo\n");
+    text = "Hello {{USER:x-foo:x-test-cm}}";        // Non-safe modifier
+    AssertCorrectModifiers(TC_HTML, text, "USER:x-foo:x-test-cm\n");
+    text = "Hello {{USER:x-test-cm:none}}";         // Complete due to :none
+    AssertCorrectModifiers(TC_HTML, text, "USER:x-test-cm:none\n");
+    text = "Hello {{USER:h:x-test-cm}}";            // Prior escaping
+    AssertCorrectModifiers(TC_HTML, text, "USER:h:x-test-cm\n");
+
     // 3. Larger test with close to every escaping case.
 
-    text = "<html><head><style>color:{{COLOR}}</style></head><body>\n"
+    text = "<html><head>\n"
+        "<style>\n"
+        "@import url(\"{{CSS_URL:U=css}}\");\n"
+        "color:{{COLOR}}</style></head><body>\n"
         "<h1>{{TITLE}}</h1>\n"
         "<img src=\"{{IMG_URL}}\">\n"
         "<form action=\"/search\">\n"
@@ -1668,7 +1858,8 @@ class TemplateUnittest {
         "</script>\n"
         "<a href=\"url\" onmouseover=\"'{{MOUSE}}'\">bla</a>\n"
         "Goodbye friend {{USER}}!\n</body></html>\n";
-    expected_out = "COLOR:c\n"
+    expected_out = "CSS_URL:U=css\n"
+        "COLOR:c\n"
         "TITLE:h\n"
         "IMG_URL:U=html\n"
         "HL:H=attribute\n"
@@ -1747,59 +1938,6 @@ class TemplateUnittest {
     dict.SetValue("USER", "evil'<>\"");
     AssertCorrectEscaping(TC_JSON, dict, text,
                           "{user = \"evil\\x27\\x3c\\x3e\\x22\"}");
-  }
-
-  // Basic test that auto-escaping continues to work on an included
-  // template.
-  static void TestIncludeWithAutoEscape() {
-    const string url = "http://www.google.com";
-    const string user = "foo";
-    const string owner = "webmaster";
-
-    // Create a template with one included template.
-    string top_text = "Hi {{>INC}}<p>Yours, truly: {{OWNER}}";
-    string sub_text = "{{USER}}; <a href=\"{{URL}}\">bla</a>";
-    Template *tpl = StringToTemplateWithAutoEscaping(top_text,
-                                                     STRIP_WHITESPACE,
-                                                     TC_HTML);
-    string incname = StringToTemplateFile(sub_text);
-    TemplateDictionary dict("dict");
-    TemplateDictionary* sub_dict = dict.AddIncludeDictionary("INC");
-    sub_dict->SetFilename(incname);
-
-    // Fill both dictionaries with good values.
-    dict.SetValue("OWNER", owner);
-    sub_dict->SetValue("USER", user);
-    sub_dict->SetValue("URL", url);
-
-    string expected = "Hi " + user + "; <a href=\"" +
-        url + "\">bla</a><p>Yours, truly: " + owner;
-    AssertExpandIs(tpl, &dict, expected, true);
-
-    // Repeat with bad values.
-    dict.SetValue("OWNER", "<");
-    sub_dict->SetValue("USER", "&>");
-    sub_dict->SetValue("URL", "javascript:alert(1)");
-
-    expected = "Hi &amp;&gt;; <a href=\"#\">bla</a><p>Yours, truly: &lt;";
-    AssertExpandIs(tpl, &dict, expected, true);
-
-    // Test modifiers at the template-include level.
-    // The whole included template (static and dynamic data) will
-    // be html escaped during expansion.
-    string top_text2 = "Hi {{>INC:h}}<p>Yours, truly: {{OWNER}}";
-    tpl = StringToTemplateWithAutoEscaping(top_text2, STRIP_WHITESPACE,
-                                           TC_HTML);
-    dict.SetValue("OWNER", "owner");
-    sub_dict->SetValue("USER", "<b>BadUser</b>");
-    sub_dict->SetValue("URL", "http://<>/bad");
-    expected = "Hi "
-        "&lt;b&gt;BadUser&lt;/b&gt;"   // {{USER}} html escaped
-        "; &lt;a href=&quot;"          // <a href=\" html escaped
-        "http://&lt;&gt;/bad"          // {{URL}} html escaped
-        "&quot;&gt;bla&lt;/a&gt;"      // rest of child html escaped
-        "<p>Yours, truly: owner";      // parent template, intact.
-    AssertExpandIs(tpl, &dict, expected, true);
   }
 
   // Test that the template initialization fails in auto-escape
@@ -1937,16 +2075,6 @@ class TemplateUnittest {
 
     string kAutoescapeHtmlPragma = "{{%AUTOESCAPE context=\"HTML\"}}";
 
-    // Check there is no cache-key collision.
-    text = kAutoescapeHtmlPragma + "{{USER}}";
-    filename = StringToTemplateFile(text);
-    tpl = Template::GetTemplate(filename, strip);
-    ASSERT(tpl);
-    Template* tpl2 = Template::GetTemplateWithAutoEscaping(filename, strip,
-                                                           TC_HTML);
-    ASSERT(tpl2);
-    ASSERT(tpl != tpl2);
-
     // Check that Selective Auto-Escape does not auto-escape included templates
     // unless these are also marked for auto-escape. To attest that,
     // we check that when no escaping was given in the included template, none
@@ -2020,6 +2148,12 @@ class TemplateUnittest {
     inc_dict->SetFilename(StringToTemplateFile(inc_text));
     inc_dict->SetValue("USER", user);
     AssertExpandIs(tpl, &dict3, user_esc, true);
+
+    // Test that {{%...}} is a "removable" marker. A related test is
+    // also added to TestStrip().
+    tpl = StringToTemplate("{{%AUTOESCAPE context=\"HTML\"}}\nText\n Text",
+                           STRIP_BLANK_LINES);
+    AssertExpandIs(tpl, &dict, "Text\n Text", true);
   }
 
   static void TestRegisterString() {
@@ -2068,6 +2202,67 @@ class TemplateUnittest {
     ASSERT(Template::GetTemplate(filename, STRIP_WHITESPACE) == tpl);
     AssertExpandIs(tpl, &dict, expected, true);
   }
+
+ private:
+  // This is used by TestAnnotation().  It behaves like
+  // TextTemplateAnnotator but just to test our ability to customize
+  // annotation, and with stateful one, it prefixes each text annotation
+  // with an event (call) count.
+  class CustomTestAnnotator : public ctemplate::TextTemplateAnnotator {
+   public:
+    CustomTestAnnotator() : event_count_(0) { }
+    void Reset() { event_count_ = 0; }
+
+    virtual void EmitOpenInclude(ExpandEmitter* emitter, const string& value) {
+      EmitTestPrefix(emitter);
+      ctemplate::TextTemplateAnnotator::EmitOpenInclude(emitter, value);
+    }
+    virtual void EmitCloseInclude(ExpandEmitter* emitter) {
+      EmitTestPrefix(emitter);
+      ctemplate::TextTemplateAnnotator::EmitCloseInclude(emitter);
+    }
+    virtual void EmitOpenFile(ExpandEmitter* emitter, const string& value) {
+      EmitTestPrefix(emitter);
+      ctemplate::TextTemplateAnnotator::EmitOpenFile(emitter, value);
+    }
+    virtual void EmitCloseFile(ExpandEmitter* emitter) {
+      EmitTestPrefix(emitter);
+      ctemplate::TextTemplateAnnotator::EmitCloseFile(emitter);
+    }
+    virtual void EmitOpenSection(ExpandEmitter* emitter, const string& value) {
+      EmitTestPrefix(emitter);
+      ctemplate::TextTemplateAnnotator::EmitOpenSection(emitter, value);
+    }
+    virtual void EmitCloseSection(ExpandEmitter* emitter) {
+      EmitTestPrefix(emitter);
+      ctemplate::TextTemplateAnnotator::EmitCloseSection(emitter);
+    }
+    virtual void EmitOpenVariable(ExpandEmitter* emitter, const string& value) {
+      EmitTestPrefix(emitter);
+      ctemplate::TextTemplateAnnotator::EmitOpenVariable(emitter, value);
+    }
+    virtual void EmitCloseVariable(ExpandEmitter* emitter) {
+      EmitTestPrefix(emitter);
+      ctemplate::TextTemplateAnnotator::EmitCloseVariable(emitter);
+    }
+    virtual void EmitOpenMissingInclude(ExpandEmitter* emitter,
+                                        const string& value) {
+      EmitTestPrefix(emitter);
+      ctemplate::TextTemplateAnnotator::EmitOpenMissingInclude(emitter, value);
+    }
+    virtual void EmitCloseMissingInclude(ExpandEmitter* emitter) {
+      EmitTestPrefix(emitter);
+      ctemplate::TextTemplateAnnotator::EmitCloseMissingInclude(emitter);
+    }
+
+   private:
+    void EmitTestPrefix(ExpandEmitter* emitter) {
+      char buf[128];
+      snprintf(buf, sizeof(buf), "{{EVENT=%d}}", ++event_count_);
+      emitter->Emit(buf);
+    }
+    int event_count_;
+  };
 };
 
 // This tests that StaticTemplateString is sufficiently initialized at
@@ -2119,6 +2314,7 @@ int main(int argc, char** argv) {
   TemplateUnittest::TestInheritence();
   TemplateUnittest::TestTemplateString();
   TemplateUnittest::TestExpand();
+  TemplateUnittest::TestExpandWithCustomEmitter();
 
   TemplateUnittest::TestGetTemplate();
   TemplateUnittest::TestRegisterString();
@@ -2126,6 +2322,7 @@ int main(int argc, char** argv) {
   TemplateUnittest::TestStringCacheKey();
   TemplateUnittest::TestStringGetTemplate();
   TemplateUnittest::TestStringTemplateInclude();
+  TemplateUnittest::TestRemoveStringFromTemplateCache();
   TemplateUnittest::TestTemplateCache();
   TemplateUnittest::TestStrip();
   TemplateUnittest::TestReloadIfChanged();
@@ -2137,7 +2334,6 @@ int main(int argc, char** argv) {
 
   TemplateUnittest::TestCorrectModifiersForAutoEscape();
   TemplateUnittest::TestVariableWithAutoEscape();
-  TemplateUnittest::TestIncludeWithAutoEscape();
   TemplateUnittest::TestFailedInitWithAutoEscape();
   TemplateUnittest::TestSelectiveAutoEscaping();
 

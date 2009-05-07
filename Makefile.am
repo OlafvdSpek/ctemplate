@@ -24,6 +24,7 @@ nodist_googleinclude_HEADERS = \
 	src/google/template_modifiers.h \
 	src/google/template_dictionary.h \
 	src/google/template_dictionary_interface.h \
+	src/google/template_annotator.h \
 	src/google/template_emitter.h \
 	src/google/template_namelist.h \
 	src/google/template_from_string.h \
@@ -36,6 +37,7 @@ noinst_HEADERS = \
 	src/google/template_modifiers.h.in \
 	src/google/template_dictionary.h.in \
 	src/google/template_dictionary_interface.h.in \
+	src/google/template_annotator.h.in \
 	src/google/template_emitter.h.in \
 	src/google/template_namelist.h.in \
 	src/google/template_from_string.h.in \
@@ -66,14 +68,10 @@ WINDOWS_PROJECTS = google-ctemplate.sln
 ## TESTS_ENVIRONMENT sets environment variables for when you run unittest,
 ## but it only seems to take effect for *binary* unittests (argh!)
 TESTS =
-check_SCRIPTS = make_tpl_varnames_h_unittest_sh \
-                diff_tpl_auto_escape_unittest_sh \
-                generate_fsm_test_sh
+check_SCRIPTS =
 TESTS_ENVIRONMENT = TEMPLATE_ROOTDIR=$(top_srcdir)
 # Every time you add a unittest to check_SCRIPTS, add it here too
-noinst_SCRIPTS = src/tests/make_tpl_varnames_h_unittest.sh \
-                 src/tests/diff_tpl_auto_escape_unittest.sh \
-                 src/tests/generate_fsm_test.sh
+noinst_SCRIPTS =
 # Add to this for tests that use data
 TESTDATA =
 
@@ -113,8 +111,10 @@ lib_LTLIBRARIES += libctemplate.la
 WINDOWS_PROJECTS += vsprojects/libctemplate/libctemplate.vcproj
 libctemplate_la_SOURCES = $(nodist_googleinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
+	src/base/small_map.h src/base/manual_constructor.h \
 	src/template_modifiers_internal.h \
 	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
+	src/template_annotator.cc src/per_expand_data.cc \
 	src/template_string.cc \
 	src/template_namelist.cc src/template_pathops.cc \
 	src/htmlparser/htmlparser.h src/htmlparser/htmlparser.cc \
@@ -224,7 +224,6 @@ template_dictionary_nothreads_unittest_SOURCES = $(template_dictionary_unittest_
 template_dictionary_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_dictionary_nothreads_unittest_LDADD = libctemplate_testing.la \
                                                libctemplate_nothreads_debug.la
-                                               
 
 TESTS += template_modifiers_unittest template_modifiers_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_modifiers_unittest/template_modifiers_unittest.vcproj
@@ -245,10 +244,12 @@ template_setglobals_unittest_SOURCES = src/config_for_unittests.h \
                                        src/tests/template_setglobals_unittest.cc
 template_setglobals_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_setglobals_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
-template_setglobals_unittest_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
+template_setglobals_unittest_LDADD = libctemplate_testing.la libctemplate_debug.la \
+                                     $(PTHREAD_LIBS)
 template_setglobals_nothreads_unittest_SOURCES = $(template_setglobals_unittest_SOURCES)
 template_setglobals_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
-template_setglobals_nothreads_unittest_LDADD = libctemplate_nothreads_debug.la
+template_setglobals_nothreads_unittest_LDADD = libctemplate_testing.la \
+                                               libctemplate_nothreads_debug.la
 
 TESTS += template_unittest template_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_unittest/template_unittest.vcproj
@@ -273,28 +274,36 @@ template_nothreads_regtest_SOURCES = $(template_regtest_SOURCES)
 template_nothreads_regtest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 template_nothreads_regtest_LDADD = libctemplate_nothreads_debug.la
 TESTDATA += \
-   src/tests/template_unittest_test_autoescape_simple.in  \
-   src/tests/template_unittest_test_footer.in  \
-   src/tests/template_unittest_test_html.in  \
-   src/tests/template_unittest_test_invalid1.in  \
-   src/tests/template_unittest_test_invalid2.in  \
-   src/tests/template_unittest_test_modifiers.in  \
-   src/tests/template_unittest_test_nul.in  \
-   src/tests/template_unittest_test_simple.in  \
-   src/tests/template_unittest_test_valid1.in  \
-   src/tests/template_unittest_test_autoescape_simple_dict01.out  \
-   src/tests/template_unittest_test_autoescape_simple_dict02.out  \
-   src/tests/template_unittest_test_autoescape_simple_dict03.out  \
-   src/tests/template_unittest_test_footer_dict01.out  \
-   src/tests/template_unittest_test_footer_dict02.out  \
-   src/tests/template_unittest_test_html_dict01.out  \
-   src/tests/template_unittest_test_html_dict02.out  \
-   src/tests/template_unittest_test_modifiers_dict01.out  \
-   src/tests/template_unittest_test_nul_dict01.out  \
-   src/tests/template_unittest_test_simple_dict01.out  \
-   src/tests/template_unittest_test_simple_dict02.out  \
-   src/tests/template_unittest_test_simple_dict03.out  \
-   src/tests/template_unittest_test_valid1_dict01.out 
+   src/tests/template_unittest_test_footer.in \
+   src/tests/template_unittest_test_html.in \
+   src/tests/template_unittest_test_invalid1.in \
+   src/tests/template_unittest_test_invalid2.in \
+   src/tests/template_unittest_test_markerdelim.in \
+   src/tests/template_unittest_test_modifiers.in \
+   src/tests/template_unittest_test_nul.in \
+   src/tests/template_unittest_test_selective_css.in \
+   src/tests/template_unittest_test_selective_html.in \
+   src/tests/template_unittest_test_selective_js.in \
+   src/tests/template_unittest_test_simple.in \
+   src/tests/template_unittest_test_valid1.in \
+   src/tests/template_unittest_test_footer_dict01.out \
+   src/tests/template_unittest_test_footer_dict02.out \
+   src/tests/template_unittest_test_html_dict01.out \
+   src/tests/template_unittest_test_html_dict02.out \
+   src/tests/template_unittest_test_markerdelim_dict01.out \
+   src/tests/template_unittest_test_markerdelim_dict02.out \
+   src/tests/template_unittest_test_modifiers_dict01.out \
+   src/tests/template_unittest_test_nul_dict01.out \
+   src/tests/template_unittest_test_selective_css_dict01.out \
+   src/tests/template_unittest_test_selective_css_dict02.out \
+   src/tests/template_unittest_test_selective_html_dict01.out \
+   src/tests/template_unittest_test_selective_html_dict02.out \
+   src/tests/template_unittest_test_selective_js_dict01.out \
+   src/tests/template_unittest_test_selective_js_dict02.out \
+   src/tests/template_unittest_test_simple_dict01.out \
+   src/tests/template_unittest_test_simple_dict02.out \
+   src/tests/template_unittest_test_simple_dict03.out \
+   src/tests/template_unittest_test_valid1_dict01.out
 
 TESTS += htmlparser_test htmlparser_nothreads_test
 WINDOWS_PROJECTS += vsprojects/htmlparser_test/htmlparser_test.vcproj
@@ -333,27 +342,35 @@ generate_fsm_c_test_CXXFLAGS = -xc
 
 # This is something only maintainers need (since they're the only ones
 # who generate .h or .c files from .config files).
-generate_fsm_test_sh: $(top_srcdir)/src/tests/generate_fsm_test.sh \
-                      $(top_srcdir)/src/tests/htmlparser_testdata/sample_fsm.config \
-                      $(top_srcdir)/src/tests/htmlparser_testdata/sample_fsm.c \
-                      $(top_srcdir)/src/htmlparser/generate_fsm.py
+check_SCRIPTS += generate_fsm_test_sh
+noinst_SCRIPTS += src/tests/generate_fsm_test.sh
+generate_fsm_test_sh: src/tests/generate_fsm_test.sh \
+                      src/tests/htmlparser_testdata/sample_fsm.config \
+                      src/tests/htmlparser_testdata/sample_fsm.c \
+                      src/htmlparser/generate_fsm.py
 	$(top_srcdir)/src/tests/generate_fsm_test.sh $(top_srcdir)
 TESTDATA += \
    src/tests/htmlparser_testdata/sample_fsm.config \
    src/tests/htmlparser_testdata/sample_fsm.c
 
-make_tpl_varnames_h_unittest_sh: $(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
+check_SCRIPTS += make_tpl_varnames_h_unittest_sh
+noinst_SCRIPTS += src/tests/make_tpl_varnames_h_unittest.sh
+make_tpl_varnames_h_unittest_sh: src/tests/make_tpl_varnames_h_unittest.sh \
                                  make_tpl_varnames_h
 	$(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
 	   $(top_builddir)/make_tpl_varnames_h /tmp/$@_dir
 
-diff_tpl_auto_escape_unittest_sh: $(top_srcdir)/src/tests/diff_tpl_auto_escape_unittest.sh \
-                                  diff_tpl_auto_escape
-	$(top_srcdir)/src/tests/diff_tpl_auto_escape_unittest.sh \
-	   $(top_builddir)/diff_tpl_auto_escape /tmp/$@_dir
+## diff_tpl_auto_escape.cc has the following comment (as of April 2009):
+##    // TODO(jad): This script is currently broken. Fix me.
+## Uncomment this unittest when that TODO is resolved
+#check_SCRIPTS += diff_tpl_auto_escape_unittest_sh
+#noinst_SCRIPTS += src/tests/diff_tpl_auto_escape_unittest.sh
+#diff_tpl_auto_escape_unittest_sh: src/tests/diff_tpl_auto_escape_unittest.sh \
+#                                  diff_tpl_auto_escape
+#	$(top_srcdir)/src/tests/diff_tpl_auto_escape_unittest.sh \
+#	   $(top_builddir)/diff_tpl_auto_escape /tmp/$@_dir
 
 ## ^^^^ END OF RULES TO MAKE THE LIBRARIES, BINARIES, AND UNITTESTS
-
 
 ## This should always include $(TESTS), but may also include other
 ## binaries that you compile but don't want automatically installed.

@@ -187,6 +187,119 @@ static void tolower_str(char *s)
     }
 }
 
+static const char *ignore_spaces_or_digits(const char *value) {
+  while (html_isspace(*value) || ((*value >= '0' && *value <= '9')))
+    value++;
+
+  return value;
+}
+
+static const char *ignore_spaces(const char *value) {
+  while (html_isspace(*value))
+    value++;
+
+  return value;
+}
+
+/* Return type of the function meta_redirect_type.
+ */
+enum meta_redirect_type_enum {
+  META_REDIRECT_TYPE_NONE,
+  META_REDIRECT_TYPE_URL_START,
+  META_REDIRECT_TYPE_URL
+};
+
+/* Analyzes a string for the presence of a meta refresh type url.
+ *
+ * This function receives the value of the content attribute of a meta tag and
+ * parses it in order to identify if a url is going to be present. This is the
+ * format of such tag:
+ *
+ * <meta http-equiv="refresh" content="5; URL=http://www.google.com">
+ *
+ * Using a regular expression library would be the most obvious way to implement
+ * this functionality, but introducing such a dependency is undesirable. We
+ * opted instead to parse programmaticly since the expression is simple enough.
+ *
+ * For reference, this is the spec on the meta http refresh tag:
+ * http://dev.w3.org/html5/spec/Overview.html#attr-meta-http-equiv-refresh
+ *
+ * If the value has no content after the expression, we know we are at the start
+ * of the URL. Otherwise we are past the start of the URL.
+ *
+ *
+ * Returns:
+ *
+ * This functions returns one of the following values:
+ *   META_REDIRECT_TYPE_NONE - A url was not identified in the input string.
+ *   META_REDIRECT_TYPE_URL_START - The input string ends exactly at the start
+ *   of the url.
+ *   META_REDIRECT_TYPE_URL - The input string ends somewhere in the middle or
+ *   the end of the url.
+ *
+ * A few examples:
+ *   "5"
+ *   Returns META_REDIRECT_TYPE_NONE since we don't expect a url to follow.
+ *
+ *   "5; URL = "
+ *   The function returns META_REDIRECT_TYPE_URL_START since we expect a url to
+ *   follow.
+ *
+ *   "5; URL = http://www.google.com/?"
+ *   Returns META_REDIRECT_TYPE_URL since the input value terminates in the
+ *   middle or end of a url.
+ *
+ *
+ * Caveats: We are only recording up to 256 characters of attribute values, so
+ * our analysis is limited to that. This shouldn't be an issue in practice
+ * though as it would be unexpected for the part of the string that we are
+ * matching to be so long.
+ */
+enum meta_redirect_type_enum meta_redirect_type(const char *value) {
+
+  if (value == NULL)
+    return META_REDIRECT_TYPE_NONE;
+
+  /* Match while [ \t\r\n0-9]* */
+  value = ignore_spaces_or_digits(value);
+
+  /* Verify that we got a semi-colon character */
+  if (*value != ';')
+    return META_REDIRECT_TYPE_NONE;
+  value++;
+
+  /* Match while [ \t\r\n]* */
+  value = ignore_spaces(value);
+
+  /* Validate that we have 'URL' */
+  if (strncasecmp(value, "url", strlen("url")) != 0)
+    return META_REDIRECT_TYPE_NONE;
+
+  value += strlen("url");
+
+  /* Match while [ \t\r\n]* */
+  value = ignore_spaces(value);
+
+  if (*value != '=')
+    return META_REDIRECT_TYPE_NONE;
+  value++;
+
+  /* Match while [ \t\r\n]* */
+  value = ignore_spaces(value);
+
+  /* The HTML5 spec allows for the url to be quoted, so we skip a single or
+   * double quote if we find one.
+   */
+  if (*value == '"' || *value == '\'')
+    value++;
+
+  if (*value == '\0')
+    return META_REDIRECT_TYPE_URL_START;
+  else
+    return META_REDIRECT_TYPE_URL;
+}
+
+
 /* Resets the entityfilter to it's initial state so it can be reused.
  */
 void entityfilter_reset(entityfilter_ctx *ctx)
@@ -292,11 +405,6 @@ static const char *entity_convert(const char *s, char *output, char terminator)
 
 /* Processes a character from the input stream and decodes any html entities
  * in the processed input stream.
- *
- * Returns a reference to a string that points to an internal buffer. This
- * buffer will be changed after every call to entityfilter_process(). As
- * such this string should be duplicated before subsequent calls to
- * entityfilter_process().
  */
 const char *entityfilter_process(entityfilter_ctx *ctx, char c)
 {
@@ -540,22 +648,7 @@ static void exit_state_cdata_may_close(statemachine_ctx *ctx, int start,
   }
 }
 
-/* htmlparser_reset_mode(htmlparser_ctx *ctx, int mode)
- *
- * Resets the parser to it's initial state and changes the parser mode.
- * All internal context like tag name, attribute name or the state of the
- * statemachine are reset to it's original values as if the object was just
- * created.
- *
- * Available modes:
- *  HTMLPARSER_MODE_HTML - Parses html text
- *  HTMLPARSER_MODE_JS - Parses javascript files
- *  HTMLPARSER_MODE_CSS - Parses CSS files. No actual parsing is actually done
- *                        but htmlparser_in_css() always returns true.
- *  HTMLPARSER_MODE_HTML_IN_TAG - Parses an attribute list inside a tag. To
- *                                be used in a template expanded in the
- *                                following context: <a $template>
- *
+/* Resets the parser to it's initial state and changes the parser mode.
  */
 void htmlparser_reset_mode(htmlparser_ctx *ctx, int mode)
 {
@@ -589,10 +682,6 @@ void htmlparser_reset_mode(htmlparser_ctx *ctx, int mode)
 
 /* Resets the parser to it's initial state and to the default mode, which
  * is MODE_HTML.
- *
- * All internal context like tag name, attribute name or the state of the
- * statemachine are reset to it's original values as if the object was just
- * created.
  */
 void htmlparser_reset(htmlparser_ctx *ctx)
 {
@@ -718,10 +807,6 @@ htmlparser_ctx *htmlparser_new()
 }
 
 /* Copies the context of the htmlparser pointed to by src to the htmlparser dst.
- *
- * Also copies over the instances of the state machine, the jsparser and the
- * entity filter but not the statemachine definition since this one is read
- * only.
  */
 void htmlparser_copy(htmlparser_ctx *dst, const htmlparser_ctx *src)
 {
@@ -750,11 +835,6 @@ int htmlparser_state(htmlparser_ctx *ctx)
 }
 
 /* Parses the input html stream and returns the finishing state.
- *
- * Returns HTMLPARSER_ERROR if unable to parse the input. If htmlparser_parse()
- * is called after an error situation was encountered the behaviour is
- * unspecified. At this point, htmlparser_reset() or htmlparser_reset_mode()
- * can be called to reset the state.
  */
 int htmlparser_parse(htmlparser_ctx *ctx, const char *str, int size)
 {
@@ -777,9 +857,8 @@ int htmlparser_is_attr_quoted(htmlparser_ctx *ctx) {
       return 0;
 }
 
-/* Returns true if the parser is currently in javascript. This can be a
- * an attribute that takes javascript, a javascript block or the parser
- * can just be in MODE_JS. */
+/* Returns true if the parser is currently in javascript.
+ */
 int htmlparser_in_js(htmlparser_ctx *ctx) {
   int st = statemachine_get_state(ctx->statemachine);
 
@@ -807,26 +886,6 @@ int htmlparser_in_js(htmlparser_ctx *ctx) {
 
 /* Returns the current tag or NULL if not available or we haven't seen the
  * entire tag yet.
- *
- * There is no stack implemented because we currently don't have a need for
- * it, which means tag names are tracked only one level deep.
- *
- * This is better understood by looking at the following example:
- *
- * <b [tag=b]>
- *   [tag=b]
- *   <i>
- *    [tag=i]
- *   </i>
- *  [tag=NULL]
- * </b>
- *
- * The tag is correctly filled inside the tag itself and before any new inner
- * tag is closed, at which point the tag will be null.
- *
- * For our current purposes this is not a problem, but we may implement a tag
- * tracking stack in the future for completeness.
- *
  */
 const char *htmlparser_tag(htmlparser_ctx *ctx)
 {
@@ -872,8 +931,6 @@ int htmlparser_in_css(htmlparser_ctx *ctx) {
 }
 
 /* Returns the contents of the current attribute value.
- *
- * Returns NULL if not inside an attribute value.
  */
 const char *htmlparser_value(htmlparser_ctx *ctx)
 {
@@ -929,17 +986,36 @@ int htmlparser_value_index(htmlparser_ctx *ctx)
     return -1;
 }
 
+/* Returns true if this is the first character of a url inside an attribute.
+ */
+int htmlparser_is_url_start(htmlparser_ctx *ctx)
+{
+  const char *tag;
+  const char *attr;
+
+  if (htmlparser_attr_type(ctx) == HTMLPARSER_ATTR_URI) {
+    tag = htmlparser_tag(ctx);
+    attr = htmlparser_attr(ctx);
+
+    if ((tag && strcmp(tag, "meta") == 0 &&
+         meta_redirect_type(htmlparser_value(ctx)) ==
+         META_REDIRECT_TYPE_URL_START) ||
+        htmlparser_value_index(ctx) == 0)
+      return 1;
+
+  }
+  return 0;
+}
+
 /* Returns the current attribute type.
- *
- * The attribute type can be one of:
- *   HTMLPARSER_ATTR_NONE - not inside an attribute.
- *   HTMLPARSER_ATTR_REGULAR - Inside a normal attribute.
- *   HTMLPARSER_ATTR_URI - Inside an attribute that accepts a uri.
- *   HTMLPARSER_ATTR_JS - Inside a javascript attribute.
- *   HTMLPARSER_ATTR_STYLE - Inside a css style attribute.
  */
 int htmlparser_attr_type(htmlparser_ctx *ctx)
 {
+    const char *tag;
+    const char *attr;
+    const char *value;
+    enum meta_redirect_type_enum redirect_type;
+
     if (!htmlparser_in_attr(ctx))
         return HTMLPARSER_ATTR_NONE;
 
@@ -952,24 +1028,53 @@ int htmlparser_attr_type(htmlparser_ctx *ctx)
     if (is_style_attribute(ctx->attr))
         return HTMLPARSER_ATTR_STYLE;
 
+    tag = htmlparser_tag(ctx);
+    attr = htmlparser_attr(ctx);
+
+    /* Special logic to handle meta redirect type tags. */
+    if (tag && strcmp(tag, "meta") == 0 &&
+        attr && strcmp(attr, "content") == 0) {
+
+      value = htmlparser_value(ctx);
+      redirect_type = meta_redirect_type(value);
+
+      if (redirect_type == META_REDIRECT_TYPE_URL ||
+          redirect_type == META_REDIRECT_TYPE_URL_START)
+        return HTMLPARSER_ATTR_URI;
+    }
+
     return HTMLPARSER_ATTR_REGULAR;
 }
 
+/* Return the current line number. */
+int htmlparser_get_line_number(htmlparser_ctx *ctx) {
+  return statemachine_get_line_number(ctx->statemachine);
+}
+
+/* Set the current line number. */
+void htmlparser_set_line_number(htmlparser_ctx *ctx, int line) {
+  statemachine_set_line_number(ctx->statemachine, line);
+}
+
+/* Return the current column number. */
+int htmlparser_get_column_number(htmlparser_ctx *ctx) {
+  return statemachine_get_column_number(ctx->statemachine);
+}
+
+/* Set the current column number. */
+void htmlparser_set_column_number(htmlparser_ctx *ctx, int column) {
+  statemachine_set_column_number(ctx->statemachine, column);
+}
+
+/* Retrieve a human readable error message in case an error occurred.
+ *
+ * NULL is returned if the parser didn't encounter an error.
+ */
+const char *htmlparser_get_error_msg(htmlparser_ctx *ctx) {
+  return statemachine_get_error_msg(ctx->statemachine);
+}
+
 /* Invoked by the caller when text is expanded by the caller.
- *
- * Should be invoked when a template directive that expands to content is
- * executed but we don't provide this content to the parser itself. This
- * changes the current state by following the default rule, ensuring we
- * stay in sync with the template. Ideally the caller would provide an
- * assertion that ensures the state change change executes the right state
- * transition.
- *
- * Returns 1 if template directives are accepted for this state and 0 if they
- * are not, which should result in an error condition.
- *
- * Right now the only case being handled are unquoted attribute values and it
- * always returns 1. In the future we can handle more cases and restrict
- * the states were we allow template directives by returning 0 for those.
  */
 int htmlparser_insert_text(htmlparser_ctx *ctx)
 {

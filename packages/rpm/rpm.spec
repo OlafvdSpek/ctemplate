@@ -34,19 +34,28 @@ The %name-devel package contains static and debug libraries and header
 files for developing applications that use the %name package.
 
 %changelog
-    * Mon Mar 13 2006 <opensource@google.com>
-    - First draft
+	* Wed Apr 22 2009  <opensource@google.com>
+	- Change build rule to use %configure instead of ./configure
+	- Change install to use DESTDIR instead of prefix for make install
+	- Use wildcards for doc/ and lib/ directories
+        - Use {_libdir}/{_includedir}/etc instead of {prefix}/lib, etc
+
+	* Mon Mar 13 2006 <opensource@google.com>
+	- First draft
 
 %prep
 %setup
 
 %build
-./configure
-make prefix=%prefix
+# I can't use '% configure', because it defines -m32 which breaks on
+# my development environment for some reason.  But I do take
+# as much from % configure (in /usr/lib/rpm/macros) as I can.
+./configure --prefix=%{_prefix} --exec-prefix=%{_exec_prefix} --bindir=%{_bindir} --sbindir=%{_sbindir} --sysconfdir=%{_sysconfdir} --datadir=%{_datadir} --includedir=%{_includedir} --libdir=%{_libdir} --libexecdir=%{_libexecdir} --localstatedir=%{_localstatedir} --sharedstatedir=%{_sharedstatedir} --mandir=%{_mandir} --infodir=%{_infodir}
+make
 
 %install
 rm -rf $RPM_BUILD_ROOT
-make prefix=$RPM_BUILD_ROOT%{prefix} install
+make DESTDIR=$RPM_BUILD_ROOT install
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -54,27 +63,22 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root)
 
-%doc AUTHORS COPYING ChangeLog INSTALL NEWS README
-%doc doc/designstyle.css doc/index.html
-%doc doc/howto.html doc/auto_escape.html doc/tips.html doc/example.html
-%doc doc/xss_resources.html
-%doc contrib/README.contrib contrib/highlighting.vim contrib/tpl-mode.el
+%docdir %{prefix}/share/doc/%{NAME}-%{VERSION}
+## %{prefix}/share/doc/%{NAME}-%{VERSION}/*
 
-%{prefix}/lib/libctemplate.so.0
-%{prefix}/lib/libctemplate.so.0.0.0
-%{prefix}/lib/libctemplate_nothreads.so.0
-%{prefix}/lib/libctemplate_nothreads.so.0.0.0
+%doc AUTHORS COPYING ChangeLog INSTALL NEWS README
+%doc doc/*
+%doc contrib/*
+
+%{_libdir}/*.so.*
 
 %files devel
 %defattr(-,root,root)
 
-%{prefix}/include/google
-%{prefix}/lib/libctemplate.a
-%{prefix}/lib/libctemplate.la
-%{prefix}/lib/libctemplate.so
-%{prefix}/lib/libctemplate_nothreads.a
-%{prefix}/lib/libctemplate_nothreads.la
-%{prefix}/lib/libctemplate_nothreads.so
-%{prefix}/bin/make_tpl_varnames_h
-%{prefix}/bin/template-converter
-%{prefix}/bin/diff_tpl_auto_escape
+%{_includedir}/google
+%{_libdir}/*.a
+%{_libdir}/*.la
+%{_libdir}/*.so
+%{_bindir}/make_tpl_varnames_h
+%{_bindir}/template-converter
+%{_bindir}/diff_tpl_auto_escape

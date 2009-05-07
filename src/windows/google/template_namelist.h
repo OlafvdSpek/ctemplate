@@ -44,6 +44,7 @@
 #include <vector>
 #include <hash_set>
 #include <google/template_enums.h>   // for Strip
+#include <google/template_string.h>  // for StringHash
 
 // NOTE: if you are statically linking the template library into your binary
 // (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
@@ -82,27 +83,12 @@ namespace google {
 
 class CTEMPLATE_DLL_DECL TemplateNamelist {
   friend class TemporaryRegisterTemplate;
- private:
-  // Standard hash_compare libs don't define hash_compare<string>, but do define hash_compare<char*>
-  struct TemplateHasher {
-    size_t operator()(const std::string& s) const {
-      return stdext::hash_compare<const char*>()(s.c_str());
-    }
-    // Less operator for MSVC's hash_compare containers.
-    bool operator()(const std::string& a, const std::string& b) const {
-      return a < b;
-    }
-    // These two public members are required by msvc.  4 and 8 are defaults.
-    static const size_t bucket_size = 4;
-    static const size_t min_buckets = 8;
-  };
-
  public:
   // These types should be taken as 'generic' containers.  The only
   // thing you should do with them is call size() and/or iterate
   // between begin() and end(), and the only operations we promise
   // the iterators will support are operator* and operator++.
-  typedef stdext::hash_set<std::string, TemplateHasher> NameListType;
+  typedef stdext::hash_set<std::string, ctemplate::StringHash> NameListType;
   typedef std::vector<std::string> MissingListType;
   typedef std::vector<std::string> SyntaxListType;
 

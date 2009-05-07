@@ -132,8 +132,6 @@
 # error Need to implement mutex.h for your architecture, or #define NO_THREADS
 #endif
 
-#include <stdlib.h>           // for rand()
-
 class Mutex {
  public:
   // Create a Mutex that is not held by anybody.  This constructor is
@@ -161,15 +159,15 @@ class Mutex {
 
  private:
   MutexType mutex_;
-  bool is_safe_;
+  // We want to make sure that the compiler sets is_safe_ to true only
+  // when we tell it to, and never makes assumptions is_safe_ is
+  // always true.  volatile is the most reliable way to do that.
+  volatile bool is_safe_;
 
-  // Set is_safe_ to true in a way that the compiler can't easily optimize.
-  // We pick a rand(), which is never negative, though the compiler can't know
-  // that.  TODO(csilvers): consider just making is_safe_ volatile instead.
-  inline void SetIsSafe() { is_safe_ = (rand() >= 0); }
+  inline void SetIsSafe() { is_safe_ = true; }
 
   // Catch the error of writing Mutex when intending MutexLock.
-  Mutex(Mutex *ignored) {}
+  Mutex(Mutex* /*ignored*/) {}
   // Disallow "evil" constructors
   Mutex(const Mutex&);
   void operator=(const Mutex&);
@@ -228,7 +226,8 @@ void Mutex::Lock()         { SAFE_PTHREAD(pthread_rwlock_wrlock); }
 void Mutex::Unlock()       { SAFE_PTHREAD(pthread_rwlock_unlock); }
 #ifdef GMUTEX_TRYLOCK
 bool Mutex::TryLock()      { return is_safe_ ?
-                                 pthread_rwlock_trywrlock(&mutex_) == 0 : true; }
+                                    pthread_rwlock_trywrlock(&mutex_) == 0 :
+                                    true; }
 #endif
 void Mutex::ReaderLock()   { SAFE_PTHREAD(pthread_rwlock_rdlock); }
 void Mutex::ReaderUnlock() { SAFE_PTHREAD(pthread_rwlock_unlock); }

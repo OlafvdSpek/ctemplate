@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include <google/template.h>
 #include <google/template_dictionary.h>
+#include "tests/template_test_util.h"
 
 #define ASSERT(cond)  do {                                      \
   if (!(cond)) {                                                \
@@ -62,7 +63,8 @@ class TemplateSetGlobalsUnittest {
     // first call the static function TemplateDictionary::SetGlobalValue().
     TemplateDictionary::SetGlobalValue("TEST_GLOBAL_VAR", "test_value");
     TemplateDictionary tpl("empty");
-    ASSERT_STREQ(tpl.GetSectionValue("TEST_GLOBAL_VAR"),
+    TemplateDictionaryPeer peer(&tpl);
+    ASSERT_STREQ(peer.GetSectionValue("TEST_GLOBAL_VAR"),
                 "test_value");
   }
 

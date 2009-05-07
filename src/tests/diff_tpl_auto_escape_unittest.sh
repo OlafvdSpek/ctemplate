@@ -83,24 +83,24 @@ expected_ok2_verbose=`cat <<EOF | grep -v '^EOF$'
 [VERBOSE] $TMPDIR/ok2.tpl: Variables Found: Total=2; Diffs=0; NoMods=0
 EOF`
 
-# One difference.  We also capture the LOG(WARNING) output
+# One difference.  We also capture the LOG(ERROR) output
 expected_ok3=`cat <<EOF |  grep -v '^EOF$'
-WARNING: Token: USER has missing in-template modifiers. You gave :j and we computed :h. We changed to :j:h
+ERROR: Token: USER has missing in-template modifiers. You gave :j and we computed :h. We changed to :j:h
 $TMPDIR/ok3.tpl: Difference for variable USER -- :j vs. :j:h
 EOF`
 
-# Two differences (with associated LOG(WARNING) output).
+# Two differences (with associated LOG(ERROR) output).
 expected_ok4=`cat <<EOF |  grep -v '^EOF$'
-WARNING: Token: USER has missing in-template modifiers. You gave :j and we computed :h. We changed to :j:h
-WARNING: Token: OWNER has missing in-template modifiers. You gave :c and we computed :h. We changed to :c:h
+ERROR: Token: USER has missing in-template modifiers. You gave :j and we computed :h. We changed to :j:h
+ERROR: Token: OWNER has missing in-template modifiers. You gave :c and we computed :h. We changed to :c:h
 $TMPDIR/ok4.tpl: Difference for variable USER -- :j vs. :j:h
 $TMPDIR/ok4.tpl: Difference for variable OWNER -- :c vs. :c:h
 EOF`
 
 # Two differences but --brief output.
 expected_ok4_brief=`cat <<EOF |  grep -v '^EOF$'
-WARNING: Token: USER has missing in-template modifiers. You gave :j and we computed :h. We changed to :j:h
-WARNING: Token: OWNER has missing in-template modifiers. You gave :c and we computed :h. We changed to :c:h
+ERROR: Token: USER has missing in-template modifiers. You gave :j and we computed :h. We changed to :j:h
+ERROR: Token: OWNER has missing in-template modifiers. You gave :c and we computed :h. We changed to :c:h
 $TMPDIR/ok4.tpl: Detected 2 differences.
 EOF`
 

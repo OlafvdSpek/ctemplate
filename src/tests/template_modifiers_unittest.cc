@@ -300,6 +300,35 @@ class TemplateModifiersUnittest {
                  "#");
   }
 
+  static void TestValidateUrlCssEscape() {
+    TemplateDictionary dict("TestValidateUrlCssEscape", NULL);
+    dict.SetEscapedValue("easy http URL", "http://www.google.com",
+                         template_modifiers::validate_url_and_css_escape);
+    dict.SetEscapedValue("harder https URL",
+                         "https://www.google.com/search?q=f&hl=en",
+                         template_modifiers::validate_url_and_css_escape);
+    dict.SetEscapedValue("javascript URL",
+                         "javascript:alert(document.cookie)",
+                         template_modifiers::validate_url_and_css_escape);
+    dict.SetEscapedValue("relative URL", "/search?q=green flowers&hl=en",
+                         template_modifiers::validate_url_and_css_escape);
+    dict.SetEscapedValue("hardest URL", "http://www.google.com/s?q='bla'"
+                         "&a=\"\"&b=(<tag>)&c=*\r\n\\\\bla",
+                         template_modifiers::validate_url_and_css_escape);
+
+    TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
+    ASSERT_STREQ(peer.GetSectionValue("easy http URL"),
+                 "http://www.google.com");
+    ASSERT_STREQ(peer.GetSectionValue("harder https URL"),
+                 "https://www.google.com/search?q=f&hl=en");
+    ASSERT_STREQ(peer.GetSectionValue("javascript URL"), "#");
+    ASSERT_STREQ(peer.GetSectionValue("relative URL"),
+                 "/search?q=green flowers&hl=en");
+    ASSERT_STREQ(peer.GetSectionValue("hardest URL"),
+                 "http://www.google.com/s?q=%27bla%27"
+                 "&a=%22%22&b=%28%3Ctag%3E%29&c=%2A%0D%0A%5C%5Cbla");
+  }
+
   static void TestCleanseAttribute() {
     TemplateDictionary dict("TestCleanseAttribute", NULL);
     dict.SetEscapedValue("easy attribute", "top",
@@ -597,6 +626,7 @@ class TemplateModifiersUnittest {
     ASSERT(info = template_modifiers::FindModifier("x-test", 6, "", 0));
     ASSERT(info->is_registered);
     ASSERT(info->modifier == &foo_modifier1);
+    ASSERT(info->xss_class == template_modifiers::XSS_UNIQUE);
     ASSERT(info = template_modifiers::FindModifier("x-test", 6, "=h", 2));
     ASSERT(!info->is_registered);
     // This tests default values
@@ -639,6 +669,15 @@ class TemplateModifiersUnittest {
     ASSERT(!info->is_registered);
     ASSERT(info = template_modifiers::FindModifier("x-bar", 5, "=p", 2));
     ASSERT(!info->is_registered);
+
+    // Basic test with added XssSafe modifier.
+    template_modifiers::NullModifier foo_modifier5;
+    ASSERT(template_modifiers::AddXssSafeModifier("x-safetest",
+                                                  &foo_modifier5));
+    ASSERT(info = template_modifiers::FindModifier("x-safetest", 10, "", 0));
+    ASSERT(info->is_registered);
+    ASSERT(info->xss_class == template_modifiers::XSS_SAFE);
+    ASSERT(info->modifier == &foo_modifier5);
   }
 
   static void TestAddModifier() {
@@ -686,6 +725,40 @@ class TemplateModifiersUnittest {
     ASSERT(info->modifier == &foo_modifier);
   }
 
+  static void TestAddXssSafeModifier() {
+    // For shorter lines.
+    const template_modifiers::TemplateModifier* esc_fn =
+        &template_modifiers::html_escape;
+
+    ASSERT(template_modifiers::AddXssSafeModifier("x-asafetest", esc_fn));
+    ASSERT(template_modifiers::AddXssSafeModifier("x-asafetest-arg=", esc_fn));
+    ASSERT(template_modifiers::AddXssSafeModifier("x-asafetest-arg=h", esc_fn));
+
+    // Make sure AddXssSafeModifier fails with an invalid name.
+    ASSERT(!template_modifiers::AddXssSafeModifier("test", esc_fn));
+
+    // Make sure AddXssSafeModifier fails with a duplicate name.
+    ASSERT(!template_modifiers::AddXssSafeModifier("x-asafetest", esc_fn));
+    ASSERT(!template_modifiers::AddXssSafeModifier("x-asafetest-arg=", esc_fn));
+    ASSERT(!template_modifiers::AddXssSafeModifier("x-asafetest-arg=h",
+                                                   esc_fn));
+
+    // Make sure AddXssSafeModifier fails if the same modifier was
+    // previously added via AddModifier.
+    ASSERT(template_modifiers::AddModifier("x-safetest2", esc_fn));
+    ASSERT(template_modifiers::AddModifier("x-safetest2-arg=", esc_fn));
+    ASSERT(template_modifiers::AddModifier("x-safetest2-arg=h", esc_fn));
+    ASSERT(!template_modifiers::AddXssSafeModifier("x-safetest2", esc_fn));
+    ASSERT(!template_modifiers::AddXssSafeModifier("x-safetest2-arg=", esc_fn));
+    ASSERT(!template_modifiers::AddXssSafeModifier("x-safetest2-arg=h",
+                                                   esc_fn));
+
+    // and vice versa.
+    ASSERT(!template_modifiers::AddModifier("x-asafetest", esc_fn));
+    ASSERT(!template_modifiers::AddModifier("x-asafetest-arg=", esc_fn));
+    ASSERT(!template_modifiers::AddModifier("x-asafetest-arg=h", esc_fn));
+  }
+
   // Helper function. Determines whether the Modifier specified by
   // alt_modname/alt_modval is a safe XSS alternative to
   // the Modifier specified by modname/modval.
@@ -716,18 +789,20 @@ class TemplateModifiersUnittest {
     ASSERT(CheckXSSAlternative("url_query_escape", "",
                                "url_escape_with_arg", "=query"));
 
-    // H=(pre|snippet|attribute), p, u and U=query are all alternatives to h.
+    // H=(pre|snippet|attribute), p, u, U=query and U=html (a.k.a H=url)
+    // are all alternatives to h.
     ASSERT(CheckXSSAlternative("h", "", "H", "=pre"));
     ASSERT(CheckXSSAlternative("h", "", "H", "=snippet"));
     ASSERT(CheckXSSAlternative("h", "", "H", "=attribute"));
+    ASSERT(CheckXSSAlternative("h", "", "H", "=url"));
     ASSERT(CheckXSSAlternative("h", "", "p", ""));
     ASSERT(CheckXSSAlternative("h", "", "u", ""));
     ASSERT(CheckXSSAlternative("h", "", "U", "=query"));
+    ASSERT(CheckXSSAlternative("h", "", "U", "=html"));
 
     // But h is not an alternative to H=attribute
-    // nor are U=html (yet) or json_escape alternatives to h.
+    // nor is json_escape an alternative to h.
     ASSERT(!CheckXSSAlternative("H", "=attribute", "h", ""));
-    ASSERT(!CheckXSSAlternative("h", "", "U", "=html"));
     ASSERT(!CheckXSSAlternative("h", "", "json_escape", ""));
 
     // H=snippet and H=attribute are alternatives to H=pre
@@ -798,6 +873,7 @@ int main(int argc, char** argv) {
   TemplateModifiersUnittest::TestXmlEscape();
   TemplateModifiersUnittest::TestValidateUrlHtmlEscape();
   TemplateModifiersUnittest::TestValidateUrlJavascriptEscape();
+  TemplateModifiersUnittest::TestValidateUrlCssEscape();
   TemplateModifiersUnittest::TestCleanseAttribute();
   TemplateModifiersUnittest::TestCleanseCss();
   TemplateModifiersUnittest::TestJavascriptEscape();
@@ -807,6 +883,7 @@ int main(int argc, char** argv) {
   TemplateModifiersUnittest::TestPrefixLine();
   TemplateModifiersUnittest::TestFindModifier();
   TemplateModifiersUnittest::TestAddModifier();
+  TemplateModifiersUnittest::TestAddXssSafeModifier();
   TemplateModifiersUnittest::TestXSSAlternatives();
   TemplateModifiersUnittest::TestDefaultModifiersForContext();
 

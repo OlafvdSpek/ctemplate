@@ -38,6 +38,8 @@
 #include <vector>
 #include HASH_MAP_H           // defined in config.h
 #include <google/template_namelist.h>
+#include <google/template_dictionary_interface.h>
+#include <google/template_dictionary.h>
 
 _START_GOOGLE_NAMESPACE_
 
@@ -62,10 +64,30 @@ class TemporaryRegisterTemplate {
   void operator=(const TemporaryRegisterTemplate&);
 };
 
-// This class is meant for use in unittests.  This class wraps the
-// TemplateDictionary and provides access to internal data that should not
-// be used in production code.
+// For friendship reasons, we make this a top-level class rather
+// than a nested class.  It's used only in TemplateDictionaryPeer.
+// We take ownership of the iterator passed to us.  To make sure that
+// isn't a problem, we make this class not-copyable.
+class TemplateDictionaryPeerIterator {
+ public:
+  explicit TemplateDictionaryPeerIterator(
+      TemplateDictionaryInterface::Iterator* it) : it_(it) { }
+  ~TemplateDictionaryPeerIterator() { delete it_; }
+  bool HasNext() const { return it_->HasNext(); }
+  const TemplateDictionaryInterface& Next() { return it_->Next(); }
+ private:
+  TemplateDictionaryInterface::Iterator* it_;
+  TemplateDictionaryPeerIterator(const TemplateDictionaryPeerIterator&);
+  TemplateDictionaryPeerIterator& operator=(
+      const TemplateDictionaryPeerIterator&);
+};
 
+// This class is meant for use in unittests.  This class wraps the
+// TemplateDictionary and provides access to internal data that should
+// not be used in production code.  If you need this kind of
+// functionality in production, use TemplateDictionaryWrapper or
+// TemplateDictionaryInterface; see top of file for details.
+//
 // Example Usage:
 //  TemplateDictionary dict("test dictionary");
 //  FillDictionaryValues(&dict);
@@ -82,6 +104,9 @@ class TemplateDictionaryPeer {
 
   // Returns true if the named section is hidden.
   bool IsHiddenSection(const TemplateString& name) const;
+
+  // Returns true if the named sub-template is hidden.
+  bool IsHiddenTemplate(const TemplateString& name) const;
 
   // Retrieves TemplateDictionary instances for the given section name.  The
   // caller does not assume ownership of the returned TemplateDictionary
@@ -104,6 +129,19 @@ class TemplateDictionaryPeer {
   // with AddIncludeDictionary rather than AddOldstyleIncludeDictionary.
   int GetIncludeDictionaries(const TemplateString& section_name,
                              std::vector<const TemplateDictionary*>* dicts) const;
+
+  const char* GetIncludeTemplateName(const TemplateString& variable,
+                                     int dictnum) const;
+
+  typedef TemplateDictionaryPeerIterator Iterator;
+
+  Iterator* CreateTemplateIterator(const TemplateString& section) const {
+    return new Iterator(dict_->CreateTemplateIterator(section));
+  }
+
+  Iterator* CreateSectionIterator(const TemplateString& section) const {
+    return new Iterator(dict_->CreateSectionIterator(section));
+  }
 
   // Returns the filename associated with the TemplateDictionary.
   const char* GetFilename() const;

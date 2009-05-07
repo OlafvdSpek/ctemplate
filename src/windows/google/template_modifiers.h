@@ -199,6 +199,7 @@ class CTEMPLATE_DLL_DECL ValidateUrl : public TemplateModifier {
 };
 extern CTEMPLATE_DLL_DECL ValidateUrl validate_url_and_html_escape;
 extern CTEMPLATE_DLL_DECL ValidateUrl validate_url_and_javascript_escape;
+extern CTEMPLATE_DLL_DECL ValidateUrl validate_url_and_css_escape;
 
 // Escapes < > & " ' to &lt; &gt; &amp; &quot; &#39; (same as in HtmlEscape).
 // If you use it within a CDATA section, you may be escaping more characters
@@ -284,6 +285,33 @@ extern CTEMPLATE_DLL_DECL PrefixLine prefix_line;
 // and VAR4 by my_modifierC.  The order of the AddModifier calls is not
 // significant.
 extern CTEMPLATE_DLL_DECL bool AddModifier(const char* long_name, const TemplateModifier* modifier);
+
+// Same as AddModifier() above except that the modifier is considered
+// to produce safe output that can be inserted in any context without
+// the need for additional escaping. This difference only impacts
+// the Auto-Escape mode: In that mode, when a variable (or template-include)
+// has a modifier added via AddXssSafeModifier(), it is excluded from
+// further escaping, effectively treated as though it had the :none modifier.
+// Because Auto-Escape is disabled for any variable and template-include
+// that includes such a modifier, use this function with care and ensure
+// that it may not emit harmful output that could lead to XSS.
+//
+// Some valid uses of AddXssSafeModifier:
+// . A modifier that converts a string to an integer since
+//   an integer is generally safe in any context.
+// . A modifier that returns one of a fixed number of safe values
+//   depending on properties of the input.
+//
+// Some not recommended uses of AddXssSafeModifier:
+// . A modifier that applies some extra formatting to the input
+//   before returning it since the output will still contain
+//   harmful content if the input does.
+// . A modifier that applies one type of escaping to the input
+//   (say HTML-escape). This may be dangerous when the modifier
+//   is used in a different context (say Javascript) where this
+//   escaping may be inadequate.
+extern CTEMPLATE_DLL_DECL bool AddXssSafeModifier(const char* long_name,
+                        const TemplateModifier* modifier);
 
 }  // namespace template_modifiers
 

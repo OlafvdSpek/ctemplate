@@ -241,8 +241,8 @@ void CleanseAttribute::Modify(const char* in, size_t inlen,
 CleanseAttribute cleanse_attribute;
 
 void CleanseCss::Modify(const char* in, size_t inlen,
-                              const PerExpandData*,
-                              ExpandEmitter* out, const string& arg) const {
+                        const PerExpandData*,
+                        ExpandEmitter* out, const string& arg) const {
   for (size_t i = 0; i < inlen; ++i) {
     char c = in[i];
     switch (c) {
@@ -270,6 +270,48 @@ void CleanseCss::Modify(const char* in, size_t inlen,
 }
 CleanseCss cleanse_css;
 
+// CssUrlEscape is used as a chained modifier by ValidateUrl
+// (validate_url_and_css_escape) and is not directly exposed.
+class CssUrlEscape : public TemplateModifier {
+ public:
+  virtual void Modify(const char* in, size_t inlen,
+                      const ctemplate::PerExpandData*, ExpandEmitter* outbuf,
+                      const string& arg) const;
+};
+
+// URL-encodes the characters [\n\r\\'"()<>*] to ensure the URL can be safely
+// inserted in a CSS context, e.g:
+// . In an '@import url("URL");' statement
+// . In a CSS property such as 'background: url("URL");'
+// In both locations above, enclosing quotes are optional but parens are not.
+// We want to make sure the URL cannot exit the parens enclosure, close a
+// STYLE tag or reset the browser's CSS parser (via comments or newlines).
+//
+// References:
+// . CSS 2.1 URLs: http://www.w3.org/TR/CSS21/syndata.html#url
+// . CSS 1 URLs: http://www.w3.org/TR/REC-CSS1/#url
+void CssUrlEscape::Modify(const char* in, size_t inlen,
+                          const PerExpandData*,
+                          ExpandEmitter* out, const string& arg) const {
+  for (size_t i = 0; i < inlen; ++i) {
+    char c = in[i];
+    switch (c) {
+      case '\n': APPEND("%0A"); break;
+      case '\r': APPEND("%0D"); break;
+      case '"':  APPEND("%22"); break;
+      case '\'': APPEND("%27"); break;
+      case '(':  APPEND("%28"); break;
+      case ')':  APPEND("%29"); break;
+      case '*':  APPEND("%2A"); break;
+      case '<':  APPEND("%3C"); break;
+      case '>':  APPEND("%3E"); break;
+      case '\\': APPEND("%5C"); break;
+      default: out->Emit(c); break;
+    }
+  }
+}
+CssUrlEscape css_url_escape;
+
 void ValidateUrl::Modify(const char* in, size_t inlen,
                          const PerExpandData* per_expand_data,
                          ExpandEmitter* out, const string& arg) const {
@@ -295,6 +337,7 @@ void ValidateUrl::Modify(const char* in, size_t inlen,
 }
 ValidateUrl validate_url_and_html_escape(html_escape);
 ValidateUrl validate_url_and_javascript_escape(javascript_escape);
+ValidateUrl validate_url_and_css_escape(css_url_escape);
 
 void XmlEscape::Modify(const char* in, size_t inlen,
                        const PerExpandData*,
@@ -549,14 +592,17 @@ static struct ModifierWithAlternatives {
   ModifierInfo* safe_alt_mods[MAX_SAFE_ALTERNATIVES];
 } g_modifiers[] = {
   /* 0 */ { ModifierInfo("cleanse_css", 'c',
-                         XSS_WEB_STANDARD, &cleanse_css), {} },
+                         XSS_WEB_STANDARD, &cleanse_css),
+            {&g_modifiers[16].modifier_info} },  // url_escape_with_arg=css
   /* 1 */ { ModifierInfo("html_escape", 'h',
                          XSS_WEB_STANDARD, &html_escape),
             {&g_modifiers[2].modifier_info,   // html_escape_with_arg=snippet
              &g_modifiers[3].modifier_info,   // html_escape_with_arg=pre
              &g_modifiers[4].modifier_info,   // html_escape_with_arg=attribute
+             &g_modifiers[5].modifier_info,   // html_escape_with_arg=url
              &g_modifiers[8].modifier_info,   // pre_escape
              &g_modifiers[9].modifier_info,   // url_query_escape
+             &g_modifiers[11].modifier_info,  // url_escape_with_arg=html
              &g_modifiers[12].modifier_info} },  // url_escape_with_arg=query
 
   /* 2 */ { ModifierInfo("html_escape_with_arg=snippet", 'H',
@@ -600,12 +646,14 @@ static struct ModifierWithAlternatives {
                           XSS_WEB_STANDARD, &validate_url_and_html_escape), {} },
   /* 12 */ { ModifierInfo("url_escape_with_arg=query", 'U',
                           XSS_WEB_STANDARD, &url_query_escape), {} },
-  /* 13 */ { ModifierInfo("none", '\0', XSS_UNIQUE, &null_modifier), {} },
+  /* 13 */ { ModifierInfo("none", '\0', XSS_SAFE, &null_modifier), {} },
   /* 14 */ { ModifierInfo("xml_escape", '\0', XSS_WEB_STANDARD, &xml_escape),
              {&g_modifiers[1].modifier_info,      // html_escape
               &g_modifiers[4].modifier_info,} },  // H=attribute
   /* 15 */ { ModifierInfo("javascript_escape_with_arg=number", 'J',
                           XSS_WEB_STANDARD, &javascript_number), {} },
+  /* 16 */ { ModifierInfo("url_escape_with_arg=css", 'U',
+                          XSS_WEB_STANDARD, &validate_url_and_css_escape), {} },
 };
 
 static vector<ModifierInfo> g_extension_modifiers;
@@ -655,8 +703,8 @@ static inline bool IsExtensionModifier(const char* long_name) {
   return memcmp(long_name, "x-", 2) == 0;
 }
 
-bool AddModifier(const char* long_name,
-                 const TemplateModifier* modifier) {
+static bool AddModifierCommon(const char* long_name,
+                 const TemplateModifier* modifier, bool xss_safe) {
   if (!IsExtensionModifier(long_name))
     return false;
 
@@ -683,9 +731,23 @@ bool AddModifier(const char* long_name,
     }
   }
 
-  g_extension_modifiers.push_back(ModifierInfo(long_name, '\0',
-                                               XSS_UNIQUE, modifier));
+  g_extension_modifiers.push_back(
+      ModifierInfo(long_name, '\0',
+                   xss_safe ? XSS_SAFE : XSS_UNIQUE,
+                   modifier));
   return true;
+}
+
+// Modifier added with XSS_UNIQUE XssClass.
+bool AddModifier(const char* long_name,
+                 const TemplateModifier* modifier) {
+  return AddModifierCommon(long_name, modifier, false);
+}
+
+// Modifier added with XSS_SAFE XssClass.
+bool AddXssSafeModifier(const char* long_name,
+                 const TemplateModifier* modifier) {
+  return AddModifierCommon(long_name, modifier, true);
 }
 
 // If candidate_match is a better match for modname/modval than bestmatch,
@@ -928,7 +990,7 @@ vector<const ModifierAndValue*> GetModifierForHtmlJs(
           // .  If it is a URL fragment, then :u is safe and not likely to
           //   break the URL.
           if (!htmlparser->IsAttributeQuoted()) {
-            if (htmlparser->ValueIndex() == 0) {   // Complete URL.
+            if (htmlparser->IsUrlStart()) {   // Complete URL.
               error_msg->append("Value of URL attribute \"" + attribute_name +
                                 "\" must be enclosed in quotes.");
               assert(modvals.empty());
@@ -939,7 +1001,7 @@ vector<const ModifierAndValue*> GetModifierForHtmlJs(
           } else {
             // Only validate the URL if we have a complete URL,
             // otherwise simply html_escape.
-            if (htmlparser->ValueIndex() == 0)
+            if (htmlparser->IsUrlStart())
               modvals.push_back(g_am_dirs[AM_URL_HTML]);
             else
               modvals.push_back(g_am_dirs[AM_HTML]);
