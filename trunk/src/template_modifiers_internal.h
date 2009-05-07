@@ -80,15 +80,20 @@ class TemplateModifier;
 //
 // XssClass is not exposed in any API and cannot be set in custom
 // modifiers, it is for internal use only (for Auto-Escape). We currently
-// have only two classes.
+// have only three classes.
 //
 // XSS_UNUSED: not used.
 // XSS_WEB_STANDARD: All the curent built-in escaping modifiers.
-// XSS_UNIQUE: Set for all custom modifiers.
+// XSS_UNIQUE: Set for all custom modifiers added via AddModifier()
+//             and may need to be escaped.
+// XSS_SAFE: Set for all custom modifiers added via AddXssSafeModifier()
+//           that are considered to produce safe output and hence
+//           do not need further escaping. Also includes the :none modifier.
 enum XssClass {
   XSS_UNUSED,
   XSS_WEB_STANDARD,
   XSS_UNIQUE,
+  XSS_SAFE,
 };
 
 // TODO(csilvers): collapse this into the TemplateModifier class?

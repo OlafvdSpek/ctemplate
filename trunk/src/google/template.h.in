@@ -99,8 +99,6 @@ enum TemplateState { TS_UNUSED, TS_EMPTY, TS_ERROR, TS_READY, TS_SHOULD_RELOAD }
 //              HTML-aware parsing and auto-escaping when template-includes
 //              specify modifiers.
 // - TC_MANUAL: Equivalent to not specifying auto-escaping at all.
-//              That is, GetTemplateWithAutoEscaping(..., TC_MANUAL) is
-//              equivalent to GetTemplate(...).
 //
 // TODO(jad): Move declaration to inside Template class.
 enum TemplateContext { TC_UNUSED, TC_HTML, TC_JS, TC_CSS, TC_JSON,
@@ -111,6 +109,11 @@ enum TemplateContext { TC_UNUSED, TC_HTML, TC_JS, TC_CSS, TC_JSON,
 //   expand the parsed structure to a string.
 class @ac_windows_dllexport@ Template {
  public:
+  // ---- CREATING A TEMPLATE OBJECT -------
+  //    GetTemplate
+  //    StringToTemplate
+  //    StringToTemplateCache
+
   // GetTemplate (static Template factory method)
   //   Attempts to retrieve the template object from the cache, stored
   //   under its filename. This will fail only the first time the method
@@ -138,33 +141,6 @@ class @ac_windows_dllexport@ Template {
   //   at either the beginning or end of a line.  See template constructor
   //   for more details.
   static Template *GetTemplate(const std::string& filename, Strip strip);
-
-  // GetTemplateWithAutoEscaping (static Template factory method)
-  //   Same logic as GetTemplate above except it also enables
-  //   auto-escaping for that template and for all templates it may
-  //   include. The auto-escaping mode is not for everyone, in particular
-  //   it is only useful when you are using the Template System in the
-  //   context of web-applications which operate on untrusted
-  //   content that requires proper escaping when expanded into the template.
-  //   In order to automatically determine the correct escaping to apply
-  //   to all variable substitutions, the Template System becomes
-  //   "HTML-aware" and parses the template during initial creation.
-  //
-  //   TemplateContext must match the context in which the template
-  //   is being returned or the auto-escaping will be wrong.
-  static Template *GetTemplateWithAutoEscaping(const std::string& filename,
-                                               Strip strip,
-                                               TemplateContext context);
-
-  // Template destructor
-  virtual ~Template();
-
-  // SetTemplateRootDirectory
-  //   Sets the root directory for all templates used by the program.
-  //   After calling this method, the filename passed to GetTemplate
-  //   may be a relative pathname (no leading '/'), in which case
-  //   this root-directory is prepended to the filename.
-  static bool SetTemplateRootDirectory(const std::string& directory);
 
   // Parses the string as a template file (e.g. "Hello {{WORLD}}"),
   // and returns the generated Template object, or NULL on parse
@@ -199,13 +175,56 @@ class @ac_windows_dllexport@ Template {
     return StringToTemplateCache(key, content.data(), content.length());
   }
 
-  // ReloadAllIfChanged
-  //   Marks each template object in the cache to check to see if
-  //   its template file has changed the next time it is invoked
-  //   via GetTemplate. If it finds the file has changed, it
-  //   then reloads and parses the file before being returned by
-  //   GetTemplate.
-  static void ReloadAllIfChanged();
+  // ---- EXPANDING A TEMPLATE -------
+  //    Expand
+  //    ExpandWithData
+
+  // ExpandWithData
+  //   If you want any per-expand data to be used at expand time, call
+  //   this routine instead of Expand.  You pass in an extra PerExpandData
+  //   structure (see per_expand_data.h) which sets this data:
+  //   whether or not you want the template to be annotated, and any
+  //   data you want to pass in to template modifers.  If per_expand_data
+  //   is NULL, this is exactly the same as Expand().
+  //   The first version is the most general, followed by common-case code.
+  bool ExpandWithData(ExpandEmitter* output,
+                      const TemplateDictionaryInterface *dictionary,
+                      ctemplate::PerExpandData* per_expand_data) const;
+
+  bool ExpandWithData(std::string *output_buffer,
+                      const TemplateDictionaryInterface *dictionary,
+                      ctemplate::PerExpandData* per_expand_data) const {
+    if (output_buffer == NULL)  return false;
+    StringEmitter e(output_buffer);
+    return ExpandWithData(&e, dictionary, per_expand_data);
+  }
+
+  // Expand
+  //   Expands the template into a string using the values
+  //   in the supplied dictionary.  Returns true iff all the template
+  //   files load and parse correctly.
+  //   The first version is the most general, followed by common-case code.
+  bool Expand(ExpandEmitter* output,
+              const TemplateDictionaryInterface *dictionary) const {
+    return ExpandWithData(output, dictionary, NULL);
+  }
+  bool Expand(std::string *output_buffer,
+              const TemplateDictionaryInterface *dictionary) const {
+    return ExpandWithData(output_buffer, dictionary, NULL);
+  }
+
+
+  // ---- OTHER TEMPLATE OPERATIONS -------
+
+  // Template destructor
+  virtual ~Template();
+
+  // SetTemplateRootDirectory
+  //   Sets the root directory for all templates used by the program.
+  //   After calling this method, the filename passed to GetTemplate
+  //   may be a relative pathname (no leading '/'), in which case
+  //   this root-directory is prepended to the filename.
+  static bool SetTemplateRootDirectory(const std::string& directory);
 
   // ClearCache
   //   Deletes all the template objects in the cache and all raw
@@ -218,25 +237,32 @@ class @ac_windows_dllexport@ Template {
   //   program will prevent unnecessary reporting in that case.
   static void ClearCache();
 
-  // ExpandWithData
-  //   If you want any per-expand data to be used at expand time, call
-  //   this routine instead of Expand.  You pass in an extra PerExpandData
-  //   structure (see per_expand_data.h) which sets this data:
-  //   whether or not you want the template to be annotated, and any
-  //   data you want to pass in to template modifers.  If per_expand_data
-  //   is NULL, this is exactly the same as Expand().
-  bool ExpandWithData(std::string *output_buffer,
-                      const TemplateDictionaryInterface *dictionary,
-                      const ctemplate::PerExpandData* per_expand_data) const;
+  // RemoveStringFromTemplateCache
+  //   The opposite of StringToTemplateCache, this removes the string
+  //   with the given key from the cache.  Note it can only be used
+  //   on strings added to the cache via StringToTemplateCache; to
+  //   remove disk-based entries, you must delete the file on disk
+  //   and then call ReloadIfChanged().
+  static void RemoveStringFromTemplateCache(const std::string& key);
 
-  // Expand
-  //   Expands the template into a string using the values
-  //   in the supplied dictionary.  Returns true iff all the template
-  //   files load and parse correctly.
-  bool Expand(std::string *output_buffer,
-              const TemplateDictionaryInterface *dictionary) const {
-    return ExpandWithData(output_buffer, dictionary, NULL);
-  }
+  // ReloadAllIfChanged
+  //   Marks each template object in the cache to check to see if
+  //   its template file has changed the next time it is invoked
+  //   via GetTemplate. If it finds the file has changed, it
+  //   then reloads and parses the file before being returned by
+  //   GetTemplate.
+  static void ReloadAllIfChanged();
+
+  // ReloadIfChanged
+  //   Reloads the file from the filesystem iff its mtime is different
+  //   now from what it was last time the file was reloaded.  Note a
+  //   file is always "reloaded" the first time this is called.  If
+  //   the file is in fact reloaded, then the contents of the file are
+  //   parsed into the template node parse tree by calling BuildTree
+  //   After this call, the state of the Template will be either
+  //   TS_READY or TS_ERROR.  Return value is true iff we reloaded
+  //   because the content changed and could be parsed with no errors.
+  bool ReloadIfChanged();
 
   // Dump
   //   Dumps the parsed structure of the template for debugging assistance.
@@ -257,22 +283,11 @@ class @ac_windows_dllexport@ Template {
   //   Returns the name of the template file used to build this template.
   const char *template_file() const;
 
-  // ReloadIfChanged
-  //   Reloads the file from the filesystem iff its mtime is different
-  //   now from what it was last time the file was reloaded.  Note a
-  //   file is always "reloaded" the first time this is called.  If
-  //   the file is in fact reloaded, then the contents of the file are
-  //   parsed into the template node parse tree by calling BuildTree
-  //   After this call, the state of the Template will be either
-  //   TS_READY or TS_ERROR.  Return value is true iff we reloaded
-  //   because the content changed and could be parsed with no errors.
-  bool ReloadIfChanged();
-
   // template_root_directory
   //   Returns the stored template root directory name
   static std::string template_root_directory();
 
-  // WriteHeaderEntries
+  // WriteHeaderEntries (used by make_tpl_varnames_h.cc)
   void WriteHeaderEntries(std::string *outstring) const;
 
  protected:
@@ -329,11 +344,6 @@ class @ac_windows_dllexport@ Template {
   //   ownership of input_buffer, and will delete it.  It should have
   //   been created via new[].
   bool BuildTree(const char *input_buffer, const char* input_buffer_end);
-
-  // Internal version of Expand, used for recursive calls.
-  bool Expand(class ExpandEmitter *expand_emitter,
-              const TemplateDictionaryInterface *dictionary,
-              const ctemplate::PerExpandData *per_expand_data) const;
 
   // Internal version of ReloadIfChanged, used when the function already
   // has a write-lock on mutex_.

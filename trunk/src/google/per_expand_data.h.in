@@ -45,6 +45,7 @@
 #include <stdlib.h>   // for NULL
 #include <string.h>   // for strcmp
 #include <sys/types.h>
+#include <google/template_string.h>   // for StringHash
 #include @ac_cv_cxx_hash_map@
 
 @ac_windows_dllexport_defines@
@@ -57,9 +58,14 @@ class TemplateModifier;
 
 namespace ctemplate {
 
+class TemplateAnnotator;
+
 class @ac_windows_dllexport@ PerExpandData {
  public:
-  PerExpandData() : annotate_path_(NULL), expand_modifier_(NULL) { }
+  PerExpandData()
+      : annotate_path_(NULL),
+        annotator_(NULL),
+        expand_modifier_(NULL) { }
 
   // Indicate that annotations should be inserted during template expansion.
   // template_path_start - the start of a template path.  When
@@ -75,6 +81,21 @@ class @ac_windows_dllexport@ PerExpandData {
 
   // The annotate-path; undefined if annotate() != true
   const char* annotate_path() const { return annotate_path_; }
+
+  // This sets the TemplateAnnotator to be used when annotating is on.
+  // This allows you to override the default text-based annotator
+  // that will be used if you do not call this.  The passed annotator
+  // will be aliased by this object and returned by annotator().
+  // Passing NULL has the special behavior of causing annotator() to
+  // revert to returning its built-in instance.
+  void SetAnnotator(ctemplate::TemplateAnnotator* annotator) {
+    annotator_ = annotator;
+  }
+
+  // This returns the TemplateAnnotator to be used when annotating is on.
+  // The value returned will be either an instance previously provided
+  // to SetAnnotator() or the callable built-in text-based annotator.
+  ctemplate::TemplateAnnotator* annotator() const;
 
   // This is a TemplateModifier to be applied to all templates
   // expanded via this call to Expand().  That is, this modifier is
@@ -114,31 +135,17 @@ class @ac_windows_dllexport@ PerExpandData {
 
  private:
 #ifdef _MSC_VER
-  struct DataHash {
-    size_t operator()(const char* s1) const {
-      return @ac_cv_cxx_hash_namespace@::hash<const char*>()(s1);
-    }
-    bool operator()(const char* s1, const char* s2) const {  // less-than
-      return (s2 == 0 ? false : s1 == 0 ? true : strcmp(s1, s2) < 0);
-    }
-    // These two public members are required by msvc.  4 and 8 are defaults.
-    static const size_t bucket_size = 4;
-    static const size_t min_buckets = 8;
-  };
-
-  typedef @ac_cv_cxx_hash_namespace@::hash_map<const char*, const void*, DataHash> DataMap;
+  typedef @ac_cv_cxx_hash_map_class@<const char*, const void*, StringHash> DataMap;
 #else
   struct DataEq {
-    bool operator()(const char* s1, const char* s2) const {
-      return ((s1 == 0 && s2 == 0) ||
-              (s1 && s2 && *s1 == *s2 && strcmp(s1, s2) == 0));
-    }
+    bool operator()(const char* s1, const char* s2) const;
   };
-  typedef @ac_cv_cxx_hash_namespace@::hash_map<const char*, const void*, @ac_cv_cxx_hash_namespace@::hash<const char*>, DataEq>
+  typedef @ac_cv_cxx_hash_map_class@<const char*, const void*, StringHash, DataEq>
     DataMap;
 #endif
 
   const char* annotate_path_;
+  ctemplate::TemplateAnnotator* annotator_;
   const template_modifiers::TemplateModifier* expand_modifier_;
   DataMap map_;
 
@@ -150,4 +157,4 @@ class @ac_windows_dllexport@ PerExpandData {
 
 @ac_google_end_namespace@
 
-#endif  // #ifndef TEMPLATE_PER_EXPAND_DATA_H_
+#endif  // TEMPLATE_PER_EXPAND_DATA_H_

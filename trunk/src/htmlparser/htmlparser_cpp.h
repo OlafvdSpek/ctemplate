@@ -180,6 +180,25 @@ class HtmlParser {
       return htmlparser_value_index(parser_);
     }
 
+    /* Returns true if this is the first character of a url inside an attribute.
+     *
+     * This function can be used by an html sanitizer or auto escaping system as
+     * a hint that it should validate the url for a whitelist of protocol
+     * handlers and for well-formedness, or that it should just escape a
+     * component of it.
+     *
+     * For attributes that expect a url this will return true if we are at the
+     * first character of the attribute, but for the special case of a meta
+     * redirect tag some analysis is made in order to verify if we are at the
+     * start of a url or not.
+     *
+     * For any other attributes, the result will always be false.
+     *
+     */
+    bool IsUrlStart() const {
+      return htmlparser_is_url_start(parser_);
+    }
+
     /* Returns the current attribute type.
      *
      * The attribute type can be one of:

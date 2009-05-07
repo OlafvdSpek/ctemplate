@@ -72,9 +72,7 @@ to achieve html-safety (that is, you only use
 <code>html_escape</code>, <code>url_query_escape</code>, and so
 forth), you can stop specifying template-modifiers in your template at
 all. The Auto Escape mode will generate the modifiers on its own and
-perform the correct escaping. You can observe the modifiers it applied
-to your variables using the provided command-line tool
-<a href="#diff_tpl_auto_escape">diff_tpl_auto_escape</a>.</p>
+perform the correct escaping.</p>
 
 <p>If you need other types of modifiers, including your own custom
 modifiers, you can still specify them in your template and they will
@@ -109,10 +107,20 @@ the appropriate escaping modifiers after your own.</p>
                <li><code>:pre_escape</code></li>
                <li><code>:html_escape_with_arg=snippet</code></li>
                <li><code>:html_escape_with_arg=attribute</code></li>
+               <li><code>:html_escape_with_arg=url</code></li>
                <li><code>:url_query_escape</code></li>
+               <li><code>:url_escape_with_arg=html</code></li>
        </ul></td>
        </tr>
-       
+
+       <tr>
+       <td><code>TC_HTML</code> and <code>TC_CSS</code></td>
+       <td><code>:cleanse_css</code></td>
+       <td><ul>
+               <li><code>:url_escape_with_arg=css</code></li>
+       </ul></td>
+       </tr>
+
        <tr>
        <td><code>TC_XML</code></td>
        <td><code>:xml_escape</code></td>
@@ -329,7 +337,7 @@ restrictions governing the use of this template system.</p>
        <code>&lt;/script&gt;</code> tag.</p> </li>
 
   <li> <p>Error reporting.  We currently report errors by logging
-       a warning during initial template
+       a warning or an error during initial template
        initialization and parsing if we suspect something is
        incorrect. Please check for them, as they indicate an error
        that may cause auto-escaping to work improperly.</p> </li>
@@ -386,67 +394,6 @@ of  template filenames: </p>
 
 <p>If we find one of these keywords in the filename but 
 it does not match the template type given, we log a warning.</p>
-
-<h2>Development Tools</h2>
-
-<h3><a name="diff_tpl_auto_escape">diff_tpl_auto_escape:
-    Escaping Modifier Comparaison tool for Templates</a></h3>
-
-<p>If you currently apply escaping modifiers to variables in
-your template, you may be interested in 
-<code>diff_tpl_auto_escape</code>. This tool compares escaping
-modifiers applied to each variable in a template against the modifiers
-that Auto Escape would have selected and emits information on
-a mismatch. Cases where it may be helpful include:
-<ol>
-    <li>You are considering switching to Auto-Escape and would
-        like to know whether your variables will be escaped differently.
-    </li>
-    <li>You want to continue manually escaping all variables but
-        would like some validation that your escaping is correct.
-        Consider using the <code>--dump_templates</code> command-line
-        option described below.</li>
-</ol></p>
-
-<p>Consider the example below of an HTML template with
-two variables, <code>USER</code> which is escaped properly
-and <code>ID</code> which is not. 
-<pre>
-&lt;html&gt;
-  &lt;body&gt;
-    &lt;p&gt;Hello {{USER:h}}&lt;/p&gt;
-    &lt;script&gt;var id = '{{ID:h}}'; alert(id);&lt;/script&gt;
-  &lt;/body&gt;
-&lt;/html&gt;
-</pre>
-
-<p>Running <code>diff_tpl_auto_escape</code> on this template will
-emit one line for variable <code>ID</code> indicating the
-mismatch and how the escaping you provided would be modified
-under Auto-Escape. Note that by default, the tool will not output
-information for variables that do not have escaping modifiers
-applied to them in your template. In that case you may want
-to provide the <code>--dump_templates</code> command-line option.</p>
-
-<p>Important command line flags:</p>
-
-<ul>
-  <li> <code>--context</code> -- sets the <code>TemplateContext</code>
-       for the template files provided. Default: "TC_HTML"</li>
-
-  <li> <code>--dump_templates</code> -- emits the entire template
-       showing the modifiers it selected to each variable.</li>
-
-  <li> <code>--template_dir</code> -- sets the template root
-       directory.  Default: <code>./</code> which is the correct
-       specification when it is run from the directory where the templates
-       are located.  This is only used if the input template filenames
-       are specified as relative paths rather than absolute
-       paths. </li>
-</ul>
-
-<p>For a full list of command line flags, run
-<code>diff_tpl_auto_escape --help</code>.</p>
       
 <hr>
 <ul>

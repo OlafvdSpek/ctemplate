@@ -478,46 +478,6 @@ static void TestExpand(const vector<Testdata>::const_iterator& begin,
   }
 }
 
-// Predicate function used to separate tests which require initializing
-// the template in auto-escape mode from the ones that don't. This is done
-// by checking if the input filename contains "_autoescape_".
-// Returns true for manual-escape tests, false otherwise.
-static bool TestNeedsManualEscape(const Testdata& testdata) {
-  return (testdata.input_template_name.find("_autoescape_") == string::npos);
-}
-
-// Runs tests only against filenames that have "_autoescape_" in them
-// and it just tests with STRIP_WHITESPACE.
-static void
-TestExpandWithAutoEscape(const vector<Testdata>::const_iterator& begin,
-                         const vector<Testdata>::const_iterator& end) {
-  for (vector<Testdata>::const_iterator one_test = begin;
-       one_test != end; ++one_test) {
-    string template_name(one_test->input_template_name);
-    Template* tpl_ws = Template::GetTemplateWithAutoEscaping(template_name,
-                                                             STRIP_WHITESPACE,
-                                                             TC_HTML);
-    for (vector<string>::const_iterator out = one_test->output.begin();
-         out != one_test->output.end(); ++out) {
-      int dictnum = out - one_test->output.begin() + 1;  // first dict is 01
-      // If output is the empty string, we assume the file does not exist
-      if (out->empty())
-        continue;
-      printf("Testing template %s on dict #%d\n",
-             template_name.c_str(), dictnum);
-      // If we're expecting output, the template better not have had an error
-      ASSERT(tpl_ws);
-      string output_ws;
-      TemplateDictionary* dict = MakeDictionary(dictnum);
-      tpl_ws->Expand(&output_ws, dict);
-      delete dict;   // it's our responsibility
-
-      // "out" is the output for STRIP_WHITESPACE mode.
-      ASSERT_STRING_EQ(*out, output_ws);
-    }
-  }
-}
-
 int main(int argc, char** argv) {
   // If TEMPLATE_ROOTDIR is set in the environment, it overrides the
   // default of ".".  We use an env-var rather than argv because
@@ -531,15 +491,7 @@ int main(int argc, char** argv) {
 
   vector<Testdata> testdata = ReadDataFiles(
       Template::template_root_directory().c_str());
-
-  // We separate the test cases (dictionaries) into those that test
-  // the auto escape mode and those that don't using the predicate
-  // TestNeedsManualEscape.
-  vector<Testdata>::const_iterator separator;
-  separator = stable_partition(testdata.begin(), testdata.end(),
-                          TestNeedsManualEscape);
-  TestExpand(testdata.begin(), separator);
-  TestExpandWithAutoEscape(separator, testdata.end());
+  TestExpand(testdata.begin(), testdata.end());
 
   printf("DONE\n");
   return 0;

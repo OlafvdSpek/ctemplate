@@ -71,11 +71,15 @@ class CTEMPLATE_DLL_DECL TemplateDictionaryInterface {
 
   // GetSectionValue
   //   Returns the value of a variable.
+  //   Do not use this in production code!
+  //   TODO(csilvers): make this protected so only template.cc can see it.
   virtual const char *GetSectionValue(const TemplateString& variable) const = 0;
 
   // IsHiddenSection
   //   A predicate to indicate the current hidden/visible state of a section
   //   whose name is passed to it.
+  //   Do not use this in production code!
+  //   TODO(csilvers): make this protected so only template.cc can see it.
   virtual bool IsHiddenSection(const TemplateString& name) const = 0;
 
   // Dump a string representation of this dictionary to the supplied string.
@@ -89,6 +93,9 @@ class CTEMPLATE_DLL_DECL TemplateDictionaryInterface {
   // The interface as follows is used at expand-time by Expand.
   friend class SectionTemplateNode;   // for access to GetDictionaries, etc.
   friend class TemplateTemplateNode;  // for access to GetDictionaries, etc.
+  // This class reaches into our internals for testing.
+  friend class TemplateDictionaryPeer;
+  friend class TemplateDictionaryPeerIterator;
 
   class Iterator {
    protected:
@@ -101,23 +108,6 @@ class CTEMPLATE_DLL_DECL TemplateDictionaryInterface {
 
     // Returns the current referent and increments the iterator to the next.
     virtual const TemplateDictionaryInterface& Next() = 0;
-  };
-
-  // Since the iterators will be implemented by subclasses and we don't want to
-  // return a pointer from CreateIterator, we instead return a proxy object. It
-  // deletes its pointer when it goes out of scope.
-  class IteratorProxy : public Iterator {
-   public:
-    explicit IteratorProxy(Iterator* iterator) : iterator_(iterator) {
-    }
-    ~IteratorProxy() {
-      delete iterator_;
-    }
-    bool HasNext() const { return iterator_->HasNext(); }
-    const TemplateDictionaryInterface& Next() { return iterator_->Next(); }
-   private:
-    Iterator* iterator_;
-    // IteratorProxy is designed to be copied.
   };
 
   // IsHiddenTemplate
@@ -134,14 +124,16 @@ class CTEMPLATE_DLL_DECL TemplateDictionaryInterface {
 
   // CreateTemplateIterator
   //   A factory method for constructing an iterator representing the
-  //   subdictionaries of the given include node.
-  virtual IteratorProxy CreateTemplateIterator(
+  //   subdictionaries of the given include node.  The caller is
+  //   responsible for deleting the return value when it's done with it.
+  virtual Iterator* CreateTemplateIterator(
       const TemplateString& section) const = 0;
 
   // CreateSectionIterator
   //   A factory method for constructing an iterator representing the
-  //   subdictionaries of the given section node.
-  virtual IteratorProxy CreateSectionIterator(
+  //   subdictionaries of the given section node.  The caller is
+  //   responsible for deleting the return value when it's done with it.
+  virtual Iterator* CreateSectionIterator(
       const TemplateString& section) const = 0;
 
  private:

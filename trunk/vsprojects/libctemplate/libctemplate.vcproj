@@ -150,6 +150,23 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath="..\..\src\per_expand_data.cc">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
+						RuntimeLibrary="3"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
+						RuntimeLibrary="2"/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath="..\..\src\template.cc">
 				<FileConfiguration
 					Name="Debug|Win32">
@@ -185,6 +202,23 @@
 			</File>
 			<File
 				RelativePath="..\..\src\template_modifiers.cc">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
+						RuntimeLibrary="3"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
+						RuntimeLibrary="2"/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\..\src\template_annotator.cc">
 				<FileConfiguration
 					Name="Debug|Win32">
 					<Tool
@@ -308,10 +342,13 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
 			<File
-				RelativePath="..\..\src\template_modifiers.h">
+				RelativePath="..\..\src\base\arena.h">
 			</File>
 			<File
-				RelativePath="..\..\src\base\arena.h">
+				RelativePath="..\..\src\base\manual_constructor.h">
+			</File>
+			<File
+				RelativePath="..\..\src\base\small_map.h">
 			</File>
 			<File
 				RelativePath="..\..\src\windows\config.h">
@@ -336,6 +373,9 @@
 			</File>
 			<File
 				RelativePath="..\..\src\windows\google\template.h">
+			</File>
+			<File
+				RelativePath="..\..\src\windows\google\template_annotator.h">
 			</File>
 			<File
 				RelativePath="..\..\src\windows\google\template_dictionary.h">

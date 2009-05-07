@@ -49,7 +49,7 @@ namespace google {
 // should do this for any TemplateString you pass in to
 // TemplateDictionary routines more than once; that is, all the time.
 // Using a StaticTemplateString allows you to avoid string copies and
-// recomputing the hash_compare.  Use it like like this (at global scope):
+// recomputing the hash_compare.  Use it like like this (at global scope *only*):
 // static const kMyVarName = STS_INIT(kMyVarName, "MY_VALUE");
 #define STS_INIT(name, str)  STS_INIT_WITH_HASH(name, str, 0)
 
@@ -63,6 +63,9 @@ typedef unsigned __int64 TemplateId;
 namespace ctemplate {
 // Use the low-bit from TemplateId as the "initialized" flag.
 const TemplateId kTemplateStringInitializedFlag = 1;
+// Since all initialized TemplateId have the lower bit set, a TemplateId
+// of 0 can be used as an illegal sentinel value.
+const TemplateId kIllegalTemplateId = 0;
 
 inline bool IsTemplateIdInitialized(TemplateId id) {
   return id & kTemplateStringInitializedFlag;
@@ -84,6 +87,28 @@ struct TemplateIdHasher {
   // These two public members are required by msvc.  4 and 8 are defaults.
   static const size_t bucket_size = 4;
   static const size_t min_buckets = 8;
+};
+
+// Let's define a convenient hash_compare function for hashing 'normal'
+// strings: char* and string.  We'll use MurmurHash, which is probably
+// better than the STL default.  We don't include TemplateString or
+// StaticTemplateString here, since they are hashed more efficiently
+// based on their id.
+struct CTEMPLATE_DLL_DECL StringHash {
+  size_t operator()(const char* s) const    { return Hash(s, strlen(s)); }
+  size_t operator()(const std::string& s) const  { return Hash(s.data(), s.size()); }
+  // Less operator for MSVC's hash_compare containers.
+  bool operator()(const char* a, const char* b) const {
+    return (a != b) && (strcmp(a, b) < 0);
+  }
+  bool operator()(const std::string& a, const std::string& b) const {
+    return a < b;
+  }
+  // These two public members are required by msvc.  4 and 8 are defaults.
+  static const size_t bucket_size = 4;
+  static const size_t min_buckets = 8;
+ private:
+  size_t Hash(const char* s, size_t slen) const;
 };
 
 }  // namespace
@@ -140,11 +165,11 @@ struct StaticTemplateString {
     static const size_t min_buckets = 8;
   };
 
-  // The following conversion operators are here so we don't break builds
-  // of people relying on auto-generated variables having const char* type.
-  // TODO(jcrim): remove them after existing code is updated.
-  operator const char * () const {
-    return do_not_use_directly_.ptr_;
+  // Use sparingly. Converting to a string loses information about the
+  // id of the template string, making operations require extra hash_compare
+  // computations.
+  std::string ToString() const {
+    return std::string(do_not_use_directly_.ptr_, do_not_use_directly_.length_);
   }
 
   // Allows comparisons of StaticTemplateString objects as if they were
@@ -158,6 +183,10 @@ struct StaticTemplateString {
 
   bool operator!=(const StaticTemplateString& x) const {
     return !(*this == x);
+  }
+
+  bool empty() const {
+    return do_not_use_directly_.length_ == 0;
   }
 };
 
@@ -189,6 +218,7 @@ class CTEMPLATE_DLL_DECL StaticTemplateStringInitializer {
 const StaticTemplateString kStsEmpty =
     STS_INIT_WITH_HASH(kStsEmpty, "", 1457976849674613049ULL);
 
+
 // Most methods of TemplateDictionary take a TemplateString rather than a
 // C++ string.  This is for efficiency: it can avoid extra string copies.
 // For any argument that takes a TemplateString, you can pass in any of:
@@ -200,13 +230,16 @@ const StaticTemplateString kStsEmpty =
 class CTEMPLATE_DLL_DECL TemplateString {
  public:
   TemplateString(const char* s)
-      : ptr_(s ? s : ""), length_(strlen(ptr_)), is_immutable_(false), id_(0) {
+      : ptr_(s ? s : ""), length_(strlen(ptr_)), is_immutable_(false),
+        id_(ctemplate::kIllegalTemplateId) {
   }
   TemplateString(const std::string& s)
-      : ptr_(s.data()), length_(s.size()), is_immutable_(false), id_(0) {
+      : ptr_(s.data()), length_(s.size()), is_immutable_(false),
+        id_(ctemplate::kIllegalTemplateId) {
   }
   TemplateString(const char* s, size_t slen)
-      : ptr_(s), length_(slen), is_immutable_(false), id_(0) {
+      : ptr_(s), length_(slen), is_immutable_(false),
+        id_(ctemplate::kIllegalTemplateId) {
   }
   TemplateString(const TemplateString& s)
       : ptr_(s.ptr_), length_(s.length_),
@@ -221,6 +254,10 @@ class CTEMPLATE_DLL_DECL TemplateString {
   // STL requires this to be public for hash_map, though I'd rather not.
   bool operator==(const TemplateString& x) const {
     return (GetGlobalId() == x.GetGlobalId());
+  }
+
+  bool empty() const {
+    return length_ == 0;
   }
 
   // Returns the global id, computing it for the first time if

@@ -1,3 +1,20 @@
+Thu May  7 11:27:28 2009  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.94 release
+	* Use arena for all memory allocations: 3-4% speedup (csilvers)
+	* Add the ability to hook the annotation system (ryoji)
+	* Expose Expand(ExpandEmitter*,...) to allow custom emitters (csilvers)
+	* Add RemoveStringFromTemplateCache (csilvers)
+	* Add new :url_escape_with_arg=css modifier for urls in CSS (jad)
+	* Support tr1's unordered_map in preference to hash_map (csilvers)
+	* Use Murmurhash for all string hashing, rather than hash<> (csilvers)
+	* Better parsing of meta tags and dangling < for auto-escape (falmeida)
+	* Add AddXssSafeModifier (jad)
+	* Allow disabling auto-escape for 'trusted' vars (jad)
+	* BUGFIX: resolve possible memory-leaks in CopyDictionary (csilvers)
+	* BUGFIX: fix bug when reloading with AUTOESCAPE pragma (jad)
+	* Updated autoconf version to 2.61 and libtool version to 1.5.26
+
 Mon Feb  2 13:51:33 2009  Google Inc. <opensource@google.com>
 
 	* ctemplate: version 0.93 release

@@ -64,19 +64,17 @@ int main() {
 </pre>
 
 Note: If this template was intended to run in a web application, you can 
-leverage the functionality provided by the auto-escape mode. Simply change the
-template initialization by calling <code>GetTemplateWithAutoEscaping</code>
-instead of <code>GetTemplate</code> as shown below. Your variables will be
-automatically escaped for the HTML context as specified by <code>TC_HTML</code>
-supplied in the initialization.
+leverage the functionality provided by the auto-escape mode. Simply add
+the AUTOESCAPE pragma directive at the top of the template text and your
+variables will be automatically escaped for the context you specify.
 
-<pre>
+For example, if your template is returned in an HTML context,
+change the <code>template_text</code> declaration as follows:
 
-  Template* tpl = 
-    TemplateFromString::GetTemplateWithAutoEscaping("error_msg_tpl", 
-                                                    template_text,
-                                                    DO_NOT_STRIP, TC_HTML);
-
+<pre class=example>
+  static const char template_text[] =
+    "{{%AUTOESCAPE context=\"HTML\"}}"
+    "ERROR: {{FUNCTION}}({{ARGS}}) returned {{ERROR_CODE}}: {{ERROR_MESSAGE}}\n";
 </pre>
 
 <p>This example is only slightly more complicated: we only print the

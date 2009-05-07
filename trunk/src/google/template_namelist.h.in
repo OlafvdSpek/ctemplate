@@ -44,6 +44,7 @@
 #include <vector>
 #include @ac_cv_cxx_hash_set@
 #include <google/template_enums.h>   // for Strip
+#include <google/template_string.h>  // for StringHash
 
 @ac_windows_dllexport_defines@
 
@@ -77,27 +78,12 @@
 
 class @ac_windows_dllexport@ TemplateNamelist {
   friend class TemporaryRegisterTemplate;
- private:
-  // Standard hash libs don't define hash<string>, but do define hash<char*>
-  struct TemplateHasher {
-    size_t operator()(const std::string& s) const {
-      return @ac_cv_cxx_hash_namespace@::hash<const char*>()(s.c_str());
-    }
-    // Less operator for MSVC's hash containers.
-    bool operator()(const std::string& a, const std::string& b) const {
-      return a < b;
-    }
-    // These two public members are required by msvc.  4 and 8 are defaults.
-    static const size_t bucket_size = 4;
-    static const size_t min_buckets = 8;
-  };
-
  public:
   // These types should be taken as 'generic' containers.  The only
   // thing you should do with them is call size() and/or iterate
   // between begin() and end(), and the only operations we promise
   // the iterators will support are operator* and operator++.
-  typedef @ac_cv_cxx_hash_namespace@::hash_set<std::string, TemplateHasher> NameListType;
+  typedef @ac_cv_cxx_hash_set_class@<std::string, ctemplate::StringHash> NameListType;
   typedef std::vector<std::string> MissingListType;
   typedef std::vector<std::string> SyntaxListType;
 

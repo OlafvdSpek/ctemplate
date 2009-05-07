@@ -56,6 +56,7 @@
 // > $ cd ~/src/google3
 // > $ bin/template/diff_tpl_auto_escape TC_HTML some_template_file.tpl
 //
+// TODO(jad): This script is currently broken. Fix me.
 
 // Note, we keep the google-infrastructure use to a minimum here,
 // in order to ease porting to opensource.
@@ -184,8 +185,7 @@ bool LoadVariables(const char* filename, TemplateContext context,
     // Setting Strip to the most common value for web-apps.
     // In theory it should not matter, in practice it could particularly
     // with subtle HTML parser cases.
-    tpl = Template::GetTemplateWithAutoEscaping(filename, STRIP_WHITESPACE,
-                                                context);
+    tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);
   } else {
     tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);
   }

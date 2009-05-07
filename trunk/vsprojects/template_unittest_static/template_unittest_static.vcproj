@@ -149,6 +149,23 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath="..\..\src\per_expand_data.cc">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
+						RuntimeLibrary="3"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
+						RuntimeLibrary="2"/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath="..\..\src\template.cc">
 				<FileConfiguration
 					Name="Debug|Win32">
@@ -201,6 +218,23 @@
 					<Tool
 						Name="VCCLCompilerTool"
 						AdditionalOptions="/D CTEMPLATE_DLL_DECL="
+						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
+						RuntimeLibrary="2"/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\..\src\template_annotator.cc">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
+						RuntimeLibrary="3"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
 						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
 						RuntimeLibrary="2"/>
 				</FileConfiguration>
@@ -358,6 +392,12 @@
 				RelativePath="..\..\src\base\arena.h">
 			</File>
 			<File
+				RelativePath="..\..\src\base\manual_constructor.h">
+			</File>
+			<File
+				RelativePath="..\..\src\base\small_map.h">
+			</File>
+			<File
 				RelativePath="..\..\src\htmlparser\htmlparser.h">
 			</File>
 			<File
@@ -383,6 +423,9 @@
 			</File>
 			<File
 				RelativePath="..\..\src\windows\google\template.h">
+			</File>
+			<File
+				RelativePath="..\..\src\windows\google\template_annotator.h">
 			</File>
 			<File
 				RelativePath="..\..\src\windows\google\template_dictionary.h">

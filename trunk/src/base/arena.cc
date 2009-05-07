@@ -93,11 +93,11 @@ using std::vector;
 
 
 BaseArena::BaseArena(char* first, const size_t block_size)
-  : first_block_we_own_(first ? 1 : 0),
+  : remaining_(0),
+    first_block_we_own_(first ? 1 : 0),
     block_size_(block_size),
     freestart_(NULL),                   // set for real in Reset()
     last_alloc_(NULL),
-    remaining_(0),
     blocks_alloced_(1),
     overflow_blocks_(NULL),
     handle_alignment_(1) {
@@ -105,7 +105,7 @@ BaseArena::BaseArena(char* first, const size_t block_size)
   if (first)
     first_blocks_[0].mem = first;
   else
-    first_blocks_[0].mem = reinterpret_cast<char*>(::operator new(block_size_));
+    first_blocks_[0].mem = reinterpret_cast<char*>(malloc(block_size_));
   first_blocks_[0].size = block_size_;
 
   Reset();
