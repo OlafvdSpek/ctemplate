@@ -1,0 +1,170 @@
+Fri Jun 12 08:13:35 2009  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.95 release
+	* Change default namespace from google to ctemplate
+	* Rename include directory from google to ctemplate
+	* Remove deprecated code: template_from_string.{h,cc}
+	* Remove deprecated code: modifiers in TemplateDictionary class
+	* Remove last arg from StringToTemplate; use autoescape pragma instead
+	* Remove template_modifiers namespace
+	* Provide a script to help convert namespaces and #includes
+	* TemplateDictionary constructor takes TemplateString, not string
+
+Thu May  7 11:27:28 2009  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.94 release
+	* Use arena for all memory allocations: 3-4% speedup (csilvers)
+	* Add the ability to hook the annotation system (ryoji)
+	* Expose Expand(ExpandEmitter*,...) to allow custom emitters (csilvers)
+	* Add RemoveStringFromTemplateCache (csilvers)
+	* Add new :url_escape_with_arg=css modifier for urls in CSS (jad)
+	* Support tr1's unordered_map in preference to hash_map (csilvers)
+	* Use Murmurhash for all string hashing, rather than hash<> (csilvers)
+	* Better parsing of meta tags and dangling < for auto-escape (falmeida)
+	* Add AddXssSafeModifier (jad)
+	* Allow disabling auto-escape for 'trusted' vars (jad)
+	* BUGFIX: resolve possible memory-leaks in CopyDictionary (csilvers)
+	* BUGFIX: fix bug when reloading with AUTOESCAPE pragma (jad)
+	* Updated autoconf version to 2.61 and libtool version to 1.5.26
+
+Mon Feb  2 13:51:33 2009  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.93 release
+	* New AUTOESCAPE pragma: alternative to GetTemplateWithAutoescaping (jad)
+	* Improve autoescape for CSS template and more (jad)
+	* Replace RegisterStringAsTemplate with TemplateToString (csilvers)
+	* Speed up template code by hashing and cacheing template strings (jcrim)
+	* Add StaticTemplateString to make hashing/cacheing even faster
+	* Autogenerate parser files from .config files (falmeida)
+	* TESTING: new compile_test to test end-to-end compilation (csilvers)
+	* Fix Mutex class to allow expanding template before main() (csilvers)
+
+Wed Nov 12 11:24:33 2008  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.92 release
+	* BUG FIX: affecting an included string-template with autoescaping (jad)
+	* BUG FIX: long-name cmdline flag in diff_tpl_auto_escape (jad)
+	* Do include-template indenting after applying modifiers (jad)
+	* Add human-readable error messages to the html parser (falmeida)
+	* Create an abstract base class for TemplateDictionary (williasr)
+	* PORTING: Be more careful about Windows #defines and types (csilvers)
+	* PORTING: Make unittest scripts more sh-compatible (falmeida)
+	* Show missing includes in annotated output (ribrdb)
+	* Improvements to javascript escaping (escape \f) (jad)
+	* Improvements to json escaping (escape <>&) (jad)
+	* Avoid raciness by preferring cached to new template-strings (csilvers)
+
+Tue Aug 19 16:20:27 2008  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.91 release
+	* NEW FEATURE: "separator" sections (csilvers)
+	* NEW FEATURE: changing the markup separator via {{=XXX YYY=}} (csilvers)
+	* NEW FEATURE: Add an Expand modifier to template dictionary (turnidge)
+	* TemplateAsString class -> Template::RegisterStringAsTemplate (edwardcu)
+	* TemplateModifier class -> PerExpandData class (csilvers)
+	* Store more data in the arena, shrinking TemplateDictionary (csilvers)
+	* Use TemplateString more widely internally; small speedup (adamk)
+	* Lazily initialize hash-maps, saving time and space (csilvers)
+	* Make template annotations more efficient (turnidge)
+	* PORTABILITY: Fixed a testing script to run on solaris x86 (csilvers)
+	* Fix namespaces to start with :: (csilvers)
+	* Improve html parser in various ways (falmeida)
+	
+Sun Apr 27 15:06:15 2008  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.90 release
+	* MAJOR NEW FEATURE: New "auto-escape" mode (jad, falmeida, mughda)
+	* New tool, diff_tpl_auto_escape, to convert templates to auto-escaping
+	* Fixed make install to install test datafiles (csilvers)
+	* Add a new modifier: javascript_escape_with_arg=number (jad)
+	* Javascript modifier now escapes all js newlines (msamuel)
+
+Thu Jan 24 16:09:43 2008  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.9 release
+	* Bugfix: now we honor "preserve newlines in javacript" (ktl)
+	* Fix indentation of included templates (csilvers)
+	* Deprecate the SetEscaped* methods in favor of modifiers (csilvers)
+	* Revamp the way template modifiers are registered (csilvers)
+	* Change the psuedo-name of main section from __MAIN__ to __{{MAIN}}__
+	* Fix types to quiet windows compiler (csilvers)
+	* Allow infile and outfile for template-converter (ambrose)
+	* Some doc fixes
+
+Thu Aug 16 21:42:55 2007  Google Inc. <opensource@google.com>
+	
+	* ctemplate: version 0.8 release
+	* Add the ability to dynamically add modifiers (ribrdb)
+	* Support per-Expand() data for template modifiers (ribrdb)
+	* New commandline flag -f for make_tpl_varnames_h (herbertc)
+	* Windows: give debug dll and release dll different names (csilvers)
+	* A few fixups of Windows includes, based on user reports (csilvers)
+
+Tue Jul  3 12:46:59 2007  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.7 release
+	* Bugfix: another lock hygiene fix, for recursive includes (csilvers)
+	* Minor type-hygiene improvements: size_t for int, etc. (csilvers)
+	* Porting improvements: tests pass on OS X, FreeBSD, Solaris (csilvers)
+	* Windows port! -- VS solution provided for all unittests (csilvers)
+
+Thu Jun 21 14:02:32 2007  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.6.1 release
+	* Bugfix: data corruption bug with >2 template modifiers (jmacgill)
+	* Bugfix: syntax error in template-namelist: configure-bug (csilvers)
+	* Bugfix: improve lock hygiene to avoid potential deadlock (csilvers)
+
+Sat Jun  9 22:34:52 2007  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.6 release
+	* Use computed includes for hash_map/set: easier config (csilvers)
+	* Added all used .m4 templates to the distribution (csilvers)
+	* Beefed-up and revamped modifier code (csilvers)
+	* New modifiers for url-escaping, attribute-cleansing, etc (ribrdb)
+	* Annotations now include modifier information (csilvers)
+	* Support embedded NULs in template names and values (csilvers)
+
+Mon May 14 17:27:10 2007  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.5 release
+	* Add new MakeCopy() method to copy template dictionaries (csilvers)
+	* Add JSON-escaping (mikepurvis)
+	* Internal change that should ease thread-handling a bit (csilvers)
+	* Fix url_query_escape to avoid stack overflow (csilvers)
+
+Mon Jan 15 14:10:42 2007  Google Inc. <opensource@google.com>
+	
+	* ctemplate: version 0.4 release
+	* Improve html-escaping by adding single-quote (bdangelo)
+	* Improve javascript-escaping by adding more characters too (smknappy)
+	* Add url-escaping, for url query parameters (dcoker)
+	* Add support for "pre" escaping, which preserves whitespace (dboswell)
+	* Typo fixes in documentation (csilvers)
+	* Expand() returns false if a template file failed to load (jmittleman)
+
+Mon Aug 21 17:44:32 2006  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.3 release
+	* New contrib/ directory entry: vi syntax highlighting (patlac)
+	* New contrib/ directory entry: emacs syntax highlighting (tonyg)
+	* Allow escape-modifiers to affect includes, not just vars (csilvers)
+	  separating logic from presentation.
+	* Add JSON escape-functor (majewski)
+
+Wed Jun 14 14:56:04 2006  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.2 release
+	* API CHANGE: new typedefs (and types) for namelist functions (csilvers)
+	* carry annotation status through to child templates/sections (ehamon)
+	* Support registering templates after global construct time (njain)
+	* Add pthread-rwlock support for darwin (csilvers)
+	* SetTemplateGlobalValue(): new variable type with new scoping (ehamon)
+	* Export a nothreads version of the ctemplate library (csilvers)
+	* Got rid of scandir call, which should improve portability (csilvers)
+
+Mon Mar 13 22:20:46 2006  Google Inc. <opensource@google.com>
+
+	* ctemplate: initial release:
+	  The ctemplate package contains a library implementing a simple
+	  but powerful template language for C++.  It emphasizes
