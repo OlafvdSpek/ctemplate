@@ -68,12 +68,15 @@ DLLDEF_DEFINES="\
 
   # Process all the .in files in the "google" subdirectory
   mkdir -p "$1/windows/google"
-  for file in "$1"/google/*.in; do
+  for file in "$1"/ctemplate/*.in; do
      echo "Processing $file"
-     outfile="$1/windows/google/`basename $file .in`"
+     outfile="$1/windows/ctemplate/`basename $file .in`"
 
      # Besides replacing @...@, we also need to turn on dllimport
      # We also need to replace hash by hash_compare (annoying we hard-code :-( )
+     # Finally, we get rid of the header files that try to find @ac_cv_unit64@
+     # We tell them by their comment: "a place @ac_cv_uint64@ might live".
+     # Except it has a typo and says "unit64", so I check for both.
      sed -e "s!@ac_windows_dllexport@!$DLLDEF_MACRO_NAME!g" \
          -e "s!@ac_windows_dllexport_defines@!$DLLDEF_DEFINES!g" \
          -e "s!@ac_cv_cxx_hash_map@!$HASH_MAP_H!g" \
@@ -85,6 +88,7 @@ DLLDEF_DEFINES="\
          -e "s!@ac_google_namespace@!$GOOGLE_NAMESPACE!g" \
          -e "s!@ac_google_start_namespace@!$_START_GOOGLE_NAMESPACE_!g" \
          -e "s!@ac_htmlparser_namespace@!$HTMLPARSER_NAMESPACE!g" \
+         -e "s!.*@ac_cv_u..t64@ might live.*!!g" \
          -e "s!@ac_cv_uint64@!unsigned __int64!g" \
          -e "s!\\bhash\\b!hash_compare!g" \
          "$file" > "$outfile"

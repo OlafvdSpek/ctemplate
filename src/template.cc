@@ -59,14 +59,14 @@
 #include HASH_MAP_H         // defined in config.h
 #include "htmlparser/htmlparser_cpp.h"
 #include "template_modifiers_internal.h"
-#include <google/template_pathops.h>
-#include <google/template.h>
-#include <google/template_annotator.h>
-#include <google/template_modifiers.h>
-#include <google/template_dictionary.h>
-#include <google/template_dictionary_interface.h>   // also gets kIndent
-#include <google/per_expand_data.h>
-#include <google/template_string.h>
+#include <ctemplate/template_pathops.h>
+#include <ctemplate/template.h>
+#include <ctemplate/template_annotator.h>
+#include <ctemplate/template_modifiers.h>
+#include <ctemplate/template_dictionary.h>
+#include <ctemplate/template_dictionary_interface.h>   // also gets kIndent
+#include <ctemplate/per_expand_data.h>
+#include <ctemplate/template_string.h>
 
 #ifndef PATH_MAX
 #ifdef MAXPATHLEN
@@ -77,7 +77,6 @@
 #endif
 
 _START_GOOGLE_NAMESPACE_
-
 
 using std::endl;
 using std::string;
@@ -95,14 +94,12 @@ using HASH_NAMESPACE::hash_map;
 #endif
 using HASH_NAMESPACE::hash;
 using HTMLPARSER_NAMESPACE::HtmlParser;
-using ctemplate::PerExpandData;
-using ctemplate::StringHash;     // from template_string.h
-using ctemplate::TemplateAnnotator;
-using template_modifiers::ModifierAndValue;
-using template_modifiers::PrettyPrintModifiers;
-using template_modifiers::PrettyPrintOneModifier;
 
 #define arraysize(x)  ( sizeof(x) / sizeof(*(x)) )
+
+TemplateId GlobalIdForSTS_INIT(const TemplateString& s) {
+  return s.GetGlobalId();   // normally this method is private
+}
 
 namespace {
 
@@ -129,11 +126,10 @@ static Mutex g_header_mutex;
 // are already present in the text. If such characters were XSS-harmful
 // in a given context, they would have already been escaped or replaced
 // by earlier escaping such as H=attribute.
-static const template_modifiers::ModifierInfo g_prefix_line_info(
-    "", '\0', template_modifiers::XSS_WEB_STANDARD,
-    &template_modifiers::prefix_line);
+static const ModifierInfo g_prefix_line_info("", '\0', XSS_WEB_STANDARD,
+                                             &prefix_line);
 
-const char * const kDefaultTemplateDirectory = ctemplate::kCWD;   // "./"
+const char * const kDefaultTemplateDirectory = kCWD;   // "./"
 // Note this name is syntactically impossible for a user to accidentally use.
 const char * const kMainSectionName = "__{{MAIN}}__";
 
@@ -579,21 +575,20 @@ static const vector<const ModifierAndValue*> GetModifierForContext(
       assert(modvals.empty());
       return modvals;
     case TC_XML:
-      modvals = template_modifiers::GetModifierForXml(htmlparser, &error_msg);
+      modvals = GetModifierForXml(htmlparser, &error_msg);
       break;
     case TC_JSON:
-      modvals = template_modifiers::GetModifierForJson(htmlparser, &error_msg);
+      modvals = GetModifierForJson(htmlparser, &error_msg);
       break;
     case TC_CSS:
       assert(htmlparser);  // Parser is active in CSS
-      modvals = template_modifiers::GetModifierForCss(htmlparser, &error_msg);
+      modvals = GetModifierForCss(htmlparser, &error_msg);
       break;
     default:
       // Must be in TC_HTML or TC_JS. Parser is active in these modes.
       assert(AUTO_ESCAPE_PARSING_CONTEXT(my_context));
       assert(htmlparser);
-      modvals = template_modifiers::GetModifierForHtmlJs(htmlparser,
-                                                         &error_msg);
+      modvals = GetModifierForHtmlJs(htmlparser, &error_msg);
   }
   // Only TC_NONE has empty modifiers and we returned already.
   if (modvals.empty())
@@ -646,8 +641,7 @@ static size_t FindLongestMatch(
         ++curr_man;
       } else if ((curr_man->modifier_info->xss_class ==
                   (*curr_auto)->modifier_info->xss_class) &&
-                 (curr_man->modifier_info->xss_class !=
-                  template_modifiers::XSS_UNIQUE)) {
+                 (curr_man->modifier_info->xss_class != XSS_UNIQUE)) {
         ++curr_man;  // Ignore this modifier: it's harmless.
       } else {
         break;      // An incompatible modifier; we've failed
@@ -705,7 +699,7 @@ static void WriteOneHeaderEntry(string *outstring,
     current_file = full_pathname;
 
     // remove the path before the filename
-    string filename(ctemplate::Basename(full_pathname));
+    string filename(Basename(full_pathname));
 
     prefix = "k";
     bool take_next = true;
@@ -735,7 +729,7 @@ static void WriteOneHeaderEntry(string *outstring,
     if (variable == kMainSectionName || variable.find("BI_") == 0) {
       // We don't want to write entries for __MAIN__ or the built-ins
     } else {
-      const TemplateId id = TemplateString(variable).GetGlobalId();
+      const TemplateId id = GlobalIdForSTS_INIT(TemplateString(variable));
       std::ostringstream outstream;
       outstream << "static const StaticTemplateString "
                 << prefix << variable << " = STS_INIT_WITH_HASH("
@@ -766,7 +760,7 @@ enum TemplateTokenType { TOKENTYPE_UNUSED,        TOKENTYPE_TEXT,
                          TOKENTYPE_COMMENT,       TOKENTYPE_SET_DELIMITERS,
                          TOKENTYPE_PRAGMA,        TOKENTYPE_NULL };
 
-}  // anonymous namespace
+}  // unnamed namespace
 
 // A TemplateToken is a typed string. The semantics of the string depends on the
 // token type, as follows:
@@ -838,7 +832,7 @@ struct TemplateToken {
     // If one is found anywhere in the vector, consider the variable safe.
     for (vector<ModifierAndValue>::const_iterator it = modvals.begin();
          it != modvals.end(); ++it) {
-      if (it->modifier_info->xss_class == template_modifiers::XSS_SAFE)
+      if (it->modifier_info->xss_class == XSS_SAFE)
         return;
     }
 
@@ -854,8 +848,7 @@ struct TemplateToken {
       bool do_log = false;
       for (vector<ModifierAndValue>::const_iterator it = modvals.begin();
            it != modvals.end(); ++it) {
-        if (it->modifier_info->xss_class ==
-            template_modifiers::XSS_WEB_STANDARD) {
+        if (it->modifier_info->xss_class == XSS_WEB_STANDARD) {
           do_log = true;
           break;
         }
@@ -1279,7 +1272,7 @@ bool TemplateTemplateNode::ExpandOnce(
   // if there was a problem retrieving the template, bail!
   if (!included_template) {
     if (per_expand_data->annotate()) {
-      ctemplate::TemplateAnnotator* annotator = per_expand_data->annotator();
+      TemplateAnnotator* annotator = per_expand_data->annotator();
       annotator->EmitOpenMissingInclude(output_buffer,
                                         token_.ToString());
       output_buffer->Emit(filename);
@@ -2112,9 +2105,8 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
           value = mod_end;
         string value_string(value, mod_end - value);
         // Convert the string to a functor, and error out if we can't.
-        const template_modifiers::ModifierInfo* modstruct =
-            template_modifiers::FindModifier(mod, value - mod,
-                                             value, mod_end - value);
+        const ModifierInfo* modstruct = FindModifier(mod, value - mod,
+                                                     value, mod_end - value);
         // There are various ways a modifier syntax can be illegal.
         if (modstruct == NULL) {
           FAIL("Unknown modifier for variable "
@@ -2190,16 +2182,12 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
 //       RemoveStringFromTemplateCache() lets you remove a string that
 //    you had previously interned via StringToTemplateCache().
 // ----------------------------------------------------------------------
-
 Template* Template::StringToTemplate(const char* content, size_t content_len,
-                                     Strip strip, TemplateContext context) {
+                                     Strip strip) {
   // An empty filename_ keeps ReloadIfChangedLocked from performing
   // file operations.
 
-  // Enable selective autoescape if called with TC_MANUAL context, otherwise
-  // disable since full-on autoescape is in effect.
-  const bool selective_autoescape = (context == TC_MANUAL);
-  Template *tpl = new Template("", strip, context, selective_autoescape);
+  Template *tpl = new Template("", strip, TC_MANUAL, true);
 
   // But we have to do the "loading" and parsing ourselves:
 
@@ -2234,8 +2222,7 @@ bool Template::StringToTemplateCache(const string& key,
   // (Well, technically, a template can be valid under some
   // auto-escape contexts, but not others, but this should catch the
   // vast majority of problems.)  Do this without needing the lock.
-  Template* tpl = StringToTemplate(content, content_len,
-                                   DO_NOT_STRIP, TC_MANUAL);
+  Template* tpl = StringToTemplate(content, content_len, DO_NOT_STRIP);
   if (tpl == NULL)
     return false;
   delete tpl;
@@ -2269,7 +2256,7 @@ void Template::RemoveStringFromTemplateCache(const string& key) {
     vector<TemplateCacheKey> to_erase;
     for (TemplateCache::iterator it = g_parsed_template_cache->begin();
          it != g_parsed_template_cache->end();  ++it) {
-      string abspath(ctemplate::PathJoin(template_root_directory(), key));
+      string abspath(PathJoin(template_root_directory(), key));
       if (it->first.first == abspath) {
         // We'll delete the content pointed to by the entry here, since
         // it's handy, but we won't delete the entry itself quite yet.
@@ -2420,7 +2407,7 @@ Template *Template::GetTemplateCommon(const string& filename, Strip strip,
                                       TemplateContext context,
                                       bool selective_autoescape) {
   // No need to have the cache-mutex acquired for this step
-  string abspath(ctemplate::PathJoin(template_root_directory(), filename));
+  string abspath(PathJoin(template_root_directory(), filename));
 
   Template* tpl = NULL;
   {
@@ -2436,8 +2423,7 @@ Template *Template::GetTemplateCommon(const string& filename, Strip strip,
           (g_raw_template_content_cache->find(filename) !=
            g_raw_template_content_cache->end())) {
         string* content = (*g_raw_template_content_cache)[filename];
-        tpl = StringToTemplate(content->data(), content->length(),
-                               strip, context);
+        tpl = StringToTemplate(content->data(), content->length(), strip);
         // If we failed to get a template, cannot proceed.
         if (tpl == NULL)
           return tpl;
@@ -2529,7 +2515,7 @@ bool Template::BuildTree(const char* input_buffer,
 
 void Template::WriteHeaderEntries(string *outstring) const {
   if (state() == TS_READY) {   // only write header entries for 'good' tpls
-    outstring->append("#include <google/template_string.h>\n");
+    outstring->append("#include <ctemplate/template_string.h>\n");
     tree_->WriteHeaderEntries(outstring, template_file());
   }
 }
@@ -2578,18 +2564,17 @@ bool Template::SetTemplateRootDirectory(const string& directory) {
   MutexLock ml(&g_static_mutex);
   *template_root_directory_ = directory;
   // make sure it ends with '/'
-  ctemplate::NormalizeDirectory(template_root_directory_);
+  NormalizeDirectory(template_root_directory_);
   // Make the directory absolute if it isn't already.  This makes code
   // safer if client later does a chdir.
-  if (!ctemplate::IsAbspath(*template_root_directory_)) {
+  if (!IsAbspath(*template_root_directory_)) {
     char* cwdbuf = new char[PATH_MAX];   // new to avoid stack overflow
     const char* cwd = getcwd(cwdbuf, PATH_MAX);
     if (!cwd) {   // probably not possible, but best to be defensive
       LOG(WARNING) << "Unable to convert '" << *template_root_directory_
                    << "' to an absolute path, with cwd=" << cwdbuf;
     } else {
-      *template_root_directory_ = ctemplate::PathJoin(cwd,
-                                                      *template_root_directory_);
+      *template_root_directory_ = PathJoin(cwd, *template_root_directory_);
     }
     delete[] cwdbuf;
   }
@@ -3017,7 +3002,7 @@ bool Template::ExpandWithData(ExpandEmitter *expand_emitter,
   // If the client registered an expand-modifier, which is a modifier
   // meant to modify all templates after they are expanded, apply it
   // now.
-  const template_modifiers::TemplateModifier* modifier =
+  const TemplateModifier* modifier =
       per_expand_data->template_expansion_modifier();
   if (modifier && modifier->MightModify(per_expand_data, template_file())) {
     // We found a expand TemplateModifier.  Apply it.

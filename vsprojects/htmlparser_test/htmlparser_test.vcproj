@@ -136,7 +136,7 @@
 				RelativePath="..\..\src\htmlparser\htmlparser_cpp.h">
 			</File>
 			<File
-				RelativePath="..\..\src\windows\google\template_pathops.h">
+				RelativePath="..\..\src\windows\ctemplate\template_pathops.h">
 			</File>
 			<File
 				RelativePath="..\..\src\windows\config_for_unittests.h">

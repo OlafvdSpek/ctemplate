@@ -31,37 +31,35 @@
 // Author: Jad Boutros
 // Heavily inspired from make_tpl_varnames_h.cc
 //
-// A utility for evaluating the changes to template modifiers
-// when you switch from Standard mode to Auto Escape mode.
+// A utility for evaluating the changes in escaping modifiers
+// applied to variables between two versions of a template file.
+// This may come in handy when converting a template to Auto-Escape:
+// If the template previously had escaping modifiers, this tool will show
+// the variables for which Auto-Escaped determined a different escaping.
 //
 // How it works:
-//   . We initialize the same template file twice, once in standard mode
-//     and once in Auto Escape mode with the given TemplateContext.
+//   . You provide two template files, assumed to be identical in content
+//     (same variables in the same order) except for escaping modifiers
+//     and possibly the AUTOESCAPE pragma. You also provide the Strip mode
+//     or a default of STRIP_WHITESPACE is assumed.
 //
-//   . We invoke DumpToString on both and compare the modifiers for each
-//     variable. When the variable had an in-template modifier *and* the
-//     auto-escape mode determined a different one, we print a line
-//     with the variable name, the initial modifier and the auto-escape one.
-//     You can use --brief to get only one line per file (for >0 diffs).
-//     NOTE: If your template file has only variables without any modifiers,
-//     (say from the old Google Templates) we don't print anything.
+//   . The tool loads both files and invokes DumpToString on both. It then
+//     compares the escaping modifiers for each variable and when they do
+//     not match, it prints a line with the variable name as well as
+//     the differing modifiers.
 //
-//   . We accept some command-line flags, in particular --template_context
-//     to set a TemplateContext other than TC_HTML (default),
-//     --template_dir to set a template root directory other than cwd
-//     and --dump_templates to print the full DumpToString under the
-//     auto-escape mode.
+//   . We accept some command-line flags, the most notable are:
+//       --template_dir to set a template root directory other than cwd
+//       --strip to set the Strip mode to other than STRIP_WHITESPACE.
+//         For correct operation of Auto-Escape, ensure this matches
+//         the Strip mode you normally use on these templates.
 //
-// Usage Example:
-// > $ cd ~/src/google3
-// > $ bin/template/diff_tpl_auto_escape TC_HTML some_template_file.tpl
+// Exit code is zero if there were no differences. It is non-zero
+// if we failed to load the templates or we found one or more
+// differences.
 //
-// TODO(jad): This script is currently broken. Fix me.
-
-// Note, we keep the google-infrastructure use to a minimum here,
-// in order to ease porting to opensource.
-//
-// Exit code is the number of templates we were unable to parse.
+// TODO(jad): Add flag to optionally report differences when a variable
+//            does not have modifiers in either template.
 
 #include "config.h"
 // This is for windows.  Even though we #include config.h, just like
@@ -80,17 +78,17 @@
 #endif
 #include <string.h>
 #include <string>
-#include <google/template.h>
-#include <google/template_pathops.h>
+#include <ctemplate/template.h>
+#include <ctemplate/template_pathops.h>
 
 using std::string;
 using std::vector;
 using GOOGLE_NAMESPACE::Template;
 using GOOGLE_NAMESPACE::TemplateContext;
-using GOOGLE_NAMESPACE::TC_HTML;
-using GOOGLE_NAMESPACE::TC_JS;
+using GOOGLE_NAMESPACE::Strip;
 using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
-namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;   // an interior namespace
+using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
+using GOOGLE_NAMESPACE::DO_NOT_STRIP;
 
 enum {LOG_VERBOSE, LOG_INFO, LOG_WARNING, LOG_ERROR, LOG_FATAL};
 
@@ -105,11 +103,9 @@ struct VariableAndMod {
 };
 typedef vector<VariableAndMod> VariableAndMods;
 
-static string FLAG_template_dir(ctemplate::kCWD);   // "./"
-static bool FLAG_dump_templates = false;           // cmd-line arg -d
-static string FLAG_template_context("TC_HTML");    // cmd-line arg -c
-static bool FLAG_brief = false;                    // cmd-line arg -q
-static bool FLAG_verbose = false;                  // cmd-line arg -v
+static string FLAG_template_dir(GOOGLE_NAMESPACE::kCWD);   // "./"
+static string FLAG_strip = "";      // cmd-line arg -s
+static bool FLAG_verbose = false;   // cmd-line arg -v
 
 static void LogPrintf(int severity, const char* pat, ...) {
   if (severity == LOG_VERBOSE && !FLAG_verbose)
@@ -127,28 +123,28 @@ static void LogPrintf(int severity, const char* pat, ...) {
     exit(1);
 }
 
-// prints to outfile -- usually stdout or stderr -- and then exits
+// Prints to outfile -- usually stdout or stderr -- and then exits
 static int Usage(const char* argv0, FILE* outfile) {
-  fprintf(outfile, "USAGE: %s [-t<dir>] [-d] [-b] "
-          "[-c<context>] <template_filename> ...\n", argv0);
+  fprintf(outfile, "USAGE: %s [-t<dir>] [-v] [-b] [-s<n>] <file1> <file2>\n",
+          argv0);
+
   fprintf(outfile,
           "       -t --template_dir=<dir>  Root directory of templates\n"
-          "       -c --context<context>    TemplateContext (default TC_HTML)\n"
-          "       -d --dump_templates      Cause templates dump contents\n"
-          "       -q --brief               Output only if file has diffs\n"
+          "       -s --strip=<strip>       STRIP_WHITESPACE [default],\n"
+          "                                STRIP_BLANK_LINES, DO_NOT_STRIP\n"
           "       -h --help                This help\n"
+          "       -v --verbose             For a bit more output\n"
           "       -V --version             Version information\n");
   fprintf(outfile, "\n"
-          "This program reports changes to modifiers in your templates\n"
-          "that would occur if you switch to the Auto Escape mode.\n"
-          "By default it only reports differences in modifiers for variables\n"
-          "that have existing modifiers in your templates. To see all the\n"
-          "modifiers the Auto Escape mode would set use -d to dump templates.\n"
-          "Use -b for terse output when you just want to know if the template\n"
-          "file has any diffs."
-          "The context is a string (e.g. TC_HTML) and should match what\n"
-          "you would provde in Template::GetTemplateWithAutoEscaping.\n");
-
+          "This program reports changes to modifiers between two template\n"
+          "files assumed to be identical except for modifiers applied\n"
+          "to variables. One use case is converting a template to\n"
+          "Auto-Escape and using this program to obtain the resulting\n"
+          "changes in escaping modifiers.\n"
+          "The Strip value should match what you provide in\n"
+          "Template::GetTemplate.\n"
+          "NOTE: Variables that do not have escaping modifiers in one of\n"
+          "two templates are ignored and do not count in the differences.\n");
   exit(0);
 }
 
@@ -177,27 +173,18 @@ static int Version(FILE* outfile) {
 // variable name and modifiers when present.
 // Because DumpToString also outputs text nodes, it is possible
 // to trip this function. Probably ok since this is just a helper tool.
-bool LoadVariables(const char* filename, TemplateContext context,
-                   bool auto_escape, VariableAndMods& vars_and_mods) {
+bool LoadVariables(const char* filename, Strip strip,
+                   VariableAndMods& vars_and_mods) {
   const string kVariablePreambleText = "Variable Node: ";
   Template *tpl;
-  if (auto_escape) {
-    // Setting Strip to the most common value for web-apps.
-    // In theory it should not matter, in practice it could particularly
-    // with subtle HTML parser cases.
-    tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);
-  } else {
-    tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);
-  }
+  tpl = Template::GetTemplate(filename, strip);
   if (tpl == NULL) {
-    LogPrintf(LOG_ERROR, "Could not load file: %s\n", filename);
+    LogPrintf(LOG_FATAL, "Could not load file: %s\n", filename);
     return false;
   }
 
   string output;
   tpl->DumpToString(filename, &output);
-  if (FLAG_dump_templates && auto_escape)
-    fprintf(stdout, "%s\n", output.c_str());
 
   string::size_type index = 0;
   string::size_type delim, end;
@@ -222,57 +209,66 @@ bool LoadVariables(const char* filename, TemplateContext context,
   return true;
 }
 
-// Main function to analyze diffs in a given template filename.
-// Given it loads the same file twice, once in standard mode
-// and once in auto-escape mode, there is always the improbable
-// possibility of the file changing in the mean time. For such
-// unexpected conditions, it will fatally terminate the program.
-bool DiffTemplate(const char* filename, TemplateContext context) {
-  vector<VariableAndMod> vars_and_mods, vars_and_mods_ae;
+// Returns true if the difference in the modifier strings
+// is non-significant and can be safely omitted. This is the
+// case when one is ":j:h" and the other is ":j" since
+// the :h is a no-op after a :j.
+bool SuppressLameDiff(string modifiers_a, string modifiers_b) {
+  if ((modifiers_a == ":j:h" && modifiers_b == ":j") ||
+      (modifiers_a == ":j" && modifiers_b == ":j:h"))
+    return true;
+  return false;
+}
 
-  if (!LoadVariables(filename, context, false, vars_and_mods) ||
-      !LoadVariables(filename, context, true, vars_and_mods_ae))
+// Main function to analyze differences in escaping modifiers between
+// two template files. These files are assumed to be identical in
+// content [strictly speaking: same number of variables in the same order].
+// If that is not the case, we fail.
+// We return true if there were no differences, false if we failed
+// or we found one or more differences.
+bool DiffTemplates(const char* filename_a, const char* filename_b,
+                   Strip strip) {
+  vector<VariableAndMod> vars_and_mods_a, vars_and_mods_b;
+
+  if (!LoadVariables(filename_a, strip, vars_and_mods_a) ||
+      !LoadVariables(filename_b, strip, vars_and_mods_b))
     return false;
 
-  // Should not happen unless the template file was being edited
-  // while this utility is running or other unexpected cases.
-  if (vars_and_mods.size() != vars_and_mods_ae.size())
-    LogPrintf(LOG_FATAL, "%s: Mismatch in length: %d vs. %d\n",
-              filename, vars_and_mods.size(), vars_and_mods_ae.size());
+  if (vars_and_mods_a.size() != vars_and_mods_b.size())
+    LogPrintf(LOG_FATAL, "Templates differ: %s [%d vars] vs. %s [%d vars].\n",
+              filename_a, vars_and_mods_a.size(),
+              filename_b, vars_and_mods_b.size());
 
   int mismatch_count = 0;      // How many differences there were.
   int no_modifiers_count = 0;  // How many variables without modifiers.
-  VariableAndMods::const_iterator iter, iter_ae;
-  for (iter = vars_and_mods.begin(), iter_ae = vars_and_mods_ae.begin();
-       iter != vars_and_mods.end() && iter_ae != vars_and_mods_ae.end();
-       ++iter, ++iter_ae) {
-    // Should not happen unless the template file was being edited
-    // while this utility is running or other unexpected cases.
-    if (iter->variable_name != iter_ae->variable_name)
-      LogPrintf(LOG_FATAL, "%s: Variable name mismatch: %s vs. %s\n",
-                filename, iter->variable_name.c_str(),
-                iter_ae->variable_name.c_str());
-    if (iter->modifiers == "") {
+  VariableAndMods::const_iterator iter_a, iter_b;
+  for (iter_a = vars_and_mods_a.begin(), iter_b = vars_and_mods_b.begin();
+       iter_a != vars_and_mods_a.end() && iter_b != vars_and_mods_b.end();
+       ++iter_a, ++iter_b) {
+    // The templates have different variables, we fail!
+    if (iter_a->variable_name != iter_b->variable_name)
+      LogPrintf(LOG_FATAL, "Variable name mismatch: %s vs. %s\n",
+                iter_a->variable_name.c_str(),
+                iter_b->variable_name.c_str());
+    // Variables without modifiers are ignored from the diff. They simply
+    // get counted and the count is shown in verbose logging/
+    if (iter_a->modifiers == "" || iter_b->modifiers == "") {
       no_modifiers_count++;
     } else {
-      if (iter->modifiers != iter_ae->modifiers) {
+      if (iter_a->modifiers != iter_b->modifiers &&
+          !SuppressLameDiff(iter_a->modifiers, iter_b->modifiers)) {
         mismatch_count++;
-        if (!FLAG_brief)
-          LogPrintf(LOG_INFO, "%s: Difference for variable %s -- %s vs. %s\n",
-                    filename, iter->variable_name.c_str(),
-                    iter->modifiers.c_str(), iter_ae->modifiers.c_str());
+        LogPrintf(LOG_INFO, "Difference for variable %s -- %s vs. %s\n",
+                  iter_a->variable_name.c_str(),
+                  iter_a->modifiers.c_str(), iter_b->modifiers.c_str());
       }
     }
   }
 
-  LogPrintf(LOG_VERBOSE, "%s: Variables Found: Total=%d; Diffs=%d; NoMods=%d\n",
-            filename, vars_and_mods.size(), mismatch_count, no_modifiers_count);
+  LogPrintf(LOG_VERBOSE, "Variables Found: Total=%d; Diffs=%d; NoMods=%d\n",
+            vars_and_mods_a.size(), mismatch_count, no_modifiers_count);
 
-  if (FLAG_brief && mismatch_count > 0)
-    LogPrintf(LOG_INFO, "%s: Detected %d differences.\n",
-            filename, mismatch_count);
-
-  return true;
+  return (mismatch_count == 0);
 }
 
 int main(int argc, char **argv) {
@@ -284,30 +280,26 @@ int main(int argc, char **argv) {
   const char* optarg = "";   // not used
 #elif defined(HAVE_GETOPT_LONG)
   static struct option longopts[] = {
-    {"help", 1, NULL, 'h'},
-    {"version", 1, NULL, 'V'},
+    {"help", 0, NULL, 'h'},
+    {"strip", 1, NULL, 's'},
     {"template_dir", 1, NULL, 't'},
-    {"context", 1, NULL, 'c'},
-    {"dump_templates", 0, NULL, 'd'},
-    {"brief", 0, NULL, 'q'},
     {"verbose", 0, NULL, 'v'},
+    {"version", 0, NULL, 'V'},
     {0, 0, 0, 0}
   };
   int option_index;
-# define GETOPT(argc, argv)  getopt_long(argc, argv, "t:c:dqhvV", \
+# define GETOPT(argc, argv)  getopt_long(argc, argv, "t:s:hvV", \
                                          longopts, &option_index)
 #else
-# define GETOPT(argc, argv)  getopt(argc, argv, "t:c:dqhvV")
+# define GETOPT(argc, argv)  getopt(argc, argv, "t:s:hvV")
 #endif
 
   int r = 0;
   while (r != -1) {   // getopt()/getopt_long() return -1 upon no-more-input
     r = GETOPT(argc, argv);
     switch (r) {
+      case 's': FLAG_strip.assign(optarg); break;
       case 't': FLAG_template_dir.assign(optarg); break;
-      case 'c': FLAG_template_context.assign(optarg); break;
-      case 'd': FLAG_dump_templates = true; break;
-      case 'q': FLAG_brief = true; break;
       case 'v': FLAG_verbose = true; break;
       case 'V': Version(stdout); break;
       case -1: break;   // means 'no more input'
@@ -315,29 +307,32 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (optind >= argc) {
-    LogPrintf(LOG_FATAL,
-              "Must specify at least one template file on the command line.\n");
-  }
-
   Template::SetTemplateRootDirectory(FLAG_template_dir);
 
-  // Arbitrary initial value to shush compiler warning, otherwise unused.
-  TemplateContext context = TC_HTML;
-  if (strcmp(FLAG_template_context.c_str(), "TC_HTML") == 0) {
-    context = TC_HTML;
-  } else if (strcmp(FLAG_template_context.c_str(), "TC_JS") == 0) {
-    context = TC_JS;
-  } else {
-    LogPrintf(LOG_FATAL, "Context: %s. Must be TC_HTML or TC_JS\n",
-              FLAG_template_context.c_str());
-  }
+  if (argc != (optind + 2))
+    LogPrintf(LOG_FATAL,
+              "Must specify exactly two template files on the command line.\n");
 
-  int num_errors = 0;
-  for (int i = optind; i < argc; ++i) {
-    LogPrintf(LOG_VERBOSE, "------ Checking %s ------\n", argv[i]);
-    if (!DiffTemplate(argv[i], context))
-      num_errors++;
-  }
-  return num_errors > 127 ? 127 : num_errors;
+  // Validate the Strip value. Default is STRIP_WHITESPACE.
+  Strip strip = STRIP_WHITESPACE;   // To avoid compiler warnings.
+  if (FLAG_strip == "STRIP_WHITESPACE" || FLAG_strip == "")
+    strip = STRIP_WHITESPACE;
+  else if (FLAG_strip == "STRIP_BLANK_LINES")
+    strip = STRIP_BLANK_LINES;
+  else if (FLAG_strip == "DO_NOT_STRIP")
+    strip = DO_NOT_STRIP;
+  else
+    LogPrintf(LOG_FATAL, "Unrecognized Strip: %s. Must be one of: "
+              "STRIP_WHITESPACE, STRIP_BLANK_LINES or DO_NOT_STRIP\n",
+              FLAG_strip.c_str());
+
+  const char* filename_a = argv[optind];
+  const char* filename_b = argv[optind + 1];
+  LogPrintf(LOG_VERBOSE, "------ Diff of [%s, %s] ------\n",
+            filename_a, filename_b);
+
+  if (DiffTemplates(filename_a, filename_b, strip))
+    return 0;
+  else
+    return 1;
 }

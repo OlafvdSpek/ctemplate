@@ -7,8 +7,8 @@
 #include <vector>
 #include "base/arena.h"
 #include "tests/template_test_util.h"
-#include <google/template_dictionary.h>
-#include <google/template_string.h>
+#include <ctemplate/template_dictionary.h>
+#include <ctemplate/template_string.h>
 
 using std::vector;
 using std::string;

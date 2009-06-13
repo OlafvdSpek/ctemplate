@@ -61,8 +61,6 @@
 
 class ExpandEmitter;
 
-namespace ctemplate {
-
 // This is the abstract interface for an annotation mode.  A new annotation
 // mode is introduced by subclassing and implementing each function
 // to add annotation content.  There is one function for each internal
@@ -138,8 +136,6 @@ class @ac_windows_dllexport@ TextTemplateAnnotator : public TemplateAnnotator {
   TextTemplateAnnotator(const TextTemplateAnnotator&);
   void operator=(const TextTemplateAnnotator&);
 };
-
-}  // namespace ctemplate
 
 @ac_google_end_namespace@
 

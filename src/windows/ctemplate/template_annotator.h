@@ -62,11 +62,9 @@
 # define CTEMPLATE_DLL_DECL  __declspec(dllimport)
 #endif
 
-namespace google {
+namespace ctemplate {
 
 class ExpandEmitter;
-
-namespace ctemplate {
 
 // This is the abstract interface for an annotation mode.  A new annotation
 // mode is introduced by subclassing and implementing each function
@@ -143,8 +141,6 @@ class CTEMPLATE_DLL_DECL TextTemplateAnnotator : public TemplateAnnotator {
   TextTemplateAnnotator(const TextTemplateAnnotator&);
   void operator=(const TextTemplateAnnotator&);
 };
-
-}  // namespace ctemplate
 
 }
 

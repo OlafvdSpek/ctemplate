@@ -43,9 +43,9 @@
 #include <iostream>              // for cerr
 #include <algorithm>             // for binary_search
 #include HASH_SET_H              // (defined in config.h)  to get hash<>
-#include <google/template_namelist.h>
-#include <google/template_pathops.h>
-#include <google/template.h>     // for Strip, GetTemplate(), etc.
+#include <ctemplate/template_namelist.h>
+#include <ctemplate/template_pathops.h>
+#include <ctemplate/template.h>     // for Strip, GetTemplate(), etc.
 
 _START_GOOGLE_NAMESPACE_
 
@@ -97,7 +97,7 @@ const TemplateNamelist::MissingListType& TemplateNamelist::GetMissingList(
 
     // Make sure the root directory ends with a slash (which is also
     // required by the method SetTemplateRootDirectory anyway).
-    assert(ctemplate::IsDirectory(root_dir));
+    assert(IsDirectory(root_dir));
 
     const NameListType& the_list = TemplateNamelist::GetList();
     missing_list_->clear();
@@ -106,7 +106,7 @@ const TemplateNamelist::MissingListType& TemplateNamelist::GetMissingList(
          iter != the_list.end();
          ++iter) {
       // Only prepend root_dir if *iter isn't an absolute path:
-      string path = ctemplate::PathJoin(root_dir, *iter);
+      string path = PathJoin(root_dir, *iter);
       if (access(path.c_str(), R_OK) != 0) {
         missing_list_->push_back(*iter);
         std::cerr << "ERROR: Template file missing: " << path << std::endl;
@@ -164,13 +164,13 @@ time_t TemplateNamelist::GetLastmodTime() {
   time_t retval = -1;
 
   const string& root_dir = Template::template_root_directory();
-  assert(ctemplate::IsDirectory(root_dir));
+  assert(IsDirectory(root_dir));
   const NameListType& the_list = TemplateNamelist::GetList();
   for (NameListType::const_iterator iter = the_list.begin();
        iter != the_list.end();
        ++iter) {
     // Only prepend root_dir if *iter isn't an absolute path:
-    string path = ctemplate::PathJoin(root_dir, *iter);
+    string path = PathJoin(root_dir, *iter);
     struct stat statbuf;
     if (stat(path.c_str(), &statbuf) != 0)       // ignore files we can't find
       continue;

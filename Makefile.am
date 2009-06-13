@@ -3,7 +3,7 @@
 # Make sure that when we re-make ./configure, we get the macros we need
 ACLOCAL_AMFLAGS = -I m4
 
-# This is so we can #include <google/foo>
+# This is so we can #include <ctemplate/foo>
 AM_CPPFLAGS = -I$(top_srcdir)/src
 
 # These are good warnings to turn on by default
@@ -11,37 +11,35 @@ if GCC
 AM_CXXFLAGS = -Wall -Wwrite-strings -Woverloaded-virtual -Wno-sign-compare
 endif
 
-googleincludedir = $(includedir)/google
+ctemplateincludedir = $(includedir)/ctemplate
 ## The .h files you want to install (that is, .h files that people
 ## who install this package can include in their own applications.)
 ## We have to include both the .h and .h.in forms.  The latter we
 ## put in noinst_HEADERS.
-nodist_googleinclude_HEADERS = \
-	src/google/template.h \
-	src/google/template_string.h \
-	src/google/template_enums.h \
-	src/google/template_pathops.h \
-	src/google/template_modifiers.h \
-	src/google/template_dictionary.h \
-	src/google/template_dictionary_interface.h \
-	src/google/template_annotator.h \
-	src/google/template_emitter.h \
-	src/google/template_namelist.h \
-	src/google/template_from_string.h \
-	src/google/per_expand_data.h
+nodist_ctemplateinclude_HEADERS = \
+	src/ctemplate/template.h \
+	src/ctemplate/template_string.h \
+	src/ctemplate/template_enums.h \
+	src/ctemplate/template_pathops.h \
+	src/ctemplate/template_modifiers.h \
+	src/ctemplate/template_dictionary.h \
+	src/ctemplate/template_dictionary_interface.h \
+	src/ctemplate/template_annotator.h \
+	src/ctemplate/template_emitter.h \
+	src/ctemplate/template_namelist.h \
+	src/ctemplate/per_expand_data.h
 noinst_HEADERS = \
-	src/google/template.h.in \
-	src/google/template_string.h.in \
-	src/google/template_enums.h.in \
-	src/google/template_pathops.h.in \
-	src/google/template_modifiers.h.in \
-	src/google/template_dictionary.h.in \
-	src/google/template_dictionary_interface.h.in \
-	src/google/template_annotator.h.in \
-	src/google/template_emitter.h.in \
-	src/google/template_namelist.h.in \
-	src/google/template_from_string.h.in \
-	src/google/per_expand_data.h.in
+	src/ctemplate/template.h.in \
+	src/ctemplate/template_string.h.in \
+	src/ctemplate/template_enums.h.in \
+	src/ctemplate/template_pathops.h.in \
+	src/ctemplate/template_modifiers.h.in \
+	src/ctemplate/template_dictionary.h.in \
+	src/ctemplate/template_dictionary_interface.h.in \
+	src/ctemplate/template_annotator.h.in \
+	src/ctemplate/template_emitter.h.in \
+	src/ctemplate/template_namelist.h.in \
+	src/ctemplate/per_expand_data.h.in
 
 docdir = $(prefix)/share/doc/$(PACKAGE)-$(VERSION)
 ## This is for HTML and other documentation you want to install.
@@ -109,7 +107,7 @@ CTEMPLATE_SYMBOLS = '(ctemplate|template_modifiers|BaseArena|UnsafeArena|[^A-Za-
 
 lib_LTLIBRARIES += libctemplate.la
 WINDOWS_PROJECTS += vsprojects/libctemplate/libctemplate.vcproj
-libctemplate_la_SOURCES = $(nodist_googleinclude_HEADERS) \
+libctemplate_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/base/small_map.h src/base/manual_constructor.h \
 	src/template_modifiers_internal.h \
@@ -156,7 +154,7 @@ libctemplate_nothreads_debug_la_LDFLAGS = $(libctemplate_nothreads_la_LDFLAGS)
 # mail to google-ctemplate@googlegroups.com!
 ##lib_LTLIBRARIES += libctemplate_testing.la
 noinst_LTLIBRARIES += libctemplate_testing.la
-libctemplate_testing_la_SOURCES = $(nodist_googleinclude_HEADERS) \
+libctemplate_testing_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
                                   src/tests/template_test_util.h \
                                   src/tests/template_test_util.cc
 libctemplate_testing_la_CXXFLAGS = $(AM_CXXFLAGS)
@@ -172,13 +170,13 @@ libctemplate_testing_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMB
 # Helper apps
 bin_PROGRAMS += make_tpl_varnames_h
 WINDOWS_PROJECTS += vsprojects/make_tpl_varname_h/make_tpl_varname_h.vcproj
-make_tpl_varnames_h_SOURCES = $(nodist_googleinclude_HEADERS) \
+make_tpl_varnames_h_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/make_tpl_varnames_h.cc
 make_tpl_varnames_h_LDADD = libctemplate_nothreads.la
 
 bin_PROGRAMS += diff_tpl_auto_escape
 WINDOWS_PROJECTS += vsprojects/diff_tpl_auto_escape/diff_tpl_auto_escape.vcproj
-diff_tpl_auto_escape_SOURCES = $(nodist_googleinclude_HEADERS) \
+diff_tpl_auto_escape_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/diff_tpl_auto_escape.cc
 diff_tpl_auto_escape_LDADD = libctemplate_nothreads.la
 
@@ -188,7 +186,7 @@ bin_SCRIPTS += src/template-converter
 
 TESTS += compile_test compile_nothreads_test
 WINDOWS_PROJECTS += vsprojects/compile_test/compile_test.vcproj
-compile_test_SOURCES = $(nodist_googleinclude_HEADERS) \
+compile_test_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
                        src/tests/compile_test.cc
 compile_test_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 compile_test_LDFLAGS = $(PTHREAD_CFLAGS)

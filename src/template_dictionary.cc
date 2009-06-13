@@ -43,8 +43,8 @@
 #include <utility>              // for pair<>
 #include <vector>
 #include <map>
-#include <google/template_dictionary.h>
-#include <google/template_modifiers.h>
+#include <ctemplate/template_dictionary.h>
+#include <ctemplate/template_modifiers.h>
 #include "base/mutex.h"
 #include "base/arena.h"
 #include "base/small_map.h"
@@ -56,27 +56,12 @@ using std::string;
 using std::map;
 using std::pair;
 using std::make_pair;
-using template_modifiers::TemplateModifier;
 
 static Mutex g_static_mutex;
 
 /*static*/ UnsafeArena* const TemplateDictionary::NO_ARENA = NULL;
 /*static*/ TemplateDictionary::GlobalDict* TemplateDictionary::global_dict_
   = NULL;
-
-// Define the modifiers
-/*static*/ const template_modifiers::HtmlEscape&
-  TemplateDictionary::html_escape = template_modifiers::html_escape;
-/*static*/ const template_modifiers::PreEscape&
-  TemplateDictionary::pre_escape = template_modifiers::pre_escape;
-/*static*/ const template_modifiers::XmlEscape&
-  TemplateDictionary::xml_escape = template_modifiers::xml_escape;
-/*static*/ const template_modifiers::JavascriptEscape&
-  TemplateDictionary::javascript_escape = template_modifiers::javascript_escape;
-/*static*/ const template_modifiers::UrlQueryEscape&
-  TemplateDictionary::url_query_escape = template_modifiers::url_query_escape;
-/*static*/ const template_modifiers::JsonEscape&
-  TemplateDictionary::json_escape = template_modifiers::json_escape;
 
 static const char* const kAnnotateOutput = "__ctemplate_annotate_output__";
 
@@ -144,7 +129,9 @@ inline TemplateDictionary::DictVector* TemplateDictionary::CreateDictVector() {
 }
 
 inline TemplateDictionary* TemplateDictionary::CreateTemplateSubdict(
-    const string& name, UnsafeArena* arena, TemplateDictionary* parent_dict,
+    const TemplateString& name,
+    UnsafeArena* arena,
+    TemplateDictionary* parent_dict,
     TemplateDictionary* template_global_dict_owner) {
   char* buffer = arena->Alloc(sizeof(TemplateDictionary));
   // Placement new: construct the sub-tpl in the memory used by tplbuf.
@@ -219,10 +206,11 @@ TemplateDictionary::GlobalDict* TemplateDictionary::SetupGlobalDictUnlocked() {
   return retval;
 }
 
-TemplateDictionary::TemplateDictionary(const string& name, UnsafeArena* arena)
+TemplateDictionary::TemplateDictionary(const TemplateString& name,
+                                       UnsafeArena* arena)
     : arena_(arena ? arena : new UnsafeArena(32768)),
       should_delete_arena_(arena ? false : true),   // true if we called new
-      name_(arena_->MemdupPlusNUL(name.data(), name.size())),
+      name_(Memdup(name)),    // arena must have been set up first
       variable_dict_(NULL),
       section_dict_(NULL),
       include_dict_(NULL),
@@ -236,10 +224,12 @@ TemplateDictionary::TemplateDictionary(const string& name, UnsafeArena* arena)
 }
 
 TemplateDictionary::TemplateDictionary(
-    const string& name, UnsafeArena* arena, TemplateDictionary* parent_dict,
+    const TemplateString& name,
+    UnsafeArena* arena,
+    TemplateDictionary* parent_dict,
     TemplateDictionary* template_global_dict_owner)
     : arena_(arena), should_delete_arena_(false),  // parents own it
-      name_(arena_->MemdupPlusNUL(name.data(), name.size())),
+      name_(Memdup(name)),    // arena must have been set up first
       variable_dict_(NULL),
       section_dict_(NULL),
       include_dict_(NULL),
@@ -271,7 +261,7 @@ TemplateDictionary::~TemplateDictionary() {
 // ----------------------------------------------------------------------
 
 TemplateDictionary* TemplateDictionary::InternalMakeCopy(
-    const string& name_of_copy,
+    const TemplateString& name_of_copy,
     UnsafeArena* arena,
     TemplateDictionary* parent_dict,
     TemplateDictionary* template_global_dict_owner) {
@@ -353,8 +343,8 @@ TemplateDictionary* TemplateDictionary::InternalMakeCopy(
   return newdict;
 }
 
-TemplateDictionary* TemplateDictionary::MakeCopy(const string& name_of_copy,
-                                                 UnsafeArena* arena) {
+TemplateDictionary* TemplateDictionary::MakeCopy(
+    const TemplateString& name_of_copy, UnsafeArena* arena) {
   if (template_global_dict_owner_ != this) {
     // We're not at the root, which is illegal.
     return NULL;
@@ -576,7 +566,8 @@ TemplateDictionary* TemplateDictionary::AddSectionDictionary(
   assert(dicts != NULL);
   char dictsize[64];
   snprintf(dictsize, sizeof(dictsize), "%"PRIuS, dicts->size() + 1);
-  string newname(string(name_) + "/" + section_name.ptr_ + "#" + dictsize);
+  string newname(string(name_.ptr_, name_.length_) + "/" + section_name.ptr_
+                 + "#" + dictsize);
   TemplateDictionary* retval = CreateTemplateSubdict(
       newname, arena_, this, template_global_dict_owner_);
   dicts->push_back(retval);
@@ -645,7 +636,8 @@ TemplateDictionary* TemplateDictionary::AddIncludeDictionary(
   assert(dicts != NULL);
   char dictsize[64];
   snprintf(dictsize, sizeof(dictsize), "%"PRIuS, dicts->size() + 1);
-  string newname(string(name_) + "/" + include_name.ptr_ + "#" + dictsize);
+  string newname(string(name_.ptr_, name_.length_) + "/" + include_name.ptr_
+                 + "#" + dictsize);
   TemplateDictionary* retval = CreateTemplateSubdict(
       newname, arena_, NULL, template_global_dict_owner_);
   dicts->push_back(retval);
@@ -765,7 +757,7 @@ void TemplateDictionary::DumpToString(string* out, int indent) const {
   }
 
   IndentLine(out, indent);
-  out->append(string("dictionary '") + name_);
+  out->append(string("dictionary '") + string(name_.ptr_, name_.length_));
   if (filename_ && filename_[0]) {
     out->append(" (intended for ");
     out->append(filename_);

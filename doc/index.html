@@ -49,7 +49,7 @@ details see, the links below.
    #include &lt;iostream>
    #include &lt;google/template.h>
    int main(int argc, char** argv) {
-      google::TemplateDictionary dict("example");
+      ctemplate::TemplateDictionary dict("example");
       dict.SetValue("NAME", "John Smith");
       int winnings = random() % 100000;
       dict.SetIntValue("VALUE", winnings);
@@ -60,8 +60,8 @@ details see, the links below.
         dict.ShowSection("IN_CA");
       }
 
-      google::Template* tpl = google::Template::GetTemplate("example.tpl",
-                                                            google::DO_NOT_STRIP);
+      ctemplate::Template* tpl = ctemplate::Template::GetTemplate(
+        "example.tpl", ctemplate::DO_NOT_STRIP);
       std::string output;
       tpl->Expand(&output, &dict);
       std::cout &lt;&lt; output;

@@ -39,17 +39,17 @@
 
 #include <time.h>             // for time_t
 #include <string>
-#include <google/template_enums.h>
+#include <ctemplate/template_enums.h>
 
 // We include this just so folks don't have to include both template.h
 // and template_dictionary.h, or template_namelist.h etc, to use the
 // template system; we don't actually use anything in these files ourselves.
 #if 1
-#include <google/template_dictionary.h>
-#include <google/template_namelist.h>
-#include <google/per_expand_data.h>
+#include <ctemplate/template_dictionary.h>
+#include <ctemplate/template_namelist.h>
+#include <ctemplate/per_expand_data.h>
 #else
-namespace google {
+namespace ctemplate {
 class TemplateDictionaryInterface;
 class PerExpandData;
 }
@@ -66,7 +66,7 @@ namespace google_ctemplate_streamhtmlparser {
 class HtmlParser;
 }
 
-namespace google {
+namespace ctemplate {
 
 // TemplateState of a template is:
 // - TS_EMPTY before parsing is complete,
@@ -154,11 +154,13 @@ class CTEMPLATE_DLL_DECL Template {
   // templates, you cannot use include them inside another template
   // (via "{{>TEMPLATE_THAT_COMES_FROM_A_STRING}}").  If you need that
   // functionality, use StringToTemplateCache.
+  // Also note that Auto-Escape may be enabled by adding the
+  // AUTOESCAPE pragma at the top of the string.
   static Template* StringToTemplate(const char* content, size_t content_len,
-                                    Strip strip, TemplateContext context);
+                                    Strip strip);
   static Template* StringToTemplate(const std::string& content,
-                                    Strip strip, TemplateContext context) {
-    return StringToTemplate(content.data(), content.length(), strip, context);
+                                    Strip strip) {
+    return StringToTemplate(content.data(), content.length(), strip);
   }
 
   // Parses the string as a template file (e.g. "Hello {{WORLD}}"),
@@ -194,11 +196,11 @@ class CTEMPLATE_DLL_DECL Template {
   //   The first version is the most general, followed by common-case code.
   bool ExpandWithData(ExpandEmitter* output,
                       const TemplateDictionaryInterface *dictionary,
-                      ctemplate::PerExpandData* per_expand_data) const;
+                      PerExpandData* per_expand_data) const;
 
   bool ExpandWithData(std::string *output_buffer,
                       const TemplateDictionaryInterface *dictionary,
-                      ctemplate::PerExpandData* per_expand_data) const {
+                      PerExpandData* per_expand_data) const {
     if (output_buffer == NULL)  return false;
     StringEmitter e(output_buffer);
     return ExpandWithData(&e, dictionary, per_expand_data);
@@ -271,8 +273,7 @@ class CTEMPLATE_DLL_DECL Template {
 
   // Dump
   //   Dumps the parsed structure of the template for debugging assistance.
-  //   It goes to stdout because it could be too big for LOG(INFO) and
-  //   would end up truncated.
+  //   It goes to stdout.
   void Dump(const char *filename) const;
 
   // DumpToString

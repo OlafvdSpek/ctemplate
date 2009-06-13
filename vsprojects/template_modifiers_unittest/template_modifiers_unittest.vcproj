@@ -168,34 +168,34 @@
 				RelativePath="..\..\src\windows\port.h">
 			</File>
 			<File
-				RelativePath="..\..\src\windows\google\template.h">
+				RelativePath="..\..\src\windows\ctemplate\template.h">
 			</File>
 			<File
-				RelativePath="..\..\src\windows\google\template_dictionary.h">
+				RelativePath="..\..\src\windows\ctemplate\template_dictionary.h">
 			</File>
 			<File
-				RelativePath="..\..\src\windows\google\template_dictionary_interface.h">
+				RelativePath="..\..\src\windows\ctemplate\template_dictionary_interface.h">
 			</File>
 			<File
-				RelativePath="..\..\src\windows\google\per_expand_data.h">
+				RelativePath="..\..\src\windows\ctemplate\per_expand_data.h">
 			</File>
 			<File
-				RelativePath="..\..\src\windows\google\template_emitter.h">
+				RelativePath="..\..\src\windows\ctemplate\template_emitter.h">
 			</File>
 			<File
-				RelativePath="..\..\src\windows\google\template_enums.h">
+				RelativePath="..\..\src\windows\ctemplate\template_enums.h">
 			</File>
 			<File
-				RelativePath="..\..\src\windows\google\template_from_string.h">
+				RelativePath="..\..\src\windows\ctemplate\template_from_string.h">
 			</File>
 			<File
-				RelativePath="..\..\src\windows\google\template_modifiers.h">
+				RelativePath="..\..\src\windows\ctemplate\template_modifiers.h">
 			</File>
 			<File
-				RelativePath="..\..\src\windows\google\template_namelist.h">
+				RelativePath="..\..\src\windows\ctemplate\template_namelist.h">
 			</File>
 			<File
-				RelativePath="..\..\src\windows\google\template_pathops.h">
+				RelativePath="..\..\src\windows\ctemplate\template_pathops.h">
 			</File>
 			<File
 				RelativePath="..\..\src\tests\template_test_util.h">

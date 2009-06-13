@@ -37,9 +37,9 @@
 #include <string>
 #include <vector>
 #include "template_modifiers_internal.h"
-#include <google/template_dictionary.h>
-#include <google/template_emitter.h>
-#include <google/template_modifiers.h>
+#include <ctemplate/template_dictionary.h>
+#include <ctemplate/template_emitter.h>
+#include <ctemplate/template_modifiers.h>
 #include "tests/template_test_util.h"
 
 using std::string;
@@ -71,12 +71,12 @@ class TemplateModifiersUnittest {
   static void TestHtmlEscape() {
     TemplateDictionary dict("TestHtmlEscape", NULL);
     dict.SetEscapedValue("easy HTML", "foo",
-                         template_modifiers::html_escape);
+                         html_escape);
     dict.SetEscapedValue("harder HTML", "foo & bar",
-                         template_modifiers::html_escape);
+                         html_escape);
     dict.SetEscapedValue("hardest HTML",
                          "<A HREF='foo'\nid=\"bar\t\t&&\vbaz\">",
-                         template_modifiers::html_escape);
+                         html_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy HTML"), "foo");
@@ -89,49 +89,49 @@ class TemplateModifiersUnittest {
   static void TestSnippetEscape() {
     TemplateDictionary dict("TestSnippetEscape", NULL);
     dict.SetEscapedValue("easy snippet", "foo",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("valid snippet",
                          "<b>foo<br> &amp; b<wbr>&shy;ar</b>",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("invalid snippet",
                          "<b><A HREF='foo'\nid=\"bar\t\t&&{\vbaz\">",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("snippet with italics",
                          "<i>foo<br> &amp; b<wbr>&shy;ar</i>",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("unclosed snippet",
                          "<b>foo",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("snippet with interleaving",
                          "<b><i>foo</b></i>",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("unclosed interleaving",
                          "<b><i><b>foo</b>",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("unclosed",
                          "<b><i>foo",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("unterminated 1",
                          "foo<",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("unterminated 2",
                          "foo<b",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("unterminated 3",
                          "foo</",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("unterminated 4",
                          "foo</b",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("unterminated 5",
                          "<b>foo</b",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("close b i",
                          "<i><b>foo",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
     dict.SetEscapedValue("close i b",
                          "<b><i>foo",
-                         template_modifiers::snippet_escape);
+                         snippet_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy snippet"), "foo");
@@ -162,12 +162,12 @@ class TemplateModifiersUnittest {
   static void TestPreEscape() {
     TemplateDictionary dict("TestPreEscape", NULL);
     dict.SetEscapedValue("easy PRE", "foo",
-                         template_modifiers::pre_escape);
+                         pre_escape);
     dict.SetEscapedValue("harder PRE", "foo & bar",
-                         template_modifiers::pre_escape);
+                         pre_escape);
     dict.SetEscapedValue("hardest PRE",
                          " \"--\v--\f--\n--\t--&--<-->--'--\"",
-                         template_modifiers::pre_escape);
+                         pre_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy PRE"), "foo");
@@ -179,15 +179,15 @@ class TemplateModifiersUnittest {
   static void TestXmlEscape() {
     TemplateDictionary dict("TestXmlEscape", NULL);
     dict.SetEscapedValue("no XML", "",
-                         template_modifiers::xml_escape);
+                         xml_escape);
     dict.SetEscapedValue("easy XML", "xoo",
-                         template_modifiers::xml_escape);
+                         xml_escape);
     dict.SetEscapedValue("harder XML-1", "<>&'\"",
-                         template_modifiers::xml_escape);
+                         xml_escape);
     dict.SetEscapedValue("harder XML-2", "Hello<script>alert('&')</script>",
-                         template_modifiers::xml_escape);
+                         xml_escape);
     dict.SetEscapedValue("hardest XML", "<<b>>&!''\"\"foo",
-                         template_modifiers::xml_escape);
+                         xml_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("no XML"), "");
@@ -203,22 +203,22 @@ class TemplateModifiersUnittest {
   static void TestValidateUrlHtmlEscape() {
     TemplateDictionary dict("TestValidateUrlHtmlEscape", NULL);
     dict.SetEscapedValue("easy http URL", "http://www.google.com",
-                         template_modifiers::validate_url_and_html_escape);
+                         validate_url_and_html_escape);
     dict.SetEscapedValue("harder https URL",
                          "https://www.google.com/search?q=f&hl=en",
-                         template_modifiers::validate_url_and_html_escape);
+                         validate_url_and_html_escape);
     dict.SetEscapedValue("easy javascript URL",
                          "javascript:alert(document.cookie)",
-                         template_modifiers::validate_url_and_html_escape);
+                         validate_url_and_html_escape);
     dict.SetEscapedValue("harder javascript URL",
                          "javascript:alert(10/5)",
-                         template_modifiers::validate_url_and_html_escape);
+                         validate_url_and_html_escape);
     dict.SetEscapedValue("easy relative URL",
                          "foobar.html",
-                         template_modifiers::validate_url_and_html_escape);
+                         validate_url_and_html_escape);
     dict.SetEscapedValue("harder relative URL",
                          "/search?q=green flowers&hl=en",
-                         template_modifiers::validate_url_and_html_escape);
+                         validate_url_and_html_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy http URL"),
@@ -239,42 +239,42 @@ class TemplateModifiersUnittest {
     TemplateDictionary dict("TestValidateUrlJavascriptEscape", NULL);
     dict.SetEscapedValue(
         "easy http URL", "http://www.google.com",
-        template_modifiers::validate_url_and_javascript_escape);
+        validate_url_and_javascript_escape);
     dict.SetEscapedValue(
         "harder https URL",
         "https://www.google.com/search?q=f&hl=en",
-        template_modifiers::validate_url_and_javascript_escape);
+        validate_url_and_javascript_escape);
     dict.SetEscapedValue(
         "mangled http URL", "HTTP://www.google.com",
-        template_modifiers::validate_url_and_javascript_escape);
+        validate_url_and_javascript_escape);
     dict.SetEscapedValue(
         "easy javascript URL",
         "javascript:alert(document.cookie)",
-        template_modifiers::validate_url_and_javascript_escape);
+        validate_url_and_javascript_escape);
     dict.SetEscapedValue(
         "harder javascript URL",
         "javascript:alert(10/5)",
-        template_modifiers::validate_url_and_javascript_escape);
+        validate_url_and_javascript_escape);
     dict.SetEscapedValue(
         "easy relative URL",
         "foobar.html",
-        template_modifiers::validate_url_and_javascript_escape);
+        validate_url_and_javascript_escape);
     dict.SetEscapedValue(
         "harder relative URL",
         "/search?q=green flowers&hl=en",
-        template_modifiers::validate_url_and_javascript_escape);
+        validate_url_and_javascript_escape);
     dict.SetEscapedValue(
         "data URL",
         "data: text/html",
-        template_modifiers::validate_url_and_javascript_escape);
+        validate_url_and_javascript_escape);
     dict.SetEscapedValue(
         "mangled javascript URL",
         "javaSCRIPT:alert(5)",
-        template_modifiers::validate_url_and_javascript_escape);
+        validate_url_and_javascript_escape);
     dict.SetEscapedValue(
         "harder mangled javascript URL",
         "java\nSCRIPT:alert(5)",
-        template_modifiers::validate_url_and_javascript_escape);
+        validate_url_and_javascript_escape);
 
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
@@ -303,18 +303,18 @@ class TemplateModifiersUnittest {
   static void TestValidateUrlCssEscape() {
     TemplateDictionary dict("TestValidateUrlCssEscape", NULL);
     dict.SetEscapedValue("easy http URL", "http://www.google.com",
-                         template_modifiers::validate_url_and_css_escape);
+                         validate_url_and_css_escape);
     dict.SetEscapedValue("harder https URL",
                          "https://www.google.com/search?q=f&hl=en",
-                         template_modifiers::validate_url_and_css_escape);
+                         validate_url_and_css_escape);
     dict.SetEscapedValue("javascript URL",
                          "javascript:alert(document.cookie)",
-                         template_modifiers::validate_url_and_css_escape);
+                         validate_url_and_css_escape);
     dict.SetEscapedValue("relative URL", "/search?q=green flowers&hl=en",
-                         template_modifiers::validate_url_and_css_escape);
+                         validate_url_and_css_escape);
     dict.SetEscapedValue("hardest URL", "http://www.google.com/s?q='bla'"
                          "&a=\"\"&b=(<tag>)&c=*\r\n\\\\bla",
-                         template_modifiers::validate_url_and_css_escape);
+                         validate_url_and_css_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy http URL"),
@@ -332,22 +332,22 @@ class TemplateModifiersUnittest {
   static void TestCleanseAttribute() {
     TemplateDictionary dict("TestCleanseAttribute", NULL);
     dict.SetEscapedValue("easy attribute", "top",
-                         template_modifiers::cleanse_attribute);
+                         cleanse_attribute);
     dict.SetEscapedValue("harder attribute", "foo & bar",
-                         template_modifiers::cleanse_attribute);
+                         cleanse_attribute);
     dict.SetEscapedValue("hardest attribute",
                          "top onclick='alert(document.cookie)'",
-                         template_modifiers::cleanse_attribute);
+                         cleanse_attribute);
     dict.SetEscapedValue("equal in middle", "foo = bar",
-                         template_modifiers::cleanse_attribute);
+                         cleanse_attribute);
     dict.SetEscapedValue("leading equal", "=foo",
-                         template_modifiers::cleanse_attribute);
+                         cleanse_attribute);
     dict.SetEscapedValue("trailing equal", "foo=",
-                         template_modifiers::cleanse_attribute);
+                         cleanse_attribute);
     dict.SetEscapedValue("all equals", "===foo===bar===",
-                         template_modifiers::cleanse_attribute);
+                         cleanse_attribute);
     dict.SetEscapedValue("just equals", "===",
-                         template_modifiers::cleanse_attribute);
+                         cleanse_attribute);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy attribute"), "top");
@@ -365,12 +365,12 @@ class TemplateModifiersUnittest {
   static void TestCleanseCss() {
     TemplateDictionary dict("TestCleanseCss", NULL);
     dict.SetEscapedValue("easy css", "top",
-                         template_modifiers::cleanse_css);
+                         cleanse_css);
     dict.SetEscapedValue("harder css", "foo & bar",
-                         template_modifiers::cleanse_css);
+                         cleanse_css);
     dict.SetEscapedValue("hardest css",
                          ";width:expression(document.cookie)",
-                         template_modifiers::cleanse_css);
+                         cleanse_css);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy css"),
@@ -384,22 +384,22 @@ class TemplateModifiersUnittest {
   static void TestJavascriptEscape() {
     TemplateDictionary dict("TestJavascriptEscape", NULL);
     dict.SetEscapedValue("easy JS", "joo",
-                         template_modifiers::javascript_escape);
+                         javascript_escape);
     dict.SetEscapedValue("harder JS", "f = 'joo';",
-                         template_modifiers::javascript_escape);
+                         javascript_escape);
     dict.SetEscapedValue("hardest JS",
                          ("f = 'foo\f';\r\n\tprint \"\\&foo = \b\", \"foo\""),
-                         template_modifiers::javascript_escape);
+                         javascript_escape);
     dict.SetEscapedValue("close script JS",
                          "//--></script><script>alert(123);</script>",
-                         template_modifiers::javascript_escape);
+                         javascript_escape);
     dict.SetEscapedValue("unicode codepoints",
                          ("line1" "\xe2\x80\xa8" "line2" "\xe2\x80\xa9" "line3"
                           /* \u2027 */ "\xe2\x80\xa7"
                           /* \u202A */ "\xe2\x80\xaa"
                           /* malformed */ "\xe2" "\xe2\x80\xa8"
                           /* truncated */ "\xe2\x80"),
-                         template_modifiers::javascript_escape);
+                         javascript_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy JS"), "joo");
@@ -421,55 +421,55 @@ class TemplateModifiersUnittest {
   static void TestJavascriptNumber() {
     TemplateDictionary dict("TestJavascriptNumber", NULL);
     dict.SetEscapedValue("empty string", "",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("boolean true", "true",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("boolean false", "false",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("bad boolean 1", "tfalse",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("bad boolean 2", "tru",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("bad boolean 3", "truee",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("bad boolean 4", "invalid",
-                         template_modifiers::javascript_number);
+                         javascript_number);
 
     // Check that our string comparisons for booleans do not
     // assume input is null terminated.
     dict.SetEscapedValue("good boolean 5", TemplateString("truee", 4),
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("bad boolean 6", TemplateString("true", 3),
-                         template_modifiers::javascript_number);
+                         javascript_number);
 
     dict.SetEscapedValue("hex number 1", "0x123456789ABCDEF",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("hex number 2", "0X123456789ABCDEF",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("bad hex number 1", "0x123GAC",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("bad hex number 2", "0x",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("number zero", "0",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("invalid number", "A9",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("decimal zero", "0.0",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("octal number", "01234567",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("decimal number", "799.123",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("negative number", "-244",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("positive number", "+244",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("valid float 1", ".55",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("valid float 2", "8.55e-12",
-                         template_modifiers::javascript_number);
+                         javascript_number);
     dict.SetEscapedValue("invalid float", "8.55ABC",
-                         template_modifiers::javascript_number);
+                         javascript_number);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("empty string"), "");
@@ -500,14 +500,14 @@ class TemplateModifiersUnittest {
   static void TestJsonEscape() {
     TemplateDictionary dict("TestJsonEscape", NULL);
     dict.SetEscapedValue("easy JSON", "joo",
-                         template_modifiers::json_escape);
+                         json_escape);
     dict.SetEscapedValue("harder JSON", "f = \"joo\"; e = 'joo';",
-                         template_modifiers::json_escape);
+                         json_escape);
     dict.SetEscapedValue("hardest JSON",
                          "f = 'foo<>';\r\n\t\fprint \"\\&foo = /\b\", \"foo\"",
-                         template_modifiers::json_escape);
+                         json_escape);
     dict.SetEscapedValue("html in JSON", "<html>&nbsp;</html>",
-                         template_modifiers::json_escape);
+                         json_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy JSON"), "joo");
@@ -528,21 +528,21 @@ class TemplateModifiersUnittest {
     TemplateDictionary dict("TestUrlQueryEscape", NULL);
     // The first three tests do not need escaping.
     dict.SetEscapedValue("query escape 0", "",
-                         template_modifiers::url_query_escape);
+                         url_query_escape);
     dict.SetEscapedValue("query escape 1", "noop",
-                         template_modifiers::url_query_escape);
+                         url_query_escape);
     dict.SetEscapedValue("query escape 2",
                          "0123456789abcdefghjijklmnopqrstuvwxyz"
                          "ABCDEFGHIJKLMNOPQRSTUVWXYZ.-_*/~!(),",
-                         template_modifiers::url_query_escape);
+                         url_query_escape);
     dict.SetEscapedValue("query escape 3", " ?a=b;c#d ",
-                         template_modifiers::url_query_escape);
+                         url_query_escape);
     dict.SetEscapedValue("query escape 4", "#$%&+<=>?@[\\]^`{|}",
-                         template_modifiers::url_query_escape);
+                         url_query_escape);
     dict.SetEscapedValue("query escape 5", "\xDE\xAD\xCA\xFE",
-                         template_modifiers::url_query_escape);
+                         url_query_escape);
     dict.SetEscapedValue("query escape 6", "\"':",
-                         template_modifiers::url_query_escape);
+                         url_query_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("query escape 0"), "");
@@ -560,203 +560,190 @@ class TemplateModifiersUnittest {
   static void TestPrefixLine() {
     TemplateDictionary dict("TestPrefixLine", NULL);
     // These don't escape: we don't put the prefix before the first line
-    ASSERT_STREQ(template_modifiers::prefix_line("pt 1", "   ").c_str(),
+    ASSERT_STREQ(prefix_line("pt 1", "   ").c_str(),
                  "pt 1");
-    ASSERT_STREQ(template_modifiers::prefix_line("pt 1", "::").c_str(),
+    ASSERT_STREQ(prefix_line("pt 1", "::").c_str(),
                  "pt 1");
 
-    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\npt 2", ":").c_str(),
+    ASSERT_STREQ(prefix_line("pt 1\npt 2", ":").c_str(),
                  "pt 1\n:pt 2");
-    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\npt 2", " ").c_str(),
+    ASSERT_STREQ(prefix_line("pt 1\npt 2", " ").c_str(),
                  "pt 1\n pt 2");
-    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\npt 2", "\n").c_str(),
+    ASSERT_STREQ(prefix_line("pt 1\npt 2", "\n").c_str(),
                  "pt 1\n\npt 2");
-    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\npt 2\n", "  ").c_str(),
+    ASSERT_STREQ(prefix_line("pt 1\npt 2\n", "  ").c_str(),
                  "pt 1\n  pt 2\n  ");
 
-    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\rpt 2\n", ":").c_str(),
+    ASSERT_STREQ(prefix_line("pt 1\rpt 2\n", ":").c_str(),
                  "pt 1\r:pt 2\n:");
-    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\npt 2\r", ":").c_str(),
+    ASSERT_STREQ(prefix_line("pt 1\npt 2\r", ":").c_str(),
                  "pt 1\n:pt 2\r:");
-    ASSERT_STREQ(template_modifiers::prefix_line("pt 1\r\npt 2\r", ":").c_str(),
+    ASSERT_STREQ(prefix_line("pt 1\r\npt 2\r", ":").c_str(),
                  "pt 1\r\n:pt 2\r:");
   }
 
   static void TestFindModifier() {
-    const template_modifiers::ModifierInfo* info;
-    ASSERT(info = template_modifiers::FindModifier("html_escape", 11, "", 0));
-    ASSERT(info->modifier == &template_modifiers::html_escape);
-    ASSERT(info = template_modifiers::FindModifier("h", 1, "", 0));
-    ASSERT(info->modifier == &template_modifiers::html_escape);
+    const ModifierInfo* info;
+    ASSERT(info = FindModifier("html_escape", 11, "", 0));
+    ASSERT(info->modifier == &html_escape);
+    ASSERT(info = FindModifier("h", 1, "", 0));
+    ASSERT(info->modifier == &html_escape);
 
-    ASSERT(info = template_modifiers::FindModifier("html_escape_with_arg", 20,
+    ASSERT(info = FindModifier("html_escape_with_arg", 20,
                                                    "=pre", 4));
-    ASSERT(info->modifier == &template_modifiers::pre_escape);
-    ASSERT(info = template_modifiers::FindModifier("H", 1, "=pre", 4));
-    ASSERT(info->modifier == &template_modifiers::pre_escape);
+    ASSERT(info->modifier == &pre_escape);
+    ASSERT(info = FindModifier("H", 1, "=pre", 4));
+    ASSERT(info->modifier == &pre_escape);
 
-    ASSERT(info = template_modifiers::FindModifier("javascript_escape_with_arg",
+    ASSERT(info = FindModifier("javascript_escape_with_arg",
                                                    26, "=number", 7));
-    ASSERT(info = template_modifiers::FindModifier("J", 1, "=number", 7));
-    ASSERT(info->modifier == &template_modifiers::javascript_number);
+    ASSERT(info = FindModifier("J", 1, "=number", 7));
+    ASSERT(info->modifier == &javascript_number);
 
     // html_escape_with_arg doesn't have a default value, so these should fail.
-    ASSERT(!template_modifiers::FindModifier("H", 1, "=pre", 2));  // "=p"
-    ASSERT(!template_modifiers::FindModifier("H", 1, "=pree", 5));
-    ASSERT(!template_modifiers::FindModifier("H", 1, "=notpresent", 11));
+    ASSERT(!FindModifier("H", 1, "=pre", 2));  // "=p"
+    ASSERT(!FindModifier("H", 1, "=pree", 5));
+    ASSERT(!FindModifier("H", 1, "=notpresent", 11));
 
     // If we don't have a modifier-value when we ought, we should fail.
-    ASSERT(!template_modifiers::FindModifier("html_escape", 11, "=p", 2));
-    ASSERT(!template_modifiers::FindModifier("h", 1, "=p", 2));
+    ASSERT(!FindModifier("html_escape", 11, "=p", 2));
+    ASSERT(!FindModifier("h", 1, "=p", 2));
 
-    ASSERT(!template_modifiers::FindModifier("html_escape_with_arg", 20,
+    ASSERT(!FindModifier("html_escape_with_arg", 20,
                                              "", 0));
-    ASSERT(!template_modifiers::FindModifier("H", 1, "", 0));
+    ASSERT(!FindModifier("H", 1, "", 0));
 
     // Test with added modifiers as well.
-    template_modifiers::NullModifier foo_modifier1;
-    template_modifiers::NullModifier foo_modifier2;
-    template_modifiers::NullModifier foo_modifier3;
-    template_modifiers::NullModifier foo_modifier4;
-    ASSERT(template_modifiers::AddModifier("x-test", &foo_modifier1));
-    ASSERT(template_modifiers::AddModifier("x-test-arg=", &foo_modifier2));
-    ASSERT(template_modifiers::AddModifier("x-test-arg=h", &foo_modifier3));
-    ASSERT(template_modifiers::AddModifier("x-test-arg=json", &foo_modifier4));
+    NullModifier foo_modifier1;
+    NullModifier foo_modifier2;
+    NullModifier foo_modifier3;
+    NullModifier foo_modifier4;
+    ASSERT(AddModifier("x-test", &foo_modifier1));
+    ASSERT(AddModifier("x-test-arg=", &foo_modifier2));
+    ASSERT(AddModifier("x-test-arg=h", &foo_modifier3));
+    ASSERT(AddModifier("x-test-arg=json", &foo_modifier4));
 
-    ASSERT(info = template_modifiers::FindModifier("x-test", 6, "", 0));
+    ASSERT(info = FindModifier("x-test", 6, "", 0));
     ASSERT(info->is_registered);
     ASSERT(info->modifier == &foo_modifier1);
-    ASSERT(info->xss_class == template_modifiers::XSS_UNIQUE);
-    ASSERT(info = template_modifiers::FindModifier("x-test", 6, "=h", 2));
+    ASSERT(info->xss_class == XSS_UNIQUE);
+    ASSERT(info = FindModifier("x-test", 6, "=h", 2));
     ASSERT(!info->is_registered);
     // This tests default values
-    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10, "=p", 2));
+    ASSERT(info = FindModifier("x-test-arg", 10, "=p", 2));
     ASSERT(info->is_registered);
     ASSERT(info->modifier == &foo_modifier2);
-    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10, "=h", 2));
+    ASSERT(info = FindModifier("x-test-arg", 10, "=h", 2));
     ASSERT(info->is_registered);
     ASSERT(info->modifier == &foo_modifier3);
-    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10,
+    ASSERT(info = FindModifier("x-test-arg", 10,
                                                    "=html", 5));
     ASSERT(info->is_registered);
     ASSERT(info->modifier == &foo_modifier2);
-    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10,
+    ASSERT(info = FindModifier("x-test-arg", 10,
                                                    "=json", 5));
     ASSERT(info->is_registered);
     ASSERT(info->modifier == &foo_modifier4);
     // The value is required to start with an '=' to match the
     // specialization.  If it doesn't, it will match the default.
-    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10,
+    ASSERT(info = FindModifier("x-test-arg", 10,
                                                    "json", 4));
     ASSERT(info->is_registered);
     ASSERT(info->modifier == &foo_modifier2);
-    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10,
+    ASSERT(info = FindModifier("x-test-arg", 10,
                                                    "=jsonnabbe", 5));
     ASSERT(info->is_registered);
     ASSERT(info->modifier == &foo_modifier4);
-    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10,
+    ASSERT(info = FindModifier("x-test-arg", 10,
                                                    "=jsonnabbe", 6));
     ASSERT(info->is_registered);
     ASSERT(info->modifier == &foo_modifier2);
-    ASSERT(info = template_modifiers::FindModifier("x-test-arg", 10,
+    ASSERT(info = FindModifier("x-test-arg", 10,
                                                    "=jsonnabbe", 4));
     ASSERT(info->is_registered);
     ASSERT(info->modifier == &foo_modifier2);
 
     // If we try to find an x- modifier that wasn't added, we should get
     // a legit but "unknown" modifier back.
-    ASSERT(info = template_modifiers::FindModifier("x-foo", 5, "", 0));
+    ASSERT(info = FindModifier("x-foo", 5, "", 0));
     ASSERT(!info->is_registered);
-    ASSERT(info = template_modifiers::FindModifier("x-bar", 5, "=p", 2));
+    ASSERT(info = FindModifier("x-bar", 5, "=p", 2));
     ASSERT(!info->is_registered);
 
     // Basic test with added XssSafe modifier.
-    template_modifiers::NullModifier foo_modifier5;
-    ASSERT(template_modifiers::AddXssSafeModifier("x-safetest",
+    NullModifier foo_modifier5;
+    ASSERT(AddXssSafeModifier("x-safetest",
                                                   &foo_modifier5));
-    ASSERT(info = template_modifiers::FindModifier("x-safetest", 10, "", 0));
+    ASSERT(info = FindModifier("x-safetest", 10, "", 0));
     ASSERT(info->is_registered);
-    ASSERT(info->xss_class == template_modifiers::XSS_SAFE);
+    ASSERT(info->xss_class == XSS_SAFE);
     ASSERT(info->modifier == &foo_modifier5);
   }
 
   static void TestAddModifier() {
-    ASSERT(template_modifiers::AddModifier("x-atest",
-                                           &template_modifiers::html_escape));
-    ASSERT(template_modifiers::AddModifier("x-atest-arg=",
-                                           &template_modifiers::html_escape));
-    ASSERT(template_modifiers::AddModifier("x-atest-arg=h",
-                                           &template_modifiers::html_escape));
-    ASSERT(template_modifiers::AddModifier("x-atest-arg=html",
-                                           &template_modifiers::html_escape));
-    ASSERT(template_modifiers::AddModifier("x-atest-arg=json",
-                                           &template_modifiers::json_escape));
-    ASSERT(template_modifiers::AddModifier("x-atest-arg=j",
-                                           &template_modifiers::json_escape));
-    ASSERT(template_modifiers::AddModifier("x-atest-arg=J",
-                                           &template_modifiers::json_escape));
+    ASSERT(AddModifier("x-atest", &html_escape));
+    ASSERT(AddModifier("x-atest-arg=", &html_escape));
+    ASSERT(AddModifier("x-atest-arg=h", &html_escape));
+    ASSERT(AddModifier("x-atest-arg=html", &html_escape));
+    ASSERT(AddModifier("x-atest-arg=json", &json_escape));
+    ASSERT(AddModifier("x-atest-arg=j", &json_escape));
+    ASSERT(AddModifier("x-atest-arg=J", &json_escape));
 
     // Make sure AddModifier fails with an invalid name.
-    ASSERT(!template_modifiers::AddModifier("test",
-                                            &template_modifiers::html_escape));
+    ASSERT(!AddModifier("test", &html_escape));
 
     // Make sure AddModifier fails with a duplicate name.
-    ASSERT(!template_modifiers::AddModifier("x-atest",
-                                            &template_modifiers::html_escape));
-    ASSERT(!template_modifiers::AddModifier("x-atest-arg=",
-                                            &template_modifiers::html_escape));
-    ASSERT(!template_modifiers::AddModifier("x-atest-arg=h",
-                                            &template_modifiers::html_escape));
-    ASSERT(!template_modifiers::AddModifier("x-atest-arg=html",
-                                            &template_modifiers::html_escape));
+    ASSERT(!AddModifier("x-atest", &html_escape));
+    ASSERT(!AddModifier("x-atest-arg=", &html_escape));
+    ASSERT(!AddModifier("x-atest-arg=h", &html_escape));
+    ASSERT(!AddModifier("x-atest-arg=html", &html_escape));
 
-    const template_modifiers::ModifierInfo* info;
-    ASSERT(info = template_modifiers::FindModifier("x-atest", 7, "", 0));
+    const ModifierInfo* info;
+    ASSERT(info = FindModifier("x-atest", 7, "", 0));
     ASSERT(info->modval_required == false);
 
     // Make sure we can still add a modifier after having already
     // searched for it.
-    ASSERT(info = template_modifiers::FindModifier("x-foo", 5, "", 0));
+    ASSERT(info = FindModifier("x-foo", 5, "", 0));
     ASSERT(!info->is_registered);
 
-    template_modifiers::NullModifier foo_modifier;
-    ASSERT(template_modifiers::AddModifier("x-foo", &foo_modifier));
-    ASSERT(info = template_modifiers::FindModifier("x-foo", 5, "", 0));
+    NullModifier foo_modifier;
+    ASSERT(AddModifier("x-foo", &foo_modifier));
+    ASSERT(info = FindModifier("x-foo", 5, "", 0));
     ASSERT(info->modifier == &foo_modifier);
   }
 
   static void TestAddXssSafeModifier() {
     // For shorter lines.
-    const template_modifiers::TemplateModifier* esc_fn =
-        &template_modifiers::html_escape;
+    const TemplateModifier* esc_fn =
+        &html_escape;
 
-    ASSERT(template_modifiers::AddXssSafeModifier("x-asafetest", esc_fn));
-    ASSERT(template_modifiers::AddXssSafeModifier("x-asafetest-arg=", esc_fn));
-    ASSERT(template_modifiers::AddXssSafeModifier("x-asafetest-arg=h", esc_fn));
+    ASSERT(AddXssSafeModifier("x-asafetest", esc_fn));
+    ASSERT(AddXssSafeModifier("x-asafetest-arg=", esc_fn));
+    ASSERT(AddXssSafeModifier("x-asafetest-arg=h", esc_fn));
 
     // Make sure AddXssSafeModifier fails with an invalid name.
-    ASSERT(!template_modifiers::AddXssSafeModifier("test", esc_fn));
+    ASSERT(!AddXssSafeModifier("test", esc_fn));
 
     // Make sure AddXssSafeModifier fails with a duplicate name.
-    ASSERT(!template_modifiers::AddXssSafeModifier("x-asafetest", esc_fn));
-    ASSERT(!template_modifiers::AddXssSafeModifier("x-asafetest-arg=", esc_fn));
-    ASSERT(!template_modifiers::AddXssSafeModifier("x-asafetest-arg=h",
+    ASSERT(!AddXssSafeModifier("x-asafetest", esc_fn));
+    ASSERT(!AddXssSafeModifier("x-asafetest-arg=", esc_fn));
+    ASSERT(!AddXssSafeModifier("x-asafetest-arg=h",
                                                    esc_fn));
 
     // Make sure AddXssSafeModifier fails if the same modifier was
     // previously added via AddModifier.
-    ASSERT(template_modifiers::AddModifier("x-safetest2", esc_fn));
-    ASSERT(template_modifiers::AddModifier("x-safetest2-arg=", esc_fn));
-    ASSERT(template_modifiers::AddModifier("x-safetest2-arg=h", esc_fn));
-    ASSERT(!template_modifiers::AddXssSafeModifier("x-safetest2", esc_fn));
-    ASSERT(!template_modifiers::AddXssSafeModifier("x-safetest2-arg=", esc_fn));
-    ASSERT(!template_modifiers::AddXssSafeModifier("x-safetest2-arg=h",
-                                                   esc_fn));
+    ASSERT(AddModifier("x-safetest2", esc_fn));
+    ASSERT(AddModifier("x-safetest2-arg=", esc_fn));
+    ASSERT(AddModifier("x-safetest2-arg=h", esc_fn));
+    ASSERT(!AddXssSafeModifier("x-safetest2", esc_fn));
+    ASSERT(!AddXssSafeModifier("x-safetest2-arg=", esc_fn));
+    ASSERT(!AddXssSafeModifier("x-safetest2-arg=h", esc_fn));
 
     // and vice versa.
-    ASSERT(!template_modifiers::AddModifier("x-asafetest", esc_fn));
-    ASSERT(!template_modifiers::AddModifier("x-asafetest-arg=", esc_fn));
-    ASSERT(!template_modifiers::AddModifier("x-asafetest-arg=h", esc_fn));
+    ASSERT(!AddModifier("x-asafetest", esc_fn));
+    ASSERT(!AddModifier("x-asafetest-arg=", esc_fn));
+    ASSERT(!AddModifier("x-asafetest-arg=h", esc_fn));
   }
 
   // Helper function. Determines whether the Modifier specified by
@@ -765,13 +752,13 @@ class TemplateModifiersUnittest {
   static bool CheckXSSAlternative(const string& modname, const string& modval,
                                   const string& alt_modname,
                                   const string& alt_modval) {
-    const template_modifiers::ModifierInfo *mod, *alt_mod;
-    mod = template_modifiers::FindModifier(modname.c_str(), modname.length(),
-                                           modval.c_str(), modval.length());
-    alt_mod = template_modifiers::FindModifier(alt_modname.c_str(),
-                                               alt_modname.length(),
-                                               alt_modval.c_str(),
-                                               alt_modval.length());
+    const ModifierInfo *mod, *alt_mod;
+    mod = FindModifier(modname.c_str(), modname.length(),
+                                  modval.c_str(), modval.length());
+    alt_mod = FindModifier(alt_modname.c_str(),
+                                      alt_modname.length(),
+                                      alt_modval.c_str(),
+                                      alt_modval.length());
     ASSERT(mod != NULL && alt_mod != NULL);
     return IsSafeXSSAlternative(*mod, *alt_mod);
   }
@@ -822,43 +809,43 @@ class TemplateModifiersUnittest {
   // This is a basic sanity check for the GetDefaultModifierForXXX() functions.
   // More testing happens in AutoEscaper code which uses them.
   static void TestDefaultModifiersForContext() {
-    const template_modifiers::ModifierAndValue* modval;
+    const ModifierAndValue* modval;
     string print_mods;
 
-    const vector<const template_modifiers::ModifierAndValue*> modvals_html =
-        template_modifiers::GetDefaultModifierForHtml();
+    const vector<const ModifierAndValue*> modvals_html =
+        GetDefaultModifierForHtml();
     ASSERT(1 == modvals_html.size());
-    print_mods = template_modifiers::PrettyPrintModifiers(modvals_html, ";");
+    print_mods = PrettyPrintModifiers(modvals_html, ";");
     ASSERT_STREQ(":h", print_mods.c_str());
     modval = modvals_html.front();
     ASSERT(modval->modifier_info->modifier ==
-           &template_modifiers::html_escape);
+           &html_escape);
 
-    const vector<const template_modifiers::ModifierAndValue*> modvals_js =
-        template_modifiers::GetDefaultModifierForJs();
+    const vector<const ModifierAndValue*> modvals_js =
+        GetDefaultModifierForJs();
     ASSERT(1 == modvals_js.size());
-    print_mods = template_modifiers::PrettyPrintModifiers(modvals_js, ";");
+    print_mods = PrettyPrintModifiers(modvals_js, ";");
     ASSERT_STREQ(":j", print_mods.c_str());
     modval = modvals_js.front();
     ASSERT(modval->modifier_info->modifier ==
-           &template_modifiers::javascript_escape);
+           &javascript_escape);
 
-    const vector<const template_modifiers::ModifierAndValue*> modvals_xml =
-        template_modifiers::GetDefaultModifierForXml();
+    const vector<const ModifierAndValue*> modvals_xml =
+        GetDefaultModifierForXml();
     ASSERT(1 == modvals_xml.size());
-    print_mods = template_modifiers::PrettyPrintModifiers(modvals_xml, ";");
+    print_mods = PrettyPrintModifiers(modvals_xml, ";");
     ASSERT_STREQ(":xml_escape", print_mods.c_str());
     modval = modvals_xml.front();
-    ASSERT(modval->modifier_info->modifier == &template_modifiers::xml_escape);
+    ASSERT(modval->modifier_info->modifier == &xml_escape);
 
-    const vector<const template_modifiers::ModifierAndValue*> modvals_json =
-        template_modifiers::GetDefaultModifierForJson();
+    const vector<const ModifierAndValue*> modvals_json =
+        GetDefaultModifierForJson();
     ASSERT(1 == modvals_json.size());
-    print_mods = template_modifiers::PrettyPrintModifiers(modvals_json, ";");
+    print_mods = PrettyPrintModifiers(modvals_json, ";");
     ASSERT_STREQ(":j", print_mods.c_str());
     modval = modvals_json.front();
     ASSERT(modval->modifier_info->modifier ==
-           &template_modifiers::javascript_escape);
+           &javascript_escape);
   }
 };
 

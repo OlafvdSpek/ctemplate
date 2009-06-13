@@ -65,8 +65,8 @@
 
 #include <sys/types.h>   // for size_t
 #include <string>
-#include <google/template_emitter.h>   // so we can inline operator()
-#include <google/per_expand_data.h>    // so we can inline operator()
+#include <ctemplate/template_emitter.h>   // so we can inline operator()
+#include <ctemplate/per_expand_data.h>    // so we can inline operator()
 
 // NOTE: if you are statically linking the template library into your binary
 // (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
@@ -75,16 +75,15 @@
 # define CTEMPLATE_DLL_DECL  __declspec(dllimport)
 #endif
 
-namespace google {
+namespace ctemplate {
 
 class Template;
 
-namespace template_modifiers {
 
-#define MODIFY_SIGNATURE_                                                    \
- public:                                                                     \
-  virtual void Modify(const char* in, size_t inlen,                          \
-                      const ctemplate::PerExpandData*, ExpandEmitter* outbuf, \
+#define MODIFY_SIGNATURE_                                               \
+ public:                                                                \
+  virtual void Modify(const char* in, size_t inlen,                     \
+                      const PerExpandData*, ExpandEmitter* outbuf,      \
                       const std::string& arg) const
 
 // If you wish to write your own modifier, it should subclass this
@@ -106,7 +105,7 @@ class CTEMPLATE_DLL_DECL TemplateModifier {
   //         every variable expanded using that dictionary.  This value
   //         comes from the source code.
   virtual void Modify(const char* in, size_t inlen,
-                      const ctemplate::PerExpandData* per_expand_data,
+                      const PerExpandData* per_expand_data,
                       ExpandEmitter* outbuf,
                       const std::string& arg) const = 0;
 
@@ -118,7 +117,7 @@ class CTEMPLATE_DLL_DECL TemplateModifier {
   // you're certain Modify() can be ignored.  This function is
   // advisory; the template system is not required to call
   // MightModify() before Modify().
-  virtual bool MightModify(const ctemplate::PerExpandData* per_expand_data,
+  virtual bool MightModify(const PerExpandData* per_expand_data,
                            const std::string& arg) const {
     return true;
   }
@@ -312,8 +311,6 @@ extern CTEMPLATE_DLL_DECL bool AddModifier(const char* long_name, const Template
 //   escaping may be inadequate.
 extern CTEMPLATE_DLL_DECL bool AddXssSafeModifier(const char* long_name,
                         const TemplateModifier* modifier);
-
-}  // namespace template_modifiers
 
 }
 

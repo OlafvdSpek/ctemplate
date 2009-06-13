@@ -61,18 +61,19 @@
 #endif
 #include <string>
 #include <vector>         // for MissingListType, SyntaxListType
-#include "google/template.h"
-#include "google/template_pathops.h"
-#include "google/template_annotator.h"
-#include "google/template_dictionary.h"
-#include "google/template_emitter.h"
-#include "google/template_modifiers.h"
-#include "google/template_namelist.h"
-#include "google/template_string.h"
+#include "ctemplate/template.h"
+#include "ctemplate/template_pathops.h"
+#include "ctemplate/template_annotator.h"
+#include "ctemplate/template_dictionary.h"
+#include "ctemplate/template_emitter.h"
+#include "ctemplate/template_modifiers.h"
+#include "ctemplate/template_namelist.h"
+#include "ctemplate/template_string.h"
 
 using std::vector;
 using std::string;
 using GOOGLE_NAMESPACE::ExpandEmitter;
+using GOOGLE_NAMESPACE::PerExpandData;
 using GOOGLE_NAMESPACE::Template;
 using GOOGLE_NAMESPACE::TemplateDictionary;
 using GOOGLE_NAMESPACE::TemplateString;
@@ -91,10 +92,6 @@ using GOOGLE_NAMESPACE::TC_XML;
 using GOOGLE_NAMESPACE::TC_MANUAL;
 using GOOGLE_NAMESPACE::TC_NONE;
 using GOOGLE_NAMESPACE::TC_UNUSED;
-namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;   // an interior namespace
-namespace template_modifiers = GOOGLE_NAMESPACE::template_modifiers;
-
-using ctemplate::PerExpandData;
 
 static const StaticTemplateString kHello = STS_INIT(kHello, "Hello");
 static const StaticTemplateString kWorld = STS_INIT(kWorld, "World");
@@ -221,7 +218,7 @@ static void CleanTestDir(const string& dirname) {
   }
   while (struct dirent* d = readdir(dir)) {
     if (strstr(d->d_name, "template"))
-      unlink(ctemplate::PathJoin(dirname, d->d_name).c_str());
+      unlink(GOOGLE_NAMESPACE::PathJoin(dirname, d->d_name).c_str());
   }
   closedir(dir);
 }
@@ -248,7 +245,7 @@ static string StringToTemplateFile(const string& s) {
   static int filenum = 0;
   char buf[16];
   snprintf(buf, sizeof(buf), "%03d", ++filenum);
-  string filename = ctemplate::PathJoin(FLAGS_test_tmpdir,
+  string filename = GOOGLE_NAMESPACE::PathJoin(FLAGS_test_tmpdir,
                                         string("template.") + buf);
   StringToFile(s, filename);
   return filename;
@@ -347,7 +344,7 @@ static void AssertCorrectEscaping(TemplateContext template_type,
   ASSERT_STREQ_VERBOSE(expected_out, outstring, text);
 }
 
-class DynamicModifier : public template_modifiers::TemplateModifier {
+class DynamicModifier : public GOOGLE_NAMESPACE::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData* per_expand_data,
@@ -360,7 +357,7 @@ class DynamicModifier : public template_modifiers::TemplateModifier {
   }
 };
 
-class EmphasizeTemplateModifier : public template_modifiers::TemplateModifier {
+class EmphasizeTemplateModifier : public GOOGLE_NAMESPACE::TemplateModifier {
  public:
   EmphasizeTemplateModifier(const string& match)
       : match_(match) {
@@ -511,7 +508,7 @@ class TemplateUnittest {
 
     // Sanity check string template behaviour while we're at it.
     Template* tpl2 = Template::StringToTemplate("hi {{VAR}} lo",
-                                                STRIP_WHITESPACE, TC_MANUAL);
+                                                STRIP_WHITESPACE);
     TemplateDictionary dict2("dict");
     AssertExpandIs(tpl2, &dict2, "hi  lo", true);
     dict2.SetValue("VAR", "yo");
@@ -564,12 +561,12 @@ class TemplateUnittest {
     AssertExpandIs(tpl, &dict, "hi yo_yo # <b>foo & bar</b> lo", true);
 
     // Test with custom modifiers [regular or XssSafe should not matter].
-    ASSERT(template_modifiers::AddModifier("x-test",
-                                           &template_modifiers::html_escape));
-    ASSERT(template_modifiers::AddModifier("x-test-arg=",
-                                           &template_modifiers::html_escape));
-    ASSERT(template_modifiers::AddXssSafeModifier(
-               "x-test-arg=snippet", &template_modifiers::snippet_escape));
+    ASSERT(GOOGLE_NAMESPACE::AddModifier("x-test",
+                                  &GOOGLE_NAMESPACE::html_escape));
+    ASSERT(GOOGLE_NAMESPACE::AddModifier("x-test-arg=",
+                                  &GOOGLE_NAMESPACE::html_escape));
+    ASSERT(GOOGLE_NAMESPACE::AddXssSafeModifier("x-test-arg=snippet",
+                                         &GOOGLE_NAMESPACE::snippet_escape));
 
     tpl = StringToTemplate("hi {{VAR:x-test}} lo", STRIP_WHITESPACE);
     AssertExpandIs(tpl, &dict, "hi yo&amp;yo lo", true);
@@ -581,7 +578,7 @@ class TemplateUnittest {
 
     // Test with a modifier taking per-expand data
     DynamicModifier dynamic_modifier;
-    ASSERT(template_modifiers::AddModifier("x-dynamic", &dynamic_modifier));
+    ASSERT(GOOGLE_NAMESPACE::AddModifier("x-dynamic", &dynamic_modifier));
     PerExpandData per_expand_data;
     tpl = StringToTemplate("hi {{VAR:x-dynamic}} lo", STRIP_WHITESPACE);
     AssertExpandWithDataIs(tpl, &dict, &per_expand_data, "hi  lo", true);
@@ -942,7 +939,7 @@ class TemplateUnittest {
     dict.SetValue("VAR", "var");
 
     // This string is equivalent to "/template." (at least on unix)
-    string slash_tpl(ctemplate::PathJoin(ctemplate::kRootdir, "template."));
+    string slash_tpl(GOOGLE_NAMESPACE::PathJoin(GOOGLE_NAMESPACE::kRootdir, "template."));
     per_expand_data.SetAnnotateOutput("");
     char expected[10240];           // 10k should be big enough!
     snprintf(expected, sizeof(expected),
@@ -1413,9 +1410,9 @@ class TemplateUnittest {
 
   static void TestTemplateRootDirectory() {
     string filename = StringToTemplateFile("Test template");
-    ASSERT(ctemplate::IsAbspath(filename));
+    ASSERT(GOOGLE_NAMESPACE::IsAbspath(filename));
     Template* tpl1 = Template::GetTemplate(filename, DO_NOT_STRIP);
-    Template::SetTemplateRootDirectory(ctemplate::kRootdir);  // "/"
+    Template::SetTemplateRootDirectory(GOOGLE_NAMESPACE::kRootdir);  // "/"
     // template-root shouldn't matter for absolute directories
     Template* tpl2 = Template::GetTemplate(filename, DO_NOT_STRIP);
     Template::SetTemplateRootDirectory("/sadfadsf/waerfsa/safdg");
@@ -1509,9 +1506,9 @@ class TemplateUnittest {
     string f2 = StringToTemplateFile("{{#SEC}}foo");
     string f3 = StringToTemplateFile("{This is ok");
     // Where we'll copy f1 - f3 to: these are names known at compile-time
-    string f1_copy = ctemplate::PathJoin(FLAGS_test_tmpdir, INVALID1_FN);
-    string f2_copy = ctemplate::PathJoin(FLAGS_test_tmpdir, INVALID2_FN);
-    string f3_copy = ctemplate::PathJoin(FLAGS_test_tmpdir, VALID1_FN);
+    string f1_copy = GOOGLE_NAMESPACE::PathJoin(FLAGS_test_tmpdir, INVALID1_FN);
+    string f2_copy = GOOGLE_NAMESPACE::PathJoin(FLAGS_test_tmpdir, INVALID2_FN);
+    string f3_copy = GOOGLE_NAMESPACE::PathJoin(FLAGS_test_tmpdir, VALID1_FN);
     Template::SetTemplateRootDirectory(FLAGS_test_tmpdir);
     time_t after_time = time(NULL);   // f1, f2, f3 all written by now
 
@@ -1824,8 +1821,8 @@ class TemplateUnittest {
     AssertCorrectModifiers(TC_JSON, text, "USER:h:j\n");
 
     // 2j: Variables with XssSafe Custom modifiers are untouched.
-    ASSERT(template_modifiers::AddXssSafeModifier(
-               "x-test-cm",  &template_modifiers::html_escape));
+    ASSERT(GOOGLE_NAMESPACE::AddXssSafeModifier("x-test-cm",
+                                         &GOOGLE_NAMESPACE::html_escape));
     text = "Hello {{USER:x-test-cm}}";              // Missing :h
     AssertCorrectModifiers(TC_HTML, text, "USER:x-test-cm\n");
     text = "Hello {{USER:x-test-cm:j}}";            // Extra :j
@@ -2096,7 +2093,7 @@ class TemplateUnittest {
     AssertExpandIs(tpl, &dict, user_esc, true);
 
     // Check that Selective Auto-Escape works with Template::StringToTemplate.
-    tpl = Template::StringToTemplate(inc_text, strip, TC_MANUAL);
+    tpl = Template::StringToTemplate(inc_text, strip);
     ASSERT(tpl);
     TemplateDictionary dict2("dict2");
     dict2.SetValue("USER", user);
@@ -2208,51 +2205,51 @@ class TemplateUnittest {
   // TextTemplateAnnotator but just to test our ability to customize
   // annotation, and with stateful one, it prefixes each text annotation
   // with an event (call) count.
-  class CustomTestAnnotator : public ctemplate::TextTemplateAnnotator {
+  class CustomTestAnnotator : public GOOGLE_NAMESPACE::TextTemplateAnnotator {
    public:
     CustomTestAnnotator() : event_count_(0) { }
     void Reset() { event_count_ = 0; }
 
     virtual void EmitOpenInclude(ExpandEmitter* emitter, const string& value) {
       EmitTestPrefix(emitter);
-      ctemplate::TextTemplateAnnotator::EmitOpenInclude(emitter, value);
+      GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitOpenInclude(emitter, value);
     }
     virtual void EmitCloseInclude(ExpandEmitter* emitter) {
       EmitTestPrefix(emitter);
-      ctemplate::TextTemplateAnnotator::EmitCloseInclude(emitter);
+      GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitCloseInclude(emitter);
     }
     virtual void EmitOpenFile(ExpandEmitter* emitter, const string& value) {
       EmitTestPrefix(emitter);
-      ctemplate::TextTemplateAnnotator::EmitOpenFile(emitter, value);
+      GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitOpenFile(emitter, value);
     }
     virtual void EmitCloseFile(ExpandEmitter* emitter) {
       EmitTestPrefix(emitter);
-      ctemplate::TextTemplateAnnotator::EmitCloseFile(emitter);
+      GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitCloseFile(emitter);
     }
     virtual void EmitOpenSection(ExpandEmitter* emitter, const string& value) {
       EmitTestPrefix(emitter);
-      ctemplate::TextTemplateAnnotator::EmitOpenSection(emitter, value);
+      GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitOpenSection(emitter, value);
     }
     virtual void EmitCloseSection(ExpandEmitter* emitter) {
       EmitTestPrefix(emitter);
-      ctemplate::TextTemplateAnnotator::EmitCloseSection(emitter);
+      GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitCloseSection(emitter);
     }
     virtual void EmitOpenVariable(ExpandEmitter* emitter, const string& value) {
       EmitTestPrefix(emitter);
-      ctemplate::TextTemplateAnnotator::EmitOpenVariable(emitter, value);
+      GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitOpenVariable(emitter, value);
     }
     virtual void EmitCloseVariable(ExpandEmitter* emitter) {
       EmitTestPrefix(emitter);
-      ctemplate::TextTemplateAnnotator::EmitCloseVariable(emitter);
+      GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitCloseVariable(emitter);
     }
     virtual void EmitOpenMissingInclude(ExpandEmitter* emitter,
                                         const string& value) {
       EmitTestPrefix(emitter);
-      ctemplate::TextTemplateAnnotator::EmitOpenMissingInclude(emitter, value);
+      GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitOpenMissingInclude(emitter, value);
     }
     virtual void EmitCloseMissingInclude(ExpandEmitter* emitter) {
       EmitTestPrefix(emitter);
-      ctemplate::TextTemplateAnnotator::EmitCloseMissingInclude(emitter);
+      GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitCloseMissingInclude(emitter);
     }
 
    private:
@@ -2278,7 +2275,7 @@ class DynamicInitializationTemplateExpander {
  public:
   DynamicInitializationTemplateExpander() {
     Template* tpl = Template::StringToTemplate("hi {{VAR}} lo",
-                                               STRIP_WHITESPACE, TC_MANUAL);
+                                               STRIP_WHITESPACE);
     TemplateDictionary dict("dict");
     dict.SetValue("VAR", TemplateString("short-lived", strlen("short")));
     AssertExpandIs(tpl, &dict, "hi short lo", true);

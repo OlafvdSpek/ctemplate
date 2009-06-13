@@ -80,25 +80,25 @@ $MAKETPL -f$TMPDIR/bar.h $TMPDIR/ok1.tpl $TMPDIR/ok2.tpl >/dev/null 2>&1 \
 # Some weird (broken) shells leave the ending EOF in the here-document,
 # hence the grep.
 expected_ok1=`cat <<EOF | grep -v '^EOF$'
-#include <google/template_string.h>
+#include <ctemplate/template_string.h>
 static const StaticTemplateString ko_QCHAR = STS_INIT_WITH_HASH(ko_QCHAR, "QCHAR", 13739615363438531061LLU);
 static const StaticTemplateString ko_HREF = STS_INIT_WITH_HASH(ko_HREF, "HREF", 4441707909033668369LLU);
 static const StaticTemplateString ko_PARAMS = STS_INIT_WITH_HASH(ko_PARAMS, "PARAMS", 10755877064288701757LLU);
 EOF`
 
 expected_ok2=`cat <<EOF | grep -v '^EOF$'
-#include <google/template_string.h>
+#include <ctemplate/template_string.h>
 static const StaticTemplateString ko_ATTRIBUTES = STS_INIT_WITH_HASH(ko_ATTRIBUTES, "ATTRIBUTES", 11813232524653503831LLU);
 static const StaticTemplateString ko_ATTRIBUTE = STS_INIT_WITH_HASH(ko_ATTRIBUTE, "ATTRIBUTE", 14959290143384361001LLU);
 EOF`
 
 expected_ok3=`cat <<EOF | grep -v '^EOF$'
-#include <google/template_string.h>
+#include <ctemplate/template_string.h>
 static const StaticTemplateString ko_TITLE = STS_INIT_WITH_HASH(ko_TITLE, "TITLE", 8931122033088041025LLU);
 EOF`
 
 expected_ok4=`cat <<EOF | grep -v '^EOF$'
-#include <google/template_string.h>
+#include <ctemplate/template_string.h>
 static const StaticTemplateString ko_HREF = STS_INIT_WITH_HASH(ko_HREF, "HREF", 4441707909033668369LLU);
 static const StaticTemplateString ko_PARAMS = STS_INIT_WITH_HASH(ko_PARAMS, "PARAMS", 10755877064288701757LLU);
 EOF`

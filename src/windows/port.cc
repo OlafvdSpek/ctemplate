@@ -42,11 +42,10 @@
 #include <string>
 #include <vector>
 #include "port.h"
-#include <google/template_pathops.h>
+#include <ctemplate/template_pathops.h>
 
 using std::string;
 using std::vector;
-namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;
 
 // These call the windows _vsnprintf, but always NUL-terminate.
 int safe_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
@@ -77,7 +76,7 @@ string TmpFile(const char* basename) {
 
 // A replacement for template_unittest.cc:CleanTestDir()
 void CleanTestDir(const string& dirname) {
-  string glob(ctemplate::PathJoin(dirname, "*"));
+  string glob(GOOGLE_NAMESPACE::PathJoin(dirname, "*"));
   WIN32_FIND_DATAA found;  // that final A is for Ansi (as opposed to Unicode)
   HANDLE hFind = FindFirstFileA(glob.c_str(), &found);   // A is for Ansi
   if (hFind == INVALID_HANDLE_VALUE) {  // directory doesn't exist or some such
@@ -87,14 +86,15 @@ void CleanTestDir(const string& dirname) {
   if (hFind != INVALID_HANDLE_VALUE) {
     do {
       if (strstr(found.cFileName, "template"))
-        _unlink(ctemplate::PathJoin(dirname, found.cFileName).c_str());
+        _unlink(GOOGLE_NAMESPACE::PathJoin(dirname, found.cFileName).c_str());
     } while (FindNextFileA(hFind, &found) != FALSE);  // A is for Ansi
     FindClose(hFind);
   }
 }
 
 void GetNamelist(const char* testdata_dir, vector<string>* namelist) {
-  string glob(ctemplate::PathJoin(testdata_dir, "template_unittest_test*"));
+  string glob(GOOGLE_NAMESPACE::PathJoin(testdata_dir,
+                                         "template_unittest_test*"));
   WIN32_FIND_DATAA found;  // that final A is for Ansi (as opposed to Unicode)
   HANDLE hFind = FindFirstFileA(glob.c_str(), &found);
   if (hFind == INVALID_HANDLE_VALUE)    // no files matching the glob, probably

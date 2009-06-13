@@ -61,12 +61,11 @@
 #include <errno.h>
 #include <string.h>
 #include <string>
-#include <google/template_pathops.h>
-#include <google/template.h>
+#include <ctemplate/template_pathops.h>
+#include <ctemplate/template.h>
 
 using std::string;
 using GOOGLE_NAMESPACE::Template;
-namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;   // an interior namespace
 
 enum {LOG_INFO, LOG_WARNING, LOG_ERROR, LOG_FATAL};
 
@@ -123,8 +122,8 @@ static void Version(FILE* outfile) {
 }
 
 int main(int argc, char **argv) {
-  string FLAG_template_dir(ctemplate::kCWD);   // "./"
-  string FLAG_header_dir(ctemplate::kCWD);
+  string FLAG_template_dir(GOOGLE_NAMESPACE::kCWD);   // "./"
+  string FLAG_header_dir(GOOGLE_NAMESPACE::kCWD);
   string FLAG_outputfile_suffix(".varnames.h");
   string FLAG_outputfile("");
   bool FLAG_header = true;
@@ -241,8 +240,8 @@ int main(int argc, char **argv) {
     if (!FLAG_outputfile.empty()) {
       header_file = FLAG_outputfile;
     } else {
-      string basename = ctemplate::Basename(argv[i]);
-      header_file = ctemplate::PathJoin(FLAG_header_dir,
+      string basename = GOOGLE_NAMESPACE::Basename(argv[i]);
+      header_file = GOOGLE_NAMESPACE::PathJoin(FLAG_header_dir,
                                         basename + FLAG_outputfile_suffix);
     }
 

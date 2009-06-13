@@ -65,8 +65,8 @@
 
 #include <sys/types.h>   // for size_t
 #include <string>
-#include <google/template_emitter.h>   // so we can inline operator()
-#include <google/per_expand_data.h>    // so we can inline operator()
+#include <ctemplate/template_emitter.h>   // so we can inline operator()
+#include <ctemplate/per_expand_data.h>    // so we can inline operator()
 
 @ac_windows_dllexport_defines@
 
@@ -74,12 +74,11 @@
 
 class Template;
 
-namespace template_modifiers {
 
-#define MODIFY_SIGNATURE_                                                    \
- public:                                                                     \
-  virtual void Modify(const char* in, size_t inlen,                          \
-                      const ctemplate::PerExpandData*, ExpandEmitter* outbuf, \
+#define MODIFY_SIGNATURE_                                               \
+ public:                                                                \
+  virtual void Modify(const char* in, size_t inlen,                     \
+                      const PerExpandData*, ExpandEmitter* outbuf,      \
                       const std::string& arg) const
 
 // If you wish to write your own modifier, it should subclass this
@@ -101,7 +100,7 @@ class @ac_windows_dllexport@ TemplateModifier {
   //         every variable expanded using that dictionary.  This value
   //         comes from the source code.
   virtual void Modify(const char* in, size_t inlen,
-                      const ctemplate::PerExpandData* per_expand_data,
+                      const PerExpandData* per_expand_data,
                       ExpandEmitter* outbuf,
                       const std::string& arg) const = 0;
 
@@ -113,7 +112,7 @@ class @ac_windows_dllexport@ TemplateModifier {
   // you're certain Modify() can be ignored.  This function is
   // advisory; the template system is not required to call
   // MightModify() before Modify().
-  virtual bool MightModify(const ctemplate::PerExpandData* per_expand_data,
+  virtual bool MightModify(const PerExpandData* per_expand_data,
                            const std::string& arg) const {
     return true;
   }
@@ -307,8 +306,6 @@ extern @ac_windows_dllexport@ bool AddModifier(const char* long_name, const Temp
 //   escaping may be inadequate.
 extern @ac_windows_dllexport@ bool AddXssSafeModifier(const char* long_name,
                         const TemplateModifier* modifier);
-
-}  // namespace template_modifiers
 
 @ac_google_end_namespace@
 

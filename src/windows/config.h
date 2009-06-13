@@ -4,7 +4,7 @@
 /* Hand-filled based on src/config.h.in. */
 
 /* Namespace for Google classes */
-#define GOOGLE_NAMESPACE  google
+#define GOOGLE_NAMESPACE  ctemplate
 
 /* the location of <unordered_map> or <hash_map> */
 #define HASH_MAP_H  <hash_map>
@@ -170,7 +170,7 @@
 #define _END_GOOGLE_NAMESPACE_  }
 
 /* Puts following code inside the Google namespace */
-#define _START_GOOGLE_NAMESPACE_  namespace google {
+#define _START_GOOGLE_NAMESPACE_  namespace ctemplate {
 
 // ---------------------------------------------------------------------
 // Extra stuff not found in config.h.in

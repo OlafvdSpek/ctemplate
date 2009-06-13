@@ -37,19 +37,23 @@
 #include <string>
 #include <vector>
 #include HASH_MAP_H           // defined in config.h
-#include <google/template_namelist.h>
-#include <google/template_dictionary_interface.h>
-#include <google/template_dictionary.h>
+#include <ctemplate/template_namelist.h>
+#include <ctemplate/template_dictionary_interface.h>
+#include <ctemplate/template_dictionary.h>
+#include <ctemplate/template_string.h>
 
 _START_GOOGLE_NAMESPACE_
 
 class TemplateDictionary;
-class TemplateString;
+
+inline TemplateId GlobalIdForTest(const char* ptr, int len) {
+  return TemplateString(ptr, len).GetGlobalId();
+}
 
 // Call this to create a StaticTemplateString for testing when the ptr is
 // not guaranteed to be allocated for the entire length of the test.
 #define STS_INIT_FOR_TEST(ptr, len, arena) \
-  { { arena->Memdup(ptr, len), len, TemplateString(ptr, len).GetGlobalId() } };
+  { { arena->Memdup(ptr, len), len, GOOGLE_NAMESPACE::GlobalIdForTest(ptr, len) } };
 
 class TemporaryRegisterTemplate {
  public:
@@ -135,11 +139,13 @@ class TemplateDictionaryPeer {
 
   typedef TemplateDictionaryPeerIterator Iterator;
 
-  Iterator* CreateTemplateIterator(const TemplateString& section) const {
+  Iterator* CreateTemplateIterator(const TemplateString& section)
+      const {
     return new Iterator(dict_->CreateTemplateIterator(section));
   }
 
-  Iterator* CreateSectionIterator(const TemplateString& section) const {
+  Iterator* CreateSectionIterator(const TemplateString& section)
+      const {
     return new Iterator(dict_->CreateSectionIterator(section));
   }
 

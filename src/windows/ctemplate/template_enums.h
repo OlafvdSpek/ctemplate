@@ -1,4 +1,4 @@
-// Copyright (c) 2007, Google Inc.
+// Copyright (c) 2006, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -28,38 +28,20 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Craig Silverstein
+// Author: Frank H. Jernigan
+//
+// Alas that we can't forward-declare enums!  These are the ones
+// used by multiple files
 
-#ifndef TEMPLATE_TEMPLATE_PATHOPS_H_
-#define TEMPLATE_TEMPLATE_PATHOPS_H_
-
-#include <string>
-
-// These functions are all for internal use (hence the extra
-// namespace), so no need to worry about dll-exporting for windows.
-
-// NOTE: if you are statically linking the template library into your binary
-// (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
-// as a compiler flag in your project file to turn off the dllimports.
-#ifndef CTEMPLATE_DLL_DECL
-# define CTEMPLATE_DLL_DECL  __declspec(dllimport)
-#endif
-
-namespace google {
+#ifndef TEMPLATE_TEMPLATE_ENUMS_H_
+#define TEMPLATE_TEMPLATE_ENUMS_H_
 
 namespace ctemplate {
 
-extern CTEMPLATE_DLL_DECL const char kCWD[];       // equivalent to "./"
-extern CTEMPLATE_DLL_DECL const char kRootdir[];   // equivalent to "/"
-
-std::string CTEMPLATE_DLL_DECL PathJoin(const std::string& a,
-                                            const std::string& b);
-bool CTEMPLATE_DLL_DECL IsAbspath(const std::string& path);
-bool CTEMPLATE_DLL_DECL IsDirectory(const std::string& path);   // ends in "/"?
-void CTEMPLATE_DLL_DECL NormalizeDirectory(std::string* dir);   // appends /
-std::string CTEMPLATE_DLL_DECL Basename(const std::string& path);
-}
+// Enums for GetTemplate flag values
+enum Strip { DO_NOT_STRIP, STRIP_BLANK_LINES, STRIP_WHITESPACE,
+             NUM_STRIPS };   // sentinel value
 
 }
 
-#endif  // TEMPLATE_TEMPLATE_PATHOPS_H_
+#endif  // TEMPLATE_TEMPLATE_ENUMS_H_
