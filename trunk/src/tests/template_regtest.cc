@@ -64,24 +64,22 @@
 #include <algorithm>   // for sort() and stable_partition()
 #include <vector>
 #include <string>
-#include "google/template.h"
-#include "google/template_pathops.h"
-#include "google/template_from_string.h"
-#include "google/template_dictionary.h"
+#include "ctemplate/template.h"
+#include "ctemplate/template_pathops.h"
+#include "ctemplate/template_modifiers.h"
+#include "ctemplate/template_dictionary.h"
 
 using std::vector;
 using std::string;
 using std::sort;
 using GOOGLE_NAMESPACE::Template;
-using GOOGLE_NAMESPACE::TemplateFromString;
 using GOOGLE_NAMESPACE::TemplateDictionary;
 using GOOGLE_NAMESPACE::DO_NOT_STRIP;
 using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
 using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
 using GOOGLE_NAMESPACE::TC_HTML;
 using GOOGLE_NAMESPACE::TC_MANUAL;
-namespace ctemplate = GOOGLE_NAMESPACE::ctemplate;
-using ctemplate::PerExpandData;
+using GOOGLE_NAMESPACE::PerExpandData;
 
 // This default value is only used when the TEMPLATE_ROOTDIR envvar isn't set
 #ifndef DEFAULT_TEMPLATE_ROOTDIR
@@ -235,7 +233,7 @@ static TemplateDictionary* MakeDict1() {
   TemplateDictionary* fbt = dict->AddSectionDictionary("FOOTER_BAR_TEXT");
   fbt->SetValue("BODY", "Should never be shown");  // this is part of simple
   fbt->SetEscapedValue("HOME_LINK", "<b>Time to go home!</b>",
-                       TemplateDictionary::html_escape);
+                       GOOGLE_NAMESPACE::html_escape);
   // Note: you should never have code like this in real life!  The <b>
   // and </b> should be part of the template proper.
   fbt->SetFormattedValue("ADVERTISE_LINK", "<b>Be advertiser #%d</b>", 2);
@@ -289,7 +287,7 @@ static TemplateDictionary* MakeDict1() {
   TemplateDictionary* inc2a = jfs2->AddIncludeDictionary("FAST_NEXT_JAVASCRIPT");
   inc2a->SetFilename("template_unittest_test_simple.in");
   inc2a->SetValue("HEAD", "include-head");
-  inc2a->SetEscapedFormattedValue("BODY", TemplateDictionary::html_escape,
+  inc2a->SetEscapedFormattedValue("BODY", GOOGLE_NAMESPACE::html_escape,
                                   "<b>%s</b>: %.4f", "<A HREF=/>", 1.0/3);
   inc2a->SetValue("BI_NEWLINE", "");   // override the global default
   TemplateDictionary* inc2b = jfs2->AddIncludeDictionary("FAST_NEXT_JAVASCRIPT");
@@ -308,10 +306,10 @@ static TemplateDictionary* MakeDict1() {
   foo->SetValue("BI_NEWLINE", "not gonna matter");
 
   dict->SetEscapedValue("GOTO_MESSAGE", "print \"Go home\"",
-                        TemplateDictionary::javascript_escape);
+                        GOOGLE_NAMESPACE::javascript_escape);
 
   dict->SetEscapedValueAndShowSection("UPDATE", "monday & tuesday",
-                                      TemplateDictionary::html_escape,
+                                      GOOGLE_NAMESPACE::html_escape,
                                       "UPDATE_SECTION");
 
   dict->SetValue("ALIGNMENT", "\"right\"");   // all results sections see this
@@ -322,7 +320,7 @@ static TemplateDictionary* MakeDict1() {
     const char* res = "<&>\"result\" #%d'&'";
     result->SetFormattedValue("RESULT", res, i);
     result->SetEscapedFormattedValue("XML_RESULT",
-                                     TemplateDictionary::xml_escape,
+                                     GOOGLE_NAMESPACE::xml_escape,
                                      res, i);
     result->SetIntValue("GOODNESS", i + 5);
   }
@@ -398,11 +396,11 @@ static void TestExpand(const vector<Testdata>::const_iterator& begin,
 
     // Test TemplateToString while we're at it.
     Template* tplstr_none = Template::StringToTemplate(
-        one_test->input_template, DO_NOT_STRIP, TC_MANUAL);
+        one_test->input_template, DO_NOT_STRIP);
     Template* tplstr_lines = Template::StringToTemplate(
-        one_test->input_template, STRIP_BLANK_LINES, TC_MANUAL);
+        one_test->input_template, STRIP_BLANK_LINES);
     Template* tplstr_ws = Template::StringToTemplate(
-        one_test->input_template, STRIP_WHITESPACE, TC_MANUAL);
+        one_test->input_template, STRIP_WHITESPACE);
 
     for (vector<string>::const_iterator out = one_test->output.begin();
          out != one_test->output.end(); ++out) {
@@ -485,8 +483,8 @@ int main(int argc, char** argv) {
   const char* template_rootdir = getenv("TEMPLATE_ROOTDIR");
   if (template_rootdir == NULL)
     template_rootdir = DEFAULT_TEMPLATE_ROOTDIR;   // probably "."
-  string rootdir = ctemplate::PathJoin(template_rootdir, "src");
-  rootdir = ctemplate::PathJoin(rootdir, "tests");
+  string rootdir = GOOGLE_NAMESPACE::PathJoin(template_rootdir, "src");
+  rootdir = GOOGLE_NAMESPACE::PathJoin(rootdir, "tests");
   Template::SetTemplateRootDirectory(rootdir);
 
   vector<Testdata> testdata = ReadDataFiles(

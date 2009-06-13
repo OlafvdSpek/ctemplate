@@ -51,7 +51,7 @@
 # define CTEMPLATE_DLL_DECL  __declspec(dllimport)
 #endif
 
-namespace google {
+namespace ctemplate {
 
 const int kIndent = 2;  // num spaces to indent each level -- used with dump
 

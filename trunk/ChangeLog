@@ -1,3 +1,15 @@
+Fri Jun 12 08:13:35 2009  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.95 release
+	* Change default namespace from google to ctemplate
+	* Rename include directory from google to ctemplate
+	* Remove deprecated code: template_from_string.{h,cc}
+	* Remove deprecated code: modifiers in TemplateDictionary class
+	* Remove last arg from StringToTemplate; use autoescape pragma instead
+	* Remove template_modifiers namespace
+	* Provide a script to help convert namespaces and #includes
+	* TemplateDictionary constructor takes TemplateString, not string
+
 Thu May  7 11:27:28 2009  Google Inc. <opensource@google.com>
 
 	* ctemplate: version 0.94 release

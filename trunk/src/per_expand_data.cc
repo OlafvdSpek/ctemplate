@@ -36,14 +36,12 @@
 
 #include "config.h"
 #include HASH_MAP_H              // (defined in config.h)  for hash<>
-#include <google/per_expand_data.h>
-#include <google/template_annotator.h>
+#include <ctemplate/per_expand_data.h>
+#include <ctemplate/template_annotator.h>
 
 using std::string;
 
 _START_GOOGLE_NAMESPACE_
-
-namespace ctemplate {
 
 #ifndef _MSC_VER
 bool PerExpandData::DataEq::operator()(const char* s1, const char* s2) const {
@@ -58,10 +56,8 @@ TemplateAnnotator* PerExpandData::annotator() const {
   }
   // TextTemplateAnnotator has no static state.  So direct static definition
   // should be safe.
-  static ctemplate::TextTemplateAnnotator g_default_annotator;
+  static TextTemplateAnnotator g_default_annotator;
   return &g_default_annotator;
 }
-
-_END_GOOGLE_NAMESPACE_
 
 }  // namespace ctemplate

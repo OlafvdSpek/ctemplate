@@ -45,22 +45,22 @@
 #include <stdlib.h>   // for NULL
 #include <string.h>   // for strcmp
 #include <sys/types.h>
-#include <google/template_string.h>   // for StringHash
-#include @ac_cv_cxx_hash_map@
+#include <ctemplate/template_string.h>   // for StringHash
+#include <hash_map>
 
-@ac_windows_dllexport_defines@
-
-@ac_google_start_namespace@
-
-namespace template_modifiers {
-class TemplateModifier;
-}
+// NOTE: if you are statically linking the template library into your binary
+// (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
+// as a compiler flag in your project file to turn off the dllimports.
+#ifndef CTEMPLATE_DLL_DECL
+# define CTEMPLATE_DLL_DECL  __declspec(dllimport)
+#endif
 
 namespace ctemplate {
 
+class TemplateModifier;
 class TemplateAnnotator;
 
-class @ac_windows_dllexport@ PerExpandData {
+class CTEMPLATE_DLL_DECL PerExpandData {
  public:
   PerExpandData()
       : annotate_path_(NULL),
@@ -88,14 +88,14 @@ class @ac_windows_dllexport@ PerExpandData {
   // will be aliased by this object and returned by annotator().
   // Passing NULL has the special behavior of causing annotator() to
   // revert to returning its built-in instance.
-  void SetAnnotator(ctemplate::TemplateAnnotator* annotator) {
+  void SetAnnotator(TemplateAnnotator* annotator) {
     annotator_ = annotator;
   }
 
   // This returns the TemplateAnnotator to be used when annotating is on.
   // The value returned will be either an instance previously provided
   // to SetAnnotator() or the callable built-in text-based annotator.
-  ctemplate::TemplateAnnotator* annotator() const;
+  TemplateAnnotator* annotator() const;
 
   // This is a TemplateModifier to be applied to all templates
   // expanded via this call to Expand().  That is, this modifier is
@@ -103,13 +103,11 @@ class @ac_windows_dllexport@ PerExpandData {
   // sub-templates that are expanded due to {{>INCLUDE}} directives.
   // Caller is responsible for ensuring that modifier exists for the
   // lifetime of this object.
-  void SetTemplateExpansionModifier(
-      const template_modifiers::TemplateModifier* modifier) {
+  void SetTemplateExpansionModifier(const TemplateModifier* modifier) {
     expand_modifier_ = modifier;
   }
 
-  const template_modifiers::TemplateModifier* template_expansion_modifier()
-      const {
+  const TemplateModifier* template_expansion_modifier() const {
     return expand_modifier_;
   }
 
@@ -135,26 +133,24 @@ class @ac_windows_dllexport@ PerExpandData {
 
  private:
 #ifdef _MSC_VER
-  typedef @ac_cv_cxx_hash_map_class@<const char*, const void*, StringHash> DataMap;
+  typedef stdext::hash_map<const char*, const void*, StringHash> DataMap;
 #else
   struct DataEq {
     bool operator()(const char* s1, const char* s2) const;
   };
-  typedef @ac_cv_cxx_hash_map_class@<const char*, const void*, StringHash, DataEq>
+  typedef stdext::hash_map<const char*, const void*, StringHash, DataEq>
     DataMap;
 #endif
 
   const char* annotate_path_;
-  ctemplate::TemplateAnnotator* annotator_;
-  const template_modifiers::TemplateModifier* expand_modifier_;
+  TemplateAnnotator* annotator_;
+  const TemplateModifier* expand_modifier_;
   DataMap map_;
 
   PerExpandData(const PerExpandData&);    // disallow evil copy constructor
   void operator=(const PerExpandData&);   // disallow evil operator=
 };
 
-}  // namespace ctemplate
-
-@ac_google_end_namespace@
+}
 
 #endif  // TEMPLATE_PER_EXPAND_DATA_H_

@@ -31,10 +31,10 @@
 // Author: Ryoji Watanabe
 
 #include "config.h"
-#include <google/template_annotator.h>
+#include <ctemplate/template_annotator.h>
 
 #include <string>
-#include <google/template_emitter.h>
+#include <ctemplate/template_emitter.h>
 
 using std::string;
 
@@ -49,8 +49,6 @@ _START_GOOGLE_NAMESPACE_
 // Emits a close annotation string.  'name' must be a string literal.
 #define EMIT_CLOSE_ANNOTATION(emitter, name)            \
   (emitter)->Emit("{{/" name "}}", 5 + sizeof(name)-1);
-
-namespace ctemplate {
 
 // Implementation note: TextTemplateAnnotator contains no state, and
 // code elsewhere is depending on this.  E.g., a statically allocated
@@ -107,7 +105,5 @@ void TextTemplateAnnotator::EmitOpenMissingInclude(ExpandEmitter* emitter,
 void TextTemplateAnnotator::EmitCloseMissingInclude(ExpandEmitter* emitter) {
   EMIT_CLOSE_ANNOTATION(emitter, "MISSING_INC");
 }
-
-}  // namespace ctemplate
 
 _END_GOOGLE_NAMESPACE_

@@ -1,4 +1,4 @@
-// Copyright (c) 2006, Google Inc.
+// Copyright (c) 2007, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -28,16 +28,17 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author:   Frank H. Jernigan
+// Author: Craig Silverstein
 //
-// This file is deprecated; use Template::StringToTemplate or
-// Template:StringToTemplateCache instead.
+// When we expand a template, we expand into an abstract "emitter".
+// This is typically a string, but could be a file-wrapper, or any
+// other data structure that supports this very simple "append" API.
 
-#ifndef TEMPLATE_FROM_STRING_H
-#define TEMPLATE_FROM_STRING_H
+#ifndef TEMPLATE_TEMPLATE_EMITTER_H_
+#define TEMPLATE_TEMPLATE_EMITTER_H_
 
+#include <sys/types.h>     // for size_t
 #include <string>
-#include <google/template.h>
 
 // NOTE: if you are statically linking the template library into your binary
 // (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
@@ -46,24 +47,29 @@
 # define CTEMPLATE_DLL_DECL  __declspec(dllimport)
 #endif
 
-namespace google {
+namespace ctemplate {
 
-// DEPRECATED. Don't use this; use Template::StringToTemplate or
-// StringToTemplateCache instead.
-class CTEMPLATE_DLL_DECL TemplateFromString {
+class CTEMPLATE_DLL_DECL ExpandEmitter {
  public:
-  static Template *GetTemplate(const std::string& cache_key,
-                               const std::string& template_text,
-                               Strip strip) {
-    if (cache_key.empty()) {
-      return Template::StringToTemplate(template_text, strip, TC_MANUAL);
-    } else {
-      Template::StringToTemplateCache(cache_key, template_text);
-      return Template::GetTemplate(cache_key, strip);
-    }
-  }
+  ExpandEmitter() {}
+  virtual ~ExpandEmitter() {}
+  virtual void Emit(char c) = 0;
+  virtual void Emit(const std::string& s) = 0;
+  virtual void Emit(const char* s) = 0;
+  virtual void Emit(const char* s, size_t slen) = 0;
+};
+
+
+class CTEMPLATE_DLL_DECL StringEmitter : public ExpandEmitter {
+  std::string* const outbuf_;
+ public:
+  StringEmitter(std::string* outbuf) : outbuf_(outbuf) {}
+  virtual void Emit(char c) { *outbuf_ += c; }
+  virtual void Emit(const std::string& s) { *outbuf_ += s; }
+  virtual void Emit(const char* s) { *outbuf_ += s; }
+  virtual void Emit(const char* s, size_t slen) { outbuf_->append(s, slen); }
 };
 
 }
 
-#endif //  TEMPLATE_FROM_STRING_H
+#endif  // TEMPLATE_TEMPLATE_EMITTER_H_

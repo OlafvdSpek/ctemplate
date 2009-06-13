@@ -52,8 +52,8 @@
 #include <vector>
 #include "htmlparser/htmlparser_cpp.h"
 #include "template_modifiers_internal.h"
-#include <google/template_modifiers.h>
-#include <google/per_expand_data.h>
+#include <ctemplate/template_modifiers.h>
+#include <ctemplate/per_expand_data.h>
 
 using std::string;
 using std::vector;
@@ -75,10 +75,6 @@ typedef unsigned int uint16;
    memcmp(str, literal, sizeof(""literal"")-1) == 0)
 
 _START_GOOGLE_NAMESPACE_
-
-using ctemplate::PerExpandData;
-
-namespace template_modifiers {
 
 TemplateModifier::~TemplateModifier() {}
 
@@ -275,7 +271,7 @@ CleanseCss cleanse_css;
 class CssUrlEscape : public TemplateModifier {
  public:
   virtual void Modify(const char* in, size_t inlen,
-                      const ctemplate::PerExpandData*, ExpandEmitter* outbuf,
+                      const PerExpandData*, ExpandEmitter* outbuf,
                       const string& arg) const;
 };
 
@@ -1145,7 +1141,5 @@ vector<const ModifierAndValue*> GetDefaultModifierForXml() {
 vector<const ModifierAndValue*> GetDefaultModifierForJson() {
   return GetModifierForJson(NULL, NULL);
 }
-
-}  // namespace template_modifiers
 
 _END_GOOGLE_NAMESPACE_

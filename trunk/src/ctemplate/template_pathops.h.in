@@ -42,8 +42,6 @@
 
 @ac_google_start_namespace@
 
-namespace ctemplate {
-
 extern @ac_windows_dllexport@ const char kCWD[];       // equivalent to "./"
 extern @ac_windows_dllexport@ const char kRootdir[];   // equivalent to "/"
 
@@ -53,7 +51,6 @@ bool @ac_windows_dllexport@ IsAbspath(const std::string& path);
 bool @ac_windows_dllexport@ IsDirectory(const std::string& path);   // ends in "/"?
 void @ac_windows_dllexport@ NormalizeDirectory(std::string* dir);   // appends /
 std::string @ac_windows_dllexport@ Basename(const std::string& path);
-}
 
 @ac_google_end_namespace@
 

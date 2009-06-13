@@ -1,4 +1,4 @@
-// Copyright (c) 2006, Google Inc.
+// Copyright (c) 2007, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -28,37 +28,35 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author:   Frank H. Jernigan
-//
-// This file is deprecated; use Template::StringToTemplate or
-// Template:StringToTemplateCache instead.
+// Author: Craig Silverstein
 
-#ifndef TEMPLATE_FROM_STRING_H
-#define TEMPLATE_FROM_STRING_H
+#ifndef TEMPLATE_TEMPLATE_PATHOPS_H_
+#define TEMPLATE_TEMPLATE_PATHOPS_H_
 
 #include <string>
-#include <google/template.h>
 
-@ac_windows_dllexport_defines@
+// These functions are all for internal use (hence the extra
+// namespace), so no need to worry about dll-exporting for windows.
 
-@ac_google_start_namespace@
+// NOTE: if you are statically linking the template library into your binary
+// (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
+// as a compiler flag in your project file to turn off the dllimports.
+#ifndef CTEMPLATE_DLL_DECL
+# define CTEMPLATE_DLL_DECL  __declspec(dllimport)
+#endif
 
-// DEPRECATED. Don't use this; use Template::StringToTemplate or
-// StringToTemplateCache instead.
-class @ac_windows_dllexport@ TemplateFromString {
- public:
-  static Template *GetTemplate(const std::string& cache_key,
-                               const std::string& template_text,
-                               Strip strip) {
-    if (cache_key.empty()) {
-      return Template::StringToTemplate(template_text, strip, TC_MANUAL);
-    } else {
-      Template::StringToTemplateCache(cache_key, template_text);
-      return Template::GetTemplate(cache_key, strip);
-    }
-  }
-};
+namespace ctemplate {
 
-@ac_google_end_namespace@
+extern CTEMPLATE_DLL_DECL const char kCWD[];       // equivalent to "./"
+extern CTEMPLATE_DLL_DECL const char kRootdir[];   // equivalent to "/"
 
-#endif //  TEMPLATE_FROM_STRING_H
+std::string CTEMPLATE_DLL_DECL PathJoin(const std::string& a,
+                                            const std::string& b);
+bool CTEMPLATE_DLL_DECL IsAbspath(const std::string& path);
+bool CTEMPLATE_DLL_DECL IsDirectory(const std::string& path);   // ends in "/"?
+void CTEMPLATE_DLL_DECL NormalizeDirectory(std::string* dir);   // appends /
+std::string CTEMPLATE_DLL_DECL Basename(const std::string& path);
+
+}
+
+#endif  // TEMPLATE_TEMPLATE_PATHOPS_H_

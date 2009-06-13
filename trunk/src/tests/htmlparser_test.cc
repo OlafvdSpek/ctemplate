@@ -80,12 +80,12 @@
 #include <vector>
 #include HASH_MAP_H
 #include "htmlparser/htmlparser_cpp.h"
-#include "google/template_pathops.h"
+#include "ctemplate/template_pathops.h"
 
 using std::string;
 using std::vector;
 using std::pair;
-using google::ctemplate::PathJoin;
+using GOOGLE_NAMESPACE::PathJoin;
 using HTMLPARSER_NAMESPACE::HtmlParser;
 using HTMLPARSER_NAMESPACE::JavascriptParser;
 

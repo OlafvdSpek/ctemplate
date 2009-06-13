@@ -46,20 +46,19 @@ noinst_PROGRAMS = $(am__EXEEXT_1)
 DIST_COMMON = README $(am__configure_deps) $(dist_doc_DATA) \
 	$(noinst_HEADERS) $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(top_srcdir)/configure $(top_srcdir)/src/config.h.in \
-	$(top_srcdir)/src/google/per_expand_data.h.in \
-	$(top_srcdir)/src/google/template.h.in \
-	$(top_srcdir)/src/google/template_annotator.h.in \
-	$(top_srcdir)/src/google/template_dictionary.h.in \
-	$(top_srcdir)/src/google/template_dictionary_interface.h.in \
-	$(top_srcdir)/src/google/template_emitter.h.in \
-	$(top_srcdir)/src/google/template_enums.h.in \
-	$(top_srcdir)/src/google/template_from_string.h.in \
-	$(top_srcdir)/src/google/template_modifiers.h.in \
-	$(top_srcdir)/src/google/template_namelist.h.in \
-	$(top_srcdir)/src/google/template_pathops.h.in \
-	$(top_srcdir)/src/google/template_string.h.in AUTHORS COPYING \
-	ChangeLog INSTALL NEWS compile config.guess config.sub depcomp \
-	install-sh ltmain.sh missing mkinstalldirs
+	$(top_srcdir)/src/ctemplate/per_expand_data.h.in \
+	$(top_srcdir)/src/ctemplate/template.h.in \
+	$(top_srcdir)/src/ctemplate/template_annotator.h.in \
+	$(top_srcdir)/src/ctemplate/template_dictionary.h.in \
+	$(top_srcdir)/src/ctemplate/template_dictionary_interface.h.in \
+	$(top_srcdir)/src/ctemplate/template_emitter.h.in \
+	$(top_srcdir)/src/ctemplate/template_enums.h.in \
+	$(top_srcdir)/src/ctemplate/template_modifiers.h.in \
+	$(top_srcdir)/src/ctemplate/template_namelist.h.in \
+	$(top_srcdir)/src/ctemplate/template_pathops.h.in \
+	$(top_srcdir)/src/ctemplate/template_string.h.in AUTHORS \
+	COPYING ChangeLog INSTALL NEWS compile config.guess config.sub \
+	depcomp install-sh ltmain.sh missing mkinstalldirs
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ac_have_attribute.m4 \
@@ -74,14 +73,16 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno configure.status.lineno
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/src/config.h
-CONFIG_CLEAN_FILES = src/google/template_string.h \
-	src/google/template_enums.h src/google/template.h \
-	src/google/template_from_string.h \
-	src/google/template_modifiers.h src/google/template_emitter.h \
-	src/google/template_annotator.h \
-	src/google/template_dictionary.h src/google/template_pathops.h \
-	src/google/template_namelist.h src/google/per_expand_data.h \
-	src/google/template_dictionary_interface.h
+CONFIG_CLEAN_FILES = src/ctemplate/template_string.h \
+	src/ctemplate/template_enums.h src/ctemplate/template.h \
+	src/ctemplate/template_modifiers.h \
+	src/ctemplate/template_emitter.h \
+	src/ctemplate/template_annotator.h \
+	src/ctemplate/template_dictionary.h \
+	src/ctemplate/template_pathops.h \
+	src/ctemplate/template_namelist.h \
+	src/ctemplate/per_expand_data.h \
+	src/ctemplate/template_dictionary_interface.h
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -90,7 +91,7 @@ am__vpath_adj = case $$p in \
 am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
 am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" \
 	"$(DESTDIR)$(bindir)" "$(DESTDIR)$(docdir)" \
-	"$(DESTDIR)$(googleincludedir)"
+	"$(DESTDIR)$(ctemplateincludedir)"
 libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES) $(noinst_LTLIBRARIES)
 am__DEPENDENCIES_1 =
@@ -350,8 +351,8 @@ DIST_SOURCES = $(libctemplate_la_SOURCES) \
 	$(template_unittest_SOURCES)
 dist_docDATA_INSTALL = $(INSTALL_DATA)
 DATA = $(dist_doc_DATA)
-nodist_googleincludeHEADERS_INSTALL = $(INSTALL_HEADER)
-HEADERS = $(nodist_googleinclude_HEADERS) $(noinst_HEADERS)
+nodist_ctemplateincludeHEADERS_INSTALL = $(INSTALL_HEADER)
+HEADERS = $(nodist_ctemplateinclude_HEADERS) $(noinst_HEADERS)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -492,39 +493,37 @@ target_alias = @target_alias@
 # Make sure that when we re-make ./configure, we get the macros we need
 ACLOCAL_AMFLAGS = -I m4
 
-# This is so we can #include <google/foo>
+# This is so we can #include <ctemplate/foo>
 AM_CPPFLAGS = -I$(top_srcdir)/src
 
 # These are good warnings to turn on by default
 @GCC_TRUE@AM_CXXFLAGS = -Wall -Wwrite-strings -Woverloaded-virtual -Wno-sign-compare
-googleincludedir = $(includedir)/google
-nodist_googleinclude_HEADERS = \
-	src/google/template.h \
-	src/google/template_string.h \
-	src/google/template_enums.h \
-	src/google/template_pathops.h \
-	src/google/template_modifiers.h \
-	src/google/template_dictionary.h \
-	src/google/template_dictionary_interface.h \
-	src/google/template_annotator.h \
-	src/google/template_emitter.h \
-	src/google/template_namelist.h \
-	src/google/template_from_string.h \
-	src/google/per_expand_data.h
+ctemplateincludedir = $(includedir)/ctemplate
+nodist_ctemplateinclude_HEADERS = \
+	src/ctemplate/template.h \
+	src/ctemplate/template_string.h \
+	src/ctemplate/template_enums.h \
+	src/ctemplate/template_pathops.h \
+	src/ctemplate/template_modifiers.h \
+	src/ctemplate/template_dictionary.h \
+	src/ctemplate/template_dictionary_interface.h \
+	src/ctemplate/template_annotator.h \
+	src/ctemplate/template_emitter.h \
+	src/ctemplate/template_namelist.h \
+	src/ctemplate/per_expand_data.h
 
 noinst_HEADERS = \
-	src/google/template.h.in \
-	src/google/template_string.h.in \
-	src/google/template_enums.h.in \
-	src/google/template_pathops.h.in \
-	src/google/template_modifiers.h.in \
-	src/google/template_dictionary.h.in \
-	src/google/template_dictionary_interface.h.in \
-	src/google/template_annotator.h.in \
-	src/google/template_emitter.h.in \
-	src/google/template_namelist.h.in \
-	src/google/template_from_string.h.in \
-	src/google/per_expand_data.h.in
+	src/ctemplate/template.h.in \
+	src/ctemplate/template_string.h.in \
+	src/ctemplate/template_enums.h.in \
+	src/ctemplate/template_pathops.h.in \
+	src/ctemplate/template_modifiers.h.in \
+	src/ctemplate/template_dictionary.h.in \
+	src/ctemplate/template_dictionary_interface.h.in \
+	src/ctemplate/template_annotator.h.in \
+	src/ctemplate/template_emitter.h.in \
+	src/ctemplate/template_namelist.h.in \
+	src/ctemplate/per_expand_data.h.in
 
 dist_doc_DATA = AUTHORS COPYING ChangeLog INSTALL NEWS README README.windows \
 	doc/designstyle.css doc/index.html \
@@ -647,7 +646,7 @@ BUILT_SOURCES = src/htmlparser/htmlparser_fsm.h \
 # template_modifiers and BaseArena and UnsafeArena perhaps shouldn't be
 # exported, but they're needed -- at least -- for some unittests.
 CTEMPLATE_SYMBOLS = '(ctemplate|template_modifiers|BaseArena|UnsafeArena|[^A-Za-z]Template[^A-Za-z]|TemplateDictionary|TemplateNamelist|TemplateFromString|TemplateString|TemplateState|[^A-Za-z]Strip[^A-Za-z])'
-libctemplate_la_SOURCES = $(nodist_googleinclude_HEADERS) \
+libctemplate_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/base/small_map.h src/base/manual_constructor.h \
 	src/template_modifiers_internal.h \
@@ -676,22 +675,22 @@ libctemplate_nothreads_debug_la_SOURCES = $(libctemplate_nothreads_la_SOURCES)
 libctemplate_nothreads_debug_la_DEPENDENCIES = $(libctemplate_nothreads_la_DEPENDENCIES)
 libctemplate_nothreads_debug_la_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 libctemplate_nothreads_debug_la_LDFLAGS = $(libctemplate_nothreads_la_LDFLAGS)
-libctemplate_testing_la_SOURCES = $(nodist_googleinclude_HEADERS) \
+libctemplate_testing_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
                                   src/tests/template_test_util.h \
                                   src/tests/template_test_util.cc
 
 libctemplate_testing_la_CXXFLAGS = $(AM_CXXFLAGS)
 CTEMPLATE_TESTING_SYMBOLS = 'TemporaryRegisterTemplate|TemplateDictionaryPeer'
 libctemplate_testing_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS)
-make_tpl_varnames_h_SOURCES = $(nodist_googleinclude_HEADERS) \
+make_tpl_varnames_h_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/make_tpl_varnames_h.cc
 
 make_tpl_varnames_h_LDADD = libctemplate_nothreads.la
-diff_tpl_auto_escape_SOURCES = $(nodist_googleinclude_HEADERS) \
+diff_tpl_auto_escape_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/diff_tpl_auto_escape.cc
 
 diff_tpl_auto_escape_LDADD = libctemplate_nothreads.la
-compile_test_SOURCES = $(nodist_googleinclude_HEADERS) \
+compile_test_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
                        src/tests/compile_test.cc
 
 compile_test_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
@@ -856,29 +855,27 @@ $(top_srcdir)/src/config.h.in:  $(am__configure_deps)
 
 distclean-hdr:
 	-rm -f src/config.h src/stamp-h1
-src/google/template_string.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_string.h.in
+src/ctemplate/template_string.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/template_string.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-src/google/template_enums.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_enums.h.in
+src/ctemplate/template_enums.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/template_enums.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-src/google/template.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template.h.in
+src/ctemplate/template.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/template.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-src/google/template_from_string.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_from_string.h.in
+src/ctemplate/template_modifiers.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/template_modifiers.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-src/google/template_modifiers.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_modifiers.h.in
+src/ctemplate/template_emitter.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/template_emitter.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-src/google/template_emitter.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_emitter.h.in
+src/ctemplate/template_annotator.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/template_annotator.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-src/google/template_annotator.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_annotator.h.in
+src/ctemplate/template_dictionary.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/template_dictionary.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-src/google/template_dictionary.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_dictionary.h.in
+src/ctemplate/template_pathops.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/template_pathops.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-src/google/template_pathops.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_pathops.h.in
+src/ctemplate/template_namelist.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/template_namelist.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-src/google/template_namelist.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_namelist.h.in
+src/ctemplate/per_expand_data.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/per_expand_data.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-src/google/per_expand_data.h: $(top_builddir)/config.status $(top_srcdir)/src/google/per_expand_data.h.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
-src/google/template_dictionary_interface.h: $(top_builddir)/config.status $(top_srcdir)/src/google/template_dictionary_interface.h.in
+src/ctemplate/template_dictionary_interface.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/template_dictionary_interface.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 install-libLTLIBRARIES: $(lib_LTLIBRARIES)
 	@$(NORMAL_INSTALL)
@@ -1853,22 +1850,22 @@ uninstall-dist_docDATA:
 	  echo " rm -f '$(DESTDIR)$(docdir)/$$f'"; \
 	  rm -f "$(DESTDIR)$(docdir)/$$f"; \
 	done
-install-nodist_googleincludeHEADERS: $(nodist_googleinclude_HEADERS)
+install-nodist_ctemplateincludeHEADERS: $(nodist_ctemplateinclude_HEADERS)
 	@$(NORMAL_INSTALL)
-	test -z "$(googleincludedir)" || $(mkdir_p) "$(DESTDIR)$(googleincludedir)"
-	@list='$(nodist_googleinclude_HEADERS)'; for p in $$list; do \
+	test -z "$(ctemplateincludedir)" || $(mkdir_p) "$(DESTDIR)$(ctemplateincludedir)"
+	@list='$(nodist_ctemplateinclude_HEADERS)'; for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  f=$(am__strip_dir) \
-	  echo " $(nodist_googleincludeHEADERS_INSTALL) '$$d$$p' '$(DESTDIR)$(googleincludedir)/$$f'"; \
-	  $(nodist_googleincludeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(googleincludedir)/$$f"; \
+	  echo " $(nodist_ctemplateincludeHEADERS_INSTALL) '$$d$$p' '$(DESTDIR)$(ctemplateincludedir)/$$f'"; \
+	  $(nodist_ctemplateincludeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(ctemplateincludedir)/$$f"; \
 	done
 
-uninstall-nodist_googleincludeHEADERS:
+uninstall-nodist_ctemplateincludeHEADERS:
 	@$(NORMAL_UNINSTALL)
-	@list='$(nodist_googleinclude_HEADERS)'; for p in $$list; do \
+	@list='$(nodist_ctemplateinclude_HEADERS)'; for p in $$list; do \
 	  f=$(am__strip_dir) \
-	  echo " rm -f '$(DESTDIR)$(googleincludedir)/$$f'"; \
-	  rm -f "$(DESTDIR)$(googleincludedir)/$$f"; \
+	  echo " rm -f '$(DESTDIR)$(ctemplateincludedir)/$$f'"; \
+	  rm -f "$(DESTDIR)$(ctemplateincludedir)/$$f"; \
 	done
 
 ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
@@ -1995,7 +1992,7 @@ check-TESTS: $(TESTS)
 distdir: $(DISTFILES)
 	$(am__remove_distdir)
 	mkdir $(distdir)
-	$(mkdir_p) $(distdir)/doc $(distdir)/m4 $(distdir)/packages $(distdir)/packages/rpm $(distdir)/src $(distdir)/src/google $(distdir)/src/htmlparser $(distdir)/src/solaris $(distdir)/src/tests $(distdir)/src/tests/htmlparser_testdata $(distdir)/vsprojects/compile_test $(distdir)/vsprojects/diff_tpl_auto_escape $(distdir)/vsprojects/generate_fsm_c_test $(distdir)/vsprojects/htmlparser_test $(distdir)/vsprojects/libctemplate $(distdir)/vsprojects/make_tpl_varname_h $(distdir)/vsprojects/statemachine_test $(distdir)/vsprojects/template_dictionary_unittest $(distdir)/vsprojects/template_modifiers_unittest $(distdir)/vsprojects/template_regtest $(distdir)/vsprojects/template_setglobals_unittest $(distdir)/vsprojects/template_test_util_test $(distdir)/vsprojects/template_unittest $(distdir)/vsprojects/template_unittest_static
+	$(mkdir_p) $(distdir)/doc $(distdir)/m4 $(distdir)/packages $(distdir)/packages/rpm $(distdir)/src $(distdir)/src/ctemplate $(distdir)/src/htmlparser $(distdir)/src/solaris $(distdir)/src/tests $(distdir)/src/tests/htmlparser_testdata $(distdir)/vsprojects/compile_test $(distdir)/vsprojects/diff_tpl_auto_escape $(distdir)/vsprojects/generate_fsm_c_test $(distdir)/vsprojects/htmlparser_test $(distdir)/vsprojects/libctemplate $(distdir)/vsprojects/make_tpl_varname_h $(distdir)/vsprojects/statemachine_test $(distdir)/vsprojects/template_dictionary_unittest $(distdir)/vsprojects/template_modifiers_unittest $(distdir)/vsprojects/template_regtest $(distdir)/vsprojects/template_setglobals_unittest $(distdir)/vsprojects/template_test_util_test $(distdir)/vsprojects/template_unittest $(distdir)/vsprojects/template_unittest_static
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \
@@ -2133,7 +2130,7 @@ all-am: Makefile $(LTLIBRARIES) $(PROGRAMS) $(SCRIPTS) $(DATA) \
 install-binPROGRAMS: install-libLTLIBRARIES
 
 installdirs:
-	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(docdir)" "$(DESTDIR)$(googleincludedir)"; do \
+	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(docdir)" "$(DESTDIR)$(ctemplateincludedir)"; do \
 	  test -z "$$dir" || $(mkdir_p) "$$dir"; \
 	done
 install: $(BUILT_SOURCES)
@@ -2186,7 +2183,7 @@ info: info-am
 info-am:
 
 install-data-am: install-dist_docDATA \
-	install-nodist_googleincludeHEADERS
+	install-nodist_ctemplateincludeHEADERS
 
 install-exec-am: install-binPROGRAMS install-binSCRIPTS \
 	install-libLTLIBRARIES
@@ -2219,7 +2216,8 @@ ps-am:
 
 uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
 	uninstall-dist_docDATA uninstall-info-am \
-	uninstall-libLTLIBRARIES uninstall-nodist_googleincludeHEADERS
+	uninstall-libLTLIBRARIES \
+	uninstall-nodist_ctemplateincludeHEADERS
 
 .PHONY: CTAGS GTAGS all all-am am--refresh check check-TESTS check-am \
 	clean clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
@@ -2233,13 +2231,14 @@ uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
 	install-data-am install-dist_docDATA install-exec \
 	install-exec-am install-info install-info-am \
 	install-libLTLIBRARIES install-man \
-	install-nodist_googleincludeHEADERS install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
+	install-nodist_ctemplateincludeHEADERS install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags uninstall uninstall-am uninstall-binPROGRAMS \
 	uninstall-binSCRIPTS uninstall-dist_docDATA uninstall-info-am \
-	uninstall-libLTLIBRARIES uninstall-nodist_googleincludeHEADERS
+	uninstall-libLTLIBRARIES \
+	uninstall-nodist_ctemplateincludeHEADERS
 
 
 # These files are auto-generated via generate_fsm.py.  Since we don't want

@@ -43,7 +43,7 @@
 #include <sys/types.h>    // final place u_int32_t might live
 #endif
 #include HASH_SET_H
-#include <google/template_string.h>
+#include <ctemplate/template_string.h>
 #include "base/arena.h"
 
 // This is all to figure out endian-ness and byte-swapping on various systems
@@ -198,10 +198,6 @@ uint64 MurmurHash64(const char* ptr, size_t len) {
   return h;
 }
 
-namespace {
-
-Mutex mutex;
-
 // Unlike StaticTemplateString, it is not a good idea to have a
 // default TemplateString::Hasher because TemplateString does not
 // provide any lifetime guarantees.  The global template_string_set is
@@ -209,25 +205,28 @@ Mutex mutex;
 struct TemplateStringHasher {
   size_t operator()(const TemplateString& ts) const {
     TemplateId id = ts.GetGlobalId();
-    assert(ctemplate::IsTemplateIdInitialized(id));
+    assert(IsTemplateIdInitialized(id));
     return hasher(id);
   }
   // Less operator for MSVC's hash containers.
   bool operator()(const TemplateString& a, const TemplateString& b) const {
     const TemplateId id_a = a.GetGlobalId();
     const TemplateId id_b = b.GetGlobalId();
-    assert(ctemplate::IsTemplateIdInitialized(id_a));
-    assert(ctemplate::IsTemplateIdInitialized(id_b));
+    assert(IsTemplateIdInitialized(id_a));
+    assert(IsTemplateIdInitialized(id_b));
     return hasher(id_a, id_b);
   }
   // static makes this compile under MSVC (shrug)
-  static const ctemplate::TemplateIdHasher hasher;
+  static const TemplateIdHasher hasher;
   // These two public members are required by msvc.  4 and 8 are defaults.
   static const size_t bucket_size = 4;
   static const size_t min_buckets = 8;
 };
 
-/*static*/ const ctemplate::TemplateIdHasher TemplateStringHasher::hasher = {};
+/*static*/ const TemplateIdHasher TemplateStringHasher::hasher = {};
+
+namespace {
+Mutex mutex;
 
 #ifdef HAVE_UNORDERED_MAP
 typedef HASH_NAMESPACE::unordered_set<TemplateString, TemplateStringHasher>
@@ -241,15 +240,14 @@ TemplateStringSet* template_string_set;
 UnsafeArena* arena;
 }  // namespace
 
-namespace ctemplate {
+
 size_t StringHash::Hash(const char* s, size_t slen) const {
   return static_cast<size_t>(MurmurHash64(s, slen));
-}
 }
 
 void TemplateString::AddToGlobalIdToNameMap() {
   // shouldn't be calling this if we don't have an id.
-  assert(ctemplate::IsTemplateIdInitialized(id_));
+  assert(IsTemplateIdInitialized(id_));
   {
     // Check to see if it's already here.
     ReaderMutexLock reader_lock(&mutex);
@@ -286,12 +284,12 @@ void TemplateString::AddToGlobalIdToNameMap() {
 }
 
 TemplateId TemplateString::GetGlobalId() const {
-  if (ctemplate::IsTemplateIdInitialized(id_)) {
+  if (IsTemplateIdInitialized(id_)) {
     return id_;
   }
   // Initialize the id and sets the "initialized" flag.
   return static_cast<TemplateId>(MurmurHash64(ptr_, length_) |
-                                 ctemplate::kTemplateStringInitializedFlag);
+                                 kTemplateStringInitializedFlag);
 }
 
 // static

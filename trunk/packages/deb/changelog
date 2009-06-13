@@ -1,3 +1,15 @@
+ctemplate (0.95-2) unstable; urgency=low
+
+  * Fix the include directory in the spec files: google -> ctemplate
+
+ -- Google Inc. <opensource@google.com>  Fri, 12 Jun 2009 08:13:35 -0700
+
+ctemplate (0.95-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Google Inc. <opensource@google.com>  Fri, 12 Jun 2009 08:13:35 -0700
+
 ctemplate (0.94-1) unstable; urgency=low
 
   * New upstream release.

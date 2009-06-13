@@ -35,9 +35,9 @@
 #include <string.h>
 #include <assert.h>
 #include <vector>
-#include <google/template_dictionary.h>
-#include <google/template_modifiers.h>
-#include <google/per_expand_data.h>
+#include <ctemplate/template_dictionary.h>
+#include <ctemplate/template_modifiers.h>
+#include <ctemplate/per_expand_data.h>
 #include "base/arena.h"
 #include "tests/template_test_util.h"
 
@@ -75,10 +75,8 @@ using std::vector;
 
 _START_GOOGLE_NAMESPACE_
 
-using ctemplate::PerExpandData;
-
 // test escape-functor that replaces all input with "foo"
-class FooEscaper : public template_modifiers::TemplateModifier {
+class FooEscaper : public TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData*,
@@ -89,7 +87,7 @@ class FooEscaper : public template_modifiers::TemplateModifier {
 };
 
 // test escape-functor that replaces all input with ""
-class NullEscaper : public template_modifiers::TemplateModifier {
+class NullEscaper : public TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData*,
@@ -99,15 +97,14 @@ class NullEscaper : public template_modifiers::TemplateModifier {
 };
 
 // first does javascript-escaping, then html-escaping
-class DoubleEscaper : public template_modifiers::TemplateModifier {
+class DoubleEscaper : public TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData* data,
               ExpandEmitter* outbuf, const string& arg) const {
     assert(arg.empty());    // we don't take an argument
-    string tmp = template_modifiers::javascript_escape(in, inlen);
-    template_modifiers::html_escape.Modify(tmp.data(), tmp.size(),
-                                           data, outbuf, "");
+    string tmp = javascript_escape(in, inlen);
+    html_escape.Modify(tmp.data(), tmp.size(), data, outbuf, "");
   }
 };
 
@@ -266,12 +263,12 @@ static void TestSetEscapedValue() {
 
   dict.SetEscapedValue("hardest HTML",
                        "<A HREF='foo'\nid=\"bar\t\t&&\vbaz\">",
-                       TemplateDictionary::html_escape);
+                       html_escape);
   dict.SetEscapedValue("hardest JS",
                        ("f = 'foo';\r\n\tprint \"\\&foo = \b\", \"foo\""),
-                       TemplateDictionary::javascript_escape);
+                       javascript_escape);
   dict.SetEscapedValue("query escape 0", "",
-                       TemplateDictionary::url_query_escape);
+                       url_query_escape);
 
   ASSERT_STREQ(peer.GetSectionValue("hardest HTML"),
                "&lt;A HREF=&#39;foo&#39; id=&quot;bar  &amp;&amp; "
@@ -310,13 +307,13 @@ static void TestSetEscapedFormattedValue() {
   TemplateDictionary dict("test_SetEscapedFormattedValue", NULL);
   TemplateDictionaryPeer peer(&dict);
 
-  dict.SetEscapedFormattedValue("HTML", TemplateDictionary::html_escape,
+  dict.SetEscapedFormattedValue("HTML", html_escape,
                                 "This is <%s> #%.4f", "a & b", 1.0/3);
-  dict.SetEscapedFormattedValue("PRE", TemplateDictionary::pre_escape,
+  dict.SetEscapedFormattedValue("PRE", pre_escape,
                                 "if %s x = %.4f;", "(a < 1 && b > 2)\n\t", 1.0/3);
-  dict.SetEscapedFormattedValue("URL", TemplateDictionary::url_query_escape,
+  dict.SetEscapedFormattedValue("URL", url_query_escape,
                                 "pageviews-%s", "r?egex");
-  dict.SetEscapedFormattedValue("XML", TemplateDictionary::xml_escape,
+  dict.SetEscapedFormattedValue("XML", xml_escape,
                                 "This&is%s -- ok?", "just&");
 
   ASSERT_STREQ(peer.GetSectionValue("HTML"),
@@ -329,8 +326,12 @@ static void TestSetEscapedFormattedValue() {
                "This&amp;isjust&amp; -- ok?");
 }
 
+static const StaticTemplateString kSectName =
+    STS_INIT(kSectName, "test_SetAddSectionDictionary");
+
 static void TestAddSectionDictionary() {
-  TemplateDictionary dict("test_SetAddSectionDictionary", NULL);
+  // For fun, we'll make this constructor take a static template string.
+  TemplateDictionary dict(kSectName, NULL);
   TemplateDictionaryPeer peer(&dict);
   dict.SetValue("TOPLEVEL", "foo");
   dict.SetValue("TOPLEVEL2", "foo2");
@@ -414,15 +415,15 @@ static void TestAddSectionDictionary() {
                "21");
 
   // Make sure we're making descriptive names
-  ASSERT_STREQ(dict.name(),
+  ASSERT_STREQ(dict.name().c_str(),
                "test_SetAddSectionDictionary");
-  ASSERT_STREQ(subdict_1a->name(),
+  ASSERT_STREQ(subdict_1a->name().c_str(),
                "test_SetAddSectionDictionary/section1#1");
-  ASSERT_STREQ(subdict_1b->name(),
+  ASSERT_STREQ(subdict_1b->name().c_str(),
                "test_SetAddSectionDictionary/section1#2");
-  ASSERT_STREQ(subdict_2->name(),
+  ASSERT_STREQ(subdict_2->name().c_str(),
                "test_SetAddSectionDictionary/section2#1");
-  ASSERT_STREQ(subdict_2_1->name(),
+  ASSERT_STREQ(subdict_2_1->name().c_str(),
                "test_SetAddSectionDictionary/section2#1/sub#1");
 
   // Finally, we can test the whole kit and kaboodle
@@ -514,7 +515,7 @@ static void TestSetValueAndShowSection() {
   dict.SetValueAndShowSection("NOTINSEC2", NULL, "SEC3");
 
   dict.SetEscapedValueAndShowSection("EINSEC", "a & b",
-                                     TemplateDictionary::html_escape,
+                                     html_escape,
                                      "SEC4");
   dict.SetEscapedValueAndShowSection("EINSEC2", "a beautiful poem",
                                      FooEscaper(),
@@ -767,15 +768,15 @@ static void TestAddIncludeDictionary() {
                "baz");
 
   // Make sure we're making descriptive names
-  ASSERT_STREQ(dict.name(),
+  ASSERT_STREQ(dict.name().c_str(),
                "test_SetAddIncludeDictionary");
-  ASSERT_STREQ(subdict_1a->name(),
+  ASSERT_STREQ(subdict_1a->name().c_str(),
                "test_SetAddIncludeDictionary/include1#1");
-  ASSERT_STREQ(subdict_1b->name(),
+  ASSERT_STREQ(subdict_1b->name().c_str(),
                "test_SetAddIncludeDictionary/include1#2");
-  ASSERT_STREQ(subdict_2->name(),
+  ASSERT_STREQ(subdict_2->name().c_str(),
                "test_SetAddIncludeDictionary/include2#1");
-  ASSERT_STREQ(subdict_2_1->name(),
+  ASSERT_STREQ(subdict_2_1->name().c_str(),
                "test_SetAddIncludeDictionary/include2#1/sub#1");
 
   // Finally, we can test the whole kit and kaboodle

@@ -37,7 +37,7 @@
 #include "config.h"
 #include <string>
 #include <ctype.h>       // for isalpha, used on windows
-#include <google/template_pathops.h>
+#include <ctemplate/template_pathops.h>
 
 using std::string;
 
@@ -59,8 +59,6 @@ _START_GOOGLE_NAMESPACE_
 //    and stuff like that, for now.  Not very efficient.
 //    Returns a string which is the joining.
 // ----------------------------------------------------------------------
-
-namespace ctemplate {
 
 const char kCWD[] = { '.', PATH_SEP, '\0' };
 const char kRootdir[] = { PATH_SEP, '\0' };
@@ -111,7 +109,5 @@ string Basename(const string& path) {
   return path;   // no path-separator found, so whole string is the basename
 }
 
-
-}  // namespace ctemplate
 
 _END_GOOGLE_NAMESPACE_

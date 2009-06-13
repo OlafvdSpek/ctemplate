@@ -32,14 +32,20 @@
 # ---
 # Author: Jad Boutros
 # Heavily inspired from make_tpl_varnames_h_unittest.sh
+#
+# TODO(jad): Add better testing of Strip mode.
+# TODO(jad): Add testing for (lame) suppressed diffs.
 
 die() {
     echo "Test failed: $@" 1>&2
     exit 1
 }
 
+TEST_SRCDIR=${TEST_SRCDIR-"."}
+TEST_TMPDIR=${TMPDIR-"/tmp"}
+
 # Optional first argument is where the executable lives
-DIFFTPL=${1-"$TEST_SRCDIR/google3/template/diff_tpl_auto_escape"}
+DIFFTPL=${1-"$TEST_SRCDIR/diff_tpl_auto_escape"}
 
 # Optional second argument is tmpdir to use
 TMPDIR=${2-"$TEST_TMPDIR/difftpl"}
@@ -48,22 +54,32 @@ rm -rf $TMPDIR
 mkdir $TMPDIR || die "$LINENO: Can't make $TMPDIR"
 
 # Let's make some templates
-# ok1 and ok2 have no diffs, ok3 has one diff, ok4 has 2 diffs.
-# bad1 would fail parsing and hence cause an error.
-# ok_js is for a template with TC_JS TemplateContext, exercises
-# quoted and non-quoted literal javascript substitutions.
-echo 'Hello {{USER}}. Have a good one! -- {{OWNER}}.' > $TMPDIR/ok1.tpl
-echo 'Hello {{USER:h}}. Have a good one! -- {{OWNER:p}}.' > $TMPDIR/ok2.tpl
-echo 'Hello {{USER:j}}. Have a good one! -- {{OWNER:h}}.' > $TMPDIR/ok3.tpl
-echo 'Hello {{USER:j}}. Have a good one! -- {{OWNER:c}}.' > $TMPDIR/ok4.tpl
-echo "var a = '{{VALUE:j}}'; var b = {{VALUE:J=number}};" > $TMPDIR/ok_js.tpl
-echo '<a href={{QC' > $TMPDIR/bad1.tpl
+# ok1.tpl is valid HTML and has one correct modifier.
+echo '<a href="{{URL}}">{{USER:h}}</a>' > $TMPDIR/ok1.tpl
+
+# ok2.tpl is valid HTML and has one right and one wrong modifier.
+echo '<a href="{{URL:U=html}}">{{USER:j}}</a>' > $TMPDIR/ok2.tpl
+
+# ok3.tpl is valid HTML and has both wrong modifiers.
+echo '<a href="{{URL:h}}">{{USER:c}}</a>' > $TMPDIR/ok3.tpl
+
+# ok4.tpl is valid HTML and is auto-escaped.
+echo '{{%AUTOESCAPE context="HTML"}}' \
+     '<a href="{{URL}}">{{USER}}</a>' > $TMPDIR/ok4.tpl
+# bad1.tpl will fail auto-escape parsing.
+echo '{{%AUTOESCAPE context="HTML"}}<a href={{QC' > $TMPDIR/bad1.tpl
 
 # First, test commandline flags
 $DIFFTPL >/dev/null 2>&1 \
    && die "$LINENO: $DIFFTPL with no args didn't give an error"
-$DIFFTPL -c TC_HTML >/dev/null 2>&1 \
+$DIFFTPL --strip=STRIP_WHITESPACE >/dev/null 2>&1 \
    && die "$LINENO: $DIFFTPL with no template didn't give an error"
+$DIFFTPL $TMPDIR/ok1.tpl >/dev/null 2>&1 \
+   && die "$LINENO: $DIFFTPL with only one template didn't give an error"
+$DIFFTPL -sFOO $TMPDIR/ok1.tpl $TMPDIR/ok1.tpl >/dev/null 2>&1 \
+   && die "$LINENO: $DIFFTPL with bad strip didn't given an error"
+$DIFFTPL --strip=BLA $TMPDIR/ok1.tpl $TMPDIR/ok1.tpl >/dev/null 2>&1 \
+   && die "$LINENO: $DIFFTPL with other bad strip didn't given an error"
 $DIFFTPL -h >/dev/null 2>&1 \
    || die "$LINENO: $DIFFTPL -h failed"
 $DIFFTPL --help >/dev/null 2>&1 \
@@ -71,94 +87,109 @@ $DIFFTPL --help >/dev/null 2>&1 \
 
 # Some weird (broken) shells leave the ending EOF in the here-document,
 # hence the grep.
-# No output expected besides verbose info.
-expected_ok1_verbose=`cat <<EOF | grep -v '^EOF$'
-[VERBOSE] ------ Checking $TMPDIR/ok1.tpl ------
-[VERBOSE] $TMPDIR/ok1.tpl: Variables Found: Total=2; Diffs=0; NoMods=2
+# Diff between ok1.tpl and ok4.tpl. No differences.
+expected_test1_verbose=`cat <<EOF | grep -v '^EOF$'
+[VERBOSE] ------ Diff of [$TMPDIR/ok1.tpl, $TMPDIR/ok4.tpl] ------
+[VERBOSE] Variables Found: Total=2; Diffs=0; NoMods=1
 EOF`
 
-# No output expected besides verbose info.
-expected_ok2_verbose=`cat <<EOF | grep -v '^EOF$'
-[VERBOSE] ------ Checking $TMPDIR/ok2.tpl ------
-[VERBOSE] $TMPDIR/ok2.tpl: Variables Found: Total=2; Diffs=0; NoMods=0
+expected_test1=`cat <<EOF | grep -v '^EOF$'
 EOF`
 
-# One difference.  We also capture the LOG(ERROR) output
-expected_ok3=`cat <<EOF |  grep -v '^EOF$'
-ERROR: Token: USER has missing in-template modifiers. You gave :j and we computed :h. We changed to :j:h
-$TMPDIR/ok3.tpl: Difference for variable USER -- :j vs. :j:h
+# Diff between ok1.tpl and ok2.tpl. Expect one difference.
+expected_test2_verbose=`cat <<EOF | grep -v '^EOF$'
+[VERBOSE] ------ Diff of [$TMPDIR/ok1.tpl, $TMPDIR/ok2.tpl] ------
+Difference for variable USER -- :h vs. :j
+[VERBOSE] Variables Found: Total=2; Diffs=1; NoMods=1
 EOF`
 
-# Two differences (with associated LOG(ERROR) output).
-expected_ok4=`cat <<EOF |  grep -v '^EOF$'
-ERROR: Token: USER has missing in-template modifiers. You gave :j and we computed :h. We changed to :j:h
-ERROR: Token: OWNER has missing in-template modifiers. You gave :c and we computed :h. We changed to :c:h
-$TMPDIR/ok4.tpl: Difference for variable USER -- :j vs. :j:h
-$TMPDIR/ok4.tpl: Difference for variable OWNER -- :c vs. :c:h
+expected_test2=`cat <<EOF | grep -v '^EOF$'
+Difference for variable USER -- :h vs. :j
 EOF`
 
-# Two differences but --brief output.
-expected_ok4_brief=`cat <<EOF |  grep -v '^EOF$'
-ERROR: Token: USER has missing in-template modifiers. You gave :j and we computed :h. We changed to :j:h
-ERROR: Token: OWNER has missing in-template modifiers. You gave :c and we computed :h. We changed to :c:h
-$TMPDIR/ok4.tpl: Detected 2 differences.
+# Diff between ok3.tpl and ok4.tpl. Expect two differences.
+expected_test3_verbose=`cat <<EOF |  grep -v '^EOF$'
+[VERBOSE] ------ Diff of [$TMPDIR/ok3.tpl, $TMPDIR/ok4.tpl] ------
+Difference for variable URL -- :h vs. :U=html
+Difference for variable USER -- :c vs. :h
+[VERBOSE] Variables Found: Total=2; Diffs=2; NoMods=0
 EOF`
 
-# No differences, TemplateContext set to TC_JS, verbose mode.
-expected_ok_js_verbose=`cat <<EOF | grep -v '^EOF$'
-[VERBOSE] ------ Checking $TMPDIR/ok_js.tpl ------
-[VERBOSE] $TMPDIR/ok_js.tpl: Variables Found: Total=2; Diffs=0; NoMods=0
+expected_test3=`cat <<EOF |  grep -v '^EOF$'
+Difference for variable URL -- :h vs. :U=html
+Difference for variable USER -- :c vs. :h
 EOF`
 
-# No differences, TemplateContext set to TC_JS, brief output.
-expected_ok_js_brief=`cat <<EOF | grep -v '^EOF$'
+# Diff between ok2.tpl and ok3.tpl. Expect two differences.
+expected_test4_verbose=`cat <<EOF |  grep -v '^EOF$'
+[VERBOSE] ------ Diff of [$TMPDIR/ok2.tpl, $TMPDIR/ok3.tpl] ------
+Difference for variable URL -- :U=html vs. :h
+Difference for variable USER -- :j vs. :c
+[VERBOSE] Variables Found: Total=2; Diffs=2; NoMods=0
 EOF`
+
+expected_test4=`cat <<EOF |  grep -v '^EOF$'
+Difference for variable URL -- :U=html vs. :h
+Difference for variable USER -- :j vs. :c
+EOF`
+
 
 # syntax-check these templates
 echo "TMPDIR is: $TMPDIR"
-$DIFFTPL $TMPDIR/ok1.tpl $TMPDIR/ok2.tpl $TMPDIR/ok3.tpl >/dev/null 2>&1 \
-   || die "$LINENO: $DIFFTPL gave error parsing good templates"
-$DIFFTPL $TMPDIR/ok1.tpl $TMPDIR/ok2.tpl $TMPDIR/bad1.tpl >/dev/null 2>&1 \
+$DIFFTPL $TMPDIR/ok1.tpl $TMPDIR/ok1.tpl >/dev/null 2>&1 \
+   || die "$LINENO: $DIFFTPL gave error parsing identical templates"
+$DIFFTPL $TMPDIR/ok1.tpl $TMPDIR/bad1.tpl >/dev/null 2>&1 \
    && die "$LINENO: $DIFFTPL gave no error parsing bad template"
-$DIFFTPL $TMPDIR/ok1.tpl $TMPDIR/ok2.tpl $TMPDIR/ok100.tpl >/dev/null 2>&1 \
+$DIFFTPL $TMPDIR/ok100.tpl $TMPDIR/ok1.tpl >/dev/null 2>&1 \
    && die "$LINENO: $DIFFTPL gave no error parsing non-existent template"
 
 # Now try the same thing, but use template-root so we don't need absdirs
-$DIFFTPL --template_root=$TMPDIR ok1.tpl ok2.tpl >/dev/null 2>&1 \
-   || die "$LINENO: $DIFFTPL gave error parsing good templates"
+$DIFFTPL --template_root=$TMPDIR ok2.tpl ok2.tpl >/dev/null 2>&1 \
+   || die "$LINENO: $DIFFTPL gave error parsing identical templates"
 
-# Parse the templates.  Bad one in the middle should be ignored.
-$DIFFTPL -c TC_HTML $TMPDIR/ok1.tpl $TMPDIR/bad1.tpl $TMPDIR/ok3.tpl >/dev/null 2>&1
-[ $? = 1 ] || die "$LINENO: $DIFFTPL gave wrong error-code parsing 1 bad template: $?"
+# Diffing the same template produces exit code 0. Check with all Strip values.
+$DIFFTPL -sSTRIP_WHITESPACE $TMPDIR/ok1.tpl $TMPDIR/ok1.tpl >/dev/null 2>&1
+[ $? = 0 ] || die "$LINENO: $DIFFTPL: wrong error-code on same template: $?"
+$DIFFTPL -sSTRIP_BLANK_LINES $TMPDIR/ok1.tpl $TMPDIR/ok1.tpl >/dev/null 2>&1
+[ $? = 0 ] || die "$LINENO: $DIFFTPL: wrong error-code on same template: $?"
+$DIFFTPL -sDO_NOT_STRIP $TMPDIR/ok1.tpl $TMPDIR/ok1.tpl >/dev/null 2>&1
+[ $? = 0 ] || die "$LINENO: $DIFFTPL: wrong error-code on same template: $?"
+
+# Diffing templates with diff, should produce exit code 1.
+$DIFFTPL $TMPDIR/ok1.tpl $TMPDIR/ok2.tpl >/dev/null 2>&1
+[ $? = 1 ] || die "$LINENO: $DIFFTPL: wrong error-code on diff. templates: $?"
+
+# Diffing templates with failure, should produce exit code 1.
+$DIFFTPL $TMPDIR/ok1.tpl $TMPDIR/ok100.tpl >/dev/null 2>&1
+[ $? = 1 ] || die "$LINENO: $DIFFTPL: wrong error-code on failed template: $?"
 
 # If you use relative filenames, must first fix expected outputs.
-out=`$DIFFTPL -v $TMPDIR/ok1.tpl 2>&1`
-[ "$out" != "$expected_ok1_verbose" ] &&\
-  die "$LINENO: $DIFFTPL: bad output for ok1: $out\n"
+out=`$DIFFTPL -v $TMPDIR/ok1.tpl $TMPDIR/ok4.tpl 2>&1`
+[ "$out" != "$expected_test1_verbose" ] &&\
+  die "$LINENO: $DIFFTPL: bad output for test1_verbose: $out\n"
+out=`$DIFFTPL $TMPDIR/ok1.tpl $TMPDIR/ok4.tpl 2>&1`
+[ "$out" != "$expected_test1" ] &&\
+  die "$LINENO: $DIFFTPL: bad output for test1: $out\n"
 
-out=`$DIFFTPL -v $TMPDIR/ok2.tpl 2>&1`
-[ "$out" != "$expected_ok2_verbose" ] &&\
-  die "$LINENO: $DIFFTPL: bad output for ok2: $out\n"
+out=`$DIFFTPL -v $TMPDIR/ok1.tpl $TMPDIR/ok2.tpl 2>&1`
+[ "$out" != "$expected_test2_verbose" ] &&\
+  die "$LINENO: $DIFFTPL: bad output for test2_verbose: $out\n"
+out=`$DIFFTPL $TMPDIR/ok1.tpl $TMPDIR/ok2.tpl 2>&1`
+[ "$out" != "$expected_test2" ] &&\
+  die "$LINENO: $DIFFTPL: bad output for test2: $out\n"
 
-out=`$DIFFTPL $TMPDIR/ok3.tpl 2>&1`
-[ "$out" != "$expected_ok3" ] &&\
-  die "$LINENO: $DIFFTPL: bad output for ok3: $out\n"
+out=`$DIFFTPL -v $TMPDIR/ok3.tpl $TMPDIR/ok4.tpl 2>&1`
+[ "$out" != "$expected_test3_verbose" ] &&\
+  die "$LINENO: $DIFFTPL: bad output for test3_verbose: $out\n"
+out=`$DIFFTPL $TMPDIR/ok3.tpl $TMPDIR/ok4.tpl 2>&1`
+[ "$out" != "$expected_test3" ] &&\
+  die "$LINENO: $DIFFTPL: bad output for test3: $out\n"
 
-out=`$DIFFTPL $TMPDIR/ok4.tpl 2>&1`
-[ "$out" != "$expected_ok4" ] &&\
-  die "$LINENO: $DIFFTPL: bad output for ok4: $out\n"
-
-out=`$DIFFTPL -q $TMPDIR/ok4.tpl 2>&1`
-[ "$out" != "$expected_ok4_brief" ] &&\
-  die "$LINENO: $DIFFTPL: bad output for ok4 [--brief]: $out\n"
-
-out=`$DIFFTPL -v -c TC_JS $TMPDIR/ok_js.tpl 2>&1`
-[ "$out" != "$expected_ok_js_verbose" ] &&\
-  die "$LINENO: $DIFFTPL: bad output for verbose ok_js [TC_JS]: $out\n"
-
-# Same as above but with --context instead of -c cmd-line arg and brief output.
-out=`$DIFFTPL --context TC_JS $TMPDIR/ok_js.tpl 2>&1`
-[ "$out" != "$expected_ok_js_brief" ] &&\
-  die "$LINENO: $DIFFTPL: bad output for brief ok_js [TC_JS]: $out\n"
+out=`$DIFFTPL -v $TMPDIR/ok2.tpl $TMPDIR/ok3.tpl 2>&1`
+[ "$out" != "$expected_test4_verbose" ] &&\
+  die "$LINENO: $DIFFTPL: bad output for test4_verbose: $out\n"
+out=`$DIFFTPL $TMPDIR/ok2.tpl $TMPDIR/ok3.tpl 2>&1`
+[ "$out" != "$expected_test4" ] &&\
+  die "$LINENO: $DIFFTPL: bad output for test4: $out\n"
 
 echo "PASSED"

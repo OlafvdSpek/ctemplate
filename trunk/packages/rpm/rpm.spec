@@ -64,18 +64,14 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 
 %docdir %{prefix}/share/doc/%{NAME}-%{VERSION}
-## %{prefix}/share/doc/%{NAME}-%{VERSION}/*
-
-%doc AUTHORS COPYING ChangeLog INSTALL NEWS README
-%doc doc/*
-%doc contrib/*
+%{prefix}/share/doc/%{NAME}-%{VERSION}/*
 
 %{_libdir}/*.so.*
 
 %files devel
 %defattr(-,root,root)
 
-%{_includedir}/google
+%{_includedir}/ctemplate
 %{_libdir}/*.a
 %{_libdir}/*.la
 %{_libdir}/*.so

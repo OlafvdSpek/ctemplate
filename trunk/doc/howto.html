@@ -485,7 +485,7 @@ template could be a valid use of a custom modifier:</p>
 write a modifier and how to register it. Here is an example of the
 code for a custom modifier:</p>
 <pre>
-   class StarEscape : public template_modifiers::TemplateModifier {
+   class StarEscape : public ctemplate::TemplateModifier {
      void Modify(const char* in, size_t inlen,
                  const ctemplate::PerExpandData* per_expand_data,
                  ExpandEmitter* outbuf, const string&amp; arg) const {
@@ -745,7 +745,7 @@ all template code in namespace <code>google</code>.
 <h3> Loading A Template </h3>
 
 <p>The main routine to load a template is
-<code>google::Template::GetTemplate()</code>, defined in
+<code>ctemplate::Template::GetTemplate()</code>, defined in
 <code>template.h</code>.  This is a static, factory method, that loads
 a template from either disk or from an internal template cache, and
 returns a pointer to a <code>Template</code> object.  Besides a
@@ -754,16 +754,16 @@ defines how to expand whitespace found in a template file.  It can
 have one of the following values:</p>
 
 <ul>
-  <li> <code>google::DO_NOT_STRIP</code>: do nothing.  This expands the
+  <li> <code>ctemplate::DO_NOT_STRIP</code>: do nothing.  This expands the
        template file verbatim.
 
-  <li> <code>google::STRIP_BLANK_LINES</code>: remove all blank
+  <li> <code>ctemplate::STRIP_BLANK_LINES</code>: remove all blank
        lines when expanding.  This ignores any blank lines found in
        the template file when expanding.  When the template is html,
        this reduces the size of the output text without requiring a
        sacrifice of readability for the input file.
 
-  <li> <code>google::STRIP_WHITESPACE</code>: remove not only blank lines when
+  <li> <code>ctemplate::STRIP_WHITESPACE</code>: remove not only blank lines when
        expanding, but also whitespace at the beginning and end of each
        line.  It also removes any linefeed (possibly following
        whitespace) that follows a closing '}}' of any kind of template
@@ -783,7 +783,7 @@ or if there is a syntax error trying to load it.</p>
 <p>Besides loading templates, the application can also ask the
 template system to <i>reload</i> a template, via
 <code>template->ReloadIfChanged()</code>.  (You can also reload all
-templates at once via <code>google::Template::ReloadAllIfChanged()</code>.)
+templates at once via <code>ctemplate::Template::ReloadAllIfChanged()</code>.)
 <code>ReloadIfChanged()</code> looks on disk, and if it notices the
 template file has changed since the last load, it will reload the
 template from disk, replacing the old contents.  Actually, the reload
@@ -794,8 +794,8 @@ is called.</p>
 
 <h3> Creating A Template Dictionary </h3>
 
-<p>The class <code>google::TemplateDictionary</code> is used for all template
-dictionary operations.  <code>new google::TemplateDictionary(name)</code> is
+<p>The class <code>ctemplate::TemplateDictionary</code> is used for all template
+dictionary operations.  <code>new ctemplate::TemplateDictionary(name)</code> is
 used to create a new top-level dictionary.
 <code>dict->AddSectionDictionary(name)</code> and
 <code>dict->AddIncludeDictionary(name)</code> are used to create
@@ -846,7 +846,7 @@ can be specified as strings in a variety of ways: C++ strings, char
 
 <p>There are two other ways to set a variable's value as well, each
 with a different scoping rule.  You can call
-<code>google::TemplateDictionary::SetGlobalValue(name, value)</code>
+<code>ctemplate::TemplateDictionary::SetGlobalValue(name, value)</code>
 -- no <code>TemplateDictionary</code> instance needed here -- to set a
 variable that can be used by all templates in an application.  This
 is quite rare.</p>
@@ -876,7 +876,7 @@ helper routines to help setting values of a few special forms.</p>
 
 <p>Example:</p>
 <pre>
-   google::TemplateDictionary* dict = new google::TemplateDictionary("var example");
+   ctemplate::TemplateDictionary* dict = new ctemplate::TemplateDictionary("var example");
    dict->SetValue("FOOTER", "Aren't these great results?");
 </pre>
 
@@ -924,11 +924,11 @@ value)</code>.</p>
 
 <p>Example:</p>
 <pre>
-   using google::TemplateDictionary;
+   using ctemplate::TemplateDictionary;
    TemplateDictionary* dict = new TemplateDictionary("section example");
    const char* username = GetUsername();   // returns "" for no user
    if (username[0] != '\0') {
-      TemplateDictionary* sub_dict = dict->AddSectionDictionary("CHANGE_USER");
+      ctemplate::TemplateDictionary* sub_dict = dict->AddSectionDictionary("CHANGE_USER");
       sub_dict->SetValue("USERNAME", username);
    } else {
       // don't need to do anything; we want a hidden section, which is the default
@@ -974,7 +974,7 @@ it's relative to <A HREF="#managing">template_root</A>.</p>
 
 <p>Example:</p>
 <pre>
-   using google::TemplateDictionary;
+   using ctemplate::TemplateDictionary;
    TemplateDictionary* dict = new TemplateDictionary("include example");
    GetResults(results, &amp;num_results);
    for (int i = 0; i < num_results; ++i) {
@@ -1033,8 +1033,8 @@ whitespace is stripped.</p>
 itself to expand the template with those dictionary values, putting
 the output in a string:</p>
 <pre>
-   google::Template* tpl = google::Template::GetTemplate(&lt;filename&gt;, google::STRIP_WHITESPACE);
-   google::TemplateDictionary dict("debug-name");
+   ctemplate::Template* tpl = ctemplate::Template::GetTemplate(&lt;filename&gt;, ctemplate::STRIP_WHITESPACE);
+   ctemplate::TemplateDictionary dict("debug-name");
    FillDictionary(&amp;dict, ...);
    string output;
    bool error_free = <font color=red>tpl->Expand(&amp;output, &amp;dict);</font>
@@ -1054,9 +1054,9 @@ If <code>output</code> was not empty before calling
 <code>ExpandWithData()</code>, that allows you to pass in per-expand
 data.  It's called like this:</p>
 <pre>
-   Template* tpl = google::Template::GetTemplate(...);
-   TemplateDictionary dict(...);
-   google::ctemplate::PerExpandData per_expand_data;
+   ctemplate::Template* tpl = ctemplate::Template::GetTemplate(...);
+   ctemlpate::TemplateDictionary dict(...);
+   ctemplate::PerExpandData per_expand_data;
    string output;
    tpl->ExpandWithData(&amp;output, &amp;dict, &amp;per_expand_data);
 </pre>
@@ -1154,14 +1154,14 @@ you want to include this template inside another template (for
 instance, via <code>{{>TEMPLATE_THAT_COMES_FROM_A_STRING}}</code>).
 The latter is possible because <code>StringToTemplateCache</code>
 takes a "key", which you can later pass in to
-<code>TemplateDictionary::SetFilename()</code> in order to set up the
+<code>ctemplate::TemplateDictionary::SetFilename()</code> in order to set up the
 template-include.</p>
 
 <p>Future calls to <code>StringToTemplateCache()</code> with the same
 key will have no effect.  <code>ReloadIfChanged()</code> has no effect
 on string-based templates.  The only way to change the string
 associated with a given filename/key, is to call
-<code>google::Template::ClearCache()</code>.</p>
+<code>ctemplate::Template::ClearCache()</code>.</p>
 
 <p>Prefer file-based to string-based templates where possible.
 Updating a file-based template requires merely a data push, rather
@@ -1373,7 +1373,7 @@ sub-templates -- we suggest the following idiom:</p>
    #include "example.tpl.varnames.h"   // defines 1 string per dictionary key
    RegisterTemplateFilename(EXAMPLE_FN, "example.tpl");   // defines template
    ...
-   google::Template* tpl = google::Template::GetTemplate(EXAMPLE_FN, ...);
+   ctemplate::Template* tpl = ctemplate::Template::GetTemplate(EXAMPLE_FN, ...);
    ...
    include_dict->SetFilename(EXAMPLE_FN);
 </pre>
@@ -1389,7 +1389,7 @@ forth.</p>
 system.</p>
 
 <ul>
-  <li> <code>google::Template::SetTemplateRootDirectory(root)</code>: when
+  <li> <code>ctemplate::Template::SetTemplateRootDirectory(root)</code>: when
        <code>GetTemplate()</code> is called with a relative filename,
        the template system will try to load the template from
        <code>root/file</code>.  This defaults to <code>./</code>. </li>
@@ -1400,17 +1400,17 @@ template performance and debugging template problems.  The following
 functions work on <A HREF="#register">registered</A> templates.</p>
 
 <ul>
-  <li> <code>google::TemplateNameList::GetMissingList()</code>: returns a list
+  <li> <code>ctemplate::TemplateNameList::GetMissingList()</code>: returns a list
        of all registered templates where the file could not be found
        on disk. </li>
-  <li> <code>google::TemplateNameList::AllDoExist()</code>: true iff the
+  <li> <code>ctemplate::TemplateNameList::AllDoExist()</code>: true iff the
        missing-list is empty. </li>
-  <li> <code>google::TemplateNameList::GetBadSyntaxList()</code>: returns a
+  <li> <code>ctemplate::TemplateNameList::GetBadSyntaxList()</code>: returns a
        list of all registered templates where the template contains a
        syntax error, and thus cannot be used. </li>
-  <li> <code>google::TemplateNameList::IsAllSyntaxOkay()</code>: true iff the
+  <li> <code>ctemplate::TemplateNameList::IsAllSyntaxOkay()</code>: true iff the
        bad-syntax list is emtpy. </li>
-  <li> <code>google::TemplateNameList::GetLastmodTime()</code>: the latest
+  <li> <code>ctemplate::TemplateNameList::GetLastmodTime()</code>: the latest
        last-modified time for any registered template-file. </li>
 </ul>
 
@@ -1436,7 +1436,7 @@ system uses.</p>
 
 <p>All static methods on <code>Template</code> and
 <code>TemplateDictionary</code> objects are threadsafe: you can safely
-call <code>google::TemplateDictionary::SetGlobalValue()</code> without needing
+call <code>ctemplate::TemplateDictionary::SetGlobalValue()</code> without needing
 to worry about locking.</p>
 
 <p>Non-static methods are not thread-safe.  It is not safe for two

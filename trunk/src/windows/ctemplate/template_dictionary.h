@@ -54,9 +54,9 @@
 #include <map>
 #include <string>
 #include <vector>
-#include <google/template_dictionary_interface.h>
-#include <google/template_string.h>
-#include <google/template_modifiers.h>
+#include <ctemplate/template_dictionary_interface.h>
+#include <ctemplate/template_string.h>
+#include <ctemplate/template_modifiers.h>
 
 // NOTE: if you are statically linking the template library into your binary
 // (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
@@ -65,7 +65,7 @@
 # define CTEMPLATE_DLL_DECL  __declspec(dllimport)
 #endif
 
-namespace google {
+namespace ctemplate {
 
 class UnsafeArena;
 template<typename A, int B, typename C, typename D> class small_map;
@@ -124,15 +124,14 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // name is used only for debugging.
   // arena is used to store all names and values.  It can be NULL (the
   //    default), in which case we create own own arena.
-  // TODO(csilvers): consider using "TemplateString name" instead of string&.
-  explicit TemplateDictionary(const std::string& name,
+  explicit TemplateDictionary(const TemplateString& name,
                               UnsafeArena* arena=NULL);
   ~TemplateDictionary();
 
   // If you want to be explicit, you can use NO_ARENA as a synonym to NULL.
   static UnsafeArena* const NO_ARENA;
 
-  const char* name() const { return name_; }
+  std::string name() const { return std::string(name_.ptr_, name_.length_); }
 
   // Returns a recursive copy of this dictionary.  This dictionary
   // *must* be a "top-level" dictionary (that is, not created via
@@ -140,7 +139,7 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // the resulting dict, and must delete it.  If arena is NULL, we
   // create our own.  Returns NULL if the copy fails (probably because
   // the "top-level" rule was violated).
-  TemplateDictionary* MakeCopy(const std::string& name_of_copy,
+  TemplateDictionary* MakeCopy(const TemplateString& name_of_copy,
                                UnsafeArena* arena=NULL);
 
   // --- Routines for VARIABLES
@@ -237,9 +236,9 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // to do the escaping in the template:
   //            "...{{MYVAR:html_escape}}..."
   void SetEscapedValue(const TemplateString variable, const TemplateString value,
-                       const template_modifiers::TemplateModifier& escfn);
+                       const TemplateModifier& escfn);
   void SetEscapedFormattedValue(const TemplateString variable,
-                                const template_modifiers::TemplateModifier& escfn,
+                                const TemplateModifier& escfn,
                                 const char* format, ...)
 #if 0
        __attribute__((__format__ (__printf__, 4, 5)))
@@ -247,15 +246,8 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
       ;  // starts at 4 because of implicit 1st arg 'this'
   void SetEscapedValueAndShowSection(const TemplateString variable,
                                      const TemplateString value,
-                                     const template_modifiers::TemplateModifier& escfn,
+                                     const TemplateModifier& escfn,
                                      const TemplateString section_name);
-  static const template_modifiers::HtmlEscape& html_escape;
-  static const template_modifiers::PreEscape& pre_escape;
-  static const template_modifiers::XmlEscape& xml_escape;
-  static const template_modifiers::JavascriptEscape& javascript_escape;
-  static const template_modifiers::UrlQueryEscape& url_query_escape;
-  static const template_modifiers::JsonEscape& json_escape;
-
 
  private:
   friend class SectionTemplateNode;   // for access to GetSectionValue(), etc.
@@ -298,7 +290,9 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   template<typename T> inline void LazilyCreateDict(T** dict);
   inline DictVector* CreateDictVector();
   inline TemplateDictionary* CreateTemplateSubdict(
-      const std::string& name, UnsafeArena* arena, TemplateDictionary* parent_dict,
+      const TemplateString& name,
+      UnsafeArena* arena,
+      TemplateDictionary* parent_dict,
       TemplateDictionary* template_global_dict_owner);
 
   // This is a helper function to insert <key,value> into m.
@@ -314,7 +308,7 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // template-global dictionary from which all children (both
   // IncludeDictionary and SectionDictionary) inherit.  Values are
   // filled into global_template_dict via SetTemplateGlobalValue.
-  explicit TemplateDictionary(const std::string& name,
+  explicit TemplateDictionary(const TemplateString& name,
                               class UnsafeArena* arena,
                               TemplateDictionary* parent_dict,
                               TemplateDictionary* template_global_dict_owner);
@@ -333,7 +327,7 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
 
   // Used for recursive MakeCopy calls.
   TemplateDictionary* InternalMakeCopy(
-      const std::string& name_of_copy,
+      const TemplateString& name_of_copy,
       UnsafeArena* arena,
       TemplateDictionary* parent_dict,
       TemplateDictionary* template_global_dict_owner);
@@ -397,7 +391,7 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // The arena, also set at construction time.
   class UnsafeArena* const arena_;
   bool should_delete_arena_;   // only true if we 'new arena' in constructor
-  const char* const name_;     // points into the arena
+  TemplateString name_;        // points into the arena, or to static memory
 
   // The three dictionaries that I own -- for vars, sections, and template-incs
   VariableDict* variable_dict_;

@@ -44,12 +44,12 @@ template-includes.</p>
 int main() {
   static const char template_text[] =
     "ERROR: {{FUNCTION}}({{ARGS}}) returned {{ERROR_CODE}}: {{ERROR_MESSAGE}}\n";
-  Template* tpl = TemplateFromString::GetTemplate("error_msg_tpl", template_text,
-                                                  DO_NOT_STRIP);
+  ctemplate::Template* tpl = ctemplate::Template::StringToTemplate(
+      template_text, DO_NOT_STRIP);
   FILE* fp = fopen(argv[1], "r");
   if (fp == NULL) {
     int err_no = errno;   // squirrel this away
-    TemplateDictionary dict("error_msg: fopen()");
+    ctemplate::TemplateDictionary dict("error_msg: fopen()");
     dict.SetValue("FUNCTION", "fopen");
     dict.SetValue("ARGS", argv[1]);
     dict.SetIntValue("ERROR_CODE", err_no);
@@ -59,6 +59,7 @@ int main() {
     tpl->Expand(&error_text, &dict);
     puts(error_text.c_str());
   }
+  delete tpl;
 }
 
 </pre>
@@ -87,12 +88,12 @@ int main() {
   static const char template_text[] =
      "ERROR: {{FUNCTION}}({{ARGS}}) returned {{ERROR_CODE}}"
      "{{#MSG_SECTION}}: {{ERROR_MESSAGE}}{{/MSG_SECTION}}\n";
-  Template* tpl = TemplateFromString::GetTemplate("error_msg", template_text,
-                                                  DO_NOT_STRIP);
+  ctemplate::Template* tpl = ctemplate::Template::StringToTemplate(
+      template_text, DO_NOT_STRIP);
   FILE* fp = fopen(argv[1], "r");
   if (fp == NULL) {
     int err_no = errno;   // squirrel this away
-    TemplateDictionary dict("file_error_message");
+    ctemplate::TemplateDictionary dict("file_error_message");
     dict.SetValue("FUNCTION", "fopen");
     dict.SetValue("ARGS", argv[1]);
     dict.SetIntValue("ERROR_CODE", err_no);
@@ -104,6 +105,7 @@ int main() {
     tpl->Expand(&error_text, &dict);
     puts(error_text.c_str());
   }
+  delete tpl;
 }
 
 </pre>
@@ -192,9 +194,9 @@ initializing each top-level template with some standard values.</p>
 RegisterTemplateFilename(SEARCH_RESULTS_FN, "search_results.tpl");
 #include "search_results.tpl.varnames.h"  // defines ksr_HEADER, etc.
 
-using google::Template;
-using google::TemplateDictionary;
-using google::STRIP_WHITESPACE;
+using ctemplate::TemplateDictionary;
+using ctemplate::Template;
+using ctemplate::STRIP_WHITESPACE;
 
 // IsEmpty
 //    A simple utility function

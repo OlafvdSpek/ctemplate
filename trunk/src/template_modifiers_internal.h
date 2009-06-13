@@ -50,7 +50,7 @@
 #include <string.h>      // for strchr
 #include <string>
 #include <vector>
-#include <google/template_modifiers.h>   // for null_modifier
+#include <ctemplate/template_modifiers.h>   // for null_modifier
 
 // Annoying stuff for windows -- make sure clients (in this case
 // unittests) can import the class definitions and variables.
@@ -67,8 +67,6 @@ class HtmlParser;
 }
 
 _START_GOOGLE_NAMESPACE_
-
-namespace template_modifiers {
 
 class TemplateModifier;
 
@@ -237,8 +235,6 @@ extern CTEMPLATE_DLL_DECL
 std::vector<const ModifierAndValue*> GetDefaultModifierForXml();
 extern CTEMPLATE_DLL_DECL
 std::vector<const ModifierAndValue*> GetDefaultModifierForJson();
-
-}  // namespace template_modifiers
 
 _END_GOOGLE_NAMESPACE_
 

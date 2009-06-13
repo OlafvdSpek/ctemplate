@@ -4,7 +4,7 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 0.94, opensource@google.com)
+AC_INIT(ctemplate, 0.95, opensource@google.com)
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
@@ -65,7 +65,7 @@ AC_RWLOCK
 # Find out what namespace 'normal' STL code lives in, and also what namespace
 # the user wants our classes to be defined in
 AC_CXX_STL_NAMESPACE
-AC_DEFINE_GOOGLE_NAMESPACE(google)
+AC_DEFINE_GOOGLE_NAMESPACE(ctemplate)
 
 # Figures out where hash_map and hash_set live, and what namespace they use
 AC_CXX_STL_HASH
@@ -120,12 +120,16 @@ AC_DEFINE_UNQUOTED(HTMLPARSER_NAMESPACE, $ac_htmlparser_namespace,
 
 # Write generated configuration file, and also .h files
 AC_CONFIG_FILES([Makefile \
-                 src/google/template_string.h src/google/template_enums.h \
-		 src/google/template.h src/google/template_from_string.h \
-		 src/google/template_modifiers.h src/google/template_emitter.h \
-		 src/google/template_annotator.h \
-		 src/google/template_dictionary.h src/google/template_pathops.h \
-		 src/google/template_namelist.h src/google/per_expand_data.h \
-		 src/google/template_dictionary_interface.h \
+                 src/ctemplate/template_string.h \
+                 src/ctemplate/template_enums.h \
+                 src/ctemplate/template.h \
+                 src/ctemplate/template_modifiers.h \
+                 src/ctemplate/template_emitter.h \
+                 src/ctemplate/template_annotator.h \
+                 src/ctemplate/template_dictionary.h \
+                 src/ctemplate/template_pathops.h \
+                 src/ctemplate/template_namelist.h \
+                 src/ctemplate/per_expand_data.h \
+                 src/ctemplate/template_dictionary_interface.h \
 		 ])
 AC_OUTPUT

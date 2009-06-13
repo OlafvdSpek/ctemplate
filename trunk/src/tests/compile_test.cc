@@ -34,27 +34,30 @@
 // This brings in some code most users won't use.  This test is meant
 // entirely to use ctemplate as users will, just #including the public
 // .h files directly.  It does hardly any work, and is mainly intended
-// as a compile check for the .h files.
+// as a compile check for the .h files.  It will not work if you use
+// a non-standard name for the package namespace (via
+//     ./configure --enable-namespace=foo
+// ).
 
 // These are all the .h files that we export
-#include <google/per_expand_data.h>
-#include <google/template.h>
-#include <google/template_dictionary.h>
-#include <google/template_dictionary_interface.h>
-#include <google/template_emitter.h>
-#include <google/template_enums.h>
-#include <google/template_from_string.h>
-#include <google/template_modifiers.h>
-#include <google/template_namelist.h>
-#include <google/template_pathops.h>
-#include <google/template_string.h>
+#include <ctemplate/per_expand_data.h>
+#include <ctemplate/template.h>
+#include <ctemplate/template_dictionary.h>
+#include <ctemplate/template_dictionary_interface.h>
+#include <ctemplate/template_emitter.h>
+#include <ctemplate/template_enums.h>
+#include <ctemplate/template_modifiers.h>
+#include <ctemplate/template_namelist.h>
+#include <ctemplate/template_pathops.h>
+#include <ctemplate/template_string.h>
 #include <stdio.h>
 #include <string>
 
 int main() {
-  google::Template* tpl = google::Template::StringToTemplate(
-      "example", google::DO_NOT_STRIP, google::TC_MANUAL);
-  google::TemplateDictionary dict("my dict");
+  ctemplate::Template::StringToTemplateCache("key", "example");
+  ctemplate::Template* tpl = ctemplate::Template::GetTemplate(
+      "key", ctemplate::DO_NOT_STRIP);
+  ctemplate::TemplateDictionary dict("my dict");
   std::string nothing_will_come_of_nothing;
   tpl->Expand(&nothing_will_come_of_nothing, &dict);
   printf("PASS.\n");

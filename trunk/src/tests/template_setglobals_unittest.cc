@@ -33,8 +33,8 @@
 #include "config_for_unittests.h"
 #include <assert.h>
 #include <stdio.h>
-#include <google/template.h>
-#include <google/template_dictionary.h>
+#include <ctemplate/template.h>
+#include <ctemplate/template_dictionary.h>
 #include "tests/template_test_util.h"
 
 #define ASSERT(cond)  do {                                      \
