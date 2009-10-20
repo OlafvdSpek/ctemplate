@@ -639,6 +639,22 @@ static void TestSetTemplateGlobalValue() {
                "templateval2");
   ASSERT_STREQ(includedict2_peer.GetSectionValue("TEMPLATEVAL2"),
                "templateval2");
+
+  // A section shown template-globally will be shown in all its children.
+  dict.ShowTemplateGlobalSection("ShownTemplateGlobalSection");
+  ASSERT(!peer.IsHiddenSection("ShownTemplateGlobalSection"));
+
+  ASSERT(!subdict2_peer.IsHiddenSection("ShownTemplateGlobalSection"));
+  ASSERT(!subsubdict_peer.IsHiddenSection("ShownTemplateGlobalSection"));
+
+  // Showing a template-global section in a child will show it in all templates
+  // in the tree
+  subdict->ShowTemplateGlobalSection("ShownFromAChild");
+  ASSERT(!peer.IsHiddenSection("ShownFromAChild"));
+  ASSERT(!subsubdict_peer.IsHiddenSection("ShownFromAChild"));
+
+  // Asking for a section that doesn't exist shouldn't cause infinite recursion
+  peer.IsHiddenSection("NAVBAR_SECTION");
 }
 
 static void TestSetTemplateGlobalValueWithoutCopy() {
@@ -964,6 +980,16 @@ static void TestIterator() {
   delete corn_crop;
 }
 
+static void TestIsHiddenSectionDefault() {
+  TemplateDictionary dict("dict");
+  TemplateDictionaryPeer peer(&dict);
+  ASSERT(peer.IsHiddenSection("UNDEFINED"));
+  ASSERT(!peer.IsUnhiddenSection("UNDEFINED"));
+  dict.ShowSection("VISIBLE");
+  ASSERT(!peer.IsHiddenSection("VISIBLE"));
+  ASSERT(peer.IsUnhiddenSection("VISIBLE"));
+}
+
 int Main() {
   SetUp();
 
@@ -980,6 +1006,7 @@ int Main() {
   TestSetTemplateGlobalValue();
   TestSetTemplateGlobalValueWithoutCopy();
   TestAddIncludeDictionary();
+  TestIsHiddenSectionDefault();
 
   TestIterator();
 

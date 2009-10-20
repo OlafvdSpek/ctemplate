@@ -110,7 +110,7 @@ WINDOWS_PROJECTS += vsprojects/libctemplate/libctemplate.vcproj
 libctemplate_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/base/small_map.h src/base/manual_constructor.h \
-	src/template_modifiers_internal.h \
+	src/template_modifiers_internal.h src/indented_writer.h \
 	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
 	src/template_annotator.cc src/per_expand_data.cc \
 	src/template_string.cc \
@@ -324,19 +324,21 @@ TESTDATA += \
    src/tests/htmlparser_testdata/simple.html \
    src/tests/htmlparser_testdata/tags.html
 
+# We want to compile statemachine.cc as a c file as well as a c++ file
+
+statemachine.c: src/htmlparser/statemachine.cc
+	$(LN_S) src/htmlparser/statemachine.cc $@
+
 TESTS += statemachine_test
 WINDOWS_PROJECTS += vsprojects/statemachine_test/statemachine_test.vcproj
 statemachine_test_SOURCES = src/tests/statemachine_test.c \
-                            src/htmlparser/statemachine.cc
-# We force this to be compiled as C code, just to make sure no c++ snuck
-# into statemachine.cc (only the namespace declaration should be c++).
-statemachine_test_CXXFLAGS = -xc
+                            statemachine.c
+statemachine_test_CFLAGS = -Isrc/htmlparser
 
 TESTS += generate_fsm_c_test
 WINDOWS_PROJECTS += vsprojects/generate_fsm_c_test/generate_fsm_c_test.vcproj
 generate_fsm_c_test_SOURCES = src/tests/generate_fsm_c_test.c
 generate_fsm_c_test_DEPENDENCIES = src/tests/htmlparser_testdata/sample_fsm.c
-generate_fsm_c_test_CXXFLAGS = -xc
 
 # This is something only maintainers need (since they're the only ones
 # who generate .h or .c files from .config files).

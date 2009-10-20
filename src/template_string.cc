@@ -226,7 +226,7 @@ struct TemplateStringHasher {
 /*static*/ const TemplateIdHasher TemplateStringHasher::hasher = {};
 
 namespace {
-Mutex mutex;
+Mutex mutex(Mutex::LINKER_INITIALIZED);
 
 #ifdef HAVE_UNORDERED_MAP
 typedef HASH_NAMESPACE::unordered_set<TemplateString, TemplateStringHasher>

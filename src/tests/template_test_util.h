@@ -109,6 +109,10 @@ class TemplateDictionaryPeer {
   // Returns true if the named section is hidden.
   bool IsHiddenSection(const TemplateString& name) const;
 
+  // IsUnhiddenSection
+  //   Returns true if the section has been marked visible and false otherwise.
+  bool IsUnhiddenSection(const TemplateString& name) const;
+
   // Returns true if the named sub-template is hidden.
   bool IsHiddenTemplate(const TemplateString& name) const;
 

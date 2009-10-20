@@ -136,6 +136,11 @@ class CTEMPLATE_DLL_DECL TemplateDictionaryInterface {
   virtual Iterator* CreateSectionIterator(
       const TemplateString& section) const = 0;
 
+  // IsUnhiddenSection
+  //   Returns true if the section has been marked visible and false otherwise.
+  virtual bool IsUnhiddenSection(
+      const TemplateString& name) const = 0;
+
  private:
   // Disallow copy and assign.
   TemplateDictionaryInterface(const TemplateDictionaryInterface&);

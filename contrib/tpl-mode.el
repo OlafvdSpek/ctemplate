@@ -81,8 +81,7 @@
 (defconst tpl-mode-close-section (concat "{{/\\("
 					 tpl-mode-tpl-token
 					 "\\)}}"))
-;; TODO(tonyg) Figure out a way to support multiline comments.
-(defconst tpl-mode-comment "\\({{!.*?}}\\)")
+(defconst tpl-mode-comment "\\({{![^}]+?}}\\)")
 (defconst tpl-mode-include (concat "\\({{>"
 				   tpl-mode-tpl-token
 				   "}}\\)"))

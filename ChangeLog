@@ -1,3 +1,21 @@
+Mon Oct 19 11:42:57 2009  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.96 release
+	* Support multiple template root directories (williasr)
+	* Remove TemplateContext from TemplateToString (jad)
+	* Remove programmatic auto-escape code (jad)
+	* Speedup: use linker to detect immutable TemplateStrings (csilvers)
+	* Implement ShowTemplateGlobalSection (williasr)
+	* Change SetIntValue to accept longs (omoikane)
+	* Allow TemplateDictionary c'tor to take a TemplateString (csilvers)
+	* Make Mutex safer to run during global destructors (csilvers)
+	* BUILD: don't set TMPDIR when building; ar reads it (csilvers)
+	* BUILD: fix compiling of C (as opposed to C++) test file (csilvers)
+	* BUILD: remove bash-specific 'test x == y' from configure.ac (csilvers)
+	* BUGFIX: use AllocAligned when allocating non-char objects (csilvers)
+	* PORTING: remove obsolete MSVC Detect64BitPortabilityProblems (csilvers)
+	* Updated from autoconf 2.61 to 2.62
+
 Fri Jun 12 08:13:35 2009  Google Inc. <opensource@google.com>
 
 	* ctemplate: version 0.95 release

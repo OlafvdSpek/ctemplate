@@ -69,6 +69,11 @@ bool TemplateDictionaryPeer::IsHiddenSection(
   return dict_->IsHiddenSection(name);
 }
 
+bool TemplateDictionaryPeer::IsUnhiddenSection(
+    const TemplateString& name) const {
+  return dict_->IsUnhiddenSection(name);
+}
+
 bool TemplateDictionaryPeer::IsHiddenTemplate(
     const TemplateString& name) const {
   return dict_->IsHiddenTemplate(name);

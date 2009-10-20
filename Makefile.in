@@ -211,7 +211,8 @@ am_make_tpl_varnames_h_OBJECTS = $(am__objects_1) \
 	make_tpl_varnames_h.$(OBJEXT)
 make_tpl_varnames_h_OBJECTS = $(am_make_tpl_varnames_h_OBJECTS)
 make_tpl_varnames_h_DEPENDENCIES = libctemplate_nothreads.la
-am_statemachine_test_OBJECTS = statemachine_test.$(OBJEXT) \
+am_statemachine_test_OBJECTS =  \
+	statemachine_test-statemachine_test.$(OBJEXT) \
 	statemachine_test-statemachine.$(OBJEXT)
 statemachine_test_OBJECTS = $(am_statemachine_test_OBJECTS)
 statemachine_test_LDADD = $(LDADD)
@@ -418,6 +419,7 @@ PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
 PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
+PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PTHREAD_CC = @PTHREAD_CC@
@@ -441,6 +443,7 @@ ac_google_attribute = @ac_google_attribute@
 ac_google_end_namespace = @ac_google_end_namespace@
 ac_google_namespace = @ac_google_namespace@
 ac_google_start_namespace = @ac_google_start_namespace@
+ac_have_attribute_weak = @ac_have_attribute_weak@
 ac_htmlparser_namespace = @ac_htmlparser_namespace@
 ac_windows_dllexport = @ac_windows_dllexport@
 ac_windows_dllexport_defines = @ac_windows_dllexport_defines@
@@ -649,7 +652,7 @@ CTEMPLATE_SYMBOLS = '(ctemplate|template_modifiers|BaseArena|UnsafeArena|[^A-Za-
 libctemplate_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/base/small_map.h src/base/manual_constructor.h \
-	src/template_modifiers_internal.h \
+	src/template_modifiers_internal.h src/indented_writer.h \
 	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
 	src/template_annotator.cc src/per_expand_data.cc \
 	src/template_string.cc \
@@ -778,14 +781,11 @@ htmlparser_nothreads_test_SOURCES = $(htmlparser_test_SOURCES)
 htmlparser_nothreads_test_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 htmlparser_nothreads_test_LDADD = libctemplate_nothreads_debug.la
 statemachine_test_SOURCES = src/tests/statemachine_test.c \
-                            src/htmlparser/statemachine.cc
+                            statemachine.c
 
-# We force this to be compiled as C code, just to make sure no c++ snuck
-# into statemachine.cc (only the namespace declaration should be c++).
-statemachine_test_CXXFLAGS = -xc
+statemachine_test_CFLAGS = -Isrc/htmlparser
 generate_fsm_c_test_SOURCES = src/tests/generate_fsm_c_test.c
 generate_fsm_c_test_DEPENDENCIES = src/tests/htmlparser_testdata/sample_fsm.c
-generate_fsm_c_test_CXXFLAGS = -xc
 # In addition to the normal stuff, we include all the windows-specific
 # code, and also the code used to generate the html-parser fsm files.
 # NOTE: BUILT_SOURCES should come after the .config files, so they
@@ -981,7 +981,7 @@ make_tpl_varnames_h$(EXEEXT): $(make_tpl_varnames_h_OBJECTS) $(make_tpl_varnames
 	$(CXXLINK) $(make_tpl_varnames_h_LDFLAGS) $(make_tpl_varnames_h_OBJECTS) $(make_tpl_varnames_h_LDADD) $(LIBS)
 statemachine_test$(EXEEXT): $(statemachine_test_OBJECTS) $(statemachine_test_DEPENDENCIES) 
 	@rm -f statemachine_test$(EXEEXT)
-	$(CXXLINK) $(statemachine_test_LDFLAGS) $(statemachine_test_OBJECTS) $(statemachine_test_LDADD) $(LIBS)
+	$(LINK) $(statemachine_test_LDFLAGS) $(statemachine_test_OBJECTS) $(statemachine_test_LDADD) $(LIBS)
 template_dictionary_nothreads_unittest$(EXEEXT): $(template_dictionary_nothreads_unittest_OBJECTS) $(template_dictionary_nothreads_unittest_DEPENDENCIES) 
 	@rm -f template_dictionary_nothreads_unittest$(EXEEXT)
 	$(CXXLINK) $(template_dictionary_nothreads_unittest_LDFLAGS) $(template_dictionary_nothreads_unittest_OBJECTS) $(template_dictionary_nothreads_unittest_LDADD) $(LIBS)
@@ -1101,7 +1101,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_testing_la-template_test_util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/make_tpl_varnames_h.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statemachine_test-statemachine.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statemachine_test.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statemachine_test-statemachine_test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/template_dictionary_nothreads_unittest-template_dictionary_unittest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/template_dictionary_unittest-template_dictionary_unittest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/template_modifiers_nothreads_unittest-template_modifiers_unittest.Po@am__quote@
@@ -1152,19 +1152,33 @@ generate_fsm_c_test.obj: src/tests/generate_fsm_c_test.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o generate_fsm_c_test.obj `if test -f 'src/tests/generate_fsm_c_test.c'; then $(CYGPATH_W) 'src/tests/generate_fsm_c_test.c'; else $(CYGPATH_W) '$(srcdir)/src/tests/generate_fsm_c_test.c'; fi`
 
-statemachine_test.o: src/tests/statemachine_test.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT statemachine_test.o -MD -MP -MF "$(DEPDIR)/statemachine_test.Tpo" -c -o statemachine_test.o `test -f 'src/tests/statemachine_test.c' || echo '$(srcdir)/'`src/tests/statemachine_test.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/statemachine_test.Tpo" "$(DEPDIR)/statemachine_test.Po"; else rm -f "$(DEPDIR)/statemachine_test.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='src/tests/statemachine_test.c' object='statemachine_test.o' libtool=no @AMDEPBACKSLASH@
+statemachine_test-statemachine_test.o: src/tests/statemachine_test.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statemachine_test_CFLAGS) $(CFLAGS) -MT statemachine_test-statemachine_test.o -MD -MP -MF "$(DEPDIR)/statemachine_test-statemachine_test.Tpo" -c -o statemachine_test-statemachine_test.o `test -f 'src/tests/statemachine_test.c' || echo '$(srcdir)/'`src/tests/statemachine_test.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/statemachine_test-statemachine_test.Tpo" "$(DEPDIR)/statemachine_test-statemachine_test.Po"; else rm -f "$(DEPDIR)/statemachine_test-statemachine_test.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='src/tests/statemachine_test.c' object='statemachine_test-statemachine_test.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o statemachine_test.o `test -f 'src/tests/statemachine_test.c' || echo '$(srcdir)/'`src/tests/statemachine_test.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statemachine_test_CFLAGS) $(CFLAGS) -c -o statemachine_test-statemachine_test.o `test -f 'src/tests/statemachine_test.c' || echo '$(srcdir)/'`src/tests/statemachine_test.c
 
-statemachine_test.obj: src/tests/statemachine_test.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT statemachine_test.obj -MD -MP -MF "$(DEPDIR)/statemachine_test.Tpo" -c -o statemachine_test.obj `if test -f 'src/tests/statemachine_test.c'; then $(CYGPATH_W) 'src/tests/statemachine_test.c'; else $(CYGPATH_W) '$(srcdir)/src/tests/statemachine_test.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/statemachine_test.Tpo" "$(DEPDIR)/statemachine_test.Po"; else rm -f "$(DEPDIR)/statemachine_test.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='src/tests/statemachine_test.c' object='statemachine_test.obj' libtool=no @AMDEPBACKSLASH@
+statemachine_test-statemachine_test.obj: src/tests/statemachine_test.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statemachine_test_CFLAGS) $(CFLAGS) -MT statemachine_test-statemachine_test.obj -MD -MP -MF "$(DEPDIR)/statemachine_test-statemachine_test.Tpo" -c -o statemachine_test-statemachine_test.obj `if test -f 'src/tests/statemachine_test.c'; then $(CYGPATH_W) 'src/tests/statemachine_test.c'; else $(CYGPATH_W) '$(srcdir)/src/tests/statemachine_test.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/statemachine_test-statemachine_test.Tpo" "$(DEPDIR)/statemachine_test-statemachine_test.Po"; else rm -f "$(DEPDIR)/statemachine_test-statemachine_test.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='src/tests/statemachine_test.c' object='statemachine_test-statemachine_test.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o statemachine_test.obj `if test -f 'src/tests/statemachine_test.c'; then $(CYGPATH_W) 'src/tests/statemachine_test.c'; else $(CYGPATH_W) '$(srcdir)/src/tests/statemachine_test.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statemachine_test_CFLAGS) $(CFLAGS) -c -o statemachine_test-statemachine_test.obj `if test -f 'src/tests/statemachine_test.c'; then $(CYGPATH_W) 'src/tests/statemachine_test.c'; else $(CYGPATH_W) '$(srcdir)/src/tests/statemachine_test.c'; fi`
+
+statemachine_test-statemachine.o: statemachine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statemachine_test_CFLAGS) $(CFLAGS) -MT statemachine_test-statemachine.o -MD -MP -MF "$(DEPDIR)/statemachine_test-statemachine.Tpo" -c -o statemachine_test-statemachine.o `test -f 'statemachine.c' || echo '$(srcdir)/'`statemachine.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/statemachine_test-statemachine.Tpo" "$(DEPDIR)/statemachine_test-statemachine.Po"; else rm -f "$(DEPDIR)/statemachine_test-statemachine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='statemachine.c' object='statemachine_test-statemachine.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statemachine_test_CFLAGS) $(CFLAGS) -c -o statemachine_test-statemachine.o `test -f 'statemachine.c' || echo '$(srcdir)/'`statemachine.c
+
+statemachine_test-statemachine.obj: statemachine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statemachine_test_CFLAGS) $(CFLAGS) -MT statemachine_test-statemachine.obj -MD -MP -MF "$(DEPDIR)/statemachine_test-statemachine.Tpo" -c -o statemachine_test-statemachine.obj `if test -f 'statemachine.c'; then $(CYGPATH_W) 'statemachine.c'; else $(CYGPATH_W) '$(srcdir)/statemachine.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/statemachine_test-statemachine.Tpo" "$(DEPDIR)/statemachine_test-statemachine.Po"; else rm -f "$(DEPDIR)/statemachine_test-statemachine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='statemachine.c' object='statemachine_test-statemachine.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statemachine_test_CFLAGS) $(CFLAGS) -c -o statemachine_test-statemachine.obj `if test -f 'statemachine.c'; then $(CYGPATH_W) 'statemachine.c'; else $(CYGPATH_W) '$(srcdir)/statemachine.c'; fi`
 
 .cc.o:
 @am__fastdepCXX_TRUE@	if $(CXXCOMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
@@ -1613,20 +1627,6 @@ make_tpl_varnames_h.obj: src/make_tpl_varnames_h.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/make_tpl_varnames_h.cc' object='make_tpl_varnames_h.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o make_tpl_varnames_h.obj `if test -f 'src/make_tpl_varnames_h.cc'; then $(CYGPATH_W) 'src/make_tpl_varnames_h.cc'; else $(CYGPATH_W) '$(srcdir)/src/make_tpl_varnames_h.cc'; fi`
-
-statemachine_test-statemachine.o: src/htmlparser/statemachine.cc
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statemachine_test_CXXFLAGS) $(CXXFLAGS) -MT statemachine_test-statemachine.o -MD -MP -MF "$(DEPDIR)/statemachine_test-statemachine.Tpo" -c -o statemachine_test-statemachine.o `test -f 'src/htmlparser/statemachine.cc' || echo '$(srcdir)/'`src/htmlparser/statemachine.cc; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/statemachine_test-statemachine.Tpo" "$(DEPDIR)/statemachine_test-statemachine.Po"; else rm -f "$(DEPDIR)/statemachine_test-statemachine.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/htmlparser/statemachine.cc' object='statemachine_test-statemachine.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statemachine_test_CXXFLAGS) $(CXXFLAGS) -c -o statemachine_test-statemachine.o `test -f 'src/htmlparser/statemachine.cc' || echo '$(srcdir)/'`src/htmlparser/statemachine.cc
-
-statemachine_test-statemachine.obj: src/htmlparser/statemachine.cc
-@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statemachine_test_CXXFLAGS) $(CXXFLAGS) -MT statemachine_test-statemachine.obj -MD -MP -MF "$(DEPDIR)/statemachine_test-statemachine.Tpo" -c -o statemachine_test-statemachine.obj `if test -f 'src/htmlparser/statemachine.cc'; then $(CYGPATH_W) 'src/htmlparser/statemachine.cc'; else $(CYGPATH_W) '$(srcdir)/src/htmlparser/statemachine.cc'; fi`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/statemachine_test-statemachine.Tpo" "$(DEPDIR)/statemachine_test-statemachine.Po"; else rm -f "$(DEPDIR)/statemachine_test-statemachine.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/htmlparser/statemachine.cc' object='statemachine_test-statemachine.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statemachine_test_CXXFLAGS) $(CXXFLAGS) -c -o statemachine_test-statemachine.obj `if test -f 'src/htmlparser/statemachine.cc'; then $(CYGPATH_W) 'src/htmlparser/statemachine.cc'; else $(CYGPATH_W) '$(srcdir)/src/htmlparser/statemachine.cc'; fi`
 
 template_dictionary_nothreads_unittest-template_dictionary_unittest.o: src/tests/template_dictionary_unittest.cc
 @am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(template_dictionary_nothreads_unittest_CXXFLAGS) $(CXXFLAGS) -MT template_dictionary_nothreads_unittest-template_dictionary_unittest.o -MD -MP -MF "$(DEPDIR)/template_dictionary_nothreads_unittest-template_dictionary_unittest.Tpo" -c -o template_dictionary_nothreads_unittest-template_dictionary_unittest.o `test -f 'src/tests/template_dictionary_unittest.cc' || echo '$(srcdir)/'`src/tests/template_dictionary_unittest.cc; \
@@ -2251,6 +2251,11 @@ src/htmlparser/jsparser_fsm.h: src/htmlparser/generate_fsm.py src/htmlparser/fsm
 
 src/tests/statemachine_test_fsm.h: src/htmlparser/generate_fsm.py src/htmlparser/fsm_config.py src/tests/statemachine_test_fsm.config
 	$(top_srcdir)/src/htmlparser/generate_fsm.py $(top_srcdir)/src/tests/statemachine_test_fsm.config > $@
+
+# We want to compile statemachine.cc as a c file as well as a c++ file
+
+statemachine.c: src/htmlparser/statemachine.cc
+	$(LN_S) src/htmlparser/statemachine.cc $@
 generate_fsm_test_sh: src/tests/generate_fsm_test.sh \
                       src/tests/htmlparser_testdata/sample_fsm.config \
                       src/tests/htmlparser_testdata/sample_fsm.c \

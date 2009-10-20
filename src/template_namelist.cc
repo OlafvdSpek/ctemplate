@@ -93,21 +93,14 @@ const TemplateNamelist::MissingListType& TemplateNamelist::GetMissingList(
   }
 
   if (refresh) {
-    const string& root_dir = Template::template_root_directory();
-
-    // Make sure the root directory ends with a slash (which is also
-    // required by the method SetTemplateRootDirectory anyway).
-    assert(IsDirectory(root_dir));
-
     const NameListType& the_list = TemplateNamelist::GetList();
     missing_list_->clear();
 
     for (NameListType::const_iterator iter = the_list.begin();
          iter != the_list.end();
          ++iter) {
-      // Only prepend root_dir if *iter isn't an absolute path:
-      string path = PathJoin(root_dir, *iter);
-      if (access(path.c_str(), R_OK) != 0) {
+      const string path = Template::FindTemplateFilename(*iter);
+      if (path.empty() || access(path.c_str(), R_OK) != 0) {
         missing_list_->push_back(*iter);
         std::cerr << "ERROR: Template file missing: " << path << std::endl;
       }
@@ -163,17 +156,15 @@ const TemplateNamelist::SyntaxListType& TemplateNamelist::GetBadSyntaxList(
 time_t TemplateNamelist::GetLastmodTime() {
   time_t retval = -1;
 
-  const string& root_dir = Template::template_root_directory();
-  assert(IsDirectory(root_dir));
   const NameListType& the_list = TemplateNamelist::GetList();
   for (NameListType::const_iterator iter = the_list.begin();
        iter != the_list.end();
        ++iter) {
     // Only prepend root_dir if *iter isn't an absolute path:
-    string path = PathJoin(root_dir, *iter);
+    const string path = Template::FindTemplateFilename(*iter);
     struct stat statbuf;
-    if (stat(path.c_str(), &statbuf) != 0)       // ignore files we can't find
-      continue;
+    if (path.empty() || stat(path.c_str(), &statbuf) != 0)
+      continue;  // ignore files we can't find
     retval = retval > statbuf.st_mtime ? retval : statbuf.st_mtime;
   }
   return retval;

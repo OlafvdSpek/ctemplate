@@ -148,7 +148,7 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // either a char* or a C++ string, or a TemplateString(s, slen).
 
   void SetValue(const TemplateString variable, const TemplateString value);
-  void SetIntValue(const TemplateString variable, int value);  // "%d" formatting
+  void SetIntValue(const TemplateString variable, long value);
   void SetFormattedValue(const TemplateString variable, const char* format, ...)
 #if 0
        __attribute__((__format__ (__printf__, 3, 4)))
@@ -171,6 +171,13 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // fairly rare, we don't provide variants.
   void SetTemplateGlobalValue(const TemplateString variable,
                               const TemplateString value);
+
+  // Similar SetTemplateGlobalValue above, this method shows a section in this
+  // template, all its sections, and all its template-includes. This is intended
+  // for session-global data, for example allowing you to show variant portions
+  // of your template for certain browsers/languages without having to call
+  // ShowSection on each template you use.
+  void ShowTemplateGlobalSection(const TemplateString variable);
 
   // These routines are like SetValue and SetTemplateGlobalValue, but
   // they do not make a copy of the input data. THE CALLER IS
@@ -256,6 +263,8 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // For unittesting code using a TemplateDictionary.
   friend class TemplateDictionaryPeer;
 
+  class DictionaryPrinter;
+
   // We need this functor to tell small_map how to create a map<> when
   // it decides to do so: we want it to create that map on the arena.
   class map_arena_init;
@@ -288,6 +297,7 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // These are helper functions to allocate the parts of the dictionary
   // on the arena.
   template<typename T> inline void LazilyCreateDict(T** dict);
+  inline void LazyCreateTemplateGlobalDict();
   inline DictVector* CreateDictVector();
   inline TemplateDictionary* CreateTemplateSubdict(
       const TemplateString& name,
@@ -313,13 +323,17 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
                               TemplateDictionary* parent_dict,
                               TemplateDictionary* template_global_dict_owner);
 
-  // Helps set up the static stuff
-  static GlobalDict* SetupGlobalDictUnlocked();
+  // Helps set up the static stuff. Must be called exactly once before
+  // accessing global_dict_.  GoogleOnceInit() is used to manage that
+  // initialization in a thread-safe way.
+  static void SetupGlobalDict();
 
   // Utility functions for copying a string into the arena.
+  // Memdup also copies in a trailing NUL, which is why we have the
+  // trailing-NUL check in the TemplateString version of Memdup.
   TemplateString Memdup(const char* s, size_t slen);
   TemplateString Memdup(const TemplateString& s) {
-    if (s.is_immutable()) {
+    if (s.is_immutable() && s.ptr_[s.length_] == '\0') {
       return s;
     }
     return Memdup(s.ptr_, s.length_);
@@ -345,9 +359,24 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // TODO(csilvers): have GetSectionValue return a TemplateString.
   virtual const char *GetSectionValue(const TemplateString& variable) const;
   virtual bool IsHiddenSection(const TemplateString& name) const;
+  virtual bool IsUnhiddenSection(const TemplateString& name) const {
+    return !IsHiddenSection(name);
+  }
   virtual bool IsHiddenTemplate(const TemplateString& name) const;
   virtual const char *GetIncludeTemplateName(const TemplateString& variable,
                                              int dictnum) const;
+
+  // Determine whether there's anything set in this dictionary
+  bool Empty() const;
+
+  // This is needed by DictionaryPrinter because it's not a friend
+  // of TemplateString, but we are
+  static std::string PrintableTemplateString(const TemplateString& ts) {
+    return std::string(ts.ptr_, ts.length_);
+  }
+  static bool InvalidTemplateString(const TemplateString& ts) {
+    return ts.ptr_ == NULL;
+  }
 
   // CreateTemplateIterator
   //   This is SectionIterator exactly, just with a different name to
@@ -358,7 +387,7 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
 
   // CreateSectionIterator
   //   Factory method implementation that constructs a iterator representing the
-  //   set of dictionaries associated with a secion name, if any. This
+  //   set of dictionaries associated with a section name, if any. This
   //   implementation checks the local dictionary itself, not the template-wide
   //   dictionary or the global dictionary.
   // Caller frees return value.
@@ -398,15 +427,15 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   SectionDict* section_dict_;
   IncludeDict* include_dict_;
 
-  // Like variable_dict_, but persists across template-includes.
-  // Unlike the global dict in that only this template and its
-  // children get to see the values.  So it's halfway in between.  For
-  // the parent-template, template_global_dict_ is not NULL, and
+  // The template_global_dict is consulted if a lookup in the variable, section,
+  // or include dicts named above fails. It forms a convenient place to store
+  // session-specific data that's applicable to all templates in the dictionary
+  // tree.
+  // For the parent-template, template_global_dict_ is not NULL, and
   // template_global_dict_owner_ is this.  For all of its children,
-  // template_global_dict_ is NULL, and template_global_dict_owner_
-  // points to the root parent-template (the one with the non-NULL
-  // template_global_dict_).
-  VariableDict* template_global_dict_;
+  // template_global_dict_ is NULL, and template_global_dict_owner_ points to
+  // the root parent-template (the one with the non-NULL template_global_dict_).
+  TemplateDictionary* template_global_dict_;
   TemplateDictionary* template_global_dict_owner_;
 
   // My parent dictionary, used when variable lookups at this level fail.
@@ -421,6 +450,11 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   const char* filename_;
 
  private:
+  // Used by our nested class (friendship rules require us to forward this).
+  static TemplateString IdToString(TemplateId id) {
+    return TemplateString::IdToString(id);
+  }
+
   // Can't invoke copy constructor or assignment operator
   TemplateDictionary(const TemplateDictionary&);
   void operator=(const TemplateDictionary&);
