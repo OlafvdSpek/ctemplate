@@ -76,38 +76,36 @@ namespace ctemplate {
 // (TS_UNUSED is not used)
 enum TemplateState { TS_UNUSED, TS_EMPTY, TS_ERROR, TS_READY, TS_SHOULD_RELOAD };
 
-// To use the auto-escape mode you will need to provide the context (a.k.a type)
-// of the template in GetTemplate. We provide:
-// - TC_HTML:   The template contains HTML code. Need not be a complete HTML
-//              page just content the browser interprets in the context of
-//              HTML parsing. This should be the most common context to use.
-//              This mode activates our HTML parser.
-// - TC_JS:     The template contains raw javascript. If your template
-//              starts with <script> tag, it is of type TC_HTML not TC_JS.
-//              TC_JS is typically associated with a content-type of
-//              text/javascript. This mode activates our HTML parser.
-// - TC_CSS:    The template contains CSS (cascaded style-sheet). If your
-//              template starts with a <style> tag, it is of type TC_HTML
-//              not TC_CSS. A TC_CSS template is typically associated with a
-//              text/css content-type header. Currently treated same as
-//              TC_HTML but don't rely on that. We may later develop
-//              CSS-specific sanitizers and parsers.
-// - TC_JSON:   The template contains raw JSON. Applies javascript_escape
-//              to variables. Note: javascript_escape is safer than
-//              json_escape which we may want to remove.
-// - TC_XML:    The template contains raw XML. Applies xml_escape to variables.
-//              CAUTION: This mode is not suitable for cases where the
-//              application data encapsulated in XML requires special
-//              escaping, such as the case of XHTML.
-//              TC_XML is typically associated with text/xml content-type.
-// - TC_NONE:   Don't use, Internal use only to support passivating the
-//              HTML-aware parsing and auto-escaping when template-includes
-//              specify modifiers.
+// Used for Auto-Escape. It represents the different contexts a template may
+// be initialized in via the AUTOESCAPE pragma in the template file
+// (or string). It is only public for testing. The contexts are:
+// - TC_HTML: The template contains HTML code. Need not be a complete HTML
+//            page just content the browser interprets in the context of
+//            HTML parsing. This should be the most common context to use.
+//            This mode activates our HTML parser.
+// - TC_JS:   The template contains raw javascript. If your template
+//            starts with <script> tag, it is of type TC_HTML not TC_JS.
+//            TC_JS is typically associated with a content-type of
+//            text/javascript. This mode activates our HTML parser.
+// - TC_CSS:  The template contains CSS (cascaded style-sheet). If your
+//            template starts with a <style> tag, it is of type TC_HTML
+//            not TC_CSS. A TC_CSS template is typically associated with a
+//            text/css content-type header. Currently treated same as
+//            TC_HTML but don't rely on that. We may later develop
+//            CSS-specific sanitizers and parsers.
+// - TC_JSON: The template contains raw JSON. Applies javascript_escape
+//            to variables. Note: javascript_escape is safer than
+//            json_escape which we may want to remove.
+// - TC_XML:  The template contains raw XML. Applies xml_escape to variables.
+//            CAUTION: This mode is not suitable for cases where the
+//            application data encapsulated in XML requires special
+//            escaping, such as the case of XHTML.
+//            TC_XML is typically associated with text/xml content-type.
 // - TC_MANUAL: Equivalent to not specifying auto-escaping at all.
 //
-// TODO(jad): Move declaration to inside Template class.
+// TODO(jad): Find a way to remove TemplateContext from the public API.
 enum TemplateContext { TC_UNUSED, TC_HTML, TC_JS, TC_CSS, TC_JSON,
-                       TC_XML, TC_NONE, TC_MANUAL };
+                       TC_XML, TC_MANUAL };
 
 // Template
 //   The object which reads and parses the template file and then is used to
@@ -139,6 +137,11 @@ class CTEMPLATE_DLL_DECL Template {
   //   (NOTE: This description is much longer and less precise and probably
   //   harder to understand than the method itself. Read the code.)
   //
+  //   To enable Auto-Escape on that template, place the corresponding
+  //   AUTOESCAPE pragma at the top of the template file. The template
+  //   will then be Auto-Escaped independently of the template it may be
+  //   included from or the templates it may include.
+  //
   //   'Strip' indicates how to handle whitespace when expanding the
   //   template.  DO_NOT_STRIP keeps the template exactly as-is.
   //   STRIP_BLANK_LINES elides all blank lines in the template.
@@ -166,9 +169,9 @@ class CTEMPLATE_DLL_DECL Template {
   // Parses the string as a template file (e.g. "Hello {{WORLD}}"),
   // and inserts it into the template cache, so it can later be
   // retrieved by GetTemplate.  The user specifies a key, which is
-  // passed in to GetTemplate.  (Note the user does not specify strip
-  // or context; those will be specified later in the GetTemplate
-  // call.)  The template system will manage memory for this template.
+  // passed in to GetTemplate.  (Note the user does not specify strip;
+  // it will be specified later in the GetTemplate call.)
+  // The template system will manage memory for this template.
   // Returns true if the template was successfully parsed and
   // submitted to the template cache, or false otherwise.  In particular,
   // we return false if a string was already cached with the given key.
@@ -232,6 +235,18 @@ class CTEMPLATE_DLL_DECL Template {
   //   may be a relative pathname (no leading '/'), in which case
   //   this root-directory is prepended to the filename.
   static bool SetTemplateRootDirectory(const std::string& directory);
+
+  // AddAlternateTemplateRootDirectory
+  //   Adds an additional search path for all templates used by the program.
+  //   You may call this multiple times.
+  static bool AddAlternateTemplateRootDirectory(const std::string& directory);
+
+  // FindTemplateFilename
+  //   Given an unresolved filename, look through the template search
+  //   path to see if the template can be found. If so, return the
+  //   path of the resolved filename, otherwise return an empty
+  //   string.
+  static std::string FindTemplateFilename(const std::string& unresolved);
 
   // ClearCache
   //   Deletes all the template objects in the cache and all raw
@@ -300,20 +315,6 @@ class CTEMPLATE_DLL_DECL Template {
   friend class SectionTemplateNode;  // for access to set_state(), ParseState
   friend class TemplateTemplateNode; // for recursive call to Expand()
 
-  // Performs the actual work for both factory methods
-  // GetTemplate and GetTemplateWithAutoEscaping.
-  // See description of member variable selective_autoescape_ for
-  // information on Selective Auto-Escape.
-  static Template *GetTemplateCommon(const std::string& filename, Strip strip,
-                                     TemplateContext context,
-                                     bool selective_autoescape);
-
-  // AssureGlobalsInitialized
-  //   Initializes the global (static) variables the first time it is
-  //   called. After that it simply checks one of the
-  //   initialized pointers and finds it has already been called.
-  static void AssureGlobalsInitialized();
-
   // Template constructor
   //   Reads the template file and parses it into a parse tree of TemplateNodes
   //   by calling the method ReloadIfChanged
@@ -329,10 +330,7 @@ class CTEMPLATE_DLL_DECL Template {
   //   a comment marker as the last element on the line.
   //   These two options allow the template to include whitespace for
   //   readability without adding to the expanded output.
-  //   If context is not TC_MANUAL we enable auto-escaping
-  //   for that template and any template it includes.
-  Template(const std::string& filename, Strip strip, TemplateContext context,
-           bool selective_autoescape);
+  Template(const std::string& filename, Strip strip);
 
   // MaybeInitHtmlParser
   //   In TemplateContexts where the HTML parser is needed, we initialize it
@@ -365,8 +363,10 @@ class CTEMPLATE_DLL_DECL Template {
   //   it with a new buffer.  Used by ReloadIfChanged().
   void StripBuffer(char **buffer, size_t* len);
 
-  // The file we read the template from
-  const std::string filename_;
+  // The file we originally got from the Template() constructor
+  const std::string original_filename_;
+  // The pathname as fully resolved on the filesystem
+  std::string resolved_filename_;
   time_t filename_mtime_;   // lastmod time for filename last time we loaded it
 
   // What to do with whitespace at template-expand time
@@ -415,28 +415,19 @@ class CTEMPLATE_DLL_DECL Template {
   // threads.
   mutable class Mutex* mutex_;
 
-  // The root directory for all templates. Defaults to "./" until
-  // SetTemplateRootDirectory changes it
-  static std::string *template_root_directory_;
-
-  // TC_MANUAL indicates the template is not in auto-escaping mode.
-  // other values imply auto-escape mode is enabled.
+  // All templates are initialized to TC_MANUAL (no Auto-Escape). Then,
+  // during template parsing (BuildTree()), if an AUTOESCAPE pragma is
+  // encountered, the context changes appropriately.
   TemplateContext initial_context_;
-  // Non-null if template was initialized in auto_escape mode.
+  // Non-null if the template was initialized in an Auto-Escape mode that
+  // requires a parser (currently TC_HTML, TC_CSS and TC_JS).
   google_ctemplate_streamhtmlparser::HtmlParser *htmlparser_;
 
-  // We now support two types of Auto-Escape:
-  // 1. Full-on Auto-Escape where a template and all its included templates
-  //    get auto-escaped. This is the case when the top-level template is
-  //    obtained via GetTemplateWithAutoEscaping, or for string Templates
-  //    via StringToTemplate with an auto-escape template context.
-  // 2. Selective Auto-Escape where only templates which contain the AUTOESCAPE
-  //    pragma {{%AUTOESCAPE ...}} are auto-escaped. The top-level template
-  //    must be obtained via GetTemplate, or for string Templates, via
-  //    StringToTemplate with TC_MANUAL template context.
-  // In the first case, selective_autoescape_ is false, in the second case
-  // it is true. Note: It is propagated as-is from parent to included template.
-  const bool selective_autoescape_;
+  // A sorted list of trusted variable names, declared here because a unittest
+  // needs to verify that it is appropriately sorted (an unsorted array would
+  // lead to the binary search of this array failing).
+  static const char * const kSafeWhitelistedVariables[];
+  static const size_t kNumSafeWhitelistedVariables;
 
  private:
   // These are helper routines to StripFile.  I would make them static

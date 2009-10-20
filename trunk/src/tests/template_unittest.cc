@@ -90,7 +90,6 @@ using GOOGLE_NAMESPACE::TC_JS;
 using GOOGLE_NAMESPACE::TC_JSON;
 using GOOGLE_NAMESPACE::TC_XML;
 using GOOGLE_NAMESPACE::TC_MANUAL;
-using GOOGLE_NAMESPACE::TC_NONE;
 using GOOGLE_NAMESPACE::TC_UNUSED;
 
 static const StaticTemplateString kHello = STS_INIT(kHello, "Hello");
@@ -196,8 +195,6 @@ static string GetPragmaForContext(TemplateContext context) {
       return kPragmaJson;
     case TC_XML:
       return kPragmaXml;
-    case TC_NONE:
-      return "";  // NONE is now synonymous with TC_MANUAL
     case TC_MANUAL:
       return "";  // No AUTOESCAPE pragma.
     case TC_UNUSED:
@@ -380,11 +377,28 @@ class EmphasizeTemplateModifier : public GOOGLE_NAMESPACE::TemplateModifier {
   string match_;
 };
 
-// This is all in a single class just to make friendship easier:
-// the TemplateUnittest class can be listed as a friend
-// once, and access all the internals of Template.
+class TemplateForTest : public Template {
+ public:
+  using Template::kSafeWhitelistedVariables;
+  using Template::kNumSafeWhitelistedVariables;
+ private:
+  // This quiets gcc3, which otherwise complains: "base `Template'
+  // with only non-default constructor in class without a constructor".
+  TemplateForTest();
+};
+
 class TemplateUnittest {
  public:
+
+  static void CheckWhitelistedVariablesSorted() {
+    // NOTE(williasr): kSafeWhitelistedVariables must be sorted, it's accessed
+    // using binary search.
+    for (int i = 1; i < TemplateForTest::kNumSafeWhitelistedVariables; i++) {
+      assert(strcmp(TemplateForTest::kSafeWhitelistedVariables[i-1],
+                    TemplateForTest::kSafeWhitelistedVariables[i]) < 0);
+    }
+  }
+
 
   // The following tests test various aspects of how Expand() should behave.
   static void TestWeirdSyntax() {
@@ -1218,6 +1232,39 @@ class TemplateUnittest {
     Template::ClearCache();
   }
 
+  static void TestTemplateSearchPath() {
+    const string pathA = ctemplate::PathJoin(FLAGS_test_tmpdir, "a/");
+    const string pathB = ctemplate::PathJoin(FLAGS_test_tmpdir, "b/");
+
+    TemplateDictionary dict("");
+    Template::SetTemplateRootDirectory(pathA);
+    Template::AddAlternateTemplateRootDirectory(pathB);
+
+    // 1. Show that a template in the secondary path can be found.
+    const string path_b_bar = ctemplate::PathJoin(pathB, "bar");
+    StringToFile("b/bar", path_b_bar);
+    ASSERT_STREQ(path_b_bar.c_str(),
+                 Template::FindTemplateFilename("bar").c_str());
+    Template* b_bar = Template::GetTemplate("bar", DO_NOT_STRIP);
+    ASSERT(b_bar);
+    AssertExpandIs(b_bar, &dict, "b/bar", true);
+
+    // 2. Show that the search stops once the first match is found.
+    //    Create two templates in separate directories with the same name.
+    const string path_a_foo = ctemplate::PathJoin(pathA, "foo");
+    StringToFile("a/foo", path_a_foo);
+    StringToFile("b/foo", ctemplate::PathJoin(pathB, "foo"));
+    ASSERT_STREQ(path_a_foo.c_str(),
+                 Template::FindTemplateFilename("foo").c_str());
+    Template* a_foo = Template::GetTemplate("foo", DO_NOT_STRIP);
+    ASSERT(a_foo);
+    AssertExpandIs(a_foo, &dict, "a/foo", true);
+
+    // 3. Show that attempting to find a non-existent template gives an
+    //    empty path.
+    ASSERT(Template::FindTemplateFilename("baz").empty());
+  }
+
   static void TestRemoveStringFromTemplateCache() {
     Template::ClearCache();   // just for exercise.
     const string cache_key = "TestRemoveStringFromTemplateCache";
@@ -1433,7 +1480,7 @@ class TemplateUnittest {
         Template::SetTemplateRootDirectory(filename.substr(0, sep_pos + 1));
         Template* tpl = Template::GetTemplate(filename.substr(sep_pos + 1),
                                               DO_NOT_STRIP);
-        ASSERT(tpl == tpl1);
+        ASSERT(string(tpl->template_file()) == tpl1->template_file());
       }
     }
   }
@@ -1681,10 +1728,6 @@ class TemplateUnittest {
     text = "<a href=/bla{{BI_SPACE}}style=\"{{VAR}}\">text</a>";
     AssertCorrectModifiers(TC_HTML, text, "BI_SPACE\nVAR:c\n");
 
-    // Special handling for TC_NONE. No auto-escaping.
-    text = "Hello {{USER}}";
-    AssertCorrectModifiers(TC_NONE, text, "USER\n");
-
     // XML and JSON modes.
     text = "<PARAM name=\"{{VAL}}\">{{DATA}}";
     AssertCorrectModifiers(TC_XML, text, "VAL:xml_escape\nDATA:xml_escape\n");
@@ -1788,15 +1831,7 @@ class TemplateUnittest {
     text = "{{BI_SPACE:x-bla}}";   // Also support custom modifiers.
     AssertCorrectModifiers(TC_HTML, text, "BI_SPACE:x-bla\n");
 
-    // 2h: In TC_NONE context, don't touch modifiers.
-    text = "Hello {{USER:h}}";
-    AssertCorrectModifiers(TC_NONE, text, "USER:h\n");
-    text = "Hello {{USER:j}}";
-    AssertCorrectModifiers(TC_NONE, text, "USER:j\n");
-    text = "Hello {{USER:x-bla:none}}";
-    AssertCorrectModifiers(TC_NONE, text, "USER:x-bla:none\n");
-
-    // 2i: TC_CSS, TC_XML and TC_JSON
+    // 2h: TC_CSS, TC_XML and TC_JSON
     text = "H1{margin-{{START_EDGE}}:0;\n text-align:{{END_EDGE}}\n}";
     AssertCorrectModifiers(TC_CSS, text, "START_EDGE:c\nEND_EDGE:c\n");
     text = "body{background:url('{{URL:U=css}}')}";  // :U=css valid substitute
@@ -1820,7 +1855,7 @@ class TemplateUnittest {
     text = "{user={{USER:h}}";   // but html_escape is not
     AssertCorrectModifiers(TC_JSON, text, "USER:h:j\n");
 
-    // 2j: Variables with XssSafe Custom modifiers are untouched.
+    // 2i: Variables with XssSafe Custom modifiers are untouched.
     ASSERT(GOOGLE_NAMESPACE::AddXssSafeModifier("x-test-cm",
                                          &GOOGLE_NAMESPACE::html_escape));
     text = "Hello {{USER:x-test-cm}}";              // Missing :h
@@ -1910,11 +1945,6 @@ class TemplateUnittest {
     expected_out = "Hello bla\nfoo.";
     AssertCorrectEscaping(TC_HTML, dict, text, expected_out);
 
-    // TC_NONE, no escaping done.
-    text = "hi {{VAR}} lo";
-    dict.SetValue("VAR", "<bad>yo");
-    AssertCorrectEscaping(TC_NONE, dict, text, "hi <bad>yo lo");
-
     // TC_CSS
     text = "H1{margin-{{EDGE}}:0; text-align:{{BAD_EDGE}}}";
     dict.SetValue("EDGE", "left");
@@ -1954,7 +1984,7 @@ class TemplateUnittest {
     ASSERT(NULL == StringToTemplateWithAutoEscaping(bad_html, strip, TC_HTML));
   }
 
-  static void TestSelectiveAutoEscaping() {
+  static void TestAutoEscaping() {
     Strip strip = STRIP_WHITESPACE;
     Template *tpl;
     string filename;
@@ -2289,12 +2319,15 @@ class DynamicInitializationTemplateExpander {
 DynamicInitializationTemplateExpander sts_tester;  // this runs before main()
 const StaticTemplateString kLateDefine = STS_INIT(kLateDefine, "laterz");
 
-
 int main(int argc, char** argv) {
   CleanTestDir(FLAGS_test_tmpdir);
+  // Subdirs used by TestTemplateSearchPath
+  CleanTestDir(ctemplate::PathJoin(FLAGS_test_tmpdir, "a"));
+  CleanTestDir(ctemplate::PathJoin(FLAGS_test_tmpdir, "b"));
 
   // This goes first so that future tests don't mess up the filenames
   TemplateUnittest::TestAnnotation();
+  TemplateUnittest::CheckWhitelistedVariablesSorted();
   TemplateUnittest::TestTemplateExpansionModifier();
 
   TemplateUnittest::TestWeirdSyntax();
@@ -2313,6 +2346,7 @@ int main(int argc, char** argv) {
   TemplateUnittest::TestExpand();
   TemplateUnittest::TestExpandWithCustomEmitter();
 
+  TemplateUnittest::TestTemplateSearchPath();
   TemplateUnittest::TestGetTemplate();
   TemplateUnittest::TestRegisterString();
   TemplateUnittest::TestRegisterStringVsFileCollision();
@@ -2332,7 +2366,7 @@ int main(int argc, char** argv) {
   TemplateUnittest::TestCorrectModifiersForAutoEscape();
   TemplateUnittest::TestVariableWithAutoEscape();
   TemplateUnittest::TestFailedInitWithAutoEscape();
-  TemplateUnittest::TestSelectiveAutoEscaping();
+  TemplateUnittest::TestAutoEscaping();
 
   printf("DONE\n");
   return 0;

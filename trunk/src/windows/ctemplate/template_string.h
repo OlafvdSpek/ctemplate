@@ -42,6 +42,11 @@
 class TemplateStringTest;          // needed for friendship declaration
 class StaticTemplateStringTest;
 
+#if 0
+extern char _start[] __attribute__((weak));  // the linker emits this: start of .text
+extern char data_start[] __attribute__((weak));        // start of .data
+#endif
+
 // NOTE: if you are statically linking the template library into your binary
 // (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
 // as a compiler flag in your project file to turn off the dllimports.
@@ -150,7 +155,7 @@ class CTEMPLATE_DLL_DECL TemplateString {
  public:
   TemplateString(const char* s)
       : ptr_(s ? s : ""), length_(strlen(ptr_)),
-        is_immutable_(false), id_(kIllegalTemplateId) {
+        is_immutable_(InTextSegment(s)), id_(kIllegalTemplateId) {
   }
   TemplateString(const std::string& s)
       : ptr_(s.data()), length_(s.size()),
@@ -158,7 +163,7 @@ class CTEMPLATE_DLL_DECL TemplateString {
   }
   TemplateString(const char* s, size_t slen)
       : ptr_(s), length_(slen),
-        is_immutable_(false), id_(kIllegalTemplateId) {
+        is_immutable_(InTextSegment(s)), id_(kIllegalTemplateId) {
   }
   TemplateString(const TemplateString& s)
       : ptr_(s.ptr_), length_(s.length_),
@@ -192,6 +197,19 @@ class CTEMPLATE_DLL_DECL TemplateString {
   }
 
   inline bool is_immutable() const;
+
+  // This returns true if s is in the .text segment of the binary.
+  // (Note this only checks .text of the main executable, not of
+  // shared libraries.  So it may not be all that useful.)
+  // This requires the gnu linker (and probably elf), to define
+  // _start and data_start.
+  static bool InTextSegment(const char* s) {
+#if 0
+    return (s >= _start && s < data_start);   // in .text
+#else
+    return false;    // the conservative choice: assume it's not static memory
+#endif
+  }
 
  protected:
   inline void CacheGlobalId();      // used by HashedTemplateString

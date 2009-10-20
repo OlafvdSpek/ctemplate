@@ -90,6 +90,7 @@ DLLDEF_DEFINES="\
          -e "s!@ac_htmlparser_namespace@!$HTMLPARSER_NAMESPACE!g" \
          -e "s!.*@ac_cv_u..t64@ might live.*!!g" \
          -e "s!@ac_cv_uint64@!unsigned __int64!g" \
+         -e "s!@ac_have_attribute_weak@!0!g" \
          -e "s!\\bhash\\b!hash_compare!g" \
          "$file" > "$outfile"
   done

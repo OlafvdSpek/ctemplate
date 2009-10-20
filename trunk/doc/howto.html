@@ -5,8 +5,6 @@
 <title>How To Use the Google Template System</title>
 
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-<link href="http://www.google.com/favicon.ico" type="image/x-icon"
-      rel="shortcut icon">
 <link href="designstyle.css" type="text/css" rel="stylesheet">
 <style type="text/css">
 <!--
@@ -124,12 +122,12 @@ as <code>11/20/2005</code>, are <b>dictionary values</b>.</p>
 
 <p> The template language has six types of markers:</p>
 <ol>
-  <li> VARIABLE markers, which are replaced by text based on
+  <li> <b>Variable</b> markers, which are replaced by text based on
        dictionary values.  All markers in the above example are
        variable markers.  Variable markers look like this:
-       <code>{{VARIABLE}}</code></li>
+       <code>{{FOO}}</code></li>
        
-  <li> START SECTION and END SECTION markers, which delimit
+  <li> <b>Start section</b> and <b>end section</b> markers, which delimit
        sections which may appear zero, one, or N times in
        the output.  The number of times a section appears is
        determined by the data dictionaries, as explained below.
@@ -138,25 +136,25 @@ as <code>11/20/2005</code>, are <b>dictionary values</b>.</p>
        iteration of a section expansion to another.  Note that the
        specification of how sections expand is entirely dependent on
        the dictionary, as set up by the application; there is no way
-       to specify a repeat rate in the template language itself.
+       to specify a repeat count in the template language itself.
        Section markers look like this:
-       <code>{{#SECTION_NAME}}...{{/SECTION_NAME}}</code></li>
+       <code>{{#FOO}}...{{/FOO}}</code></li>
        
-  <li> TEMPLATE-INCLUDE markers, which designate other templates to be
+  <li> <b>Template-include</b> markers, which designate other templates to be
        expanded and inserted at the location where the marker appears.
        These are treated much like sections -- one may think of them
        as sections whose content is specified in a
        different file instead of inline -- and just like sections, can
        be expanded zero, one or N times in the output, each with a
        different dictionary.  Template-include markers look like this:
-       <code>{{&gt;FILENAME}}</code></li>
+       <code>{{&gt;FOO}}</code></li>
 
-  <li> COMMENT markers, which may annotate the template
+  <li> <b>Comment</b> markers, which may annotate the template
        structure but drop completely out of the expanded
        output.  Comment markers look like this:
        <code>{{!&nbsp;comment&nbsp;lives&nbsp;here -- cool, no?}}</code></li>
 
-  <li> SET-DELIMITER markers, which change the marker delimiters from
+  <li> <b>Set-delimiter</b> markers, which change the marker delimiters from
        <code>{{</code> and <code>}}</code> to custom strings.  (The
        only requirement is that these strings not contain whitespace
        or the equals sign.)  This is useful for languages like TeX,
@@ -166,7 +164,7 @@ as <code>11/20/2005</code>, are <b>dictionary values</b>.</p>
              &lt;=| |=&gt;   |! And now markers are delimited by bars! |
        </code></li>
 
-  <li> PRAGMA markers, which invoke additional built-in template
+  <li> <b>Pragma</b> markers, which invoke additional built-in template
        features when processing the template. Pragma markers look like
        this: <code>{{%PRAGMA [name="value"...]}}</code>. Currently,
        AUTOESCAPE is the only pragma defined, see
@@ -216,7 +214,7 @@ Template-includes also have one other, mandatory associated piece of
 information: the filename of the template to include.  This filename
 may be specified either as an absolute path, or as a relative path.
 (In the latter case, the path is taken relative to the
-<i>template_root</i>, as <A HREF="#managing">set by the
+<i>template search path</i>, as <A HREF="#managing">set by the
 application</A>.)</p>
 
 <p>The application program is responsible for building this data
@@ -502,11 +500,11 @@ Right now, there's one such name.</p>
 
 <h4><A NAME="separator">Separator Sections</A></h4>
 
-<p>If you have a section named <code>SEP</code>, you can define inside
-of it a section named <code>SEP_separator</code>, and the template
+<p>If you have a section named <code>FOO</code>, you can define inside
+of it a section named <code>FOO_separator</code>, and the template
 system will automatically expand that section every time
-<code>SEP</code> is expanded, <i>except for the last</i>.  Thus, the
-contents of <code>SEP_separator</code> can be used to separate
+<code>FOO</code> is expanded, <i>except for the last</i>.  Thus, the
+contents of <code>FOO_separator</code> can be used to separate
 repeated values of a section.</p>
 
 <p>Here's an example:</p>
@@ -739,7 +737,7 @@ final category of code lets you inspect and control the template
 system.</p>
 
 <p>The code below assumes the default configuration option of putting
-all template code in namespace <code>google</code>.
+all template code in namespace <code>ctemplate</code>.
 
 
 <h3> Loading A Template </h3>
@@ -970,7 +968,8 @@ sub-dictionary that you create via
 <code>subdict->SetFilename()</code> to indicate the name of the
 template to include.  If you do not set this, the sub-dictionary will
 be ignored.  The filename may be absolute, or relative, in which case
-it's relative to <A HREF="#managing">template_root</A>.</p>
+it's relative to some entry in the <A HREF="#managing">template search
+  path</A>.</p>
 
 <p>Example:</p>
 <pre>
@@ -1389,10 +1388,16 @@ forth.</p>
 system.</p>
 
 <ul>
-  <li> <code>ctemplate::Template::SetTemplateRootDirectory(root)</code>: when
+  <li> <code>ctemplate::Template::SetTemplateRootDirectory(root)</code> and
+       <code>ctemplate::Template::AddAlternateTemplateRootDirectory(altroot)</code>:
+       when
        <code>GetTemplate()</code> is called with a relative filename,
        the template system will try to load the template from
-       <code>root/file</code>.  This defaults to <code>./</code>. </li>
+       <code>root/file</code>.  This defaults to <code>./</code>. If the
+       template cannot be found under the template root directory, the alternate
+       template root directories will be tried in the order they were added.
+       Together, the template root and any alternate template roots make up the
+       <i>template search path</i>.</li>
 </ul>
 
 <p>There are some administrative tools that can help with tweaking

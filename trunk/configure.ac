@@ -4,7 +4,7 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 0.95, opensource@google.com)
+AC_INIT(ctemplate, 0.96, opensource@google.com)
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
@@ -20,6 +20,8 @@ AM_CONDITIONAL(GCC, test "$GCC" = yes)   # let the Makefile know if we're gcc
 # Uncomment this if you'll be exporting libraries (.so's)
 AC_PROG_LIBTOOL
 AC_SUBST(LIBTOOL_DEPS)
+
+AC_PROG_LN_S
 
 AX_C___ATTRIBUTE__
 
@@ -87,20 +89,33 @@ AC_SUBST(ac_cv_cxx_hash_map)
 AC_SUBST(ac_cv_cxx_hash_set)
 AC_SUBST(ac_cv_cxx_hash_map_class)
 AC_SUBST(ac_cv_cxx_hash_set_class)
-if test "$ac_cv___attribute__" == "yes"; then
+if test "$ac_cv___attribute__" = "yes"; then
    AC_SUBST(ac_google_attribute, 1)
 else
    AC_SUBST(ac_google_attribute, 0)
 fi
-if test "$ac_cv_type_u_int64_t" == "yes"; then
+if test "$ac_cv_type_u_int64_t" = "yes"; then
    AC_SUBST(ac_cv_uint64, u_int64_t)
-elif test "$ac_cv_type_uint64_t" == "yes"; then
+elif test "$ac_cv_type_uint64_t" = "yes"; then
    AC_SUBST(ac_cv_uint64, uint64_t)
-elif test "$ac_cv_type___int64" == "yes"; then
+elif test "$ac_cv_type___int64" = "yes"; then
    AC_SUBST(ac_cv_uint64, unsigned __int64)
 else
    AC_SUBST(ac_cv_uint64, unsigned long long)   # best we can do
 fi
+
+# One some systems (eg gnu/linux), the linker defines _start and
+# data_start to indicate the extent of the .text section.  We can use
+# this to know strings are immutable.  In the code, we make the
+# variables weak, just in case, but for this check, we only want to
+# say "yes" if the linker supports the vars, *and* the compiler supports
+# attribute-weak.
+AC_TRY_LINK([], [ extern char _start[];
+                  extern char data_start[];
+                  extern char dummy[]  __attribute__((weak));
+                  return (_start && data_start && dummy); ],
+            [ ac_have_attribute_weak=1 ], [ ac_have_attribute_weak=0 ])
+AC_SUBST(ac_have_attribute_weak)
 
 # In unix (that is, using this script), this dll-export stuff will always
 # be the empty string.  In windows, we'll replace it with windows-specific
