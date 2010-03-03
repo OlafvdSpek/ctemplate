@@ -48,6 +48,7 @@ using std::string;
 using std::vector;
 
 // These call the windows _vsnprintf, but always NUL-terminate.
+#if !defined(__MINGW32__) && !defined(__MINGW64__)  /* mingw already defines */
 int safe_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
   if (size == 0)        // not even room for a \0?
     return -1;          // not what C99 says to do, but what windows does
@@ -62,6 +63,7 @@ int snprintf(char *str, size_t size, const char *format, ...) {
   va_end(ap);
   return r;
 }
+#endif  /* #if !defined(__MINGW32__) && !defined(__MINGW64__) */
 
 // used in template_unittest
 string TmpFile(const char* basename) {

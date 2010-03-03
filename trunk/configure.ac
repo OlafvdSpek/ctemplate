@@ -8,6 +8,7 @@ AC_INIT(ctemplate, 0.96, opensource@google.com)
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
+AC_CANONICAL_HOST
 AM_INIT_AUTOMAKE([dist-zip])
 AM_CONFIG_HEADER(src/config.h)
 
@@ -16,6 +17,29 @@ AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_CXX
 AM_CONDITIONAL(GCC, test "$GCC" = yes)   # let the Makefile know if we're gcc
+
+# MinGW uses autoconf, but also needs the windows shim routines
+# (since it doesn't have its own support for, say, pthreads).
+# This requires us to #include a special header file, and also to
+# link in some windows versions of .o's instead of the unix versions.
+AH_BOTTOM([
+#if defined( __MINGW32__) || defined(__MINGW64__)
+#include "windows/port.h"
+#endif
+])
+case $host_os in
+  *mingw*)
+    # Disabling fast install keeps libtool from creating wrapper scripts
+    # around the executables it builds.  Such scripts have caused failures on
+    # MinGW.  Using this option means an extra link step is executed during
+    # "make install".
+    AC_DISABLE_FAST_INSTALL
+    ;;
+   *)
+    AC_ENABLE_FAST_INSTALL
+    ;;
+esac
+AM_CONDITIONAL(MINGW, expr $host : '.*-mingw' >/dev/null 2>&1)
 
 # Uncomment this if you'll be exporting libraries (.so's)
 AC_PROG_LIBTOOL
@@ -32,8 +56,8 @@ AC_HEADER_STDC
 AC_COMPILER_CHARACTERISTICS
 
 # Here are some examples of how to check for the existence of a fn or file
-AC_CHECK_FUNCS(getopt_long)
-##AC_CHECK_HEADERS(sys/resource.h)
+AC_CHECK_FUNCS([getopt_long getopt])
+AC_CHECK_HEADERS([getopt.h])
 
 # These are the types I need.  We look for them in either stdint.h,
 # sys/types.h, or inttypes.h, all of which are part of the default-includes.
@@ -103,6 +127,18 @@ elif test "$ac_cv_type___int64" = "yes"; then
 else
    AC_SUBST(ac_cv_uint64, unsigned long long)   # best we can do
 fi
+# These are used by template_string.h.in
+if test "$ac_cv_header_stdint_h" = "yes"; then
+   AC_SUBST(ac_cv_have_stdint_h, 1)
+else
+   AC_SUBST(ac_cv_have_stdint_h, 0)
+fi
+if test "$ac_cv_header_inttypes_h" = "yes"; then
+   AC_SUBST(ac_cv_have_inttypes_h, 1)
+else
+   AC_SUBST(ac_cv_have_inttypes_h, 0)
+fi
+
 
 # One some systems (eg gnu/linux), the linker defines _start and
 # data_start to indicate the extent of the .text section.  We can use
@@ -146,5 +182,5 @@ AC_CONFIG_FILES([Makefile \
                  src/ctemplate/template_namelist.h \
                  src/ctemplate/per_expand_data.h \
                  src/ctemplate/template_dictionary_interface.h \
-		 ])
+                 ])
 AC_OUTPUT

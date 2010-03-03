@@ -42,6 +42,9 @@ build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = make_tpl_varnames_h$(EXEEXT) \
 	diff_tpl_auto_escape$(EXEEXT)
+
+# For MinGW, we need to bring in the windows port files
+@MINGW_TRUE@am__append_1 = src/windows/port.h src/windows/port.cc
 noinst_PROGRAMS = $(am__EXEEXT_1)
 DIST_COMMON = README $(am__configure_deps) $(dist_doc_DATA) \
 	$(noinst_HEADERS) $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
@@ -96,7 +99,30 @@ libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES) $(noinst_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 libctemplate_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am__libctemplate_la_SOURCES_DIST = src/ctemplate/template.h \
+	src/ctemplate/template_string.h src/ctemplate/template_enums.h \
+	src/ctemplate/template_pathops.h \
+	src/ctemplate/template_modifiers.h \
+	src/ctemplate/template_dictionary.h \
+	src/ctemplate/template_dictionary_interface.h \
+	src/ctemplate/template_annotator.h \
+	src/ctemplate/template_emitter.h \
+	src/ctemplate/template_namelist.h \
+	src/ctemplate/per_expand_data.h src/base/arena.h \
+	src/base/arena.cc src/base/mutex.h src/base/small_map.h \
+	src/base/manual_constructor.h \
+	src/template_modifiers_internal.h src/indented_writer.h \
+	src/template.cc src/template_dictionary.cc \
+	src/template_modifiers.cc src/template_annotator.cc \
+	src/per_expand_data.cc src/template_string.cc \
+	src/template_namelist.cc src/template_pathops.cc \
+	src/htmlparser/htmlparser.h src/htmlparser/htmlparser.cc \
+	src/htmlparser/jsparser.h src/htmlparser/jsparser.cc \
+	src/htmlparser/statemachine.h src/htmlparser/statemachine.cc \
+	src/htmlparser/htmlparser_cpp.h src/windows/port.h \
+	src/windows/port.cc
 am__objects_1 =
+@MINGW_TRUE@am__objects_2 = libctemplate_la-port.lo
 am_libctemplate_la_OBJECTS = $(am__objects_1) libctemplate_la-arena.lo \
 	libctemplate_la-template.lo \
 	libctemplate_la-template_dictionary.lo \
@@ -107,10 +133,33 @@ am_libctemplate_la_OBJECTS = $(am__objects_1) libctemplate_la-arena.lo \
 	libctemplate_la-template_namelist.lo \
 	libctemplate_la-template_pathops.lo \
 	libctemplate_la-htmlparser.lo libctemplate_la-jsparser.lo \
-	libctemplate_la-statemachine.lo
+	libctemplate_la-statemachine.lo $(am__objects_2)
 libctemplate_la_OBJECTS = $(am_libctemplate_la_OBJECTS)
 am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
-am__objects_2 = $(am__objects_1) libctemplate_debug_la-arena.lo \
+am__libctemplate_debug_la_SOURCES_DIST = src/ctemplate/template.h \
+	src/ctemplate/template_string.h src/ctemplate/template_enums.h \
+	src/ctemplate/template_pathops.h \
+	src/ctemplate/template_modifiers.h \
+	src/ctemplate/template_dictionary.h \
+	src/ctemplate/template_dictionary_interface.h \
+	src/ctemplate/template_annotator.h \
+	src/ctemplate/template_emitter.h \
+	src/ctemplate/template_namelist.h \
+	src/ctemplate/per_expand_data.h src/base/arena.h \
+	src/base/arena.cc src/base/mutex.h src/base/small_map.h \
+	src/base/manual_constructor.h \
+	src/template_modifiers_internal.h src/indented_writer.h \
+	src/template.cc src/template_dictionary.cc \
+	src/template_modifiers.cc src/template_annotator.cc \
+	src/per_expand_data.cc src/template_string.cc \
+	src/template_namelist.cc src/template_pathops.cc \
+	src/htmlparser/htmlparser.h src/htmlparser/htmlparser.cc \
+	src/htmlparser/jsparser.h src/htmlparser/jsparser.cc \
+	src/htmlparser/statemachine.h src/htmlparser/statemachine.cc \
+	src/htmlparser/htmlparser_cpp.h src/windows/port.h \
+	src/windows/port.cc
+@MINGW_TRUE@am__objects_3 = libctemplate_debug_la-port.lo
+am__objects_4 = $(am__objects_1) libctemplate_debug_la-arena.lo \
 	libctemplate_debug_la-template.lo \
 	libctemplate_debug_la-template_dictionary.lo \
 	libctemplate_debug_la-template_modifiers.lo \
@@ -121,11 +170,34 @@ am__objects_2 = $(am__objects_1) libctemplate_debug_la-arena.lo \
 	libctemplate_debug_la-template_pathops.lo \
 	libctemplate_debug_la-htmlparser.lo \
 	libctemplate_debug_la-jsparser.lo \
-	libctemplate_debug_la-statemachine.lo
-am_libctemplate_debug_la_OBJECTS = $(am__objects_2)
+	libctemplate_debug_la-statemachine.lo $(am__objects_3)
+am_libctemplate_debug_la_OBJECTS = $(am__objects_4)
 libctemplate_debug_la_OBJECTS = $(am_libctemplate_debug_la_OBJECTS)
 libctemplate_nothreads_la_LIBADD =
-am__objects_3 = $(am__objects_1) libctemplate_nothreads_la-arena.lo \
+am__libctemplate_nothreads_la_SOURCES_DIST = src/ctemplate/template.h \
+	src/ctemplate/template_string.h src/ctemplate/template_enums.h \
+	src/ctemplate/template_pathops.h \
+	src/ctemplate/template_modifiers.h \
+	src/ctemplate/template_dictionary.h \
+	src/ctemplate/template_dictionary_interface.h \
+	src/ctemplate/template_annotator.h \
+	src/ctemplate/template_emitter.h \
+	src/ctemplate/template_namelist.h \
+	src/ctemplate/per_expand_data.h src/base/arena.h \
+	src/base/arena.cc src/base/mutex.h src/base/small_map.h \
+	src/base/manual_constructor.h \
+	src/template_modifiers_internal.h src/indented_writer.h \
+	src/template.cc src/template_dictionary.cc \
+	src/template_modifiers.cc src/template_annotator.cc \
+	src/per_expand_data.cc src/template_string.cc \
+	src/template_namelist.cc src/template_pathops.cc \
+	src/htmlparser/htmlparser.h src/htmlparser/htmlparser.cc \
+	src/htmlparser/jsparser.h src/htmlparser/jsparser.cc \
+	src/htmlparser/statemachine.h src/htmlparser/statemachine.cc \
+	src/htmlparser/htmlparser_cpp.h src/windows/port.h \
+	src/windows/port.cc
+@MINGW_TRUE@am__objects_5 = libctemplate_nothreads_la-port.lo
+am__objects_6 = $(am__objects_1) libctemplate_nothreads_la-arena.lo \
 	libctemplate_nothreads_la-template.lo \
 	libctemplate_nothreads_la-template_dictionary.lo \
 	libctemplate_nothreads_la-template_modifiers.lo \
@@ -136,12 +208,36 @@ am__objects_3 = $(am__objects_1) libctemplate_nothreads_la-arena.lo \
 	libctemplate_nothreads_la-template_pathops.lo \
 	libctemplate_nothreads_la-htmlparser.lo \
 	libctemplate_nothreads_la-jsparser.lo \
-	libctemplate_nothreads_la-statemachine.lo
-am_libctemplate_nothreads_la_OBJECTS = $(am__objects_3)
+	libctemplate_nothreads_la-statemachine.lo $(am__objects_5)
+am_libctemplate_nothreads_la_OBJECTS = $(am__objects_6)
 libctemplate_nothreads_la_OBJECTS =  \
 	$(am_libctemplate_nothreads_la_OBJECTS)
 libctemplate_nothreads_debug_la_LIBADD =
-am__objects_4 = $(am__objects_1) \
+am__libctemplate_nothreads_debug_la_SOURCES_DIST =  \
+	src/ctemplate/template.h src/ctemplate/template_string.h \
+	src/ctemplate/template_enums.h \
+	src/ctemplate/template_pathops.h \
+	src/ctemplate/template_modifiers.h \
+	src/ctemplate/template_dictionary.h \
+	src/ctemplate/template_dictionary_interface.h \
+	src/ctemplate/template_annotator.h \
+	src/ctemplate/template_emitter.h \
+	src/ctemplate/template_namelist.h \
+	src/ctemplate/per_expand_data.h src/base/arena.h \
+	src/base/arena.cc src/base/mutex.h src/base/small_map.h \
+	src/base/manual_constructor.h \
+	src/template_modifiers_internal.h src/indented_writer.h \
+	src/template.cc src/template_dictionary.cc \
+	src/template_modifiers.cc src/template_annotator.cc \
+	src/per_expand_data.cc src/template_string.cc \
+	src/template_namelist.cc src/template_pathops.cc \
+	src/htmlparser/htmlparser.h src/htmlparser/htmlparser.cc \
+	src/htmlparser/jsparser.h src/htmlparser/jsparser.cc \
+	src/htmlparser/statemachine.h src/htmlparser/statemachine.cc \
+	src/htmlparser/htmlparser_cpp.h src/windows/port.h \
+	src/windows/port.cc
+@MINGW_TRUE@am__objects_7 = libctemplate_nothreads_debug_la-port.lo
+am__objects_8 = $(am__objects_1) \
 	libctemplate_nothreads_debug_la-arena.lo \
 	libctemplate_nothreads_debug_la-template.lo \
 	libctemplate_nothreads_debug_la-template_dictionary.lo \
@@ -153,9 +249,10 @@ am__objects_4 = $(am__objects_1) \
 	libctemplate_nothreads_debug_la-template_pathops.lo \
 	libctemplate_nothreads_debug_la-htmlparser.lo \
 	libctemplate_nothreads_debug_la-jsparser.lo \
-	libctemplate_nothreads_debug_la-statemachine.lo
-am__objects_5 = $(am__objects_4)
-am_libctemplate_nothreads_debug_la_OBJECTS = $(am__objects_5)
+	libctemplate_nothreads_debug_la-statemachine.lo \
+	$(am__objects_7)
+am__objects_9 = $(am__objects_8)
+am_libctemplate_nothreads_debug_la_OBJECTS = $(am__objects_9)
 libctemplate_nothreads_debug_la_OBJECTS =  \
 	$(am_libctemplate_nothreads_debug_la_OBJECTS)
 libctemplate_testing_la_LIBADD =
@@ -179,9 +276,9 @@ am__EXEEXT_1 = compile_test$(EXEEXT) compile_nothreads_test$(EXEEXT) \
 	htmlparser_nothreads_test$(EXEEXT) statemachine_test$(EXEEXT) \
 	generate_fsm_c_test$(EXEEXT)
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
-am__objects_6 = $(am__objects_1) \
+am__objects_10 = $(am__objects_1) \
 	compile_nothreads_test-compile_test.$(OBJEXT)
-am_compile_nothreads_test_OBJECTS = $(am__objects_6)
+am_compile_nothreads_test_OBJECTS = $(am__objects_10)
 compile_nothreads_test_OBJECTS = $(am_compile_nothreads_test_OBJECTS)
 compile_nothreads_test_DEPENDENCIES = libctemplate_nothreads_debug.la
 am_compile_test_OBJECTS = $(am__objects_1) \
@@ -196,8 +293,8 @@ diff_tpl_auto_escape_DEPENDENCIES = libctemplate_nothreads.la
 am_generate_fsm_c_test_OBJECTS = generate_fsm_c_test.$(OBJEXT)
 generate_fsm_c_test_OBJECTS = $(am_generate_fsm_c_test_OBJECTS)
 generate_fsm_c_test_LDADD = $(LDADD)
-am__objects_7 = htmlparser_nothreads_test-htmlparser_test.$(OBJEXT)
-am_htmlparser_nothreads_test_OBJECTS = $(am__objects_7)
+am__objects_11 = htmlparser_nothreads_test-htmlparser_test.$(OBJEXT)
+am_htmlparser_nothreads_test_OBJECTS = $(am__objects_11)
 htmlparser_nothreads_test_OBJECTS =  \
 	$(am_htmlparser_nothreads_test_OBJECTS)
 htmlparser_nothreads_test_DEPENDENCIES =  \
@@ -216,8 +313,8 @@ am_statemachine_test_OBJECTS =  \
 	statemachine_test-statemachine.$(OBJEXT)
 statemachine_test_OBJECTS = $(am_statemachine_test_OBJECTS)
 statemachine_test_LDADD = $(LDADD)
-am__objects_8 = template_dictionary_nothreads_unittest-template_dictionary_unittest.$(OBJEXT)
-am_template_dictionary_nothreads_unittest_OBJECTS = $(am__objects_8)
+am__objects_12 = template_dictionary_nothreads_unittest-template_dictionary_unittest.$(OBJEXT)
+am_template_dictionary_nothreads_unittest_OBJECTS = $(am__objects_12)
 template_dictionary_nothreads_unittest_OBJECTS =  \
 	$(am_template_dictionary_nothreads_unittest_OBJECTS)
 template_dictionary_nothreads_unittest_DEPENDENCIES =  \
@@ -227,8 +324,8 @@ template_dictionary_unittest_OBJECTS =  \
 	$(am_template_dictionary_unittest_OBJECTS)
 template_dictionary_unittest_DEPENDENCIES = libctemplate_testing.la \
 	libctemplate_debug.la $(am__DEPENDENCIES_1)
-am__objects_9 = template_modifiers_nothreads_unittest-template_modifiers_unittest.$(OBJEXT)
-am_template_modifiers_nothreads_unittest_OBJECTS = $(am__objects_9)
+am__objects_13 = template_modifiers_nothreads_unittest-template_modifiers_unittest.$(OBJEXT)
+am_template_modifiers_nothreads_unittest_OBJECTS = $(am__objects_13)
 template_modifiers_nothreads_unittest_OBJECTS =  \
 	$(am_template_modifiers_nothreads_unittest_OBJECTS)
 template_modifiers_nothreads_unittest_DEPENDENCIES =  \
@@ -238,9 +335,9 @@ template_modifiers_unittest_OBJECTS =  \
 	$(am_template_modifiers_unittest_OBJECTS)
 template_modifiers_unittest_DEPENDENCIES = libctemplate_testing.la \
 	libctemplate_debug.la $(am__DEPENDENCIES_1)
-am__objects_10 =  \
+am__objects_14 =  \
 	template_nothreads_regtest-template_regtest.$(OBJEXT)
-am_template_nothreads_regtest_OBJECTS = $(am__objects_10)
+am_template_nothreads_regtest_OBJECTS = $(am__objects_14)
 template_nothreads_regtest_OBJECTS =  \
 	$(am_template_nothreads_regtest_OBJECTS)
 template_nothreads_regtest_DEPENDENCIES =  \
@@ -256,8 +353,8 @@ am_template_regtest_OBJECTS =  \
 template_regtest_OBJECTS = $(am_template_regtest_OBJECTS)
 template_regtest_DEPENDENCIES = libctemplate_debug.la \
 	$(am__DEPENDENCIES_1)
-am__objects_11 = template_setglobals_nothreads_unittest-template_setglobals_unittest.$(OBJEXT)
-am_template_setglobals_nothreads_unittest_OBJECTS = $(am__objects_11)
+am__objects_15 = template_setglobals_nothreads_unittest-template_setglobals_unittest.$(OBJEXT)
+am_template_setglobals_nothreads_unittest_OBJECTS = $(am__objects_15)
 template_setglobals_nothreads_unittest_OBJECTS =  \
 	$(am_template_setglobals_nothreads_unittest_OBJECTS)
 template_setglobals_nothreads_unittest_DEPENDENCIES =  \
@@ -267,9 +364,9 @@ template_setglobals_unittest_OBJECTS =  \
 	$(am_template_setglobals_unittest_OBJECTS)
 template_setglobals_unittest_DEPENDENCIES = libctemplate_testing.la \
 	libctemplate_debug.la $(am__DEPENDENCIES_1)
-am__objects_12 = template_test_util_nothreads_test-template_dictionary.$(OBJEXT) \
+am__objects_16 = template_test_util_nothreads_test-template_dictionary.$(OBJEXT) \
 	template_test_util_nothreads_test-template_test_util_test.$(OBJEXT)
-am_template_test_util_nothreads_test_OBJECTS = $(am__objects_12)
+am_template_test_util_nothreads_test_OBJECTS = $(am__objects_16)
 template_test_util_nothreads_test_OBJECTS =  \
 	$(am_template_test_util_nothreads_test_OBJECTS)
 template_test_util_nothreads_test_DEPENDENCIES =  \
@@ -328,10 +425,10 @@ SOURCES = $(libctemplate_la_SOURCES) $(libctemplate_debug_la_SOURCES) \
 	$(template_test_util_nothreads_test_SOURCES) \
 	$(template_test_util_test_SOURCES) \
 	$(template_unittest_SOURCES)
-DIST_SOURCES = $(libctemplate_la_SOURCES) \
-	$(libctemplate_debug_la_SOURCES) \
-	$(libctemplate_nothreads_la_SOURCES) \
-	$(libctemplate_nothreads_debug_la_SOURCES) \
+DIST_SOURCES = $(am__libctemplate_la_SOURCES_DIST) \
+	$(am__libctemplate_debug_la_SOURCES_DIST) \
+	$(am__libctemplate_nothreads_la_SOURCES_DIST) \
+	$(am__libctemplate_nothreads_debug_la_SOURCES_DIST) \
 	$(libctemplate_testing_la_SOURCES) \
 	$(compile_nothreads_test_SOURCES) $(compile_test_SOURCES) \
 	$(diff_tpl_auto_escape_SOURCES) $(generate_fsm_c_test_SOURCES) \
@@ -412,6 +509,8 @@ LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
+MINGW_FALSE = @MINGW_FALSE@
+MINGW_TRUE = @MINGW_TRUE@
 NMEDIT = @NMEDIT@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
@@ -438,6 +537,8 @@ ac_cv_cxx_hash_map = @ac_cv_cxx_hash_map@
 ac_cv_cxx_hash_map_class = @ac_cv_cxx_hash_map_class@
 ac_cv_cxx_hash_set = @ac_cv_cxx_hash_set@
 ac_cv_cxx_hash_set_class = @ac_cv_cxx_hash_set_class@
+ac_cv_have_inttypes_h = @ac_cv_have_inttypes_h@
+ac_cv_have_stdint_h = @ac_cv_have_stdint_h@
 ac_cv_uint64 = @ac_cv_uint64@
 ac_google_attribute = @ac_google_attribute@
 ac_google_end_namespace = @ac_google_end_namespace@
@@ -639,9 +740,8 @@ TESTDATA = src/tests/template_unittest_test_footer.in \
 # have a later timestamp than the .config files that generate them, which
 # means users won't try to rebuild them.  Ah, the joys of automake.
 BUILT_SOURCES = src/htmlparser/htmlparser_fsm.h \
-                src/htmlparser/jsparser_fsm.h \
-                src/tests/statemachine_test_fsm.h
-
+	src/htmlparser/jsparser_fsm.h \
+	src/tests/statemachine_test_fsm.h statemachine.c
 
 # These are the symbols (classes, mostly) we want to export from our library.
 # Note this regexp applies to the *mangled* name, which is why we have to
@@ -653,15 +753,14 @@ libctemplate_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/base/small_map.h src/base/manual_constructor.h \
 	src/template_modifiers_internal.h src/indented_writer.h \
-	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
-	src/template_annotator.cc src/per_expand_data.cc \
-	src/template_string.cc \
+	src/template.cc src/template_dictionary.cc \
+	src/template_modifiers.cc src/template_annotator.cc \
+	src/per_expand_data.cc src/template_string.cc \
 	src/template_namelist.cc src/template_pathops.cc \
 	src/htmlparser/htmlparser.h src/htmlparser/htmlparser.cc \
 	src/htmlparser/jsparser.h src/htmlparser/jsparser.cc \
 	src/htmlparser/statemachine.h src/htmlparser/statemachine.cc \
-	src/htmlparser/htmlparser_cpp.h
-
+	src/htmlparser/htmlparser_cpp.h $(am__append_1)
 libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG $(AM_CXXFLAGS)
 libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) -export-symbols-regex $(CTEMPLATE_SYMBOLS)
 libctemplate_la_LIBADD = $(PTHREAD_LIBS)
@@ -780,10 +879,11 @@ htmlparser_test_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
 htmlparser_nothreads_test_SOURCES = $(htmlparser_test_SOURCES)
 htmlparser_nothreads_test_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 htmlparser_nothreads_test_LDADD = libctemplate_nothreads_debug.la
+CLEANFILES = statemachine.c
 statemachine_test_SOURCES = src/tests/statemachine_test.c \
                             statemachine.c
 
-statemachine_test_CFLAGS = -Isrc/htmlparser
+statemachine_test_CFLAGS = -I$(top_srcdir)/src/htmlparser
 generate_fsm_c_test_SOURCES = src/tests/generate_fsm_c_test.c
 generate_fsm_c_test_DEPENDENCIES = src/tests/htmlparser_testdata/sample_fsm.c
 # In addition to the normal stuff, we include all the windows-specific
@@ -798,7 +898,9 @@ EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb 
 	src/htmlparser/htmlparser_fsm.config \
 	src/htmlparser/jsparser_fsm.config \
 	$(BUILT_SOURCES) \
-	src/windows $(WINDOWS_PROJECTS) src/solaris/libstdc++.la contrib
+	src/windows/config.h src/windows/preprocess.sh \
+	src/windows/ctemplate src/windows/google $(WINDOWS_PROJECTS) \
+	src/solaris/libstdc++.la contrib
 
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
@@ -1054,6 +1156,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-htmlparser.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-jsparser.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-per_expand_data.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-port.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-statemachine.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-template.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_debug_la-template_annotator.Plo@am__quote@
@@ -1066,6 +1169,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-htmlparser.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-jsparser.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-per_expand_data.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-port.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-statemachine.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_la-template_annotator.Plo@am__quote@
@@ -1078,6 +1182,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-htmlparser.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-jsparser.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-per_expand_data.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-port.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-statemachine.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-template.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_debug_la-template_annotator.Plo@am__quote@
@@ -1090,6 +1195,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-htmlparser.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-jsparser.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-per_expand_data.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-port.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-statemachine.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-template.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libctemplate_nothreads_la-template_annotator.Plo@am__quote@
@@ -1285,6 +1391,13 @@ libctemplate_la-statemachine.lo: src/htmlparser/statemachine.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_la-statemachine.lo `test -f 'src/htmlparser/statemachine.cc' || echo '$(srcdir)/'`src/htmlparser/statemachine.cc
 
+libctemplate_la-port.lo: src/windows/port.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_la-port.lo -MD -MP -MF "$(DEPDIR)/libctemplate_la-port.Tpo" -c -o libctemplate_la-port.lo `test -f 'src/windows/port.cc' || echo '$(srcdir)/'`src/windows/port.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_la-port.Tpo" "$(DEPDIR)/libctemplate_la-port.Plo"; else rm -f "$(DEPDIR)/libctemplate_la-port.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/windows/port.cc' object='libctemplate_la-port.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_la-port.lo `test -f 'src/windows/port.cc' || echo '$(srcdir)/'`src/windows/port.cc
+
 libctemplate_debug_la-arena.lo: src/base/arena.cc
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_debug_la-arena.lo -MD -MP -MF "$(DEPDIR)/libctemplate_debug_la-arena.Tpo" -c -o libctemplate_debug_la-arena.lo `test -f 'src/base/arena.cc' || echo '$(srcdir)/'`src/base/arena.cc; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_debug_la-arena.Tpo" "$(DEPDIR)/libctemplate_debug_la-arena.Plo"; else rm -f "$(DEPDIR)/libctemplate_debug_la-arena.Tpo"; exit 1; fi
@@ -1368,6 +1481,13 @@ libctemplate_debug_la-statemachine.lo: src/htmlparser/statemachine.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/htmlparser/statemachine.cc' object='libctemplate_debug_la-statemachine.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_debug_la-statemachine.lo `test -f 'src/htmlparser/statemachine.cc' || echo '$(srcdir)/'`src/htmlparser/statemachine.cc
+
+libctemplate_debug_la-port.lo: src/windows/port.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_debug_la-port.lo -MD -MP -MF "$(DEPDIR)/libctemplate_debug_la-port.Tpo" -c -o libctemplate_debug_la-port.lo `test -f 'src/windows/port.cc' || echo '$(srcdir)/'`src/windows/port.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_debug_la-port.Tpo" "$(DEPDIR)/libctemplate_debug_la-port.Plo"; else rm -f "$(DEPDIR)/libctemplate_debug_la-port.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/windows/port.cc' object='libctemplate_debug_la-port.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_debug_la-port.lo `test -f 'src/windows/port.cc' || echo '$(srcdir)/'`src/windows/port.cc
 
 libctemplate_nothreads_la-arena.lo: src/base/arena.cc
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_la-arena.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_la-arena.Tpo" -c -o libctemplate_nothreads_la-arena.lo `test -f 'src/base/arena.cc' || echo '$(srcdir)/'`src/base/arena.cc; \
@@ -1453,6 +1573,13 @@ libctemplate_nothreads_la-statemachine.lo: src/htmlparser/statemachine.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_la-statemachine.lo `test -f 'src/htmlparser/statemachine.cc' || echo '$(srcdir)/'`src/htmlparser/statemachine.cc
 
+libctemplate_nothreads_la-port.lo: src/windows/port.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_la-port.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_la-port.Tpo" -c -o libctemplate_nothreads_la-port.lo `test -f 'src/windows/port.cc' || echo '$(srcdir)/'`src/windows/port.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_nothreads_la-port.Tpo" "$(DEPDIR)/libctemplate_nothreads_la-port.Plo"; else rm -f "$(DEPDIR)/libctemplate_nothreads_la-port.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/windows/port.cc' object='libctemplate_nothreads_la-port.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_la-port.lo `test -f 'src/windows/port.cc' || echo '$(srcdir)/'`src/windows/port.cc
+
 libctemplate_nothreads_debug_la-arena.lo: src/base/arena.cc
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_debug_la-arena.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_debug_la-arena.Tpo" -c -o libctemplate_nothreads_debug_la-arena.lo `test -f 'src/base/arena.cc' || echo '$(srcdir)/'`src/base/arena.cc; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_nothreads_debug_la-arena.Tpo" "$(DEPDIR)/libctemplate_nothreads_debug_la-arena.Plo"; else rm -f "$(DEPDIR)/libctemplate_nothreads_debug_la-arena.Tpo"; exit 1; fi
@@ -1536,6 +1663,13 @@ libctemplate_nothreads_debug_la-statemachine.lo: src/htmlparser/statemachine.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/htmlparser/statemachine.cc' object='libctemplate_nothreads_debug_la-statemachine.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_debug_la-statemachine.lo `test -f 'src/htmlparser/statemachine.cc' || echo '$(srcdir)/'`src/htmlparser/statemachine.cc
+
+libctemplate_nothreads_debug_la-port.lo: src/windows/port.cc
+@am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_nothreads_debug_la-port.lo -MD -MP -MF "$(DEPDIR)/libctemplate_nothreads_debug_la-port.Tpo" -c -o libctemplate_nothreads_debug_la-port.lo `test -f 'src/windows/port.cc' || echo '$(srcdir)/'`src/windows/port.cc; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/libctemplate_nothreads_debug_la-port.Tpo" "$(DEPDIR)/libctemplate_nothreads_debug_la-port.Plo"; else rm -f "$(DEPDIR)/libctemplate_nothreads_debug_la-port.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/windows/port.cc' object='libctemplate_nothreads_debug_la-port.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_nothreads_debug_la_CXXFLAGS) $(CXXFLAGS) -c -o libctemplate_nothreads_debug_la-port.lo `test -f 'src/windows/port.cc' || echo '$(srcdir)/'`src/windows/port.cc
 
 libctemplate_testing_la-template_test_util.lo: src/tests/template_test_util.cc
 @am__fastdepCXX_TRUE@	if $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libctemplate_testing_la_CXXFLAGS) $(CXXFLAGS) -MT libctemplate_testing_la-template_test_util.lo -MD -MP -MF "$(DEPDIR)/libctemplate_testing_la-template_test_util.Tpo" -c -o libctemplate_testing_la-template_test_util.lo `test -f 'src/tests/template_test_util.cc' || echo '$(srcdir)/'`src/tests/template_test_util.cc; \
@@ -1992,7 +2126,7 @@ check-TESTS: $(TESTS)
 distdir: $(DISTFILES)
 	$(am__remove_distdir)
 	mkdir $(distdir)
-	$(mkdir_p) $(distdir)/doc $(distdir)/m4 $(distdir)/packages $(distdir)/packages/rpm $(distdir)/src $(distdir)/src/ctemplate $(distdir)/src/htmlparser $(distdir)/src/solaris $(distdir)/src/tests $(distdir)/src/tests/htmlparser_testdata $(distdir)/vsprojects/compile_test $(distdir)/vsprojects/diff_tpl_auto_escape $(distdir)/vsprojects/generate_fsm_c_test $(distdir)/vsprojects/htmlparser_test $(distdir)/vsprojects/libctemplate $(distdir)/vsprojects/make_tpl_varname_h $(distdir)/vsprojects/statemachine_test $(distdir)/vsprojects/template_dictionary_unittest $(distdir)/vsprojects/template_modifiers_unittest $(distdir)/vsprojects/template_regtest $(distdir)/vsprojects/template_setglobals_unittest $(distdir)/vsprojects/template_test_util_test $(distdir)/vsprojects/template_unittest $(distdir)/vsprojects/template_unittest_static
+	$(mkdir_p) $(distdir)/doc $(distdir)/m4 $(distdir)/packages $(distdir)/packages/rpm $(distdir)/src $(distdir)/src/ctemplate $(distdir)/src/htmlparser $(distdir)/src/solaris $(distdir)/src/tests $(distdir)/src/tests/htmlparser_testdata $(distdir)/src/windows $(distdir)/vsprojects/compile_test $(distdir)/vsprojects/diff_tpl_auto_escape $(distdir)/vsprojects/generate_fsm_c_test $(distdir)/vsprojects/htmlparser_test $(distdir)/vsprojects/libctemplate $(distdir)/vsprojects/make_tpl_varname_h $(distdir)/vsprojects/statemachine_test $(distdir)/vsprojects/template_dictionary_unittest $(distdir)/vsprojects/template_modifiers_unittest $(distdir)/vsprojects/template_regtest $(distdir)/vsprojects/template_setglobals_unittest $(distdir)/vsprojects/template_test_util_test $(distdir)/vsprojects/template_unittest $(distdir)/vsprojects/template_unittest_static
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \
@@ -2151,6 +2285,7 @@ install-strip:
 mostlyclean-generic:
 
 clean-generic:
+	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)

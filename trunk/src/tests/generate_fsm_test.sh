@@ -37,7 +37,7 @@ die() {
     exit 1
 }
 
-TEST_SRCDIR=${1:-TEST_SRCDIR}
+TEST_SRCDIR=${1:-$TEST_SRCDIR}
 
 # Find input files
 INPUT_FILE="$TEST_SRCDIR/src/tests/htmlparser_testdata/sample_fsm.config"
@@ -47,9 +47,13 @@ GENERATE_FSM="$TEST_SRCDIR/src/htmlparser/generate_fsm.py"
 EXPECTED="`cat $OUTPUT_FILE`"
 if [ -z "$EXPECTED" ]; then die "Error reading $OUTPUT_FILE"; fi
 
-# We could test different versions of python here, if we wanted
-for PYTHON in "python"; do
-  GENERATED="`$PYTHON $GENERATE_FSM $INPUT_FILE`"
+# Let's make sure the script works with python2.2 and above
+for PYTHON in "python" "python2.2" "python2.4" "python2.5"; do
+  # Skip the versions of python that are not installed.
+  [ -z "$PYTHON" ] || $PYTHON -h >/dev/null 2>/dev/null || continue
+  echo "-- Running $PYTHON $GENERATE_FSM $INPUT_FILE"
+  # The tr is to get rid of windows-style line endings (\r)
+  GENERATED="`$PYTHON $GENERATE_FSM $INPUT_FILE | tr -d '\015'`"
   if [ -z "$GENERATED" ]; then die "Error running $GENERATE_FSM"; fi
 
   if [ "$EXPECTED" != "$GENERATED" ]; then

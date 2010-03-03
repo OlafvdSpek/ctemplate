@@ -123,6 +123,11 @@ libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG $(AM_CXXFLAGS)
 libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) -export-symbols-regex $(CTEMPLATE_SYMBOLS)
 libctemplate_la_LIBADD = $(PTHREAD_LIBS)
 
+# For MinGW, we need to bring in the windows port files
+if MINGW
+libctemplate_la_SOURCES += src/windows/port.h src/windows/port.cc
+endif MINGW
+
 # automake will make different .o files for this library, which is good,
 # because we use an extra compiler flag.
 lib_LTLIBRARIES += libctemplate_nothreads.la
@@ -329,11 +334,14 @@ TESTDATA += \
 statemachine.c: src/htmlparser/statemachine.cc
 	$(LN_S) src/htmlparser/statemachine.cc $@
 
+BUILT_SOURCES += statemachine.c
+CLEANFILES = statemachine.c
+
 TESTS += statemachine_test
 WINDOWS_PROJECTS += vsprojects/statemachine_test/statemachine_test.vcproj
 statemachine_test_SOURCES = src/tests/statemachine_test.c \
                             statemachine.c
-statemachine_test_CFLAGS = -Isrc/htmlparser
+statemachine_test_CFLAGS = -I$(top_srcdir)/src/htmlparser
 
 TESTS += generate_fsm_c_test
 WINDOWS_PROJECTS += vsprojects/generate_fsm_c_test/generate_fsm_c_test.vcproj
@@ -402,4 +410,6 @@ EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb 
 	src/htmlparser/htmlparser_fsm.config \
 	src/htmlparser/jsparser_fsm.config \
 	$(BUILT_SOURCES) \
-	src/windows $(WINDOWS_PROJECTS) src/solaris/libstdc++.la contrib
+	src/windows/config.h src/windows/preprocess.sh \
+	src/windows/ctemplate src/windows/google $(WINDOWS_PROJECTS) \
+	src/solaris/libstdc++.la contrib

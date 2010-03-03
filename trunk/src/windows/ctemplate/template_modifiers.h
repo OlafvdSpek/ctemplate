@@ -117,8 +117,8 @@ class CTEMPLATE_DLL_DECL TemplateModifier {
   // you're certain Modify() can be ignored.  This function is
   // advisory; the template system is not required to call
   // MightModify() before Modify().
-  virtual bool MightModify(const PerExpandData* per_expand_data,
-                           const std::string& arg) const {
+  virtual bool MightModify(const PerExpandData* /*per_expand_data*/,
+                           const std::string& /*arg*/) const {
     return true;
   }
 

@@ -85,38 +85,64 @@ void NullModifier::Modify(const char* in, size_t inlen,
 }
 NullModifier null_modifier;
 
+static inline void EmitRun(const char* start, const char* limit,
+                           ExpandEmitter* out) {
+  if (start < limit) {
+    out->Emit(start, (limit - start));
+  }
+}
+
 void HtmlEscape::Modify(const char* in, size_t inlen,
                         const PerExpandData*,
                         ExpandEmitter* out, const string& arg) const {
-  for (size_t i = 0; i < inlen; ++i) {
-    switch (in[i]) {
-      case '&': APPEND("&amp;"); break;
-      case '"': APPEND("&quot;"); break;
-      case '\'': APPEND("&#39;"); break;
-      case '<': APPEND("&lt;"); break;
-      case '>': APPEND("&gt;"); break;
-      case '\r': case '\n': case '\v': case '\f':
-      case '\t': APPEND(" "); break;     // non-space whitespace
-      default: out->Emit(in[i]);
+  const char* pos = in;
+  const char* start = pos;
+  const char* const limit = in + inlen;
+  while (pos < limit) {
+    switch (*pos) {
+      default:
+        // Increment our counter and look at the next character.
+        ++pos;
+        continue;
+
+      case '&':  EmitRun(start, pos, out); APPEND("&amp;");  break;
+      case '"':  EmitRun(start, pos, out); APPEND("&quot;"); break;
+      case '\'': EmitRun(start, pos, out); APPEND("&#39;");  break;
+      case '<':  EmitRun(start, pos, out); APPEND("&lt;");   break;
+      case '>':  EmitRun(start, pos, out); APPEND("&gt;");   break;
+
+      case '\r': case '\n': case '\v': case '\f': case '\t':
+        EmitRun(start, pos, out); APPEND(" ");      break;
     }
+    start = ++pos;
   }
+  EmitRun(start, pos, out);
 }
 HtmlEscape html_escape;
 
 void PreEscape::Modify(const char* in, size_t inlen,
                        const PerExpandData*,
                        ExpandEmitter* out, const string& arg) const {
-  for (size_t i = 0; i < inlen; ++i) {
-    switch (in[i]) {
-      case '&': APPEND("&amp;"); break;
-      case '"': APPEND("&quot;"); break;
-      case '\'': APPEND("&#39;"); break;
-      case '<': APPEND("&lt;"); break;
-      case '>': APPEND("&gt;"); break;
-      // All other whitespace we leave alone!
-      default: out->Emit(in[i]);
+  const char* pos = in;
+  const char* start = pos;
+  const char* const limit = in + inlen;
+  while (pos < limit)  {
+    switch (*pos) {
+      default:
+        // Increment our counter and look at the next character.
+        ++pos;
+        continue;
+
+      // Unlike HtmlEscape, we leave whitespace as is.
+      case '&':  EmitRun(start, pos, out); APPEND("&amp;");  break;
+      case '"':  EmitRun(start, pos, out); APPEND("&quot;"); break;
+      case '\'': EmitRun(start, pos, out); APPEND("&#39;");  break;
+      case '<':  EmitRun(start, pos, out); APPEND("&lt;");   break;
+      case '>':  EmitRun(start, pos, out); APPEND("&gt;");   break;
     }
+    start = ++pos;
   }
+  EmitRun(start, pos, out);
 }
 PreEscape pre_escape;
 
@@ -126,28 +152,60 @@ void SnippetEscape::Modify(const char* in, size_t inlen,
   enum { NONE, B, I, B_THEN_I, I_THEN_B } state = NONE;
   static const char* kCloser[] =
       { "", "</b>", "</i>", "</i></b>", "</b></i>" };
-  const char * const end = in + inlen;
-  for (const char *c = in; c < end; ++c) {
-    switch (*c) {
-      case '"': {
-        APPEND("&quot;");
+
+  const char* pos = in;
+  const char* start = pos;
+  const char* const limit = in + inlen;
+  while (pos < limit) {
+    switch (*pos) {
+      default:
+        // Increment our counter and look at the next character.
+        ++pos;
+        continue;
+
+      case '<': {
+        // If there is a permissible tag, just advance pos past it to
+        // make it part of the current run.  Notice the use of
+        // "continue" below.
+        const char* const next_pos = pos + 1;
+        const int chars_left = limit - next_pos;
+        if ((chars_left >= 2) && !memcmp(next_pos, "b>", 2)
+            && (state == NONE || state == I)) {
+          state = (state == I) ? I_THEN_B : B;
+          pos += 3;  // length of <b>
+          continue;
+        } else if ((chars_left >= 2) && !memcmp(next_pos, "i>", 2)
+                   && (state == NONE || state == B)) {
+          state = (state == B) ? B_THEN_I : I;
+          pos += 3;  // length of <i>
+          continue;
+        } else if ((chars_left >= 3) && !memcmp(next_pos, "/b>", 3)
+                   && (state != NONE && state != I)) {
+          state = (state == B) ? NONE : I;
+          pos += 4;  // length of </b>
+          continue;
+        } else if ((chars_left >= 3) && !memcmp(next_pos, "/i>", 3)
+                   && (state != NONE && state != B)) {
+          state = (state == I) ? NONE : B;
+          pos += 4;  // length of </i>
+          continue;
+        } else if ((chars_left >= 3) && !memcmp(next_pos, "br>", 3)) {
+          pos += 4;  // length of <br>
+          continue;
+        } else if ((chars_left >= 4) && !memcmp(next_pos, "wbr>", 4)) {
+          pos += 5;  // length of <wbr>
+          continue;
+        }
+
+        // Emit the entity and break out of the switch.
+        EmitRun(start, pos, out);
+        APPEND("&lt;");
         break;
       }
-      case '\'': {
-        APPEND("&#39;");
-        break;
-      }
-      case '>': {
-        APPEND("&gt;");
-        break;
-      }
-      case '\r': case '\n': case '\v': case '\f':
-      case '\t': {
-        APPEND(" ");
-        break;      // non-space whitespace
-      }
-      case '&': {
-        if (c + 1 < end && c[1] == '{') {
+
+      case '&':
+        EmitRun(start, pos, out);
+        if (pos + 1 < limit && pos[1] == '{') {
           // Could be a javascript entity, so we need to escape.
           // (Javascript entities are an xss risk in Netscape 4.)
           APPEND("&amp;");
@@ -155,46 +213,19 @@ void SnippetEscape::Modify(const char* in, size_t inlen,
           APPEND("&");
         }
         break;
-      }
-      case '<': {
-        const char* valid_tag = NULL;
-        const char* const next_char = c + 1;
-        const int chars_left = end - next_char;
-        if ((chars_left >= 2) && !memcmp(next_char, "b>", 2)
-            && (state == NONE || state == I)) {
-          state = (state == I) ? I_THEN_B : B;
-          valid_tag = "<b>";
-        } else if ((chars_left >= 2) && !memcmp(next_char, "i>", 2)
-                   && (state == NONE || state == B)) {
-          state = (state == B) ? B_THEN_I : I;
-          valid_tag = "<i>";
-        } else if ((chars_left >= 3) && !memcmp(next_char, "/b>", 3)
-                   && (state != NONE && state != I)) {
-          state = (state == B) ? NONE : I;
-          valid_tag = "</b>";
-        } else if ((chars_left >= 3) && !memcmp(next_char, "/i>", 3)
-                   && (state != NONE && state != B)) {
-          state = (state == I) ? NONE : B;
-          valid_tag = "</i>";
-        } else if ((chars_left >= 3) && !memcmp(next_char, "br>", 3)) {
-          valid_tag = "<br>";
-        } else if ((chars_left >= 4) && !memcmp(next_char, "wbr>", 4)) {
-          valid_tag = "<wbr>";
-        }
-        if (valid_tag) {
-          out->Emit(valid_tag);
-          c += strlen(valid_tag) - 1;
-        } else {
-          APPEND("&lt;");
-        }
-        break;
-      }
-      default: {
-        out->Emit(*c);
-        break;
-      }
+
+      case '"':  EmitRun(start, pos, out); APPEND("&quot;"); break;
+      case '\'': EmitRun(start, pos, out); APPEND("&#39;");  break;
+      case '>':  EmitRun(start, pos, out); APPEND("&gt;");   break;
+
+      case '\r': case '\n': case '\v': case '\f': case '\t':
+        // non-space whitespace
+        EmitRun(start, pos, out); APPEND(" "); break;
+
     }
+    start = ++pos;
   }
+  EmitRun(start, pos, out);
   if (state != NONE) {
     out->Emit(kCloser[state]);
   }
@@ -338,16 +369,25 @@ ValidateUrl validate_url_and_css_escape(css_url_escape);
 void XmlEscape::Modify(const char* in, size_t inlen,
                        const PerExpandData*,
                        ExpandEmitter* out, const string& arg) const {
-  for (size_t i = 0; i < inlen; ++i) {
-    switch (in[i]) {
-      case '&': APPEND("&amp;"); break;
-      case '"': APPEND("&quot;"); break;
-      case '\'': APPEND("&#39;"); break;
-      case '<': APPEND("&lt;"); break;
-      case '>': APPEND("&gt;"); break;
-      default: out->Emit(in[i]);
+  const char* pos = in;
+  const char* start = pos;
+  const char* const limit = in + inlen;
+  while (pos < limit) {
+    switch (*pos) {
+      default:
+        // Increment our counter and look at the next character.
+        ++pos;
+        continue;
+
+      case '&':  EmitRun(start, pos, out); APPEND("&amp;");  break;
+      case '"':  EmitRun(start, pos, out); APPEND("&quot;"); break;
+      case '\'': EmitRun(start, pos, out); APPEND("&#39;");  break;
+      case '<':  EmitRun(start, pos, out); APPEND("&lt;");   break;
+      case '>':  EmitRun(start, pos, out); APPEND("&gt;");   break;
     }
+    start = ++pos;
   }
+  EmitRun(start, pos, out);
 }
 XmlEscape xml_escape;
 
@@ -397,39 +437,53 @@ static inline uint16 UTF8CodeUnit(const char** start, const char *end) {
 void JavascriptEscape::Modify(const char* in, size_t inlen,
                               const PerExpandData*,
                               ExpandEmitter* out, const string& arg) const {
-  const char* end = in + inlen;
-  if (end < in) { return; }
-  for (const char* p = in, *pnext = in; p != end; p = pnext) {
-    uint16 code_unit = UTF8CodeUnit(&pnext, end);
+  const char* pos = in;
+  const char* start = pos;
+  const char* const limit = in + inlen;
+
+  if (limit < in) { return; }
+
+  while (pos < limit) {
+    const char* next_pos = pos;
+    uint16 code_unit = UTF8CodeUnit(&next_pos, limit);
     switch (code_unit) {
-      case '\0': APPEND("\\x00"); break;
-      case '"': APPEND("\\x22"); break;
-      case '\'': APPEND("\\x27"); break;
-      case '\\': APPEND("\\\\"); break;
-      case '\t': APPEND("\\t"); break;
-      case '\r': APPEND("\\r"); break;
-      case '\n': APPEND("\\n"); break;
-      case '\b': APPEND("\\b"); break;
+      default:
+        // Increment our counter and look at the next character.
+        pos = next_pos;
+        continue;
+
+      case '\0': EmitRun(start, pos, out); APPEND("\\x00"); break;
+      case '"':  EmitRun(start, pos, out); APPEND("\\x22"); break;
+      case '\'': EmitRun(start, pos, out); APPEND("\\x27"); break;
+      case '\\': EmitRun(start, pos, out); APPEND("\\\\");  break;
+      case '\t': EmitRun(start, pos, out); APPEND("\\t");   break;
+      case '\r': EmitRun(start, pos, out); APPEND("\\r");   break;
+      case '\n': EmitRun(start, pos, out); APPEND("\\n");   break;
+      case '\b': EmitRun(start, pos, out); APPEND("\\b");   break;
+      case '\f': EmitRun(start, pos, out); APPEND("\\f");   break;
+      case '&':  EmitRun(start, pos, out); APPEND("\\x26"); break;
+      case '<':  EmitRun(start, pos, out); APPEND("\\x3c"); break;
+      case '>':  EmitRun(start, pos, out); APPEND("\\x3e"); break;
+      case '=':  EmitRun(start, pos, out); APPEND("\\x3d"); break;
+
       case '\v':
         // Do not escape vertical tabs to "\\v" since it is interpreted as 'v'
         // by JScript according to section 2.1 of
         // http://wiki.ecmascript.org/lib/exe/fetch.php?id=resources%3Aresources
         // &cache=cache&media=resources:jscriptdeviationsfromes3.pdf
-        APPEND("\\x0b");
-        break;
-      case '\f': APPEND("\\f"); break;
-      case '&': APPEND("\\x26"); break;
-      case '<': APPEND("\\x3c"); break;
-      case '>': APPEND("\\x3e"); break;
-      case '=': APPEND("\\x3d"); break;
+        EmitRun(start, pos, out); APPEND("\\x0b"); break;
+
       // Linebreaks according to EcmaScript 262 which cannot appear in strings.
-      case 0x2028: APPEND("\\u2028"); break;  // Line separator
-      case 0x2029: APPEND("\\u2029"); break;  // Paragraph separator
-      default:
-        out->Emit(p, pnext - p);
-        break;
+      case 0x2028:
+        // Line separator
+        EmitRun(start, pos, out); APPEND("\\u2028"); break;
+      case 0x2029:
+        // Paragraph separator
+        EmitRun(start, pos, out); APPEND("\\u2029"); break;
     }
+    start = pos = next_pos;
   }
+  EmitRun(start, pos, out);
 }
 JavascriptEscape javascript_escape;
 
@@ -479,25 +533,44 @@ void JavascriptNumber::Modify(const char* in, size_t inlen,
 }
 JavascriptNumber javascript_number;
 
-void UrlQueryEscape::Modify(const char* in, size_t inlen,
-                            const PerExpandData*,
-                            ExpandEmitter* out, const string& arg) const {
+static inline bool IsUrlQueryEscapeSafeChar(unsigned char c) {
   // Everything not matching [0-9a-zA-Z.,_*/~!()-] is escaped.
   static unsigned long _safe_characters[8] = {
     0x00000000L, 0x03fff702L, 0x87fffffeL, 0x47fffffeL,
     0x00000000L, 0x00000000L, 0x00000000L, 0x00000000L
   };
 
-  for (size_t i = 0; i < inlen; ++i) {
-    unsigned char c = in[i];
-    if (c == ' ') {
-      out->Emit('+');
-    } else if ((_safe_characters[(c)>>5] & (1 << ((c) & 31)))) {
-      out->Emit(c);
+  return (_safe_characters[(c)>>5] & (1 << ((c) & 31)));
+}
+
+void UrlQueryEscape::Modify(const char* in, size_t inlen,
+                            const PerExpandData*,
+                            ExpandEmitter* out, const string& arg) const {
+  const char* pos = in;
+  const char* const limit = in + inlen;
+  while (true) {
+    // Peel off any initial runs of safe characters and emit them all
+    // at once.
+    const char* start = pos;
+    while (pos < limit && IsUrlQueryEscapeSafeChar(*pos)) {
+      pos++;
+    }
+    EmitRun(start, pos, out);
+
+    // Now deal with a single unsafe character.
+    if (pos < limit) {
+      unsigned char c = *pos;
+      if (c == ' ') {
+        out->Emit('+');
+      } else {
+        out->Emit('%');
+        out->Emit(((c>>4) < 10 ? ((c>>4) + '0') : (((c>>4) - 10) + 'A')));
+        out->Emit(((c&0xf) < 10 ? ((c&0xf) + '0') : (((c&0xf) - 10) + 'A')));
+      }
+      pos++;
     } else {
-      out->Emit('%');
-      out->Emit(((c>>4) < 10 ? ((c>>4) + '0') : (((c>>4) - 10) + 'A')));
-      out->Emit(((c&0xf) < 10 ? ((c&0xf) + '0') : (((c&0xf) - 10) + 'A')));
+      // We're done!
+      break;
     }
   }
 }
@@ -511,22 +584,31 @@ UrlQueryEscape url_query_escape;
 void JsonEscape::Modify(const char* in, size_t inlen,
                         const PerExpandData*,
                         ExpandEmitter* out, const string& arg) const {
-  for (size_t i = 0; i < inlen; ++i) {
-    switch (in[i]) {
-      case '"': APPEND("\\\""); break;
-      case '\\': APPEND("\\\\"); break;
-      case '/': APPEND("\\/"); break;
-      case '\b': APPEND("\\b"); break;
-      case '\f': APPEND("\\f"); break;
-      case '\n': APPEND("\\n"); break;
-      case '\r': APPEND("\\r"); break;
-      case '\t': APPEND("\\t"); break;
-      case '&': APPEND("\\u0026"); break;
-      case '<': APPEND("\\u003C"); break;
-      case '>': APPEND("\\u003E"); break;
-      default: out->Emit(in[i]);
+  const char* pos = in;
+  const char* start = pos;
+  const char* const limit = in + inlen;
+  while (pos < limit) {
+    switch (*pos) {
+      default:
+        // Increment our counter and look at the next character.
+        ++pos;
+        continue;
+
+      case '"':  EmitRun(start, pos, out); APPEND("\\\"");    break;
+      case '\\': EmitRun(start, pos, out); APPEND("\\\\");    break;
+      case '/':  EmitRun(start, pos, out); APPEND("\\/");     break;
+      case '\b': EmitRun(start, pos, out); APPEND("\\b");     break;
+      case '\f': EmitRun(start, pos, out); APPEND("\\f");     break;
+      case '\n': EmitRun(start, pos, out); APPEND("\\n");     break;
+      case '\r': EmitRun(start, pos, out); APPEND("\\r");     break;
+      case '\t': EmitRun(start, pos, out); APPEND("\\t");     break;
+      case '&':  EmitRun(start, pos, out); APPEND("\\u0026"); break;
+      case '<':  EmitRun(start, pos, out); APPEND("\\u003C"); break;
+      case '>':  EmitRun(start, pos, out); APPEND("\\u003E"); break;
     }
+    start = ++pos;
   }
+  EmitRun(start, pos, out);
 }
 JsonEscape json_escape;
 
