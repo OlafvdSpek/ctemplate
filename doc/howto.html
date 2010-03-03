@@ -259,8 +259,8 @@ include-template is expanded zero times.</p>
 
 <p>All names are case sensitive.  Names -- that is, variable keys and,
 as a result, template markers -- must be made of (7-bit ascii)
-alphanumeric characters and the underscore.  The commment marker,
-which does not map to dictionary keys, may contain any chararacters
+alphanumeric characters and the underscore.  The comment marker,
+which does not map to dictionary keys, may contain any characters
 whatsoever except <code>}</code>, the close-curly brace.  It's a
 syntax error for any template marker to violate this rule.</p>
 
@@ -456,7 +456,7 @@ the <code>javascript_escape_with_arg</code> modifier:</p>
         as well as hex numbers (e.g. <code>0x5FF</code>). This modifier
         is intended to ensure the variable not enclosed in
         quotes cannot contain javascript code that may execute. It does
-        not guarantee that the variable is syntatically well-formed.
+        not guarantee that the variable is syntactically well-formed.
         If the variable is safe, it is returned
         as-is, otherwise it is replaced with <code>null</code>.
         In the future we may add more logic to support objects and 
@@ -653,8 +653,8 @@ for the <code>IN_TAG</code> state of <code>HTML</code>
 <h3> <A NAME="inheritance">Details on Dictionary Lookup</A> </h3>
 
 <p>The dictionary structure is a tree: there's a 'main' dictionary,
-and then sub-dictionaries for each section or include-template.  Even
-with all this complexity, the lookup rules are mostly straightforward:
+and then a list of sub-dictionaries for each section or include-template.
+Even with all this complexity, the lookup rules are mostly straightforward:
 when looking up a marker -- be it a variable, section, or
 include-template marker -- the system looks in the currently
 applicable dictionary.  If it's found there, great.  If not, and the
@@ -916,7 +916,7 @@ show the section with <code>USERNAME</code> set to the username,
 otherwise we wish to hide the section and show neither
 <code>USERNAME</code> nor the text around it.  The method
 <code>SetValueAndShowSection(name, value, section_name)</code> does
-exactly that: if value is non-empty, add a single single dictionary to
+exactly that: if value is non-empty, add a single dictionary to
 <code>section_name</code> and call <code>section_dict->AddValue(name,
 value)</code>.</p>
 
@@ -956,15 +956,15 @@ value)</code>.</p>
 <h4> Template-includes </h4>
 
 <p>Template-include markers are much like section markers, so
-<code>SetIncludeDictionary(name)</code> acts, not surprisingly,
-exactly like <code>SetSectionDictionary(name)</code>.  However, since
+<code>AddIncludeDictionary(name)</code> acts, not surprisingly,
+exactly like <code>AddSectionDictionary(name)</code>.  However, since
 variable inheritance doesn't work across include boundaries, there is
 no template-include equivalent to <code>ShowSection()</code> or
 <code>SetValueAndShowSection()</code>.</p>
 
-<p>One difference bewteen template-includes and sections is that for a
+<p>One difference between template-includes and sections is that for a
 sub-dictionary that you create via
-<code>SetIncludeDictionary()</code>, you <i>must</i> call
+<code>AddIncludeDictionary()</code>, you <i>must</i> call
 <code>subdict->SetFilename()</code> to indicate the name of the
 template to include.  If you do not set this, the sub-dictionary will
 be ignored.  The filename may be absolute, or relative, in which case
@@ -1509,7 +1509,7 @@ errors:</p>
 
   <li> An underscore. </li>
 
-  <li> The varible or section name itself, same casing. </li>
+  <li> The variable or section name itself, same casing. </li>
 </ul>
 
 <p>As an example, the section name "RESULT_NUMBER" in the file

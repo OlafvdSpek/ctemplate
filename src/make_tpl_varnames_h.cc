@@ -55,7 +55,7 @@
 #include <unistd.h>
 #endif
 #include <stdarg.h>
-#ifndef _WIN32
+#ifdef HAVE_GETOPT_H
 #include <getopt.h>
 #endif
 #include <errno.h>
@@ -130,12 +130,7 @@ int main(int argc, char **argv) {
   bool FLAG_dump_templates = false;
   bool FLAG_log_info = true;
 
-#if defined(_WIN32)
-  // TODO(csilvers): implement something reasonable for windows
-# define GETOPT(argc, argv)  -1
-  int optind = 1;    // first non-opt argument
-  const char* optarg = "";   // not used
-#elif defined(HAVE_GETOPT_LONG)
+#if defined(HAVE_GETOPT_LONG)
   static struct option longopts[] = {
     {"help", 0, NULL, 'h'},
     {"version", 0, NULL, 'V'},
@@ -152,8 +147,13 @@ int main(int argc, char **argv) {
   int option_index;
 # define GETOPT(argc, argv)  getopt_long(argc, argv, "t:o:s:f:ndqhV", \
                                          longopts, &option_index)
-#else
+#elif defined(HAVE_GETOPT)
 # define GETOPT(argc, argv)  getopt(argc, argv, "t:o:s:f:ndqhV")
+
+#else    // TODO(csilvers): implement something reasonable for windows
+# define GETOPT(argc, argv)  -1
+  int optind = 1;    // first non-opt argument
+  const char* optarg = "";   // not used
 #endif
 
   int r = 0;

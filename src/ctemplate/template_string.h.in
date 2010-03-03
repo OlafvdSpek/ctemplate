@@ -32,8 +32,12 @@
 
 #include <string.h>      // for memcmp() and size_t
 #include <assert.h>
+#if @ac_cv_have_stdint_h@
 #include <stdint.h>       // one place @ac_cv_unit64@ might live
+#endif
+#if @ac_cv_have_inttypes_h@
 #include <inttypes.h>     // another place @ac_cv_unit64@ might live
+#endif
 #include <sys/types.h>    // final place @ac_cv_unit64@ might live
 #include @ac_cv_cxx_hash_map@
 #include <string>

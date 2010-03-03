@@ -144,13 +144,7 @@ class CTEMPLATE_DLL_DECL BaseArena {
   // The default alignment is 1.
   // Trying to set an alignment that does not meet the above constraints will
   // cause a assert-failure.
-  void set_handle_alignment(int align) {
-    assert(align > 0 && 0 == (align & (align - 1)));  // must be power of 2
-    assert(static_cast<size_t>(align) < block_size_);
-    assert((block_size_ % align) == 0);
-    assert(is_empty());
-    handle_alignment_ = align;
-  }
+  void set_handle_alignment(int align);
 
   // Retrieve the memory pointer that the supplied handle refers to.
   // Calling this with an invalid handle will assert-fail.
@@ -250,7 +244,10 @@ class CTEMPLATE_DLL_DECL BaseArena {
   AllocatedBlock first_blocks_[16];   // the length of this array is arbitrary
   // if the first_blocks_ aren't enough, expand into overflow_blocks_.
   std::vector<AllocatedBlock>* overflow_blocks_;
-  int handle_alignment_; // Alignment to be used when Handles are requested.
+  int handle_alignment_;  // Alignment to be used when Handles are requested.
+  int handle_alignment_bits_;  // log2(handle_alignment_).
+  // The amount of bits required to keep block_size_ (ceil(log2(block_size_))).
+  size_t block_size_bits_;
 
   void FreeBlocks();         // Frees all except first block
 

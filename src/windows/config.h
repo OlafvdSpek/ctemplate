@@ -1,7 +1,19 @@
+/* A manual version of config.h fit for windows machines. */
+
+/* Sometimes we accidentally #include this config.h instead of the one
+   in .. -- this is particularly true for msys/mingw, which uses the
+   unix config.h but also runs code in the windows directory.
+*/
+#if defined(__MINGW32__) || defined(__MING64__)
+#define CTEMPLATE_DLL_DECL
+// These two lines make sure we read the unix-style config.h, and not the
+// windows-style config.h -- it would be bad if we tried to read both!
+#include "../config.h"
+#define GOOGLE_CTEMPLATE_WINDOWS_CONFIG_H_
+#endif
+
 #ifndef GOOGLE_CTEMPLATE_WINDOWS_CONFIG_H_
 #define GOOGLE_CTEMPLATE_WINDOWS_CONFIG_H_
-
-/* Hand-filled based on src/config.h.in. */
 
 /* Namespace for Google classes */
 #define GOOGLE_NAMESPACE  ctemplate
@@ -27,6 +39,12 @@
 
 /* Define to 1 if you have the <endian.h> header file. */
 #undef HAVE_ENDIAN_H
+
+/* Define to 1 if you have the `getopt' function. */
+#undef HAVE_GETOPT
+
+/* Define to 1 if you have the <getopt.h> header file. */
+#undef HAVE_GETOPT_H
 
 /* Define to 1 if you have the `getopt_long' function. */
 #undef HAVE_GETOPT_LONG
@@ -140,6 +158,9 @@
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION

@@ -621,6 +621,9 @@ static size_t FindLongestMatch(
 //    Output is *appended* to outstring.
 // ----------------------------------------------------------------------
 
+#define AS_STR1(x)  #x
+#define AS_STR(x)   AS_STR1(x)
+
 static void WriteOneHeaderEntry(string *outstring,
                                 const string& variable,
                                 const string& full_pathname) {
@@ -669,10 +672,11 @@ static void WriteOneHeaderEntry(string *outstring,
     } else {
       const TemplateId id = GlobalIdForSTS_INIT(TemplateString(variable));
       std::ostringstream outstream;
-      outstream << "static const StaticTemplateString "
+      outstream << "static const "
+                << AS_STR(GOOGLE_NAMESPACE) << "::StaticTemplateString "
                 << prefix << variable << " = STS_INIT_WITH_HASH("
-                << prefix << variable << ", \"" + variable + "\", "
-                << id << + "LLU);\n";
+                << prefix << variable << ", \"" << variable << "\", "
+                << id << "LLU);\n";
       outstring->append(outstream.str());
     }
     vars_seen[variable] = true;

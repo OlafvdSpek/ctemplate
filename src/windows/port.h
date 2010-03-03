@@ -62,7 +62,9 @@
  * 4800: we know we're casting ints/char*'s to bools, and we're ok with that
  * 4996: Yes, we're ok using "unsafe" functions like fopen() and strerror()
  */
+#ifdef _MSC_VER
 #pragma warning(disable:4244 4251 4355 4715 4800 4996)
+#endif
 
 /* file I/O */
 #define PATH_MAX 1024
@@ -75,7 +77,9 @@
 #define close   _close
 #define popen   _popen
 #define pclose  _pclose
+#ifndef R_OK   /* mingw defines this, for instance */
 #define R_OK    04           /* read-only (for access()) */
+#endif
 #define S_ISDIR(m)  (((m) & _S_IFMT) == _S_IFDIR)
 
 /* Not quite as lightweight as a hard-link, but more than good enough for us. */
@@ -94,12 +98,14 @@
  * because they don't always NUL-terminate. :-(  We also can't use the
  * name vsnprintf, since windows defines that (but not snprintf (!)).
  */
+#if !defined(__MINGW32__) && !defined(__MINGW64__)  /* mingw already defines */
 extern CTEMPLATE_DLL_DECL int snprintf(char *str, size_t size,
                                        const char *format, ...);
 extern int CTEMPLATE_DLL_DECL safe_vsnprintf(char *str, size_t size,
                                              const char *format, va_list ap);
 #define vsnprintf(str, size, format, ap)  safe_vsnprintf(str, size, format, ap)
 #define va_copy(dst, src)  (dst) = (src)
+#endif  /* #if !defined(__MINGW32__) && !defined(__MINGW64__) */
 
 /* Windows doesn't support specifying the number of buckets as a
  * hash_map constructor arg, so we leave this blank.

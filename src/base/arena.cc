@@ -100,8 +100,15 @@ BaseArena::BaseArena(char* first, const size_t block_size)
     last_alloc_(NULL),
     blocks_alloced_(1),
     overflow_blocks_(NULL),
-    handle_alignment_(1) {
+    handle_alignment_(1),
+    handle_alignment_bits_(0),
+    block_size_bits_(0) {
   assert(block_size > kDefaultAlignment);
+
+  while ((static_cast<size_t>(1) << block_size_bits_) < block_size_) {
+    ++block_size_bits_;
+  }
+
   if (first)
     first_blocks_[0].mem = first;
   else
@@ -350,7 +357,8 @@ bool BaseArena::AdjustLastAlloc(void *last_alloc, const size_t newsize) {
 void* BaseArena::GetMemoryWithHandle(
     const size_t size, BaseArena::Handle* handle) {
   CHECK(handle != NULL);
-  void* p = GetMemory(size, handle_alignment_);
+  // For efficiency, handles are always allocated aligned to a power of 2.
+  void* p = GetMemory(size, (1 << handle_alignment_bits_));
   // Find the index of the block the memory was allocated from. In most
   // cases, this will be the last block, so the following loop will
   // iterate exactly once.
@@ -366,11 +374,11 @@ void* BaseArena::GetMemoryWithHandle(
   CHECK(block != NULL);  // "Failed to find block that was allocated from"
   const uint64 offset = reinterpret_cast<char*>(p) - block->mem;
   DCHECK_LT(offset, block_size_);
-  DCHECK((offset % handle_alignment_) == 0);
-  DCHECK((block_size_ % handle_alignment_) == 0);
+  DCHECK((offset & ((1 << handle_alignment_bits_) - 1)) == 0);
+  DCHECK((block_size_ & ((1 << handle_alignment_bits_) - 1)) == 0);
   uint64 handle_value =
-      (static_cast<uint64>(block_index) * block_size_ + offset) /
-      handle_alignment_;
+      ((static_cast<uint64>(block_index) << block_size_bits_) + offset) >>
+      handle_alignment_bits_;
   if (handle_value >= static_cast<uint64>(0xFFFFFFFF)) {
     // We ran out of space to be able to return a handle, so return an invalid
     // handle.
@@ -378,6 +386,28 @@ void* BaseArena::GetMemoryWithHandle(
   }
   handle->handle_ = static_cast<uint32>(handle_value);
   return p;
+}
+
+// ----------------------------------------------------------------------
+// BaseArena::set_handle_alignment()
+//    Set the alignment to be used when Handles are requested. This can only
+//    be set for an arena that is empty - it cannot be changed on the fly.
+//    The alignment must be a power of 2 that the block size is divisable by.
+//    The default alignment is 1.
+//    Trying to set an alignment that does not meet the above constraints will
+//    cause a CHECK-failure.
+// ----------------------------------------------------------------------
+
+void BaseArena::set_handle_alignment(int align) {
+  CHECK(align > 0 && 0 == (align & (align - 1)));  // must be power of 2
+  CHECK(static_cast<size_t>(align) < block_size_);
+  CHECK((block_size_ % align) == 0);
+  CHECK(is_empty());
+  handle_alignment_ = align;
+  handle_alignment_bits_ = 0;
+  while ((1 << handle_alignment_bits_) < handle_alignment_) {
+    ++handle_alignment_bits_;
+  }
 }
 
 // ----------------------------------------------------------------------
@@ -390,9 +420,10 @@ void* BaseArena::GetMemoryWithHandle(
 
 void* BaseArena::HandleToPointer(const Handle& h) const {
   CHECK(h.valid());
-  uint64 handle = static_cast<uint64>(h.handle_) * handle_alignment_;
-  int block_index = static_cast<int>(handle / block_size_);
-  size_t block_offset = static_cast<size_t>(handle % block_size_);
+  uint64 handle = static_cast<uint64>(h.handle_) << handle_alignment_bits_;
+  int block_index = static_cast<int>(handle >> block_size_bits_);
+  size_t block_offset =
+      static_cast<size_t>(handle & ((1 << block_size_bits_) - 1));
   const AllocatedBlock* block = IndexToBlock(block_index);
   CHECK(block != NULL);
   return reinterpret_cast<void*>(block->mem + block_offset);
