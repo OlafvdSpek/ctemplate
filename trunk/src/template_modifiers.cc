@@ -343,18 +343,22 @@ void ValidateUrl::Modify(const char* in, size_t inlen,
                          const PerExpandData* per_expand_data,
                          ExpandEmitter* out, const string& arg) const {
   const char* slashpos = (char*)memchr(in, '/', inlen);
-  if (slashpos == NULL)
+  if (slashpos == NULL) {
     slashpos = in + inlen;
+  }
   const void* colonpos = memchr(in, ':', slashpos - in);
-  if (colonpos != NULL) {   // colon before first slash, could be a protocol
+  if (colonpos != NULL) {   // colon before first slash, could be a protocol    
     if (inlen > sizeof("http://")-1 &&
         strncasecmp(in, "http://", sizeof("http://")-1) == 0) {
-      // We're ok, it's an http protocol
+      // We're ok, it's an http protocol                                        
     } else if (inlen > sizeof("https://")-1 &&
                strncasecmp(in, "https://", sizeof("https://")-1) == 0) {
-      // https is ok as well
+      // https is ok as well                                                    
+    } else if (inlen > sizeof("ftp://")-1 &&
+               strncasecmp(in, "ftp://", sizeof("ftp://")-1) == 0) {
+      // and ftp
     } else {
-      // It's a bad protocol, so return something safe
+      // It's a bad protocol, so return something safe                          
       chained_modifier_.Modify("#", 1, per_expand_data, out, "");
       return;
     }
