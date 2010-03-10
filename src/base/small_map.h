@@ -107,14 +107,23 @@ class small_map {
 
   small_map(const MapInit& functor) : size_(0), functor_(functor) {}
 
+  // Allow copy-constructor and assignment, since STL allows them too.
+  small_map(const small_map& src) {
+    // size_ and functor_ are initted in InitFrom()
+    InitFrom(src);
+  }
+  void operator=(const small_map& src) {
+    if (&src == this) return;
+
+    // This is not optimal. If src and dest are both using the small
+    // array, we could skip the teardown and reconstruct. One problem
+    // to be resolved is that the value_type itself is pair<const K,
+    // V>, and const K is not assignable.
+    Destroy();
+    InitFrom(src);
+  }
   ~small_map() {
-    if (size_ >= 0) {
-      for (int i = 0; i < size_; i++) {
-        array_[i].Destroy();
-      }
-    } else {
-      map_.Destroy();
-    }
+    Destroy();
   }
 
   class const_iterator;
@@ -137,7 +146,11 @@ class small_map {
       }
       return *this;
     }
-
+    inline iterator operator++(int) {
+      iterator result(*this);
+      ++(*this);
+      return result;
+    }
     inline value_type* operator->() const {
       if (array_iter_ != NULL) {
         return array_iter_->get();
@@ -193,6 +206,11 @@ class small_map {
     inline const_iterator(const iterator& other)
       : array_iter_(other.array_iter_), hash_iter_(other.hash_iter_) {}
 
+    inline const_iterator operator++(int) {
+      const_iterator result(*this);
+      ++(*this);
+      return result;
+    }
     inline const_iterator& operator++() {
       if (array_iter_ != NULL) {
         ++array_iter_;
@@ -459,9 +477,28 @@ class small_map {
     }
   }
 
-  // We don't allow a small_map to be copied.
-  small_map(const small_map&);
-  small_map& operator=(const small_map&);
+  // Helpers for constructors and destructors.
+  void InitFrom(const small_map& src) {
+    functor_ = src.functor_;
+    size_ = src.size_;
+    if (src.size_ >= 0) {
+      for (int i = 0; i < size_; i++) {
+        array_[i].Init(*src.array_[i]);
+      }
+    } else {
+      functor_(&map_);
+      (*map_.get()) = (*src.map_.get());
+    }
+  }
+  void Destroy() {
+    if (size_ >= 0) {
+      for (int i = 0; i < size_; i++) {
+        array_[i].Destroy();
+      }
+    } else {
+      map_.Destroy();
+    }
+  }
 };
 
 template <typename NormalMap, int kArraySize, typename EqualKey,

@@ -219,6 +219,9 @@ class TemplateModifiersUnittest {
     dict.SetEscapedValue("harder relative URL",
                          "/search?q=green flowers&hl=en",
                          validate_url_and_html_escape);
+    dict.SetEscapedValue("ftp URL",
+                         "ftp://ftp.example.org/pub/file.txt",
+                         validate_url_and_html_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy http URL"),
@@ -233,6 +236,8 @@ class TemplateModifiersUnittest {
                  "foobar.html");
     ASSERT_STREQ(peer.GetSectionValue("harder relative URL"),
                  "/search?q=green flowers&amp;hl=en");
+    ASSERT_STREQ(peer.GetSectionValue("ftp URL"),
+                 "ftp://ftp.example.org/pub/file.txt");
   }
 
   static void TestValidateUrlJavascriptEscape() {
