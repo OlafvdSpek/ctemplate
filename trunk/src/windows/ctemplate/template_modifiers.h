@@ -153,8 +153,8 @@ extern CTEMPLATE_DLL_DECL HtmlEscape html_escape;
 class CTEMPLATE_DLL_DECL PreEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
 extern CTEMPLATE_DLL_DECL PreEscape pre_escape;
 
-// Like HtmlEscape but allows HTML entities, <br> tags, <wbr> tags, and
-// matched <b> and </b> tags.
+// Like HtmlEscape but allows HTML entities, <br> tags, <wbr> tags,
+// matched <b> and </b> tags, and matched <i> and </i> tags.
 class CTEMPLATE_DLL_DECL SnippetEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
 extern CTEMPLATE_DLL_DECL SnippetEscape snippet_escape;
 

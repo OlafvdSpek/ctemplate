@@ -37,6 +37,7 @@
 #include <string>
 #include <vector>
 #include "template_modifiers_internal.h"
+#include <ctemplate/template.h>
 #include <ctemplate/template_dictionary.h>
 #include <ctemplate/template_emitter.h>
 #include <ctemplate/template_modifiers.h>
@@ -852,6 +853,41 @@ class TemplateModifiersUnittest {
     ASSERT(modval->modifier_info->modifier ==
            &javascript_escape);
   }
+
+  // This tests for a bug we had where we were returning a pointer into
+  // a vector that became invalid after the vector was resized.
+  static void TestManyUnknownModifiers() {
+    string tpl_str1 = "{{from_name:x-test=4}} sent you a message";
+    const ctemplate::Template* tpl1 = ctemplate::Template::StringToTemplate(
+        tpl_str1, ctemplate::DO_NOT_STRIP);
+
+    string tpl_str2 = "{{from_name:x-test=4}} sent you a message:";
+    string expected_out = "me sent you a message:";
+    // All those new unknown varnames should cause g_unknown_modifiers
+    // to resize.  1111 is an arbitrary large number.
+    for (int i = 0; i < 1111; i++) {
+      tpl_str2.append("{{from_name:x-" + string(i, 't') + "=4}}");
+      expected_out.append("me");
+    }
+    const ctemplate::Template* tpl2 = ctemplate::Template::StringToTemplate(
+        tpl_str2, ctemplate::DO_NOT_STRIP);
+
+    // Even after the resizing, the references to the unknown
+    // modifiers in tpl1 and tpl2 should still be valid.
+    ctemplate::TemplateDictionary dict("test");
+    dict.SetValue("from_name", "me");
+    string out;
+
+    out.clear();
+    tpl1->Expand(&out, &dict);
+    ASSERT_STREQ("me sent you a message", out.c_str());
+    delete tpl1;
+
+    out.clear();
+    tpl2->Expand(&out, &dict);
+    ASSERT_STREQ(expected_out.c_str(), out.c_str());
+    delete tpl2;
+  }
 };
 
 _END_GOOGLE_NAMESPACE_
@@ -878,6 +914,7 @@ int main(int argc, char** argv) {
   TemplateModifiersUnittest::TestAddXssSafeModifier();
   TemplateModifiersUnittest::TestXSSAlternatives();
   TemplateModifiersUnittest::TestDefaultModifiersForContext();
+  TemplateModifiersUnittest::TestManyUnknownModifiers();
 
   printf("DONE\n");
   return 0;

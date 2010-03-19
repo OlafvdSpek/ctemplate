@@ -738,8 +738,8 @@ static struct ModifierWithAlternatives {
                           XSS_WEB_STANDARD, &validate_url_and_css_escape), {} },
 };
 
-static vector<ModifierInfo> g_extension_modifiers;
-static vector<ModifierInfo> g_unknown_modifiers;
+static vector<const ModifierInfo*> g_extension_modifiers;
+static vector<const ModifierInfo*> g_unknown_modifiers;
 
 // Returns whether or not candidate can be safely (w.r.t XSS)
 // used in lieu of our ModifierInfo. This is true iff:
@@ -790,7 +790,9 @@ static bool AddModifierCommon(const char* long_name,
   if (!IsExtensionModifier(long_name))
     return false;
 
-  for (vector<ModifierInfo>::const_iterator mod = g_extension_modifiers.begin();
+  // TODO(csilvers): store in a map or multimap, rather than a vector
+  for (vector<const ModifierInfo*>::const_iterator mod =
+           g_extension_modifiers.begin();
        mod != g_extension_modifiers.end();
        ++mod) {
     // Check if mod has the same name as us.  For modifiers that also take
@@ -799,12 +801,13 @@ static bool AddModifierCommon(const char* long_name,
     // "foo=bar" and "foo=baz" are both valid names.  Note "foo" and
     // "foo=bar" is not valid: foo has no modval, but "foo=bar" does.
     const size_t new_modifier_namelen = strcspn(long_name, "=");
-    const size_t existing_modifier_namelen = strcspn(mod->long_name.c_str(), "=");
+    const size_t existing_modifier_namelen = strcspn((*mod)->long_name.c_str(),
+                                                     "=");
     if (new_modifier_namelen == existing_modifier_namelen &&
-        memcmp(long_name, mod->long_name.c_str(), new_modifier_namelen) == 0) {
+        !memcmp(long_name, (*mod)->long_name.c_str(), new_modifier_namelen)) {
       if (long_name[new_modifier_namelen] == '=' &&
-          mod->long_name[existing_modifier_namelen] == '=' &&
-          mod->long_name != long_name) {
+          (*mod)->long_name[existing_modifier_namelen] == '=' &&
+          (*mod)->long_name != long_name) {
         // It's ok, we're different specializations!
       } else {
         // It's not ok: we have the same name and no good excuse.
@@ -814,9 +817,9 @@ static bool AddModifierCommon(const char* long_name,
   }
 
   g_extension_modifiers.push_back(
-      ModifierInfo(long_name, '\0',
-                   xss_safe ? XSS_SAFE : XSS_UNIQUE,
-                   modifier));
+      new ModifierInfo(long_name, '\0',
+                       xss_safe ? XSS_SAFE : XSS_UNIQUE,
+                       modifier));
   return true;
 }
 
@@ -872,7 +875,7 @@ static void UpdateBestMatch(const char* modname, size_t modname_len,
     }
   } else {
     // In this case, to be a match: we must *not* have a modval.  Our
-    // modname still must match modifno's modname (either short or long).
+    // modname still must match modinfo's modname (either short or long).
     if (modval_len == 0 &&
         ((modname_len == 1 && *modname == candidate_match->short_name) ||
          (modname_len == candidate_match->long_name.size() &&
@@ -892,20 +895,22 @@ const ModifierInfo* FindModifier(const char* modname, size_t modname_len,
   // with the longest longname, since that's the most specialized match.
   const ModifierInfo* best_match = NULL;
   if (modname_len >= 2 && IsExtensionModifier(modname)) {
-    for (vector<ModifierInfo>::const_iterator mod = g_extension_modifiers.begin();
+    for (vector<const ModifierInfo*>::const_iterator mod =
+             g_extension_modifiers.begin();
          mod != g_extension_modifiers.end();
          ++mod) {
       UpdateBestMatch(modname, modname_len, modval, modval_len,
-                      &*mod, &best_match);
+                      *mod, &best_match);
     }
     if (best_match != NULL)
       return best_match;
 
-    for (vector<ModifierInfo>::const_iterator mod = g_unknown_modifiers.begin();
+    for (vector<const ModifierInfo*>::const_iterator mod =
+             g_unknown_modifiers.begin();
          mod != g_unknown_modifiers.end();
          ++mod) {
       UpdateBestMatch(modname, modname_len, modval, modval_len,
-                      &*mod, &best_match);
+                      *mod, &best_match);
     }
     if (best_match != NULL)
       return best_match;
@@ -913,12 +918,12 @@ const ModifierInfo* FindModifier(const char* modname, size_t modname_len,
     // It means "we don't know about this modifier-name."
     string fullname(modname, modname_len);
     if (modval_len) {
-      fullname.append("=");
       fullname.append(modval, modval_len);
     }
-    g_unknown_modifiers.push_back(ModifierInfo(fullname, '\0',
-                                               XSS_UNIQUE, NULL));
-    return &g_unknown_modifiers.back();
+    // TODO(csilvers): store in a map or multimap, rather than a vector
+    g_unknown_modifiers.push_back(new ModifierInfo(fullname, '\0',
+                                                   XSS_UNIQUE, NULL));
+    return g_unknown_modifiers.back();
   } else {
     for (const ModifierWithAlternatives* mod_with_alts = g_modifiers;
          mod_with_alts < g_modifiers + sizeof(g_modifiers)/sizeof(*g_modifiers);
