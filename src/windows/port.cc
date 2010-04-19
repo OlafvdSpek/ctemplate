@@ -65,7 +65,9 @@ int snprintf(char *str, size_t size, const char *format, ...) {
 }
 #endif  /* #if !defined(__MINGW32__) && !defined(__MINGW64__) */
 
-// used in template_unittest
+_START_GOOGLE_NAMESPACE_
+
+// defined (for unix) in template_test_utils.cc
 string TmpFile(const char* basename) {
   char tmppath_buffer[1024];
   int tmppath_len = GetTempPathA(sizeof(tmppath_buffer), tmppath_buffer);
@@ -77,8 +79,8 @@ string TmpFile(const char* basename) {
 }
 
 // A replacement for template_unittest.cc:CleanTestDir()
-void CleanTestDir(const string& dirname) {
-  string glob(GOOGLE_NAMESPACE::PathJoin(dirname, "*"));
+void CreateOrCleanTestDir(const string& dirname) {
+  string glob(PathJoin(dirname, "*"));
   WIN32_FIND_DATAA found;  // that final A is for Ansi (as opposed to Unicode)
   HANDLE hFind = FindFirstFileA(glob.c_str(), &found);   // A is for Ansi
   if (hFind == INVALID_HANDLE_VALUE) {  // directory doesn't exist or some such
@@ -88,11 +90,13 @@ void CleanTestDir(const string& dirname) {
   if (hFind != INVALID_HANDLE_VALUE) {
     do {
       if (strstr(found.cFileName, "template"))
-        _unlink(GOOGLE_NAMESPACE::PathJoin(dirname, found.cFileName).c_str());
+        _unlink(PathJoin(dirname, found.cFileName).c_str());
     } while (FindNextFileA(hFind, &found) != FALSE);  // A is for Ansi
     FindClose(hFind);
   }
 }
+
+_END_GOOGLE_NAMESPACE_
 
 void GetNamelist(const char* testdata_dir, vector<string>* namelist) {
   string glob(GOOGLE_NAMESPACE::PathJoin(testdata_dir,

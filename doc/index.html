@@ -8,7 +8,6 @@
         rel="shortcut icon">
   <link href="designstyle.css" type="text/css" rel="stylesheet">
   <style type="text/css">
-  <!--
   ol.bluelist li {
     color: #3366ff;
     font-family: sans-serif;
@@ -21,7 +20,6 @@
     color: #000;
     font-family: "Times Roman", times, serif;
   }
-  //-->
   </style>
 </head>
 <body>
@@ -59,11 +57,8 @@ details see, the links below.
       if (1) {
         dict.ShowSection("IN_CA");
       }
-
-      ctemplate::Template* tpl = ctemplate::Template::GetTemplate(
-        "example.tpl", ctemplate::DO_NOT_STRIP);
       std::string output;
-      tpl->Expand(&output, &dict);
+      ctemplate::Expand("example.tpl", ctemplate::DO_NOT_STRIP, &dict, &output);
       std::cout &lt;&lt; output;
       return 0;
    }
@@ -107,7 +102,7 @@ libraries.</p>
 <hr>
 <address>
 Craig Silverstein<br>
-Last modified: Wed Feb 15 23:21:42 PST 2006
+Last modified: Mon Feb 22 10:59:03 PST 2010
 </address>
 
 </body>

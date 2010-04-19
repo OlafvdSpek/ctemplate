@@ -43,6 +43,7 @@
 
 #include <stdlib.h>
 #include <string>
+#include <ctemplate/template_string.h>
 
 // NOTE: if you are statically linking the template library into your binary
 // (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
@@ -55,9 +56,6 @@ namespace ctemplate {
 
 const int kIndent = 2;  // num spaces to indent each level -- used with dump
 
-class TemplateDictionaryInterface;
-class TemplateString;
-
 // TemplateDictionaryInterface
 // The template data contains the associated values for
 // variables, the hidden/visible state for sections and included
@@ -69,33 +67,30 @@ class CTEMPLATE_DLL_DECL TemplateDictionaryInterface {
   // TemplateDictionaryInterface destructor
   virtual ~TemplateDictionaryInterface() {}
 
+ protected:
+  // The interface as follows is used at expand-time by Expand.
+  friend class VariableTemplateNode;
+  friend class SectionTemplateNode;
+  friend class TemplateTemplateNode;
+  // This class reaches into our internals for testing.
+  friend class TemplateDictionaryPeer;
+  friend class TemplateDictionaryPeerIterator;
+
   // GetSectionValue
   //   Returns the value of a variable.
-  //   Do not use this in production code!
-  //   TODO(csilvers): make this protected so only template.cc can see it.
-  virtual const char *GetSectionValue(const TemplateString& variable) const = 0;
+  virtual TemplateString GetValue(const TemplateString& variable) const = 0;
 
   // IsHiddenSection
   //   A predicate to indicate the current hidden/visible state of a section
   //   whose name is passed to it.
-  //   Do not use this in production code!
-  //   TODO(csilvers): make this protected so only template.cc can see it.
   virtual bool IsHiddenSection(const TemplateString& name) const = 0;
 
   // Dump a string representation of this dictionary to the supplied string.
   virtual void DumpToString(std::string* out, int level) const = 0;
 
- protected:
   // TemplateDictionaryInterface is an abstract class, so its constructor is
   // only visible to its subclasses.
   TemplateDictionaryInterface() {}
-
-  // The interface as follows is used at expand-time by Expand.
-  friend class SectionTemplateNode;   // for access to GetDictionaries, etc.
-  friend class TemplateTemplateNode;  // for access to GetDictionaries, etc.
-  // This class reaches into our internals for testing.
-  friend class TemplateDictionaryPeer;
-  friend class TemplateDictionaryPeerIterator;
 
   class Iterator {
    protected:
@@ -119,8 +114,8 @@ class CTEMPLATE_DLL_DECL TemplateDictionaryInterface {
   //   Returns the name of the template associated with the given template
   //   include variable. If more than one dictionary is attached to the include
   //   symbol, dictnum can be used to disambiguate which include name you mean.
-  virtual const char *GetIncludeTemplateName(const TemplateString& variable,
-                                             int dictnum) const = 0;
+  virtual const char* GetIncludeTemplateName(
+      const TemplateString& variable, int dictnum) const = 0;
 
   // CreateTemplateIterator
   //   A factory method for constructing an iterator representing the

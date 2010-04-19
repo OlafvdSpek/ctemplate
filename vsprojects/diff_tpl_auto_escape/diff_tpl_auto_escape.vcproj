@@ -148,6 +148,9 @@
 				RelativePath="..\..\src\windows\ctemplate\template.h">
 			</File>
 			<File
+				RelativePath="..\..\src\windows\ctemplate\template_cache.h">
+			</File>
+			<File
 				RelativePath="..\..\src\windows\ctemplate\template_dictionary.h">
 			</File>
 			<File

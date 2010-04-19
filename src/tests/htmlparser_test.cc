@@ -78,12 +78,13 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include HASH_MAP_H
+#include <map>
 #include "htmlparser/htmlparser_cpp.h"
 #include "ctemplate/template_pathops.h"
 
 using std::string;
 using std::vector;
+using std::map;
 using std::pair;
 using GOOGLE_NAMESPACE::PathJoin;
 using HTMLPARSER_NAMESPACE::HtmlParser;
@@ -116,23 +117,6 @@ using HTMLPARSER_NAMESPACE::JavascriptParser;
 
 #define PFATAL(s)  do { perror(s); exit(1); } while (0)
 
-
-#ifndef HAVE_UNORDERED_MAP    // tr1's hash has built-in support for string
-namespace HASH_NAMESPACE {
-template<> struct hash<string> {
-  size_t operator()(const string& k) const {
-    return hash<const char*>()(k.c_str());
-  }
-  // Less than operator:
-  bool operator()(const string& a, const string& b) const {
-    return a < b;
-  }
-  // These two public members are required by msvc.  4 and 8 are defaults.
-  static const size_t bucket_size = 4;
-  static const size_t min_buckets = 8;
-};
-}
-#endif
 
 static int strcount(const string& str, char c) {
   int count = 0;
@@ -202,11 +186,7 @@ class HtmlparserCppTest {
   // annotations against the html parser state.
   void ValidateFile(string filename);
 
-#ifdef HAVE_UNORDERED_MAP
-  typedef HASH_NAMESPACE::unordered_map<string, HtmlParser *> ContextMap;
-#else
-  typedef HASH_NAMESPACE::hash_map<string, HtmlParser *> ContextMap;
-#endif
+  typedef map<string, HtmlParser *> ContextMap;
 
   void SetUp() {
     parser_.Reset();

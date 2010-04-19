@@ -160,7 +160,7 @@ static void ReadToString(const char* filename, string* s) {
   fclose(fp);
 }
 
-#ifndef _WIN32   /* windows defines its own version in windows/port.cc */
+#ifndef USING_PORT_CC  /* windows defines its own version in windows/port.cc */
 static void GetNamelist(const char* testdata_dir, vector<string>* namelist) {
   DIR* dir = opendir(testdata_dir);
   struct dirent* dir_entry;
@@ -467,7 +467,7 @@ static void TestExpand(const vector<Testdata>::const_iterator& begin,
       per_expand_data.SetAnnotateOutput("template_unittest_test");
       string output;
       tpl_lines->ExpandWithData(&output, dict, &per_expand_data);
-      ASSERT_STRING_EQ(*out, output);
+      ASSERT_STREQ_EXCEPT(out->c_str(), output.c_str(), "\r\n");
       delete dict;   // it's our responsibility
     }
     delete tplstr_none;   // these are our responsibility too

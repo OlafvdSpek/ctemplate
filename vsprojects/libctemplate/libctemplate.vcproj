@@ -182,6 +182,23 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath="..\..\src\template_cache.cc">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
+						RuntimeLibrary="3"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
+						RuntimeLibrary="2"/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath="..\..\src\template_dictionary.cc">
 				<FileConfiguration
 					Name="Debug|Win32">
@@ -371,6 +388,9 @@
 			</File>
 			<File
 				RelativePath="..\..\src\windows\ctemplate\template.h">
+			</File>
+			<File
+				RelativePath="..\..\src\windows\ctemplate\template_cache.h">
 			</File>
 			<File
 				RelativePath="..\..\src\windows\ctemplate\template_annotator.h">

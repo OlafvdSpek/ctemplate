@@ -31,44 +31,32 @@
 // Author: Craig Silverstein
 
 #include "config_for_unittests.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-#include <assert.h>
-#include <time.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>     // for mkdir
+#include <ctemplate/template.h>
+#include <assert.h>      // for assert()
 #if defined(HAVE_PTHREAD) && !defined(NO_THREADS)
-#include <pthread.h>
+#include <pthread.h>     // for pthread_t, pthread_create(), etc
 #endif
-#ifdef HAVE_DIRENT_H
-# include <dirent.h>      // for readdir
-#else
-# define dirent direct
-# ifdef HAVE_SYS_NDIR_H
-#  include <sys/ndir.h>
-# endif
-# ifdef HAVE_SYS_DIR_H
-#  include <sys/dir.h>
-# endif
-# ifdef HAVE_NDIR_H
-#  include <ndir.h>
-# endif
+#include <stddef.h>      // for size_t
+#include <stdio.h>       // for printf(), FILE, snprintf(), fclose(), etc
+#include <stdlib.h>      // for exit()
+#include <string.h>      // for strcmp(), memchr(), strlen(), strstr()
+#include <sys/types.h>   // for mode_t
+#include <time.h>        // for time_t, time()
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>      // for link(), unlink()
 #endif
-#include <string>
-#include <vector>         // for MissingListType, SyntaxListType
-#include "ctemplate/template.h"
-#include "ctemplate/template_pathops.h"
-#include "ctemplate/template_annotator.h"
-#include "ctemplate/template_dictionary.h"
-#include "ctemplate/template_emitter.h"
-#include "ctemplate/template_modifiers.h"
-#include "ctemplate/template_namelist.h"
-#include "ctemplate/template_string.h"
+#include <list>          // for list<>::size_type
+#include <vector>        // for vector<>
+#include <ctemplate/per_expand_data.h>  // for PerExpandData
+#include <ctemplate/template_annotator.h>  // for TextTemplateAnnotator
+#include <ctemplate/template_dictionary.h>  // for TemplateDictionary
+#include <ctemplate/template_emitter.h>  // for ExpandEmitter
+#include <ctemplate/template_enums.h>  // for STRIP_WHITESPACE, Strip, etc
+#include <ctemplate/template_modifiers.h>  // for AddModifier(), HtmlEscape, etc
+#include <ctemplate/template_namelist.h>  // for TemplateNamelist, etc
+#include <ctemplate/template_pathops.h>  // for PathJoin(), IsAbspath(), etc
+#include <ctemplate/template_string.h>  // for TemplateString, StringHash, etc
+#include "tests/template_test_util.h"  // for StringToTemplate(), etc
 
 using std::vector;
 using std::string;
@@ -91,6 +79,22 @@ using GOOGLE_NAMESPACE::TC_JSON;
 using GOOGLE_NAMESPACE::TC_XML;
 using GOOGLE_NAMESPACE::TC_MANUAL;
 using GOOGLE_NAMESPACE::TC_UNUSED;
+using GOOGLE_NAMESPACE::FLAGS_test_tmpdir;
+using GOOGLE_NAMESPACE::PathJoin;
+using GOOGLE_NAMESPACE::IsAbspath;
+using GOOGLE_NAMESPACE::kRootdir;
+using GOOGLE_NAMESPACE::Now;
+using GOOGLE_NAMESPACE::CreateOrCleanTestDir;
+using GOOGLE_NAMESPACE::CreateOrCleanTestDirAndSetAsTmpdir;
+using GOOGLE_NAMESPACE::StringToFile;
+using GOOGLE_NAMESPACE::StringToTemplateFile;
+using GOOGLE_NAMESPACE::StringToTemplate;
+using GOOGLE_NAMESPACE::AssertExpandWithDataIs;
+using GOOGLE_NAMESPACE::AssertExpandIs;
+
+using GOOGLE_NAMESPACE::ExpandTemplate;
+using GOOGLE_NAMESPACE::ExpandWithData;
+using GOOGLE_NAMESPACE::StringToTemplateCache;
 
 static const StaticTemplateString kHello = STS_INIT(kHello, "Hello");
 static const StaticTemplateString kWorld = STS_INIT(kWorld, "World");
@@ -204,55 +208,6 @@ static string GetPragmaForContext(TemplateContext context) {
   return "";
 }
 
-// deletes all files named *template* in dir
-#ifndef _WIN32   // windows will define its own version, in src/windows/port.cc
-static void CleanTestDir(const string& dirname) {
-  DIR* dir = opendir(dirname.c_str());
-  if (!dir) {  // directory doesn't exist or something like that.
-    if (errno == ENOENT)   // if dir doesn't exist, try to make it
-      ASSERT(mkdir(dirname.c_str(), 0755) == 0);
-    return;
-  }
-  while (struct dirent* d = readdir(dir)) {
-    if (strstr(d->d_name, "template"))
-      unlink(GOOGLE_NAMESPACE::PathJoin(dirname, d->d_name).c_str());
-  }
-  closedir(dir);
-}
-
-static string TmpFile(const char* basename) {
-  return string("/tmp/") + basename;
-}
-#endif
-
-static const string FLAGS_test_tmpdir(TmpFile("template_unittest_dir"));
-
-
-// This writes s to the given file
-static void StringToFile(const string& s, const string& filename) {
-  FILE* fp = fopen(filename.c_str(), "wb");
-  ASSERT(fp);
-  size_t r = fwrite(s.data(), 1, s.length(), fp);
-  ASSERT(r == s.length());
-  fclose(fp);
-}
-
-// This writes s to a file and returns the filename.
-static string StringToTemplateFile(const string& s) {
-  static int filenum = 0;
-  char buf[16];
-  snprintf(buf, sizeof(buf), "%03d", ++filenum);
-  string filename = GOOGLE_NAMESPACE::PathJoin(FLAGS_test_tmpdir,
-                                        string("template.") + buf);
-  StringToFile(s, filename);
-  return filename;
-}
-
-// This writes s to a file and then loads it into a template object.
-static Template* StringToTemplate(const string& s, Strip strip) {
-  return Template::GetTemplate(StringToTemplateFile(s), strip);
-}
-
 // This writes s to a file with the AUTOESCAPE pragma corresponding
 // to the given TemplateContext and then loads it into a template object.
 static Template* StringToTemplateWithAutoEscaping(const string& s,
@@ -260,39 +215,6 @@ static Template* StringToTemplateWithAutoEscaping(const string& s,
                                                   TemplateContext context) {
   string text = GetPragmaForContext(context) + s;
   return Template::GetTemplate(StringToTemplateFile(text), strip);
-}
-
-// This is esp. useful for calling from within gdb.
-// The gdb nice-ness is balanced by the need for the caller to delete the buf.
-
-static const char* ExpandIs(Template* tpl, const TemplateDictionary *dict,
-                            PerExpandData* per_expand_data,
-                            bool expected) {
-  string outstring;
-  ASSERT(expected == tpl->ExpandWithData(&outstring, dict, per_expand_data));
-
-  char* buf = new char [outstring.size()+1];
-  strcpy(buf, outstring.c_str());
-  return buf;
-}
-
-static void AssertExpandWithDataIs(Template* tpl,
-                                   const TemplateDictionary *dict,
-                                   PerExpandData* per_expand_data,
-                                   const string& is, bool expected) {
-  const char* buf = ExpandIs(tpl, dict, per_expand_data, expected);
-  if (strcmp(buf, is.c_str())) {
-    printf("expected = '%s'\n", is.c_str());
-    printf("actual   = '%s'\n", buf);
-  }
-  ASSERT_STREQ(buf, is.c_str());
-  delete [] buf;
-}
-
-static void AssertExpandIs(Template* tpl, TemplateDictionary *dict,
-                           const string& is, bool expected) {
-  PerExpandData per_expand_data;
-  AssertExpandWithDataIs(tpl, dict, &per_expand_data, is, expected);
 }
 
 // A helper method used by TestCorrectModifiersForAutoEscape.
@@ -389,11 +311,10 @@ class TemplateForTest : public Template {
 
 class TemplateUnittest {
  public:
-
   static void CheckWhitelistedVariablesSorted() {
     // NOTE(williasr): kSafeWhitelistedVariables must be sorted, it's accessed
     // using binary search.
-    for (int i = 1; i < TemplateForTest::kNumSafeWhitelistedVariables; i++) {
+    for (size_t i = 1; i < TemplateForTest::kNumSafeWhitelistedVariables; i++) {
       assert(strcmp(TemplateForTest::kSafeWhitelistedVariables[i-1],
                     TemplateForTest::kSafeWhitelistedVariables[i]) < 0);
     }
@@ -920,6 +841,22 @@ class TemplateUnittest {
     ASSERT_STREQ(output.c_str(), "premadehilo");
   }
 
+  static void TestExpandTemplate() {
+    string filename = StringToTemplateFile("  hi {{THERE}}");
+    TemplateDictionary dict("test_expand");
+    dict.SetValue("THERE", "test");
+    string output;
+    ASSERT(ExpandTemplate(filename, STRIP_WHITESPACE, &dict, &output));
+    ASSERT_STREQ(output.c_str(), "hi test");
+
+    // This will append to output, so we see both together.
+    ASSERT(ExpandWithData(filename, DO_NOT_STRIP, &dict, NULL, &output));
+    ASSERT_STREQ(output.c_str(), "hi test  hi test");
+
+    ASSERT(!ExpandTemplate(filename + " not found", DO_NOT_STRIP, &dict,
+                           &output));
+  }
+
   static void TestExpandWithCustomEmitter() {
     Template* tpl = StringToTemplate("{{VAR}} {{VAR}}", STRIP_WHITESPACE);
     TemplateDictionary dict("test_expand");
@@ -953,7 +890,7 @@ class TemplateUnittest {
     dict.SetValue("VAR", "var");
 
     // This string is equivalent to "/template." (at least on unix)
-    string slash_tpl(GOOGLE_NAMESPACE::PathJoin(GOOGLE_NAMESPACE::kRootdir, "template."));
+    string slash_tpl(PathJoin(kRootdir, "template."));
     per_expand_data.SetAnnotateOutput("");
     char expected[10240];           // 10k should be big enough!
     snprintf(expected, sizeof(expected),
@@ -1047,7 +984,7 @@ class TemplateUnittest {
     per_expand_data.SetAnnotator(NULL);
     snprintf(expected, sizeof(expected),
              "{{#FILE=%s004}}{{#SEC=__{{MAIN}}__}}File contents: "
-             "{{#MISSING_INC=INC}}missing.tpl{{/MISSING_INC}}\n"
+             "{{#INC=INC}}{{MISSING_FILE=missing.tpl}}{{/INC}}\n"
              "{{/SEC}}{{/FILE}}",
              (FLAGS_test_tmpdir + slash_tpl).c_str());
     // We expect a false return value because of the missing file.
@@ -1060,10 +997,11 @@ class TemplateUnittest {
     snprintf(expected, sizeof(expected),
              "{{EVENT=1}}{{#FILE=%s004}}"
              "{{EVENT=2}}{{#SEC=__{{MAIN}}__}}File contents: "
-             "{{EVENT=3}}{{#MISSING_INC=INC}}missing.tpl"
-             "{{EVENT=4}}{{/MISSING_INC}}\n"
-             "{{EVENT=5}}{{/SEC}}"
-             "{{EVENT=6}}{{/FILE}}",
+             "{{EVENT=3}}{{#INC=INC}}"
+             "{{EVENT=4}}{{MISSING_FILE=missing.tpl}}"
+             "{{EVENT=5}}{{/INC}}\n"
+             "{{EVENT=6}}{{/SEC}}"
+             "{{EVENT=7}}{{/FILE}}",
              (FLAGS_test_tmpdir + slash_tpl).c_str());
     // See comment above on why we can't use AssertExpandWithDataIs() for
     // our stateful test annotator.
@@ -1233,36 +1171,41 @@ class TemplateUnittest {
   }
 
   static void TestTemplateSearchPath() {
-    const string pathA = ctemplate::PathJoin(FLAGS_test_tmpdir, "a/");
-    const string pathB = ctemplate::PathJoin(FLAGS_test_tmpdir, "b/");
+    const string pathA = PathJoin(FLAGS_test_tmpdir, "a/");
+    const string pathB = PathJoin(FLAGS_test_tmpdir, "b/");
+    CreateOrCleanTestDir(pathA);
+    CreateOrCleanTestDir(pathB);
 
     TemplateDictionary dict("");
     Template::SetTemplateRootDirectory(pathA);
     Template::AddAlternateTemplateRootDirectory(pathB);
 
     // 1. Show that a template in the secondary path can be found.
-    const string path_b_bar = ctemplate::PathJoin(pathB, "bar");
-    StringToFile("b/bar", path_b_bar);
+    const string path_b_bar = PathJoin(pathB, "template_bar");
+    StringToFile("b/template_bar", path_b_bar);
     ASSERT_STREQ(path_b_bar.c_str(),
-                 Template::FindTemplateFilename("bar").c_str());
-    Template* b_bar = Template::GetTemplate("bar", DO_NOT_STRIP);
+                 Template::FindTemplateFilename("template_bar").c_str());
+    Template* b_bar = Template::GetTemplate("template_bar", DO_NOT_STRIP);
     ASSERT(b_bar);
-    AssertExpandIs(b_bar, &dict, "b/bar", true);
+    AssertExpandIs(b_bar, &dict, "b/template_bar", true);
 
     // 2. Show that the search stops once the first match is found.
     //    Create two templates in separate directories with the same name.
-    const string path_a_foo = ctemplate::PathJoin(pathA, "foo");
-    StringToFile("a/foo", path_a_foo);
-    StringToFile("b/foo", ctemplate::PathJoin(pathB, "foo"));
+    const string path_a_foo = PathJoin(pathA, "template_foo");
+    StringToFile("a/template_foo", path_a_foo);
+    StringToFile("b/template_foo", PathJoin(pathB, "template_foo"));
     ASSERT_STREQ(path_a_foo.c_str(),
-                 Template::FindTemplateFilename("foo").c_str());
-    Template* a_foo = Template::GetTemplate("foo", DO_NOT_STRIP);
+                 Template::FindTemplateFilename("template_foo").c_str());
+    Template* a_foo = Template::GetTemplate("template_foo", DO_NOT_STRIP);
     ASSERT(a_foo);
-    AssertExpandIs(a_foo, &dict, "a/foo", true);
+    AssertExpandIs(a_foo, &dict, "a/template_foo", true);
 
     // 3. Show that attempting to find a non-existent template gives an
     //    empty path.
     ASSERT(Template::FindTemplateFilename("baz").empty());
+
+    CreateOrCleanTestDir(pathA);
+    CreateOrCleanTestDir(pathB);
   }
 
   static void TestRemoveStringFromTemplateCache() {
@@ -1357,51 +1300,57 @@ class TemplateUnittest {
     assert(!tpl2);
 
     // TODO(csilvers): figure out how to mock time, rather than sleeping
-    sleep(1);    // since mtime goes by 1-second increments
     ASSERT(!tpl->ReloadIfChanged());  // false: no reloading needed
     StringToFile("{valid template}", filename);   // no contentful change
-    sleep(1);
     ASSERT(tpl->ReloadIfChanged());   // true: change, even if not contentful
-    tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);  // needed
+    ASSERT(Template::GetTemplate(filename, STRIP_WHITESPACE) == tpl);  // needed
     AssertExpandIs(tpl, &dict, "{valid template}", true);
 
     StringToFile("exists now!", nonexistent);
     tpl2 = Template::GetTemplate(nonexistent, STRIP_WHITESPACE);
     ASSERT(!tpl2);                    // because it's cached as not existing
     Template::ReloadAllIfChanged();
-    tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);  // force the reload
+    // force the reload
+    ASSERT(Template::GetTemplate(filename, STRIP_WHITESPACE) == tpl);
     tpl2 = Template::GetTemplate(nonexistent, STRIP_WHITESPACE);
     ASSERT(tpl2);                     // file exists now
     ASSERT(!tpl2->ReloadIfChanged()); // false: file hasn't changed
-    sleep(1);
     ASSERT(!tpl2->ReloadIfChanged()); // false: file *still* hasn't changed
 
     unlink(nonexistent.c_str());      // here today...
-    sleep(1);
     ASSERT(!tpl2->ReloadIfChanged()); // false: file has disappeared
     // The old template content should be forgotten
     ASSERT(NULL == Template::GetTemplate(nonexistent, STRIP_WHITESPACE));
 
     StringToFile("lazarus", nonexistent);
-    sleep(1);
     ASSERT(tpl2->ReloadIfChanged());  // true: file exists again
 
-    tpl2 = Template::GetTemplate(nonexistent, STRIP_WHITESPACE);
+    ASSERT(Template::GetTemplate(nonexistent, STRIP_WHITESPACE) == tpl2);
     AssertExpandIs(tpl2, &dict, "lazarus", true);
     StringToFile("{new template}", filename);
     tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);  // needed
     AssertExpandIs(tpl, &dict, "{valid template}", true);   // haven't reloaded
-    sleep(1);
     ASSERT(tpl->ReloadIfChanged());   // true: change, even if not contentful
-    tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);  // needed
+    ASSERT(Template::GetTemplate(filename, STRIP_WHITESPACE) == tpl);  // needed
     AssertExpandIs(tpl, &dict, "{new template}", true);
 
     // Now change both tpl and tpl2
     StringToFile("{all-changed}", filename);
     StringToFile("lazarus2", nonexistent);
     Template::ReloadAllIfChanged();
-    tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);  // needed
-    tpl2 = Template::GetTemplate(nonexistent, STRIP_WHITESPACE);
+
+    // Since the files have actually changed, GetTemplate will return
+    // new template pointers.
+    // The old template pointers are moved to the freelist.
+    Template* tpl_post_reload = Template::GetTemplate(
+        filename, STRIP_WHITESPACE);  // needed
+    ASSERT(tpl_post_reload != tpl);
+    tpl = tpl_post_reload;
+
+    Template* tpl2_post_reload = Template::GetTemplate(nonexistent,
+                                                       STRIP_WHITESPACE);
+    ASSERT(tpl2_post_reload != tpl2);
+    tpl2 = tpl2_post_reload;
     AssertExpandIs(tpl, &dict, "{all-changed}", true);
     AssertExpandIs(tpl2, &dict, "lazarus2", true);
 
@@ -1420,7 +1369,6 @@ class TemplateUnittest {
     // Case 1: Change template from non auto-escaped to HTML auto-escaped.
     filename = StringToTemplateFile(kHtmltext);
     tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);
-    sleep(1);
     StringToFile(kHtmlPragma + kHtmltext, filename);
     AssertExpandIs(tpl, &dict2, "<p><bla>", true);   // haven't reloaded
     ASSERT(tpl->ReloadIfChanged());   // true: content changed
@@ -1429,7 +1377,6 @@ class TemplateUnittest {
     AssertExpandIs(tpl2, &dict2, "<p>&lt;bla&gt;", true);   // same as tpl
 
     // Case 2: Change template content, same auto-escape context.
-    sleep(1);
     StringToFile(kHtmlPragma + kHtmltextOther, filename);
     ASSERT(tpl->ReloadIfChanged());   // true: content changed
     AssertExpandIs(tpl, &dict2, "<span>&lt;bla&gt;", true);   // reloaded
@@ -1437,7 +1384,6 @@ class TemplateUnittest {
     AssertExpandIs(tpl2, &dict2, "<span>&lt;bla&gt;", true);   // same as tpl
 
     // Case 3: Change auto-escape context to Javascript.
-    sleep(1);
     StringToFile(kJsPragma + kJstext, filename);
     AssertExpandIs(tpl, &dict2, "<span>&lt;bla&gt;", true);  // haven't reloaded
     ASSERT(tpl->ReloadIfChanged());   // true: content changed
@@ -1446,7 +1392,6 @@ class TemplateUnittest {
     AssertExpandIs(tpl2, &dict2, "a = '\\x3cbla\\x3e'", true);  // same as tpl
 
     // Case 4: Change template from auto-escaped to non auto-escaped.
-    sleep(1);
     StringToFile(kHtmltext, filename);
     AssertExpandIs(tpl, &dict2, "a = '\\x3cbla\\x3e'", true);
     ASSERT(tpl->ReloadIfChanged());   // true: content changed
@@ -1457,9 +1402,9 @@ class TemplateUnittest {
 
   static void TestTemplateRootDirectory() {
     string filename = StringToTemplateFile("Test template");
-    ASSERT(GOOGLE_NAMESPACE::IsAbspath(filename));
+    ASSERT(IsAbspath(filename));
     Template* tpl1 = Template::GetTemplate(filename, DO_NOT_STRIP);
-    Template::SetTemplateRootDirectory(GOOGLE_NAMESPACE::kRootdir);  // "/"
+    Template::SetTemplateRootDirectory(kRootdir);  // "/"
     // template-root shouldn't matter for absolute directories
     Template* tpl2 = Template::GetTemplate(filename, DO_NOT_STRIP);
     Template::SetTemplateRootDirectory("/sadfadsf/waerfsa/safdg");
@@ -1499,7 +1444,7 @@ class TemplateUnittest {
     ASSERT(ret->file_template != NULL);
     const char* const key = "RunThread key";
     ret->string_to_template_cache_return =
-        Template::StringToTemplateCache(key, " RunThread text ");
+        StringToTemplateCache(key, " RunThread text ", STRIP_WHITESPACE);
     ret->string_template = Template::GetTemplate(key, STRIP_WHITESPACE);
     ASSERT(ret->string_template != NULL);
     return ret;
@@ -1548,16 +1493,16 @@ class TemplateUnittest {
 
   // Tests all the static methods in TemplateNamelist
   static void TestTemplateNamelist() {
-    time_t before_time = time(NULL);
+    time_t before_time = Now();   // in template_test_util.cc
     string f1 = StringToTemplateFile("{{This has spaces in it}}");
     string f2 = StringToTemplateFile("{{#SEC}}foo");
     string f3 = StringToTemplateFile("{This is ok");
     // Where we'll copy f1 - f3 to: these are names known at compile-time
-    string f1_copy = GOOGLE_NAMESPACE::PathJoin(FLAGS_test_tmpdir, INVALID1_FN);
-    string f2_copy = GOOGLE_NAMESPACE::PathJoin(FLAGS_test_tmpdir, INVALID2_FN);
-    string f3_copy = GOOGLE_NAMESPACE::PathJoin(FLAGS_test_tmpdir, VALID1_FN);
+    string f1_copy = PathJoin(FLAGS_test_tmpdir, INVALID1_FN);
+    string f2_copy = PathJoin(FLAGS_test_tmpdir, INVALID2_FN);
+    string f3_copy = PathJoin(FLAGS_test_tmpdir, VALID1_FN);
     Template::SetTemplateRootDirectory(FLAGS_test_tmpdir);
-    time_t after_time = time(NULL);   // f1, f2, f3 all written by now
+    time_t after_time = Now();   // f1, f2, f3 all written by now
 
     TemplateNamelist::NameListType names = TemplateNamelist::GetList();
     ASSERT(names.size() == 4);
@@ -1613,8 +1558,10 @@ class TemplateUnittest {
 
     time_t modtime = TemplateNamelist::GetLastmodTime();
     ASSERT(modtime >= before_time && modtime <= after_time);
-    // Now update a file and make sure lastmod time is updated
-    sleep(1);
+    // Now update a file and make sure lastmod time is updated.
+    // Note that since TemplateToFile uses "fake" timestamps way
+    // in the past, this append should definitely give a time
+    // that's after after_time.
     FILE* fp = fopen(f1_copy.c_str(), "ab");
     ASSERT(fp);
     fwrite("\n", 1, 1, fp);
@@ -2215,10 +2162,9 @@ class TemplateUnittest {
     Template::StringToTemplateCache(filename, "string contents");
 
     tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);
-    expected = "file contents";   // Contents as of first GetTemplate win
+    expected = "file contents";       // contents as of first insert win
     AssertExpandIs(tpl, &dict, expected, true);
 
-    sleep(1);    // since mtime goes by 1-second increments
     StringToFile("new file contents", filename);
     ASSERT(tpl->ReloadIfChanged());   // should reload - file wins (came first)
     ASSERT(Template::GetTemplate(filename, STRIP_WHITESPACE) == tpl);
@@ -2272,14 +2218,10 @@ class TemplateUnittest {
       EmitTestPrefix(emitter);
       GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitCloseVariable(emitter);
     }
-    virtual void EmitOpenMissingInclude(ExpandEmitter* emitter,
-                                        const string& value) {
+    virtual void EmitFileIsMissing(ExpandEmitter* emitter,
+                                      const string& value) {
       EmitTestPrefix(emitter);
-      GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitOpenMissingInclude(emitter, value);
-    }
-    virtual void EmitCloseMissingInclude(ExpandEmitter* emitter) {
-      EmitTestPrefix(emitter);
-      GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitCloseMissingInclude(emitter);
+      GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitFileIsMissing(emitter, value);
     }
 
    private:
@@ -2320,10 +2262,7 @@ DynamicInitializationTemplateExpander sts_tester;  // this runs before main()
 const StaticTemplateString kLateDefine = STS_INIT(kLateDefine, "laterz");
 
 int main(int argc, char** argv) {
-  CleanTestDir(FLAGS_test_tmpdir);
-  // Subdirs used by TestTemplateSearchPath
-  CleanTestDir(ctemplate::PathJoin(FLAGS_test_tmpdir, "a"));
-  CleanTestDir(ctemplate::PathJoin(FLAGS_test_tmpdir, "b"));
+  CreateOrCleanTestDirAndSetAsTmpdir(FLAGS_test_tmpdir);
 
   // This goes first so that future tests don't mess up the filenames
   TemplateUnittest::TestAnnotation();
@@ -2344,6 +2283,7 @@ int main(int argc, char** argv) {
   TemplateUnittest::TestInheritence();
   TemplateUnittest::TestTemplateString();
   TemplateUnittest::TestExpand();
+  TemplateUnittest::TestExpandTemplate();
   TemplateUnittest::TestExpandWithCustomEmitter();
 
   TemplateUnittest::TestTemplateSearchPath();

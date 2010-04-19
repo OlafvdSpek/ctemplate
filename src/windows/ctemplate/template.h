@@ -39,7 +39,9 @@
 
 #include <time.h>             // for time_t
 #include <string>
+#include <ctemplate/template_cache.h>
 #include <ctemplate/template_enums.h>
+#include <ctemplate/template_string.h>
 
 // We include this just so folks don't have to include both template.h
 // and template_dictionary.h, or template_namelist.h etc, to use the
@@ -68,13 +70,108 @@ class HtmlParser;
 
 namespace ctemplate {
 
+// These free functions form the "simple" template API, and support
+// the most common operations (expanding a template from a file, and
+// from a string).  They all just delegate to a default instance of
+// the TemplateCache object.
+//
+// For more sophisticated use of the template system, you may need
+// to create your own TemplateCache object, and work directly with
+// it.  See template_cache.h for details.
+
+CTEMPLATE_DLL_DECL const TemplateCache* default_template_cache();
+CTEMPLATE_DLL_DECL TemplateCache* mutable_default_template_cache();
+
+
+// ---- EXPANDING A TEMPLATE -------
+//    ExpandTemplate
+//    ExpandWithData
+
+// Loads the template named filename from disk if necessary -- it
+// gets it from the cache instead, if the template had been loaded
+// before or if it had been put explicitly in the cache via a call
+// to StringToTemplateCache() -- and expands it using the given
+// dictionary.
+// The first version is the most general, followed by common-case code.
+inline bool ExpandTemplate(const TemplateString& filename, Strip strip,
+                           const TemplateDictionaryInterface *dictionary,
+                           ExpandEmitter* output) {
+  return mutable_default_template_cache()->ExpandWithData(
+      filename, strip, dictionary, NULL, output);
+}
+inline bool ExpandTemplate(const TemplateString& filename, Strip strip,
+                           const TemplateDictionaryInterface* dictionary,
+                           std::string* output_buffer) {
+  return mutable_default_template_cache()->ExpandWithData(
+      filename, strip, dictionary, NULL, output_buffer);
+}
+
+// If you want any per-expand data to be used at expand time, call
+// this routine instead of Expand.  You pass in an extra
+// PerExpandData structure (see per_expand_data.h) which sets this
+// data: whether or not you want the template to be annotated, and
+// any data you want to pass in to template modifers.  If
+// per_expand_data is NULL, this is exactly the same as Expand().
+// The first version is the most general, followed by common-case code.
+inline bool ExpandWithData(const TemplateString& filename, Strip strip,
+                           const TemplateDictionaryInterface *dictionary,
+                           PerExpandData* per_expand_data,
+                           ExpandEmitter* output) {
+  return mutable_default_template_cache()->ExpandWithData(
+      filename, strip, dictionary, per_expand_data, output);
+}
+inline bool ExpandWithData(const TemplateString& filename, Strip strip,
+                           const TemplateDictionaryInterface* dictionary,
+                           PerExpandData* per_expand_data,
+                           std::string* output_buffer) {
+  return mutable_default_template_cache()->ExpandWithData(
+      filename, strip, dictionary, per_expand_data, output_buffer);
+}
+
+// ---- INSERTING INTO THE CACHE -------
+//   LoadTemplate
+//   StringToTemplateCache
+
+// Reads a file from disk and inserts it into the template, if it's
+// not already there.  Returns true on success or false if the
+// template could not be found, or could not be parsed.  It's never
+// necessary to call this -- Expand() will load templates lazily if
+// needed -- but you may want to if you want to make sure templates
+// exist before trying to expand them, or because you want to
+// control disk access patterns, or for some other reason.
+inline bool LoadTemplate(const TemplateString& filename, Strip strip) {
+  return mutable_default_template_cache()->LoadTemplate(filename, strip);
+}
+
+// Inserts the given string into the default template cache, as if
+// it were a file read from disk.  You can call Expand() with its
+// first arg (filename) the same as the key you use here.  You can
+// also use this key as the 'filename' for sub-included templates,
+// in TemplateDictionary::SetFilename().
+inline bool StringToTemplateCache(const TemplateString& key,
+                                  const TemplateString& content,
+                                  Strip strip) {
+  return mutable_default_template_cache()->StringToTemplateCache(
+      key, content, strip);
+}
+inline bool StringToTemplateCache(const TemplateString& key,
+                                  const char* content, size_t content_len,
+                                  Strip strip) {
+  return mutable_default_template_cache()->StringToTemplateCache(
+      key, content, content_len, strip);
+}
+
+
+// ---------------------------------------------------------------------
+// The follow are deprecated.
+// TODO(csilvers): move to parsed_template.h
+
 // TemplateState of a template is:
 // - TS_EMPTY before parsing is complete,
 // - TS_ERROR if a syntax error was found during parsing, and
 // - TS_READY if parsing has completed successfully
-// - TS_SHOULD_RELOAD if marked to reload next time it is called for
 // (TS_UNUSED is not used)
-enum TemplateState { TS_UNUSED, TS_EMPTY, TS_ERROR, TS_READY, TS_SHOULD_RELOAD };
+enum TemplateState { TS_UNUSED, TS_EMPTY, TS_ERROR, TS_READY };
 
 // Used for Auto-Escape. It represents the different contexts a template may
 // be initialized in via the AUTOESCAPE pragma in the template file
@@ -103,213 +200,130 @@ enum TemplateState { TS_UNUSED, TS_EMPTY, TS_ERROR, TS_READY, TS_SHOULD_RELOAD }
 //            TC_XML is typically associated with text/xml content-type.
 // - TC_MANUAL: Equivalent to not specifying auto-escaping at all.
 //
-// TODO(jad): Find a way to remove TemplateContext from the public API.
+// TODO(csilvers): Make this a private part of the Template class.
 enum TemplateContext { TC_UNUSED, TC_HTML, TC_JS, TC_CSS, TC_JSON,
                        TC_XML, TC_MANUAL };
 
-// Template
-//   The object which reads and parses the template file and then is used to
-//   expand the parsed structure to a string.
+
+// This class is deprecated.  Old code uses this class heavily (via
+// GetTemplate() to obtain a Template*, and then methods on that
+// Template*) but new code should use the free functions above.
 class CTEMPLATE_DLL_DECL Template {
  public:
-  // ---- CREATING A TEMPLATE OBJECT -------
-  //    GetTemplate
-  //    StringToTemplate
-  //    StringToTemplateCache
+  // ---- METHODS FOR TOOLS ----
+  //   These are not intended for normal use, but are public so a
+  //   tool can use them.
 
-  // GetTemplate (static Template factory method)
-  //   Attempts to retrieve the template object from the cache, stored
-  //   under its filename. This will fail only the first time the method
-  //   is invoked for a given filename.
-  //   Any object retrieved from the cache is then checked to see if
-  //   its status is marked for "reload if changed." If so, ReloadIfChanged
-  //   is called on the retrieved object. Then the retrieved object is
-  //   returned.
-  //   When it fails to retrieve one from the cache, it creates a new
-  //   template object, passing the filename and 'strip' values to the
-  //   constructor. (See constructor below for the meaning of the flags.)
-  //   If it succeeds in creating an object, including loading and parsing
-  //   the associated template file, the object is stored in the cache
-  //   and then returned.
-  //   If it fails in loading and parsing the template file, either
-  //   because the file was not found or it contained syntax errors, then
-  //   the newly created object is deleted and the method returns NULL.
-  //   (NOTE: This description is much longer and less precise and probably
-  //   harder to understand than the method itself. Read the code.)
-  //
-  //   To enable Auto-Escape on that template, place the corresponding
-  //   AUTOESCAPE pragma at the top of the template file. The template
-  //   will then be Auto-Escaped independently of the template it may be
-  //   included from or the templates it may include.
-  //
-  //   'Strip' indicates how to handle whitespace when expanding the
-  //   template.  DO_NOT_STRIP keeps the template exactly as-is.
-  //   STRIP_BLANK_LINES elides all blank lines in the template.
-  //   STRIP_WHITESPACE elides all blank lines, and also all whitespace
-  //   at either the beginning or end of a line.  See template constructor
-  //   for more details.
-  static Template *GetTemplate(const std::string& filename, Strip strip);
+  // Used by make_tpl_varnames_h.cc.
+  void WriteHeaderEntries(std::string *outstring) const;
 
-  // Parses the string as a template file (e.g. "Hello {{WORLD}}"),
-  // and returns the generated Template object, or NULL on parse
-  // error.  It is the caller's responsibility to free the template
-  // when done.  NOTE: since there is no 'key' associated with these
-  // templates, you cannot use include them inside another template
-  // (via "{{>TEMPLATE_THAT_COMES_FROM_A_STRING}}").  If you need that
-  // functionality, use StringToTemplateCache.
-  // Also note that Auto-Escape may be enabled by adding the
-  // AUTOESCAPE pragma at the top of the string.
-  static Template* StringToTemplate(const char* content, size_t content_len,
+  // ---- DEPRECATED METHODS ----
+  //   These methods used to be the primary way of using the Template
+  //   object, but have been deprecated in favor of the (static)
+  //   methods above.  If you are using these deprecated methods,
+  //   consider moving to the above methods instead, or to moving to
+  //   using your own TemplateCache (which supports richer operations
+  //   on parsed templates).
+
+  // Loads a template from disk or cache or string, and returns the Template*.
+  // INSTEAD, use the static Expand that takes a filename.
+  static Template *GetTemplate(const TemplateString& filename, Strip strip);
+  virtual ~Template();  // when the time comes to delete these Template*'s.
+
+  // Parses a string immediately and returns the resulting Template*.
+  // You can call the (deprecated) non-static Expand() method on this
+  // template in order to expand it with a dictionary.  You are
+  // responsible for deleting the Template* when you are done with it.
+  // INSTEAD, use StringToTemplateCache (with a key) plus the static Expand().
+  // TOOO(csilvers): return a const Template* instead.
+  static Template* StringToTemplate(const TemplateString& content,
                                     Strip strip);
-  static Template* StringToTemplate(const std::string& content,
+  static Template* StringToTemplate(const char* content, size_t content_len,
                                     Strip strip) {
-    return StringToTemplate(content.data(), content.length(), strip);
+    return StringToTemplate(TemplateString(content, content_len), strip);
   }
 
-  // Parses the string as a template file (e.g. "Hello {{WORLD}}"),
-  // and inserts it into the template cache, so it can later be
-  // retrieved by GetTemplate.  The user specifies a key, which is
-  // passed in to GetTemplate.  (Note the user does not specify strip;
-  // it will be specified later in the GetTemplate call.)
-  // The template system will manage memory for this template.
-  // Returns true if the template was successfully parsed and
-  // submitted to the template cache, or false otherwise.  In particular,
-  // we return false if a string was already cached with the given key.
-  // NOTE: to include this template from within another template (via
-  // "{{>TEMPLATE_THAT_COMES_FROM_A_STRING}}"), the argument you pass
-  // to TemplateDictionary::SetFilename() is the key you used to register
-  // the string-template.
-  static bool StringToTemplateCache(const std::string& key,
-                                    const char* content, size_t content_len);
-  static bool StringToTemplateCache(const std::string& key, const std::string& content) {
-    return StringToTemplateCache(key, content.data(), content.length());
-  }
-
-  // ---- EXPANDING A TEMPLATE -------
-  //    Expand
-  //    ExpandWithData
-
-  // ExpandWithData
-  //   If you want any per-expand data to be used at expand time, call
-  //   this routine instead of Expand.  You pass in an extra PerExpandData
-  //   structure (see per_expand_data.h) which sets this data:
-  //   whether or not you want the template to be annotated, and any
-  //   data you want to pass in to template modifers.  If per_expand_data
-  //   is NULL, this is exactly the same as Expand().
-  //   The first version is the most general, followed by common-case code.
+  // Non-static Expand*() works on a Template* returned from GetTemplate().
+  // INSTEAD, use static expand with a filename (or key-name for strings).
   bool ExpandWithData(ExpandEmitter* output,
-                      const TemplateDictionaryInterface *dictionary,
-                      PerExpandData* per_expand_data) const;
-
-  bool ExpandWithData(std::string *output_buffer,
-                      const TemplateDictionaryInterface *dictionary,
+                      const TemplateDictionaryInterface* dictionary,
+                      PerExpandData* per_expand_data) const {
+    return ExpandWithDataAndCache(output, dictionary, per_expand_data,
+                                  default_template_cache());
+  }
+  bool ExpandWithData(std::string* output_buffer,
+                      const TemplateDictionaryInterface* dictionary,
                       PerExpandData* per_expand_data) const {
     if (output_buffer == NULL)  return false;
     StringEmitter e(output_buffer);
     return ExpandWithData(&e, dictionary, per_expand_data);
   }
-
-  // Expand
-  //   Expands the template into a string using the values
-  //   in the supplied dictionary.  Returns true iff all the template
-  //   files load and parse correctly.
-  //   The first version is the most general, followed by common-case code.
   bool Expand(ExpandEmitter* output,
-              const TemplateDictionaryInterface *dictionary) const {
+              const TemplateDictionaryInterface* dictionary) const {
     return ExpandWithData(output, dictionary, NULL);
   }
-  bool Expand(std::string *output_buffer,
-              const TemplateDictionaryInterface *dictionary) const {
+  bool Expand(std::string* output_buffer,
+              const TemplateDictionaryInterface* dictionary) const {
     return ExpandWithData(output_buffer, dictionary, NULL);
   }
 
-
-  // ---- OTHER TEMPLATE OPERATIONS -------
-
-  // Template destructor
-  virtual ~Template();
-
-  // SetTemplateRootDirectory
-  //   Sets the root directory for all templates used by the program.
-  //   After calling this method, the filename passed to GetTemplate
-  //   may be a relative pathname (no leading '/'), in which case
-  //   this root-directory is prepended to the filename.
-  static bool SetTemplateRootDirectory(const std::string& directory);
-
-  // AddAlternateTemplateRootDirectory
-  //   Adds an additional search path for all templates used by the program.
-  //   You may call this multiple times.
-  static bool AddAlternateTemplateRootDirectory(const std::string& directory);
-
-  // FindTemplateFilename
-  //   Given an unresolved filename, look through the template search
-  //   path to see if the template can be found. If so, return the
-  //   path of the resolved filename, otherwise return an empty
-  //   string.
-  static std::string FindTemplateFilename(const std::string& unresolved);
-
-  // ClearCache
-  //   Deletes all the template objects in the cache and all raw
-  //   contents cached from StringToTemplateCache. This should only
-  //   be done once, just before exiting the program and after all
-  //   template expansions are completed. (If you want to refresh the
-  //   cache, the correct method to use is ReloadAllIfChanged, not
-  //   this one.) Note: this method is not necessary unless you are
-  //   testing for memory leaks. Calling this before exiting the
-  //   program will prevent unnecessary reporting in that case.
-  static void ClearCache();
-
-  // RemoveStringFromTemplateCache
-  //   The opposite of StringToTemplateCache, this removes the string
-  //   with the given key from the cache.  Note it can only be used
-  //   on strings added to the cache via StringToTemplateCache; to
-  //   remove disk-based entries, you must delete the file on disk
-  //   and then call ReloadIfChanged().
-  static void RemoveStringFromTemplateCache(const std::string& key);
-
-  // ReloadAllIfChanged
-  //   Marks each template object in the cache to check to see if
-  //   its template file has changed the next time it is invoked
-  //   via GetTemplate. If it finds the file has changed, it
-  //   then reloads and parses the file before being returned by
-  //   GetTemplate.
-  static void ReloadAllIfChanged();
-
-  // ReloadIfChanged
-  //   Reloads the file from the filesystem iff its mtime is different
-  //   now from what it was last time the file was reloaded.  Note a
-  //   file is always "reloaded" the first time this is called.  If
-  //   the file is in fact reloaded, then the contents of the file are
-  //   parsed into the template node parse tree by calling BuildTree
-  //   After this call, the state of the Template will be either
-  //   TS_READY or TS_ERROR.  Return value is true iff we reloaded
-  //   because the content changed and could be parsed with no errors.
-  bool ReloadIfChanged();
-
-  // Dump
-  //   Dumps the parsed structure of the template for debugging assistance.
-  //   It goes to stdout.
+  // Dump to stdout or a string.  filename is just used to annotate output.
   void Dump(const char *filename) const;
-
-  // DumpToString
-  //   Same as Dump above except it dumps to the given string instead.
-  //   Format is identical to Dump.
   void DumpToString(const char *filename, std::string *out) const;
 
-  // state
-  //   Retrieves the state of the template (see TemplateState above).
+  // Retrieves the state, template-file, or strip mode of this Template.
   TemplateState state() const;
-
-  // template_file
-  //   Returns the name of the template file used to build this template.
   const char *template_file() const;
+  Strip strip() const;
 
-  // template_root_directory
-  //   Returns the stored template root directory name
-  static std::string template_root_directory();
+  // Work at the level of groups of templates, so just call through to
+  // the default TemplateCache; see template_cache.h for what these do.
+  // INSTEAD, create your own TemplateCache and call these methods on that.
+  static bool SetTemplateRootDirectory(const std::string& dir) {
+    return mutable_default_template_cache()->SetTemplateRootDirectory(dir);
+  }
+  static bool AddAlternateTemplateRootDirectory(const std::string& dir) {
+    return mutable_default_template_cache()->AddAlternateTemplateRootDirectory(
+        dir);
+  }
+  static std::string template_root_directory() {
+    return default_template_cache()->template_root_directory();
+  }
+  static std::string FindTemplateFilename(const std::string& unresolved) {
+    return default_template_cache()->FindTemplateFilename(unresolved);
+  }
+  static void RemoveStringFromTemplateCache(const std::string& key) {
+    mutable_default_template_cache()->Delete(key);
+  }
+  static void ClearCache() {
+    mutable_default_template_cache()->ClearCache();
+  }
+  static void ReloadAllIfChanged() {
+    mutable_default_template_cache()->ReloadAllIfChanged(
+        TemplateCache::LAZY_RELOAD);
+  }
 
-  // WriteHeaderEntries (used by make_tpl_varnames_h.cc)
-  void WriteHeaderEntries(std::string *outstring) const;
+  // ---- EXTRA-DEPRECATED METHODS ----
+  //   These methods were deprecated even before the move to
+  //   TemplateCache.  We'd really like you to move from these to one
+  //   of the "approved" methods, or even one of the deprecated
+  //   methods.  Comments here don't even describe what these
+  //   functions do, just how to transition off of using them.
+
+  // INSTEAD, use the StringToTemplateCache function that takes the strip mode.
+  static bool StringToTemplateCache(const TemplateString& key,
+                                    const TemplateString& content);
+  static bool StringToTemplateCache(const TemplateString& key,
+                                    const char* content, size_t content_len) {
+    return StringToTemplateCache(key, TemplateString(content, content_len));
+  }
+  // This is to prevent against typos: you want the global (free-function)
+  // StringToTemplateCache here, not the one in Template.
+  static bool StringToTemplateCache(const TemplateString& key,
+                                    const char* content, Strip);
+
+  // INSTEAD, use ReloadAllIfChanged.
+  bool ReloadIfChanged();
 
  protected:
   friend class SectionTemplateNode;  // for access to set_state(), ParseState
@@ -330,15 +344,16 @@ class CTEMPLATE_DLL_DECL Template {
   //   a comment marker as the last element on the line.
   //   These two options allow the template to include whitespace for
   //   readability without adding to the expanded output.
-  Template(const std::string& filename, Strip strip);
+  Template(const TemplateString& filename, Strip strip, TemplateCache* owner);
 
   // MaybeInitHtmlParser
-  //   In TemplateContexts where the HTML parser is needed, we initialize it
-  //   in the appropriate mode. Also we do a sanity check (cannot fail) on the
-  //   template filename. This function is called at most once for a Template.
-  //   In_tag is only meaningful for TC_HTML: It is true for templates that
-  //   start inside an HTML tag and hence are expected to contain HTML attribute
-  //   name/value pairs only. It is false for standard HTML templates.
+  //   In TemplateContexts where the HTML parser is needed, we
+  //   initialize it in the appropriate mode. Also we do a sanity
+  //   check (cannot fail) on the template filename. This function is
+  //   called at most once for a Template.  In_tag is only meaningful
+  //   for TC_HTML: It is true for templates that start inside an HTML
+  //   tag and hence are expected to contain HTML attribute name/value
+  //   pairs only. It is false for standard HTML templates.
   void MaybeInitHtmlParser(bool in_tag);
 
   // BuildTree
@@ -350,7 +365,7 @@ class CTEMPLATE_DLL_DECL Template {
   bool BuildTree(const char *input_buffer, const char* input_buffer_end);
 
   // Internal version of ReloadIfChanged, used when the function already
-  // has a write-lock on mutex_.
+  // has a write-lock on g_template_mutex.
   bool ReloadIfChangedLocked();
 
   // set_state
@@ -374,6 +389,12 @@ class CTEMPLATE_DLL_DECL Template {
 
   // Keeps track of where we are in reloading, or if there was an error loading
   TemplateState state_;
+
+  // The cache we got this template from.  This is not well-defined: a
+  // Template can be in more than one cache.
+  // TODO(csilvers): remove this once we deprecate the one user, which
+  //                 is ReloadIfChanged.
+  TemplateCache* template_cache_;
 
   // The current template-contents, as read from the file
   const char* template_text_;
@@ -410,11 +431,6 @@ class CTEMPLATE_DLL_DECL Template {
   };
   ParseState parse_state_;
 
-  // The mutex object used during ReloadIfChanged to prevent the same
-  // object from reloading the template file in parallel by different
-  // threads.
-  mutable class Mutex* mutex_;
-
   // All templates are initialized to TC_MANUAL (no Auto-Escape). Then,
   // during template parsing (BuildTree()), if an AUTOESCAPE pragma is
   // encountered, the context changes appropriately.
@@ -430,6 +446,25 @@ class CTEMPLATE_DLL_DECL Template {
   static const size_t kNumSafeWhitelistedVariables;
 
  private:
+  friend class TemplateCache;
+  friend class TemplateCachePeer;  // to access num_deletes_
+
+  // Internal implementation of Expand
+  bool ExpandWithDataAndCache(ExpandEmitter* output,
+                              const TemplateDictionaryInterface *dictionary,
+                              PerExpandData* per_expand_data,
+                              const TemplateCache* cache) const;
+
+  // This is called for recursive expands, when we already hold template_lock.
+  bool ExpandLocked(ExpandEmitter* output,
+                    const TemplateDictionaryInterface *dictionary,
+                    PerExpandData* per_expand_data,
+                    const TemplateCache* cache) const;
+
+  // Returns the lastmod time in mtime_
+  // For string-based templates, not backed by a file, this returns 0
+  time_t mtime() const;
+
   // These are helper routines to StripFile.  I would make them static
   // inside template.cc, but they use the MarerDelimiters struct.
   static bool ParseDelimiters(const char* text, size_t textlen,
@@ -438,6 +473,11 @@ class CTEMPLATE_DLL_DECL Template {
                                                  const MarkerDelimiters& delim);
   static size_t InsertLine(const char *line, size_t len, Strip strip,
                            const MarkerDelimiters& delim, char* buffer);
+
+  // This is only used by template_cache_test, via TemplateCachePeer.
+  static int num_deletes() { return num_deletes_; }
+
+  static int num_deletes_;  // how many times the destructor has been called
 
   // Can't invoke copy constructor or assignment operator
   Template(const Template&);

@@ -260,7 +260,11 @@ void Mutex::ReaderUnlock() { Unlock(); }
 
 // We do a simple spinlock for pthread_once_t.  See
 //    http://www.ddj.com/cpp/199203083?pgno=3
+#ifdef INTERLOCKED_EXCHANGE_NONVOLATILE
+typedef LONG GoogleOnceType;
+#else
 typedef volatile LONG GoogleOnceType;
+#endif
 const GoogleOnceType GOOGLE_ONCE_INIT = 0;
 inline int GoogleOnceInit(GoogleOnceType* once_control,
                           void (*init_routine)(void)) {

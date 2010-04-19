@@ -104,12 +104,8 @@ class CTEMPLATE_DLL_DECL TemplateAnnotator {
   // Called after processing a variable marker.
   virtual void EmitCloseVariable(ExpandEmitter* emitter) = 0;
 
-  // Called instead of EmitOpenInclude() when the file is missing.
-  // Passed value is the include marker name.
-  virtual void EmitOpenMissingInclude(ExpandEmitter* emitter,
-                                      const std::string& value) = 0;
-  // Called instead of EmitCloseFile() if the file was missing.
-  virtual void EmitCloseMissingInclude(ExpandEmitter* emitter) = 0;
+  virtual void EmitFileIsMissing(ExpandEmitter* emitter,
+                                 const std::string& value) = 0;
 
  private:
   // Can't invoke copy constructor or assignment operator
@@ -132,9 +128,8 @@ class CTEMPLATE_DLL_DECL TextTemplateAnnotator : public TemplateAnnotator {
   virtual void EmitCloseSection(ExpandEmitter* emitter);
   virtual void EmitOpenVariable(ExpandEmitter* emitter, const std::string& value);
   virtual void EmitCloseVariable(ExpandEmitter* emitter);
-  virtual void EmitOpenMissingInclude(ExpandEmitter* emitter,
-                                      const std::string& value);
-  virtual void EmitCloseMissingInclude(ExpandEmitter* emitter);
+  virtual void EmitFileIsMissing(ExpandEmitter* emitter,
+                                 const std::string& value);
 
  private:
   // Can't invoke copy constructor or assignment operator

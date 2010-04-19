@@ -80,27 +80,47 @@ $MAKETPL -f$TMPDIR/bar.h $TMPDIR/ok1.tpl $TMPDIR/ok2.tpl >/dev/null 2>&1 \
 # Some weird (broken) shells leave the ending EOF in the here-document,
 # hence the grep.
 expected_ok1=`cat <<EOF | grep -v '^EOF$'
+#ifndef %%%OUTPUT_NAME%%%
+#define %%%OUTPUT_NAME%%%
+
 #include <ctemplate/template_string.h>
 static const ::ctemplate::StaticTemplateString ko_QCHAR = STS_INIT_WITH_HASH(ko_QCHAR, "QCHAR", 13739615363438531061LLU);
 static const ::ctemplate::StaticTemplateString ko_HREF = STS_INIT_WITH_HASH(ko_HREF, "HREF", 4441707909033668369LLU);
 static const ::ctemplate::StaticTemplateString ko_PARAMS = STS_INIT_WITH_HASH(ko_PARAMS, "PARAMS", 10755877064288701757LLU);
+
+#endif  // %%%OUTPUT_NAME%%%
 EOF`
 
 expected_ok2=`cat <<EOF | grep -v '^EOF$'
+#ifndef %%%OUTPUT_NAME%%%
+#define %%%OUTPUT_NAME%%%
+
 #include <ctemplate/template_string.h>
 static const ::ctemplate::StaticTemplateString ko_ATTRIBUTES = STS_INIT_WITH_HASH(ko_ATTRIBUTES, "ATTRIBUTES", 11813232524653503831LLU);
 static const ::ctemplate::StaticTemplateString ko_ATTRIBUTE = STS_INIT_WITH_HASH(ko_ATTRIBUTE, "ATTRIBUTE", 14959290143384361001LLU);
+
+#endif  // %%%OUTPUT_NAME%%%
 EOF`
 
 expected_ok3=`cat <<EOF | grep -v '^EOF$'
+#ifndef %%%OUTPUT_NAME%%%
+#define %%%OUTPUT_NAME%%%
+
 #include <ctemplate/template_string.h>
 static const ::ctemplate::StaticTemplateString ko_TITLE = STS_INIT_WITH_HASH(ko_TITLE, "TITLE", 8931122033088041025LLU);
+
+#endif  // %%%OUTPUT_NAME%%%
 EOF`
 
 expected_ok4=`cat <<EOF | grep -v '^EOF$'
+#ifndef %%%OUTPUT_NAME%%%
+#define %%%OUTPUT_NAME%%%
+
 #include <ctemplate/template_string.h>
 static const ::ctemplate::StaticTemplateString ko_HREF = STS_INIT_WITH_HASH(ko_HREF, "HREF", 4441707909033668369LLU);
 static const ::ctemplate::StaticTemplateString ko_PARAMS = STS_INIT_WITH_HASH(ko_PARAMS, "PARAMS", 10755877064288701757LLU);
+
+#endif  // %%%OUTPUT_NAME%%%
 EOF`
 
 expected_ok5=`echo "$expected_ok4" | sed s/ok4/ok5/g`
@@ -112,7 +132,18 @@ expected_ok8=`echo "$expected_ok4" | sed s/ok4/ok8/g`
 # The "by <program>" line is messed up when using libtool.  Thus, we just
 # strip it out when doing the comparisons.  In fact, get rid of all comments.
 Cleanse() {
-  grep -v '^//' "$1" > "$1.cleansed"
+  # Replace the file name guard with %%%OUTPUT_NAME%%% so we can use
+  # the same expected_ok* variables for different file names.
+  # We use 'basename' plus .* (in the sed) to match the filename,
+  # because mingw automatically converts mingw directories to windows
+  # directories sometimes, and we want both to match.  It's not perfect.
+  #
+  # Note that we only append 'H_' to the end of the string, instead
+  # of '_H_'.  This is because the first call to 'tr' is already
+  # adding a '_' at the end of the converted $1 (due to the newline
+  # emitted by echo).
+  n="`basename $1 | tr -c '0-9a-zA-Z' '_' | tr 'a-z' 'A-Z'`"
+  grep -v '^//' "$1" | sed -e "s:TPL_.*${n}H_:%%%OUTPUT_NAME%%%:" > "$1.cleansed"
 }
 
 # syntax-check these templates

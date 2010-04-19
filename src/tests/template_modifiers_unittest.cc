@@ -858,8 +858,8 @@ class TemplateModifiersUnittest {
   // a vector that became invalid after the vector was resized.
   static void TestManyUnknownModifiers() {
     string tpl_str1 = "{{from_name:x-test=4}} sent you a message";
-    const ctemplate::Template* tpl1 = ctemplate::Template::StringToTemplate(
-        tpl_str1, ctemplate::DO_NOT_STRIP);
+    const Template* tpl1 = Template::StringToTemplate(
+        tpl_str1, DO_NOT_STRIP);
 
     string tpl_str2 = "{{from_name:x-test=4}} sent you a message:";
     string expected_out = "me sent you a message:";
@@ -869,12 +869,12 @@ class TemplateModifiersUnittest {
       tpl_str2.append("{{from_name:x-" + string(i, 't') + "=4}}");
       expected_out.append("me");
     }
-    const ctemplate::Template* tpl2 = ctemplate::Template::StringToTemplate(
-        tpl_str2, ctemplate::DO_NOT_STRIP);
+    const Template* tpl2 = Template::StringToTemplate(
+        tpl_str2, DO_NOT_STRIP);
 
     // Even after the resizing, the references to the unknown
     // modifiers in tpl1 and tpl2 should still be valid.
-    ctemplate::TemplateDictionary dict("test");
+    TemplateDictionary dict("test");
     dict.SetValue("from_name", "me");
     string out;
 

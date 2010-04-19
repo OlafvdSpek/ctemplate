@@ -35,10 +35,12 @@
 
 #include "base/mutex.h"     // This must go first so we get _XOPEN_SOURCE
 #include <assert.h>
-#include <stdio.h>          // for fwrite, fflush
-#include <stdlib.h>
 #include <errno.h>
 #include <ctype.h>
+#include <stdio.h>          // for fwrite, fflush
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <ctype.h>          // for isspace()
 #include <sys/stat.h>
@@ -47,25 +49,25 @@
 #endif
 #include <string.h>
 #include <algorithm>        // for binary_search()
-#include <functional>       // for binary_function()
 #include <sstream>          // for ostringstream
 #include <iostream>         // for logging
 #include <iomanip>          // for indenting in Dump()
-#include <string>
-#include <list>
 #include <iterator>
+#include <list>
+#include <string>
 #include <vector>
 #include <utility>          // for pair
 #include HASH_MAP_H         // defined in config.h
 #include "htmlparser/htmlparser_cpp.h"
 #include "template_modifiers_internal.h"
-#include <ctemplate/template_pathops.h>
+#include <ctemplate/per_expand_data.h>
 #include <ctemplate/template.h>
 #include <ctemplate/template_annotator.h>
-#include <ctemplate/template_modifiers.h>
+#include <ctemplate/template_cache.h>
 #include <ctemplate/template_dictionary.h>
 #include <ctemplate/template_dictionary_interface.h>   // also gets kIndent
-#include <ctemplate/per_expand_data.h>
+#include <ctemplate/template_modifiers.h>
+#include <ctemplate/template_pathops.h>
 #include <ctemplate/template_string.h>
 
 #ifndef PATH_MAX
@@ -83,7 +85,6 @@ using std::string;
 using std::list;
 using std::vector;
 using std::pair;
-using std::binary_function;
 using std::binary_search;
 #ifdef HAVE_UNORDERED_MAP
 using HASH_NAMESPACE::unordered_map;
@@ -92,7 +93,6 @@ using HASH_NAMESPACE::unordered_map;
 #else
 using HASH_NAMESPACE::hash_map;
 #endif
-using HASH_NAMESPACE::hash;
 using HTMLPARSER_NAMESPACE::HtmlParser;
 
 #define arraysize(x)  ( sizeof(x) / sizeof(*(x)) )
@@ -101,19 +101,24 @@ TemplateId GlobalIdForSTS_INIT(const TemplateString& s) {
   return s.GetGlobalId();   // normally this method is private
 }
 
+int Template::num_deletes_ = 0;
+
 namespace {
+// Mutex for protecting Expand calls against ReloadIfChanged, which
+// might change a template while it's being expanded.  This mutex used
+// to be a per-template mutex, rather than a global mutex, which seems
+// like it would be strictly better, but we ran into subtle problems
+// with deadlocks when a template would sub-include itself (thus
+// requiring a recursive read-lock during Expand), and the template
+// was Expanded and ReloadIfChanged at the same time.  Rather than
+// deal with that complication, we just go with a global mutex.  Since
+// ReloadIfChanged is deprecated, in most applications all the mutex
+// uses will be as read-locks, so this shouldn't cause much contention.
+static Mutex g_template_mutex(Mutex::LINKER_INITIALIZED);
 
-typedef pair<string, int> TemplateCacheKey;
-
-// Mutexes protecting the globals below.  First protects
-// g_template_search_path, second protects g_parsed_template_cache
-// as well as g_raw_template_content_cache.
-// Third protects vars_seen in WriteOneHeaderEntry, below.
-// Lock priority invariant: you should never acquire a Template::mutex_
-// while holding one of these mutexes.
+// Mutex for protecting vars_seen in WriteOneHeaderEntry, below.
+// g_template_mutex and g_header_mutex are never held at the same time.
 // TODO(csilvers): assert this in the codebase.
-static Mutex g_static_mutex(Mutex::LINKER_INITIALIZED);
-static Mutex g_cache_mutex(Mutex::LINKER_INITIALIZED);
 static Mutex g_header_mutex(Mutex::LINKER_INITIALIZED);
 
 // It's not great to have a global variable with a constructor, but
@@ -145,38 +150,6 @@ class HashedTemplateString : public TemplateString {
     CacheGlobalId();
   }
 };
-
-// Type, var, and mutex used to store template objects in the internal cache
-class TemplateCacheHash {
- public:
-  StringHash string_hash_;
-  size_t operator()(const TemplateCacheKey& p) const {
-    // Using + here is silly, but should work ok in practice
-    return string_hash_(p.first) + p.second;
-  }
-  // Less operator for MSVC's hash containers.  We make int be the
-  // primary key, unintuitively, because it's a bit faster.
-  bool operator()(const TemplateCacheKey& a,
-                  const TemplateCacheKey& b) const {
-    return (a.second == b.second
-            ? a.first < b.first
-            : a.second < b.second);
-  }
-  // These two public members are required by msvc.  4 and 8 are defaults.
-  static const size_t bucket_size = 4;
-  static const size_t min_buckets = 8;
-};
-typedef hash_map<TemplateCacheKey, Template*, TemplateCacheHash>
-  TemplateCache;
-static TemplateCache *g_parsed_template_cache;
-
-// Caches the raw contents of a string template, i.e. a template
-// created via StringToTemplateCache. The key is the key given
-// (without a conversion to an absolute naming) and the value is a
-// pointer to the string containing the contents.
-// We need to define our own hash fn because hash<string> isn't standard.
-typedef hash_map<string, string*, StringHash> RawTemplateContentCache;
-static RawTemplateContentCache *g_raw_template_content_cache;
 
 // A very simple logging system
 static int kVerbosity = 0;   // you can change this by hand to get vlogs
@@ -326,7 +299,8 @@ bool PragmaMarker::IsValidAttribute(PragmaId pragma_id, const char* name,
   return false;  // We did not find the name.
 }
 
-const string* PragmaMarker::GetAttributeValue(const char* attribute_name) const {
+const string* PragmaMarker::GetAttributeValue(
+    const char* attribute_name) const {
   // Developer error if assert triggers.
   assert(IsValidAttribute(pragma_id_, attribute_name, strlen(attribute_name)));
   for (vector<pair<string, string> >::const_iterator it =
@@ -651,7 +625,7 @@ static void WriteOneHeaderEntry(string *outstring,
         break;
       }
       if (take_next) {
-        if (filename.substr(i,4) == "post") {
+        if (filename.substr(i, 4) == "post") {
           // stop before we process post...
           break;
         }
@@ -721,11 +695,6 @@ const char * const Template::kSafeWhitelistedVariables[] = {
 const size_t Template::kNumSafeWhitelistedVariables =
     arraysize(Template::kSafeWhitelistedVariables) /
     arraysize(*Template::kSafeWhitelistedVariables);
-
-// The root directory for all templates. Defaults to "./" until
-// SetTemplateRootDirectory changes it
-typedef vector<string> TemplateSearchPath;
-static TemplateSearchPath g_template_search_path;
 
 // A TemplateToken is a typed string. The semantics of the string depends on the
 // token type, as follows:
@@ -894,9 +863,9 @@ static void EmitModifiedString(const vector<ModifierAndValue>& modifiers,
 static void AppendTokenWithIndent(int level, string *out, const string& before,
                                   const TemplateToken& token,
                                   const string& after) {
- out->append(string(level * kIndent, ' '));
- string token_string(token.text, token.textlen);
- out->append(before + token_string + after);
+  out->append(string(level * kIndent, ' '));
+  string token_string(token.text, token.textlen);
+  out->append(before + token_string + after);
 }
 
 // ----------------------------------------------------------------------
@@ -918,7 +887,8 @@ class TemplateNode {
   // Returns true iff all the template files load and parse correctly.
   virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionaryInterface *dictionary,
-                      PerExpandData *per_expand_data) const = 0;
+                      PerExpandData *per_expand_data,
+                      const TemplateCache *cache) const = 0;
 
   // Writes entries to a header file to provide syntax checking at
   // compile time.
@@ -961,7 +931,8 @@ class TextTemplateNode : public TemplateNode {
   // Returns true iff all the template files load and parse correctly.
   virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionaryInterface *,
-                      PerExpandData *) const {
+                      PerExpandData *,
+                      const TemplateCache *) const {
     output_buffer->Emit(token_.text, token_.textlen);
     return true;
   }
@@ -1008,7 +979,8 @@ class VariableTemplateNode : public TemplateNode {
   // Returns true iff all the template files load and parse correctly.
   virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionaryInterface *dictionary,
-                      PerExpandData *per_expand_data) const;
+                      PerExpandData *per_expand_data,
+                      const TemplateCache *cache) const;
 
   virtual void WriteHeaderEntries(string *outstring,
                                   const string& filename) const {
@@ -1032,20 +1004,21 @@ class VariableTemplateNode : public TemplateNode {
 
 bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
                                   const TemplateDictionaryInterface *dictionary,
-                                  PerExpandData* per_expand_data) const {
+                                  PerExpandData* per_expand_data,
+                                  const TemplateCache *cache) const {
   if (per_expand_data->annotate()) {
     per_expand_data->annotator()->EmitOpenVariable(output_buffer,
                                                    token_.ToString());
   }
 
-  const char *value = dictionary->GetSectionValue(variable_);
+  const TemplateString value = dictionary->GetValue(variable_);
 
   if (AnyMightModify(token_.modvals, per_expand_data)) {
-    EmitModifiedString(token_.modvals, value, strlen(value),
+    EmitModifiedString(token_.modvals, value.ptr_, value.length_,
                        per_expand_data, output_buffer);
   } else {
     // No need to modify value, so just emit it.
-    output_buffer->Emit(value);
+    output_buffer->Emit(value.ptr_, value.length_);
   }
 
   if (per_expand_data->annotate()) {
@@ -1076,7 +1049,8 @@ class PragmaTemplateNode : public TemplateNode {
   // A no-op for pragma nodes.
   virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionaryInterface *,
-                      PerExpandData *) const {
+                      PerExpandData *,
+                      const TemplateCache *) const {
     return true;
   };
 
@@ -1145,7 +1119,8 @@ class TemplateTemplateNode : public TemplateNode {
   // Returns true iff all the template files load and parse correctly.
   virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionaryInterface *dictionary,
-                      PerExpandData *per_expand_data) const;
+                      PerExpandData *per_expand_data,
+                      const TemplateCache *cache) const;
 
   virtual void WriteHeaderEntries(string *outstring,
                                   const string& filename) const {
@@ -1168,14 +1143,16 @@ class TemplateTemplateNode : public TemplateNode {
   bool ExpandOnce(ExpandEmitter *output_buffer,
                   const TemplateDictionaryInterface &dictionary,
                   const char* const filename,
-                  PerExpandData *per_expand_data) const;
+                  PerExpandData *per_expand_data,
+                  const TemplateCache *cache) const;
 };
 
 // If no value is found in the dictionary for the template variable
 // in this node, then no output is generated in place of this variable.
 bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
                                   const TemplateDictionaryInterface *dictionary,
-                                  PerExpandData *per_expand_data) const {
+                                  PerExpandData *per_expand_data,
+                                  const TemplateCache *cache) const {
   if (dictionary->IsHiddenTemplate(variable_)) {
     // if this "template include" section is "hidden", do nothing
     return true;
@@ -1184,14 +1161,16 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
   TemplateDictionaryInterface::Iterator* di =
       dictionary->CreateTemplateIterator(variable_);
 
-  if (!di->HasNext()) { // empty dict means 'expand once using containing dict'
+  if (!di->HasNext()) {  // empty dict means 'expand once using containing dict'
     delete di;
+    // TODO(csilvers): have this return a TemplateString instead?
     const char* const filename =
         dictionary->GetIncludeTemplateName(variable_, 0);
     // If the filename wasn't set then treat it as if it were "hidden", i.e, do
     // nothing
     if (filename && *filename) {
-      return ExpandOnce(output_buffer, *dictionary, filename, per_expand_data);
+      return ExpandOnce(output_buffer, *dictionary, filename, per_expand_data,
+                        cache);
     } else {
       return true;
     }
@@ -1208,7 +1187,8 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
     // If the filename wasn't set then treat it as if it were "hidden", i.e, do
     // nothing
     if (filename && *filename) {
-      error_free &= ExpandOnce(output_buffer, child, filename, per_expand_data);
+      error_free &= ExpandOnce(output_buffer, child, filename, per_expand_data,
+                               cache);
     }
   }
   delete di;
@@ -1216,28 +1196,27 @@ bool TemplateTemplateNode::Expand(ExpandEmitter *output_buffer,
   return error_free;
 }
 
+static void EmitMissingInclude(const char* const filename,
+                               ExpandEmitter *output_buffer,
+                               PerExpandData *per_expand_data) {
+  // if there was a problem retrieving the template, bail!
+  if (per_expand_data->annotate()) {
+    TemplateAnnotator* annotator = per_expand_data->annotator();
+    annotator->EmitFileIsMissing(output_buffer, filename);
+  }
+  LOG(ERROR) << "Failed to load included template: \"" << filename << "\"\n";
+}
+
 bool TemplateTemplateNode::ExpandOnce(
     ExpandEmitter *output_buffer,
     const TemplateDictionaryInterface &dictionary,
     const char* const filename,
-    PerExpandData *per_expand_data) const {
+    PerExpandData *per_expand_data,
+    const TemplateCache *cache) const {
   bool error_free = true;
-  Template *included_template;
-  // pass the flag values from the parent template to the included template
-  included_template = Template::GetTemplate(filename, strip_);
-
-  // if there was a problem retrieving the template, bail!
-  if (!included_template) {
-    if (per_expand_data->annotate()) {
-      TemplateAnnotator* annotator = per_expand_data->annotator();
-      annotator->EmitOpenMissingInclude(output_buffer,
-                                        token_.ToString());
-      output_buffer->Emit(filename);
-      annotator->EmitCloseMissingInclude(output_buffer);
-    }
-    LOG(ERROR) << "Failed to load included template: \"" << filename << "\"\n";
-    return false;
-  }
+  // NOTE: Although we do this const_cast here, if the cache is frozen
+  // the expansion doesn't mutate the cache, and is effectively 'const'.
+  TemplateCache* cache_ptr = const_cast<TemplateCache*>(cache);
 
   // Expand the included template once for each "template specific"
   // dictionary.  Normally this will only iterate once, but it's
@@ -1248,7 +1227,6 @@ bool TemplateTemplateNode::ExpandOnce(
     per_expand_data->annotator()->EmitOpenInclude(output_buffer,
                                                   token_.ToString());
   }
-
   // sub-dictionary NULL means 'just use the current dictionary instead'.
   // We force children to annotate the output if we have to.
   // If the include-template has modifiers, we need to expand to a string,
@@ -1257,19 +1235,26 @@ bool TemplateTemplateNode::ExpandOnce(
   if (AnyMightModify(token_.modvals, per_expand_data)) {
     string sub_template;
     StringEmitter subtemplate_buffer(&sub_template);
-    error_free &= included_template->ExpandWithData(
-        &subtemplate_buffer,
-        &dictionary,
-        per_expand_data);
-    EmitModifiedString(token_.modvals,
-                       sub_template.data(), sub_template.size(),
-                       per_expand_data, output_buffer);
+    if (!cache_ptr->ExpandLocked(filename, strip_,
+                                 &subtemplate_buffer,
+                                 &dictionary,
+                                 per_expand_data)) {
+      EmitMissingInclude(filename, output_buffer, per_expand_data);
+      error_free = false;
+    } else {
+      EmitModifiedString(token_.modvals,
+                         sub_template.data(), sub_template.size(),
+                         per_expand_data, output_buffer);
+    }
   } else {
     // No need to modify sub-template
-    error_free &= included_template->ExpandWithData(
-        output_buffer,
-        &dictionary,
-        per_expand_data);
+    if (!cache_ptr->ExpandLocked(filename, strip_,
+                                 output_buffer,
+                                 &dictionary,
+                                 per_expand_data)) {
+      EmitMissingInclude(filename, output_buffer, per_expand_data);
+      error_free = false;
+    }
   }
   if (per_expand_data->annotate()) {
     per_expand_data->annotator()->EmitCloseInclude(output_buffer);
@@ -1295,7 +1280,7 @@ class SectionTemplateNode : public TemplateNode {
   // section, or template to the list of nodes contained in this
   // section.  Returns true iff we really added a node and didn't just
   // end a section or hit a syntax error in the template file.
-  // You should hold a write-lock on my_template->mutex_ when calling this.
+  // You should hold the g_template_mutex write-lock when calling this
   // (unless you're calling it from a constructor).
   bool AddSubnode(Template *my_template);
 
@@ -1316,7 +1301,8 @@ class SectionTemplateNode : public TemplateNode {
   // Returns true iff all the template files load and parse correctly.
   virtual bool Expand(ExpandEmitter *output_buffer,
                       const TemplateDictionaryInterface *dictionary,
-                      PerExpandData* per_expand_data) const;
+                      PerExpandData* per_expand_data,
+                      const TemplateCache *cache) const;
 
   // Writes a header entry for the section name and calls the same
   // method on all the nodes in the section
@@ -1367,7 +1353,8 @@ class SectionTemplateNode : public TemplateNode {
       ExpandEmitter *output_buffer,
       const TemplateDictionaryInterface *dictionary,
       PerExpandData* per_expand_data,
-      bool is_last_child_dict) const;
+      bool is_last_child_dict,
+      const TemplateCache *cache) const;
 
   // The specific methods called used by AddSubnode to add the
   // different types of nodes to this section node.
@@ -1411,7 +1398,8 @@ bool SectionTemplateNode::ExpandOnce(
     ExpandEmitter *output_buffer,
     const TemplateDictionaryInterface *dictionary,
     PerExpandData *per_expand_data,
-    bool is_last_child_dict) const {
+    bool is_last_child_dict,
+    const TemplateCache* cache) const {
   bool error_free = true;
 
   if (per_expand_data->annotate()) {
@@ -1424,7 +1412,7 @@ bool SectionTemplateNode::ExpandOnce(
   NodeList::const_iterator iter = node_list_.begin();
   for (; iter != node_list_.end(); ++iter) {
     error_free &=
-      (*iter)->Expand(output_buffer, dictionary, per_expand_data);
+        (*iter)->Expand(output_buffer, dictionary, per_expand_data, cache);
     // If this sub-node is a "separator section" -- a subsection
     // with the name "OURNAME_separator" -- expand it every time
     // through but the last.
@@ -1432,7 +1420,8 @@ bool SectionTemplateNode::ExpandOnce(
       // We call ExpandOnce to make sure we always expand,
       // even if *iter would normally be hidden.
       error_free &= separator_section_->ExpandOnce(output_buffer, dictionary,
-                                                   per_expand_data, true);
+                                                   per_expand_data, true,
+                                                   cache);
     }
   }
 
@@ -1446,12 +1435,12 @@ bool SectionTemplateNode::ExpandOnce(
 bool SectionTemplateNode::Expand(
     ExpandEmitter *output_buffer,
     const TemplateDictionaryInterface *dictionary,
-    PerExpandData *per_expand_data) const {
+    PerExpandData *per_expand_data,
+    const TemplateCache *cache) const {
   // The section named __{{MAIN}}__ is special: you always expand it
   // exactly once using the containing (main) dictionary.
   if (token_.text == kMainSectionName) {
-    return ExpandOnce(output_buffer, dictionary, per_expand_data,
-                                  true);
+    return ExpandOnce(output_buffer, dictionary, per_expand_data, true, cache);
   } else if (dictionary->IsHiddenSection(variable_)) {
     return true;      // if this section is "hidden", do nothing
   }
@@ -1466,7 +1455,7 @@ bool SectionTemplateNode::Expand(
   if (!di->HasNext()) {
     delete di;
     return ExpandOnce(output_buffer, dictionary, per_expand_data,
-                                  true);
+                      true, cache);
   }
 
   // Otherwise, there's at least one child dictionary, and when expanding this
@@ -1475,7 +1464,7 @@ bool SectionTemplateNode::Expand(
   while (di->HasNext()) {
     const TemplateDictionaryInterface& child = di->Next();
     error_free &= ExpandOnce(output_buffer, &child, per_expand_data,
-                             !di->HasNext());
+                             !di->HasNext(), cache);
   }
   delete di;
   return error_free;
@@ -1711,11 +1700,11 @@ bool SectionTemplateNode::AddSubnode(Template *my_template) {
       break;
     case TOKENTYPE_VARIABLE:
       auto_escape_success = this->AddVariableNode(&token, my_template);
-      this->indentation_.clear(); // clear whenever last read wasn't whitespace
+      this->indentation_.clear();  // clear whenever last read wasn't whitespace
       break;
     case TOKENTYPE_SECTION_START:
       auto_escape_success = this->AddSectionNode(&token, my_template);
-      this->indentation_.clear(); // clear whenever last read wasn't whitespace
+      this->indentation_.clear();  // clear whenever last read wasn't whitespace
       break;
     case TOKENTYPE_SECTION_END:
       // Don't add a node. Just make sure we are ending the right section
@@ -1728,13 +1717,13 @@ bool SectionTemplateNode::AddSubnode(Template *my_template) {
                    << "\nIn: " << string(token_.text, token_.textlen) << endl;
         my_template->set_state(TS_ERROR);
       }
-      this->indentation_.clear(); // clear whenever last read wasn't whitespace
+      this->indentation_.clear();  // clear whenever last read wasn't whitespace
       return false;
       break;
     case TOKENTYPE_TEMPLATE:
       auto_escape_success = this->AddTemplateNode(&token, my_template,
                                                   this->indentation_);
-      this->indentation_.clear(); // clear whenever last read wasn't whitespace
+      this->indentation_.clear();  // clear whenever last read wasn't whitespace
       break;
     case TOKENTYPE_COMMENT:
       // Do nothing. Comments just drop out of the file altogether.
@@ -1838,8 +1827,8 @@ static const char* MaybeEatNewline(const char* start, const char* end,
 // inappropriate characters in a name, not finding the closing curly
 // braces, etc.) an error message is logged, the error state of the
 // template is set, and a NULL token is returned.  Updates
-// parse_state_.  You should hold a write-lock on my_template->mutex_
-// when calling this.  (unless you're calling it from a constructor).
+// parse_state_.  You should hold the g_template_mutex write-lock
+// when calling this (unless you're calling it from a constructor).
 TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
   Template::ParseState* ps = &my_template->parse_state_;   // short abbrev.
   const char* token_start = ps->bufstart;
@@ -2059,11 +2048,33 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
   }
 }
 
+// ----------------------------------------------------------------------
+// CreateTemplateCache()
+// default_template_cache()
+// mutable_default_template_cache()
+//    These create the default TemplateCache object, that Template
+//    often just delegates (deprecated) operations to.
+// ----------------------------------------------------------------------
+
+static TemplateCache* g_default_template_cache = NULL;
+GoogleOnceType g_default_cache_init_once = GOOGLE_ONCE_INIT;
+
+static void CreateTemplateCache() {
+  g_default_template_cache = new TemplateCache();
+}
+
+const TemplateCache* default_template_cache() {
+  GoogleOnceInit(&g_default_cache_init_once, &CreateTemplateCache);
+  return g_default_template_cache;
+}
+
+TemplateCache* mutable_default_template_cache() {
+  GoogleOnceInit(&g_default_cache_init_once, &CreateTemplateCache);
+  return g_default_template_cache;
+}
 
 // ----------------------------------------------------------------------
 // Template::StringToTemplate()
-// Template::StringToTemplateCache()
-// Template::RemoveStringFromTemplateCache()
 //    StringToTemplate reads a string representing a template (eg
 //    "Hello {{WORLD}}"), and parses it to a Template*.  It returns
 //    the parsed template, or NULL if there was a parsing error.
@@ -2076,18 +2087,20 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
 //       RemoveStringFromTemplateCache() lets you remove a string that
 //    you had previously interned via StringToTemplateCache().
 // ----------------------------------------------------------------------
-Template* Template::StringToTemplate(const char* content, size_t content_len,
+
+Template* Template::StringToTemplate(const TemplateString& content,
                                      Strip strip) {
   // An empty original_filename_ keeps ReloadIfChangedLocked from performing
   // file operations.
 
-  Template *tpl = new Template("", strip);
+  Template *tpl = new Template("", strip, NULL);
 
   // But we have to do the "loading" and parsing ourselves:
 
   // BuildTree deletes the buffer when done, so we need a copy for it.
-  char* buffer = new char[content_len];
-  memcpy(buffer, content, content_len);
+  char* buffer = new char[content.length_];
+  size_t content_len = content.length_;
+  memcpy(buffer, content.ptr_, content_len);
   tpl->StripBuffer(&buffer, &content_len);
   if ( tpl->BuildTree(buffer, buffer + content_len) ) {
     assert(tpl->state() == TS_READY);
@@ -2099,76 +2112,10 @@ Template* Template::StringToTemplate(const char* content, size_t content_len,
   return tpl;
 }
 
-bool Template::StringToTemplateCache(const string& key,
-                                     const char* content, size_t content_len) {
-  // If the key is already in the cache, we just return false.
-  {
-    MutexLock ml(&g_cache_mutex);
-    if (g_raw_template_content_cache == NULL)
-      g_raw_template_content_cache = new RawTemplateContentCache;
-    else if (g_raw_template_content_cache->find(key) !=
-             g_raw_template_content_cache->end())
-      return false;
-  }
-
-  // This is just a sanity check to make sure the content is legal.
-  // We pick an arbitrary strip and context, since it doesn't matter.
-  // (Well, technically, a template can be valid under some
-  // auto-escape contexts, but not others, but this should catch the
-  // vast majority of problems.)  Do this without needing the lock.
-  Template* tpl = StringToTemplate(content, content_len, DO_NOT_STRIP);
-  if (tpl == NULL)
-    return false;
-  delete tpl;
-
-  MutexLock ml(&g_cache_mutex);
-  pair<RawTemplateContentCache::iterator, bool> it_and_insert =
-      g_raw_template_content_cache->insert(pair<string,string*>(key, NULL));
-  if (it_and_insert.second == false)   // key was already in the hashtable
-    return false;                      // we've already cached this content
-
-  it_and_insert.first->second = new string(content, content_len);
-  return true;
-}
-
-void Template::RemoveStringFromTemplateCache(const string& key) {
-  MutexLock ml(&g_cache_mutex);
-  // First check the raw-contents cache.
-  if (g_raw_template_content_cache) {
-    RawTemplateContentCache::iterator it
-        = g_raw_template_content_cache->find(key);
-    if (it != g_raw_template_content_cache->end()) {
-      delete it->second;
-      g_raw_template_content_cache->erase(it);
-    }
-  }
-  // Then check the parsed-template cache.  This is annoying, because
-  // we have to iterate through the cache to find all the strip+context
-  // combination used.  Since erasing while iterating through a hash-map
-  // is undefined, we need to collect the entries to delete in a vector.
-  if (g_parsed_template_cache) {
-    vector<TemplateCacheKey> to_erase;
-    for (TemplateCache::iterator it = g_parsed_template_cache->begin();
-         it != g_parsed_template_cache->end();  ++it) {
-      if (it->first.first == key) {
-        // We'll delete the content pointed to by the entry here, since
-        // it's handy, but we won't delete the entry itself quite yet.
-        delete it->second;
-        to_erase.push_back(it->first);
-      }
-    }
-    for (vector<TemplateCacheKey>::iterator it = to_erase.begin();
-         it != to_erase.end(); ++it) {
-      g_parsed_template_cache->erase(*it);
-    }
-  }
-}
-
 // ----------------------------------------------------------------------
 // Template::Template()
 // Template::~Template()
 // Template::MaybeInitHtmlParser()
-// Template::GetTemplate()
 //   Calls ReloadIfChanged to load the template the first time.
 //   The constructor is private; GetTemplate() is the factory
 //   method used to actually construct a new template if needed.
@@ -2178,10 +2125,13 @@ void Template::RemoveStringFromTemplateCache(const string& key) {
 //   template-file from disk.
 // ----------------------------------------------------------------------
 
-Template::Template(const string& filename, Strip strip)
-    : original_filename_(filename), resolved_filename_(),
-      filename_mtime_(0), strip_(strip), state_(TS_EMPTY), template_text_(NULL),
-      template_text_len_(0), tree_(NULL), parse_state_(), mutex_(new Mutex),
+Template::Template(const TemplateString& filename, Strip strip,
+                   TemplateCache* owner)
+    // TODO(csilvers): replace ToString() with an is_immutable() check
+    : original_filename_(filename.ToString()), resolved_filename_(),
+      filename_mtime_(0), strip_(strip), state_(TS_EMPTY),
+      template_cache_(owner), template_text_(NULL), template_text_len_(0),
+      tree_(NULL), parse_state_(),
       initial_context_(TC_MANUAL), htmlparser_(NULL) {
   VLOG(2) << "Constructing Template for " << template_file()
           << "; with context " << initial_context_
@@ -2189,8 +2139,8 @@ Template::Template(const string& filename, Strip strip)
 
   // Preserve whitespace in Javascript files because carriage returns
   // can convey meaning for comment termination and closures
-  if ( strip_ == STRIP_WHITESPACE && filename.length() >= 3 &&
-       !strcmp(filename.c_str() + filename.length() - 3, ".js") ) {
+  if ( strip_ == STRIP_WHITESPACE && original_filename_.length() >= 3 &&
+       !strcmp(original_filename_.c_str() + original_filename_.length() - 3, ".js") ) {
     strip_ = STRIP_BLANK_LINES;
   }
   ReloadIfChangedLocked();
@@ -2200,7 +2150,8 @@ Template::~Template() {
   VLOG(2) << endl << "Deleting Template for " << template_file()
           << "; with context " << initial_context_
           << "; and strip " << strip_ << endl;
-  delete mutex_;
+  // Since this is only used by tests, we don't bother with locking
+  num_deletes_++;
   delete tree_;
   // Delete this last, since tree has pointers into template_text_
   delete[] template_text_;
@@ -2235,75 +2186,6 @@ void Template::MaybeInitHtmlParser(bool in_tag) {
   }
 }
 
-static TemplateCacheKey GetTemplateCacheKey(const string& name,
-                                            Strip strip) {
-  return TemplateCacheKey(name, strip);
-}
-
-// Protected factory method.
-// Previously, if a template was not found in the global parsed cache
-// (g_parsed_template_cache), we created a new Template (via constructor)
-// and stored it in that cache. Now we first check if we have raw contents
-// for that filename in which case we create a new instance using
-// StringToTemplateCache instead.
-//
-// TODO(jad): This logic is based on a stale need, see below. Re-evaluate.
-// [OLD] The motivation is that under auto-escape, if an included template has
-// template-level modifiers (say {{>INC:x-mod}}, we set its context to
-// TC_NONE. That context would not exist if the template was registered
-// as a string. We now cache the contents so we can regenerate a template
-// with these contents for any other TemplateContext. See bug 1456190.
-Template *Template::GetTemplate(const string& filename, Strip strip) {
-  // No need to have the cache-mutex acquired for this step
-  Template* tpl = NULL;
-  {
-    MutexLock ml(&g_cache_mutex);
-    if (g_parsed_template_cache == NULL)
-      g_parsed_template_cache = new TemplateCache;
-
-    TemplateCacheKey template_cache_key = GetTemplateCacheKey(filename, strip);
-    tpl = (*g_parsed_template_cache)[template_cache_key];
-    if (!tpl) {
-      if (g_raw_template_content_cache &&
-          (g_raw_template_content_cache->find(filename) !=
-           g_raw_template_content_cache->end())) {
-        string* content = (*g_raw_template_content_cache)[filename];
-        tpl = StringToTemplate(content->data(), content->length(), strip);
-        // If we failed to get a template, cannot proceed.
-        if (tpl == NULL)
-          return tpl;
-      } else {
-        tpl = new Template(filename, strip);
-      }
-      (*g_parsed_template_cache)[template_cache_key] = tpl;
-    }
-  }
-
-  // TODO(csilvers): acquire a lock here, because we're looking at
-  // state().  The problem is when GetTemplate is called during
-  // ExpandWithData(), the expanding template already holds the read-lock,
-  // so if the expanding template tried to include itself, that
-  // would lead to deadlock.
-
-  // Note: if the status is TS_ERROR here, we don't attempt to reload
-  // the template file, but we don't return the template object
-  // either.  If the state is TS_EMPTY, it means tpl was just constructed
-  // and doesn't have *any* content yet, so we should certainly reload.
-  if (tpl->state() == TS_SHOULD_RELOAD || tpl->state() == TS_EMPTY) {
-    tpl->ReloadIfChangedLocked();
-  }
-
-  // If the state is TS_ERROR, we leave the state as is, but return
-  // NULL.  We won't try to load the template file again until the
-  // state gets changed to TS_SHOULD_RELOAD by another call to
-  // ReloadAllIfChanged.
-  if (tpl->state() != TS_READY) {
-    return NULL;
-  } else {
-    return tpl;
-  }
-}
-
 // ----------------------------------------------------------------------
 // Template::BuildTree()
 // Template::WriteHeaderEntry()
@@ -2316,7 +2198,7 @@ Template *Template::GetTemplate(const string& filename, Strip strip) {
 
 // NOTE: BuildTree takes over ownership of input_buffer, and will delete it.
 //       It should have been created via new[].
-// You should hold a write-lock on mutex_ before calling this
+// You should hold a write-lock on g_template_mutex before calling this
 // (unless you're calling it from a constructor).
 // In auto-escape mode, the HTML context is tracked as the tree is being
 // built, in a single pass. When this function completes, all variables
@@ -2387,112 +2269,18 @@ void Template::DumpToString(const char *filename, string *out) const {
   out->append("------------End Template Dump----------------\n");
 }
 
-// ----------------------------------------------------------------------
-// Template::SetTemplateRootDirectory()
-// Template::template_root_directory()
+// -------------------------------------------------------------------------
 // Template::state()
 // Template::set_state()
 // Template::template_file()
-//    Various introspection or functionality-modifier methods.
-//    The template-root-directory is where we look for template
-//    files (in GetTemplate and include templates) when they're
-//    given with a relative rather than absolute name.  state()
-//    is the parse-state (success, error).  template_file() is
-//    the filename of a given template object's input.
-// ----------------------------------------------------------------------
-
-static bool AddAlternateTemplateRootDirectoryHelper(
-    const string& directory,
-    bool clear_template_search_path) {
-  string normalized = directory;
-  // make sure it ends with '/'
-  NormalizeDirectory(&normalized);
-  // Make the directory absolute if it isn't already.  This makes code
-  // safer if client later does a chdir.
-  if (!IsAbspath(normalized)) {
-    char* cwdbuf = new char[PATH_MAX];   // new to avoid stack overflow
-    const char* cwd = getcwd(cwdbuf, PATH_MAX);
-    if (!cwd) {   // probably not possible, but best to be defensive
-      LOG(WARNING) << "Unable to convert '" << normalized
-                   << "' to an absolute path, with cwd=" << cwdbuf;
-    } else {
-      normalized = PathJoin(cwd, normalized);
-    }
-    delete[] cwdbuf;
-  }
-
-  VLOG(2) << "Setting Template directory to " << normalized << endl;
-  {
-    WriterMutexLock ml(&g_static_mutex);
-    if (clear_template_search_path) {
-      g_template_search_path.clear();
-    }
-    g_template_search_path.push_back(normalized);
-  }
-
-  // NOTE(williasr): The template root is not part of the template cache key, so
-  // we need to invalidate the cache contents.
-  Template::ReloadAllIfChanged();
-  return true;
-}
-
-bool Template::SetTemplateRootDirectory(const string& directory) {
-  AddAlternateTemplateRootDirectoryHelper(directory, true);
-  return true;
-}
-
-bool Template::AddAlternateTemplateRootDirectory(const string& directory) {
-  AddAlternateTemplateRootDirectoryHelper(directory, false);
-  return true;
-}
-
-// It's not safe to return a string& in threaded contexts
-string Template::template_root_directory() {
-  ReaderMutexLock ml(&g_static_mutex);   // protects the static var g_t_s_p
-  if (g_template_search_path.empty()) {
-    return kCWD;
-  }
-  return g_template_search_path[0];
-}
-
-// Given an unresolved filename, look through the template search path
-// to see if the template can be found. If so, resolved contains the
-// resolved filename, statbuf contains the stat structure for the file
-// (to avoid double-statting the file), and the function returns
-// true. Otherwise, the function returns false.
-static bool ResolveTemplateFilename(const string& unresolved,
-                                    string* resolved,
-                                    struct stat* statbuf) {
-  ReaderMutexLock ml(&g_static_mutex);
-  if (g_template_search_path.empty()) {
-    *resolved = unresolved;
-    if (stat(resolved->c_str(), statbuf) == 0) {
-      VLOG(1) << "Resolved " << unresolved << " to " << *resolved << endl;
-      return true;
-    }
-  } else {
-    for (TemplateSearchPath::const_iterator path = g_template_search_path.begin();
-         path != g_template_search_path.end();
-         ++path) {
-      *resolved = PathJoin(*path, unresolved);
-      if (stat(resolved->c_str(), statbuf) == 0) {
-        VLOG(1) << "Resolved " << unresolved << " to " << *resolved << endl;
-        return true;
-      }
-    }
-  }
-
-  *resolved = "";
-  return false;
-}
-
-string Template::FindTemplateFilename(const string& unresolved) {
-  string resolved;
-  struct stat statbuf;
-  if (!ResolveTemplateFilename(unresolved, &resolved, &statbuf))
-    resolved.clear();
-  return resolved;
-}
+// Template::strip()
+// Template::mtime()
+//    Various introspection methods.  state() is the parse-state
+//    (success, error).  template_file() is the resolved filename of a
+//    given template object's input. strip() is the Strip type. mtime() is
+//    the lastmod time. For string-based templates, not backed by a file,
+//    mtime() returns 0.
+// -------------------------------------------------------------------------
 
 void Template::set_state(TemplateState new_state) {
   state_ = new_state;
@@ -2504,6 +2292,49 @@ TemplateState Template::state() const {
 
 const char *Template::template_file() const {
   return resolved_filename_.c_str();
+}
+
+Strip Template::strip() const {
+  return strip_;
+}
+
+time_t Template::mtime() const {
+  return filename_mtime_;
+}
+
+// ----------------------------------------------------------------------
+// Template::GetTemplate()
+// Template::StringToTemplateCache()
+// Template::SetTemplateRootDirectory()
+// Template::AddAlternateTemplateRootDirectory()
+// Template::template_root_directory()
+// Template::FindTemplateFilename()
+// Template::RemoveStringFromTemplateCache()
+// Template::ClearCache()
+// Template::ReloadAllIfChanged()
+//    These are deprecated static methods that have been moved to
+//    template_cache.h.  We just forward to them, using the global
+//    default template cache.
+// ----------------------------------------------------------------------
+
+Template *Template::GetTemplate(const TemplateString& filename, Strip strip) {
+  // Until I've resolved the TODO that lets me return a const Template*
+  // here, I have to do an ugly cast. :-(
+  return const_cast<Template*>(
+      mutable_default_template_cache()->GetTemplate(filename, strip));
+}
+
+// This method is deprecated (and slow).  Instead, use the above
+// StringToTemplateCache method that takes a Strip argument.
+bool Template::StringToTemplateCache(const TemplateString& key,
+                                     const TemplateString& content) {
+  // We say the insert succeeded only if it succeded for all strip values.
+  bool retval = true;
+  for (int i = 0; i < static_cast<int>(NUM_STRIPS); ++i) {
+    if (!GOOGLE_NAMESPACE::StringToTemplateCache(key, content, static_cast<Strip>(i)))
+      retval = false;
+  }
+  return retval;
 }
 
 // ----------------------------------------------------------------------
@@ -2519,10 +2350,10 @@ bool Template::ParseDelimiters(const char* text, size_t textlen,
                                MarkerDelimiters* delim) {
   const char* space = (const char*)memchr(text, ' ', textlen);
   if (textlen < 3 ||
-      text[0] != '=' || text[textlen - 1] != '=' ||       // no = at ends
-      memchr(text + 1, '=', textlen - 2) ||               // = in the middle
-      !space ||                                           // no interior space
-      memchr(space + 1, ' ', text + textlen - (space+1))) // too many spaces
+      text[0] != '=' || text[textlen - 1] != '=' ||        // no = at ends
+      memchr(text + 1, '=', textlen - 2) ||                // = in the middle
+      !space ||                                            // no interior space
+      memchr(space + 1, ' ', text + textlen - (space+1)))  // too many spaces
     return false;
 
   delim->start_marker = text + 1;
@@ -2704,9 +2535,8 @@ void Template::StripBuffer(char **buffer, size_t* len) {
 // ----------------------------------------------------------------------
 // Template::ReloadIfChanged()
 // Template::ReloadIfChangedLocked()
-// Template::ReloadAllIfChanged()
 //    If one template, try immediately to reload it from disk.  If all
-//    templates, just set all their statuses to TS_SHOULD_RELOAD, so next time
+//    templates, just set all their reload statuses to true, so next time
 //    GetTemplate() is called on the template, it will be reloaded from disk if
 //    the disk version is newer than the one currently in memory.
 //    ReloadIfChanged() returns true if the file changed and disk *and* we
@@ -2718,17 +2548,25 @@ void Template::StripBuffer(char **buffer, size_t* len) {
 // the constructor, when you know nobody else will be messing with
 // this object.
 bool Template::ReloadIfChangedLocked() {
+  // TODO(panicker): Remove this duplicate code when constructing the template,
+  // after deprecating this method.
+  // TemplateCache::GetTemplate() already checks if the template filename is
+  // valid and resolvable. It also checks if the file needs to be reloaded
+  // based on mtime.
+
+  // NOTE(panicker): we should not be using original_filename_ to determine
+  // if a template is string-based, instead use the boolean 'string_based'
+  // in the template cache.
   if (original_filename_.empty()) {
-    // string-based templates don't reload
-    if (state() == TS_SHOULD_RELOAD)
-      set_state(TS_READY);
+  // string-based templates don't reload
     return false;
   }
 
   struct stat statbuf;
   if (resolved_filename_.empty()) {
-    if (!ResolveTemplateFilename(original_filename_, &resolved_filename_,
-                                 &statbuf)) {
+    if (!template_cache_->ResolveTemplateFilename(original_filename_,
+                                                  &resolved_filename_,
+                                                  &statbuf)) {
       LOG(WARNING) << "Unable to locate file " << original_filename_ << endl;
       set_state(TS_ERROR);
       return false;
@@ -2803,72 +2641,16 @@ bool Template::ReloadIfChangedLocked() {
 }
 
 bool Template::ReloadIfChanged() {
-  // ReloadIfChanged() is protected by mutex_ so when it's called from
-  // different threads, they don't stomp on tree_ and state_.
-  WriterMutexLock ml(mutex_);
+  // ReloadIfChanged() is protected by g_template_mutex so when it's
+  // called from different threads, they don't stomp on tree_ and
+  // state_.  (This is the only write-locker on g_template_mutex.)
+  WriterMutexLock ml(&g_template_mutex);
   return ReloadIfChangedLocked();
 }
 
-void Template::ReloadAllIfChanged() {
-  // This is slightly annoying: we copy all the template-pointers to
-  // a vector, so we don't have to hold g_cache_mutex while messing
-  // with the templates (which would violate our lock invariant).
-  vector<Template*> templates_in_cache;
-  {
-    // this protects the static g_parsed_template_cache
-    MutexLock ml(&g_cache_mutex);
-    if (g_parsed_template_cache == NULL) {
-      return;
-    }
-    for (TemplateCache::const_iterator iter = g_parsed_template_cache->begin();
-         iter != g_parsed_template_cache->end();
-         ++iter) {
-      templates_in_cache.push_back(iter->second);
-    }
-  }
-  for (vector<Template*>::iterator iter = templates_in_cache.begin();
-       iter != templates_in_cache.end();
-       ++iter) {
-    WriterMutexLock ml((*iter)->mutex_);
-    (*iter)->set_state(TS_SHOULD_RELOAD);
-  }
-}
-
 // ----------------------------------------------------------------------
-// Template::ClearCache()
-//   Deletes all the objects in the template cache as well as the
-//   cached raw contents coming from string templates.  Note: it's
-//   dangerous to clear the cache if other threads are still
-//   referencing the templates that are stored in it!
-// ----------------------------------------------------------------------
-
-void Template::ClearCache() {
-  // If deleting (while holding the lock) is too slow, we could store all
-  // the pointers in a vector, and then delete them at our leisure.
-  // Another possibility is to swap with an empty, tmp map and then delete
-  // from the tmp map at our leisure, but this crashes on MSVC 8 (buggy swap?)
-  MutexLock ml(&g_cache_mutex);
-  if (g_parsed_template_cache != NULL) {
-    for (TemplateCache::iterator iter = g_parsed_template_cache->begin();
-         iter != g_parsed_template_cache->end();
-         ++iter) {
-      delete iter->second;
-    }
-    g_parsed_template_cache->clear();
-  }
-  if (g_raw_template_content_cache != NULL) {
-    for (RawTemplateContentCache::iterator iter =
-             g_raw_template_content_cache->begin();
-         iter != g_raw_template_content_cache->end();
-         ++iter) {
-      delete iter->second;
-    }
-    g_raw_template_content_cache->clear();
-  }
-}
-
-// ----------------------------------------------------------------------
-// Template::ExpandWithData()
+// Template::ExpandLocked()
+// Template::ExpandWithDataAndCache()
 //    This is the main function clients call: it expands a template
 //    by expanding its parse tree (which starts with a top-level
 //    section node).  For each variable/section/include-template it
@@ -2876,9 +2658,10 @@ void Template::ClearCache() {
 //    appropriate value from the passed-in dictionary.
 // ----------------------------------------------------------------------
 
-bool Template::ExpandWithData(ExpandEmitter *expand_emitter,
-                              const TemplateDictionaryInterface *dict,
-                              PerExpandData *per_expand_data) const {
+bool Template::ExpandLocked(ExpandEmitter *expand_emitter,
+                            const TemplateDictionaryInterface *dict,
+                            PerExpandData *per_expand_data,
+                            const TemplateCache *cache) const {
   // Accumulator for the results of Expand for each sub-tree.
   bool error_free = true;
 
@@ -2887,15 +2670,8 @@ bool Template::ExpandWithData(ExpandEmitter *expand_emitter,
   if (per_expand_data == NULL)
     per_expand_data = &empty_per_expand_data;
 
-  // We hold mutex_ the entire time we expand, because
-  // ReloadIfChanged(), which also holds mutex_, is allowed to delete
-  // tree_, and we want to make sure it doesn't do that (in another
-  // thread) while we're expanding.  We also protect state_, etc.
-  // Note we only need a read-lock here, so many expands can go on at once.
-  ReaderMutexLock ml(mutex_);
-
   if (state() != TS_READY) {
-    // We'd like to reload if state_ == TS_SHOULD_RELOAD, but ExpandWD() is const
+    // We'd like to reload if reload status is true, but ExpandWD() is const
     return false;
   }
 
@@ -2923,12 +2699,12 @@ bool Template::ExpandWithData(ExpandEmitter *expand_emitter,
     // pass the template name in as the string arg in this case.
     string value;
     StringEmitter tmp_emitter(&value);
-    error_free &= tree_->Expand(&tmp_emitter, dict, per_expand_data);
+    error_free &= tree_->Expand(&tmp_emitter, dict, per_expand_data, cache);
     modifier->Modify(value.data(), value.size(), per_expand_data,
                      expand_emitter, template_file());
   } else {
     // No need to modify this template.
-    error_free &= tree_->Expand(expand_emitter, dict, per_expand_data);
+    error_free &= tree_->Expand(expand_emitter, dict, per_expand_data, cache);
   }
 
   if (per_expand_data->annotate()) {
@@ -2936,6 +2712,21 @@ bool Template::ExpandWithData(ExpandEmitter *expand_emitter,
   }
 
   return error_free;
+}
+
+bool Template::ExpandWithDataAndCache(ExpandEmitter *expand_emitter,
+                                      const TemplateDictionaryInterface *dict,
+                                      PerExpandData *per_expand_data,
+                                      const TemplateCache *cache) const {
+  // We hold g_template_mutex the entire time we expand, because
+  // ReloadIfChanged(), which also holds template_mutex, is allowed to
+  // delete tree_, and we want to make sure it doesn't do that (in another
+  // thread) while we're expanding.  We also protect state_, etc.
+  // Note we only need a read-lock here, so many expands can go on at once.
+  // TODO(csilvers): We can remove this once we delete ReloadIfChanged.
+  //                 When we do that, ExpandLocked() can go away as well.
+  ReaderMutexLock ml(&g_template_mutex);
+  return ExpandLocked(expand_emitter, dict, per_expand_data, cache);
 }
 
 _END_GOOGLE_NAMESPACE_

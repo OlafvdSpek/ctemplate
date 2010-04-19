@@ -35,7 +35,6 @@
 // introduce new include dependencies.
 
 #include "config.h"
-#include HASH_MAP_H              // (defined in config.h)  for hash<>
 #include <ctemplate/per_expand_data.h>
 #include <ctemplate/template_annotator.h>
 

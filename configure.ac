@@ -58,6 +58,7 @@ AC_COMPILER_CHARACTERISTICS
 # Here are some examples of how to check for the existence of a fn or file
 AC_CHECK_FUNCS([getopt_long getopt])
 AC_CHECK_HEADERS([getopt.h])
+AC_CHECK_HEADERS([utime.h])           # used by unittests to mock file-times
 
 # These are the types I need.  We look for them in either stdint.h,
 # sys/types.h, or inttypes.h, all of which are part of the default-includes.
@@ -87,6 +88,11 @@ ACX_PTHREAD
 # See if our pthreads support extends to that.  Note: for linux, it
 # does as long as you define _XOPEN_SOURCE appropriately.
 AC_RWLOCK
+
+# For mingw/cygwin, figure out if the mutex code needs to use
+# 'volatile' in some places.  They differ from MSVC, and the API is
+# unclear, so it's best just to check.
+AC_INTERLOCKED_EXCHANGE_NONVOLATILE
 
 # Find out what namespace 'normal' STL code lives in, and also what namespace
 # the user wants our classes to be defined in
@@ -174,6 +180,7 @@ AC_CONFIG_FILES([Makefile \
                  src/ctemplate/template_string.h \
                  src/ctemplate/template_enums.h \
                  src/ctemplate/template.h \
+                 src/ctemplate/template_cache.h \
                  src/ctemplate/template_modifiers.h \
                  src/ctemplate/template_emitter.h \
                  src/ctemplate/template_annotator.h \

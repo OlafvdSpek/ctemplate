@@ -1,3 +1,4 @@
+
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
 <html>
 <head>
@@ -8,7 +9,6 @@
       rel="shortcut icon">
 <link href="designstyle.css" type="text/css" rel="stylesheet">
 <style type="text/css">
-<!--
   ol.bluelist li {
     color: #3366ff;
     font-family: sans-serif;
@@ -17,22 +17,21 @@
     color: #000;
     font-family: "Times Roman", times, serif;
   }
-  ul.blacklist li {  
+  ul.blacklist li {
     color: #000;
     font-family: "Times Roman", times, serif;
   }
-//-->
 </style>
 </head>
 
 <body>
 
 <h1>Tips and Guidelines for Using the Google Template System</h1>
-<small>(as of 1 September 2006)</small>
+<small>(as of 10 March 2010)</small>
 
 <br>
 
-<p>The <A HREF="howto.html">basic rules</A> of the template system are
+<p>The <A HREF="guide.html">basic rules</A> of the template system are
 enough to use it, but over time, we at Google have developed some
 tips, guidelines, and best practices that make it easier to use
 templates effectively, and to avoid common template errors.</p>
@@ -45,7 +44,7 @@ templates effectively, and to avoid common template errors.</p>
 <p> Early in Google's use of templates, we noticed a problem: if a
 binary that uses a template and its corresponding template were both
 modified, particularly if the change were such that the old binary
-could not work with the new template or the new binary cannot work
+could not work with the new template or the new binary could not work
 with the old template, then somehow they both had to be deployed at
 the same instant to not present errors to our users.  This was hard to
 do. The solution was to adopt a template naming and versioning
@@ -64,7 +63,7 @@ convention.  The procedure to use it follows:</p>
 
   <li> Finally, update the code to refer to the new template-name
        (ideally, using the <A
-       HREF="howto.html#register"><code>RegisterTemplateFilename</code>
+       HREF="guide.html#register"><code>RegisterTemplateFilename</code>
        idiom</A>), and push the new executable to the production
        server. </li>
 </ul>
@@ -80,7 +79,7 @@ so.  After that, it is the old template file that continues to sit
 there ignored.</p>
 
 <p>The <A
-HREF="howto.html#make_tpl_varnames_h"><code>make_tpl_varnames_h</code>
+HREF="reference.html#make_tpl_varnames_h"><code>make_tpl_varnames_h</code>
 utility</A> knows about the "_postYYYYMMDD" naming convention, so it
 is important that you use that convention exactly if you use the
 <code>make_tpl_varnames_h</code>.</p>
@@ -98,7 +97,7 @@ perform the following phases, usually in this order:</p>
        sub-dictionaries, that will supply the values to the
        designated template object, its sections, and its
        included templates. </li>
-       
+
   <li> Retrieve the top-level template object required to
        format the data.  (This may or may
        not involve reading and parsing a template file,
@@ -233,9 +232,9 @@ named <code>fill_one_search_result_dictionary</code>.)
      want to display anything for this include-template after all?  It
      seems like it's too late: you've already created the
      sub-dictionary.  The solution is simple: just be sure that
-     <code>fill_include_template_dictionary()</code> doesn't call 
+     <code>fill_include_template_dictionary()</code> doesn't call
      <code>SetFilename()</code> in that case.</p>
-     
+
 <li> Never have a section which only contains another section.
      <p>For example, don't do this:</p>
      <pre>
@@ -270,13 +269,13 @@ named <code>fill_one_search_result_dictionary</code>.)
      produce output. By convention, we set such variables to the
      empty string. But in neither case do you need to hide it by
      hiding a surrounding section that contains nothing else.</p>
-     
+
 <li> Use this hide/show idiom for <code>if-else</code> blocks.
 
      <p>Since sections are hidden by default, you can use represent
      if-else logic in your code via <code>ShowSection</code>.  For
      example:</p>
-     
+
      <pre>
      if ( my_test ) {
         dict->ShowSection(kxyz_TRUE_BLOCK);
@@ -326,7 +325,7 @@ named <code>fill_one_search_result_dictionary</code>.)
      instantiates a <code>TemplateNamelist</code> object. If you place
      it in a header file, a different object will get created each time
      it is included in another <code>.cc</code> file.
-     
+
      <p>The <code>RegisterTemplateFilename</code> statement and its
      associated <code>#include</code> of the <code>varnames.h</code>
      file should occur only in the <code>.cc</code> file that
@@ -340,10 +339,10 @@ named <code>fill_one_search_result_dictionary</code>.)
      file when versioning occurs. [Also see above for more information
      about what routine uses the filename declared by the
      <code>RegisterTemplateFilename</code> statement.]</p> </li>
-     
+
 <li> Never reference more than one template in a
      fill...dictionary method.
-     
+
      <p>Each template should have its own fill-dictionary
      routine. That routine should only reference marker names defined
      in that template. If this convention is followed, then all the
@@ -366,7 +365,7 @@ named <code>fill_one_search_result_dictionary</code>.)
      after all.  Even if not, by saying what template file the
      dictionary is intended to go with, you are self-documenting your
      code.</p> </li>
-     
+
 <li> Do not call <code>c_str()</code> on strings to pass them to
      <code>TemplateDictionary</code> methods.
 
@@ -377,8 +376,8 @@ named <code>fill_one_search_result_dictionary</code>.)
      string, it's safe and efficient to just pass it in directly; you
      do not need to extract the const char * from your string object
      to pass it to these methods.  For some reason, this is a common
-     error of noviced template coders.</p>
-     
+     error of novice template coders.</p>
+
      <p>The one exception to this rule is when using the method
      <code>SetFormattedValue</code>.  When calling that
      method, you must call <code>c_str()</code> on strings that are to
@@ -387,39 +386,34 @@ named <code>fill_one_search_result_dictionary</code>.)
      any other printf format string.</p> </li>
 
 <li> Do not use <code>SetGlobalValue</code> when you could use
-     <code>SetValue</code>.
+     <code>SetValue</code> or <code>SetTemplateGlobalValue</code>.
 
      <p><code>SetGlobalValue</code> should be used quite rarely, for
      constants that really are consistent across all your templates.
      It's slower to look up a value in the global dictionary than it
      is in the template-specific dictionary.</p> </li>
-     
-<li> Do not use <code>TemplateFromString</code> unless you have
+
+<li> Do not use <code>StringToTemplateCache</code> unless you have
      a specific need for its non-file-based attributes.
 
-     <p><code>TemplateFromString</code> was created for use in highly
-     constrained cases where file I/O may be impaired or
+     <p><code>ctemplate::StringToTemplateCache</code> was created for
+     use in highly constrained cases where file I/O may be impaired or
      undesirable, for instance to produce a server error message
      where there may be disk problems or to produce formatted
      output where there are processes that do not have a facility
      for updating data files dynamically. It is not recommended for
-     ordinary use as it is limited in functionality in at least the
-     following ways:</p>
-     <ul class=blacklist>
-       <li> It can neither include nor be included from
-	    another template.
-       <li> It cannot be updated dynamically via a
-	    data-push; changes always require a binary push.
+     ordinary use since it cannot be updated dynamically via a
+     data-push; changes always require a binary push.</p>
      </ul>
      </li>
 
-<li> Use the appropriate variable-modifiers (eg
-     <code>{{VAR:h}}</code>) to prevent Cross-Site-Scripting
-     security vulnerabilities.
+<li> Use <A HREF="auto_escape.html">auto-escaping</A> to prevent
+     Cross-Site-Scripting security vulnerabilities.
 
-     <p>Apply the appropriate variable-modifiers liberally and omit
-     them only in those (usually rare) cases where there is a specific
-     reason the template variable should not be escaped, for example:
+     <p>Use <code>{{%AUTOESCAPE}}</code> consistently.  Use the
+     <code>:none</code> modifier to override autoesacping only in
+     those (usually rare) cases where there is a specific reason the
+     template variable should not be escaped, for example:
      <ul class=blacklist>
        <li>The template variable contains HTML markup that should be
        interpreted by the browser.  In this case you must be very careful to
@@ -432,31 +426,10 @@ named <code>fill_one_search_result_dictionary</code>.)
        is inserted into the template (for example, the value might be
        kept in escaped form in a storage backend). Here, escaping again
        via a variable-modifier would result in "double escaping".  You
-       must ensure that the variable has been escaped with the
-       appropriate escape function for the HTML context into which it
-       will be inserted into the template (i.e., HTML-escaping versus
-       javascript-escaping).</li>
-
+       must ensure that the variable comes escaped in the appropriate
+       context (that is, if you're inserting the variable into an html
+       document, it's html-escaped and not java-escaped).</li>
      </ul>
-     
-     <p>Applying the modifier even if you don't expect the variable
-     to contain (malicious) HTML markup keeps you on the safe side.
-     It also serves to self-document the template by making it
-     obvious that no XSS can result from the template variable in
-     question. It is recommended to comment uses of modifier-less
-     template variables accordingly, for example</p>
-     <pre>
-     {{#SNIPPET1_SECTION}}
-        {{! SNIPPET1 is HTML-escaped in SnippetGenerator::getSnippetForResult }}
-        &lt;br&gt;{{SNIPPET1}}
-     {{/SNIPPET1_SECTION}}
-     </pre>
-
-     <p>For situations where you need to provisionally escape, or use
-     an escape routine other than the built-in ones, the
-     <code>Escaped</code> versions of the set-value methods
-     are useful utility functions to use.</p>
-     
      </li>
 
 <li> Do not leave an extra space when using <code>{{BI_SPACE}}</code>
@@ -478,9 +451,11 @@ named <code>fill_one_search_result_dictionary</code>.)
      </li>
 
 </ol>
+
 <hr>
 <ul>
-  <li> <A HREF="howto.html">Howto</A> </li>
+  <li> <A HREF="guide.html">User's Guide</A> </li>
+  <li> <A HREF="reference.html">Reference Manual</A> </li>
   <li> <A HREF="auto_escape.html">Auto Escape</A> </li>
 <!--
   <li> <A HREF="tips.html">Tips</A> </li>
@@ -491,7 +466,10 @@ named <code>fill_one_search_result_dictionary</code>.)
 <hr>
 <address>
 Craig Silverstein<br>
-27 February 2006
+<script type=text/javascript>
+  var lm = new Date(document.lastModified);
+  document.write(lm.toDateString());
+</script>
 </address>
 
 </body>

@@ -121,6 +121,17 @@ static void Version(FILE* outfile) {
           );
 }
 
+// Removes all non alphanumeric characters from a string to form a
+// valid C identifier to use as a double-inclusion guard.
+static void ConvertToIdentifier(string& s) {
+  for (int i = 0; i < s.size(); i++) {
+    if (!isalnum(s[i]))
+      s[i] = '_';
+    else
+      s[i] = toupper(s[i]);
+  }
+}
+
 int main(int argc, char **argv) {
   string FLAG_template_dir(GOOGLE_NAMESPACE::kCWD);   // "./"
   string FLAG_header_dir(GOOGLE_NAMESPACE::kCWD);
@@ -225,15 +236,6 @@ int main(int argc, char **argv) {
     if (!FLAG_header)
       continue;            // They don't want header files
 
-    string contents(string("//\n") +
-                    "// This header file auto-generated for the template\n" +
-                    "//    " + argv[i] + "\n" +
-                    "// by " + argv[0] + "\n" +
-                    "// DO NOT MODIFY THIS FILE DIRECTLY\n" +
-                    "//\n");
-    // Now append the header-entry info to the intro above
-    tpl->WriteHeaderEntries(&contents);
-
     // If there is no explicit output filename set, figure out the
     // filename by removing any path before the template_file filename
     string header_file;
@@ -244,6 +246,25 @@ int main(int argc, char **argv) {
       header_file = GOOGLE_NAMESPACE::PathJoin(FLAG_header_dir,
                                         basename + FLAG_outputfile_suffix);
     }
+
+    string contents(string("//\n") +
+                    "// This header file auto-generated for the template\n" +
+                    "//    " + argv[i] + "\n" +
+                    "// by " + argv[0] + "\n" +
+                    "// DO NOT MODIFY THIS FILE DIRECTLY\n" +
+                    "//\n");
+
+    string guard(string("TPL_") + header_file);
+    ConvertToIdentifier(guard);
+    guard.append("_H_");
+
+    contents.append(string("#ifndef ") + guard + "\n");
+    contents.append(string("#define ") + guard + "\n\n");
+
+    // Now append the header-entry info to the intro above
+    tpl->WriteHeaderEntries(&contents);
+
+    contents.append(string("\n#endif  // ") + guard + "\n");
 
     // Write the results to disk.
     FILE* header = fopen(header_file.c_str(), "wb");
