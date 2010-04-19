@@ -141,8 +141,8 @@ static void TestSetValueAndTemplateStringAndArena() {
 
     TemplateDictionaryPeer peer(&dict);
     // verify what happened
-    ASSERT_STREQ(peer.GetSectionValue("FOO"), "foo");
-    ASSERT_STREQ(peer.GetSectionValue("FOO2"), "foo2");
+    ASSERT(peer.ValueIs("FOO", "foo"));
+    ASSERT(peer.ValueIs("FOO2", "foo2"));
     string dump;
     dict.DumpToString(&dump);
     char expected[256];
@@ -174,10 +174,11 @@ static void TestSetValueWithoutCopy() {
   ASSERT(ptr == arena.Alloc(0));
 
   TemplateDictionaryPeer peer(&dict);
-  ASSERT_STREQ(peer.GetSectionValue("key"), "value");
-  // If our value changes, so does what's in the dictionary.
+  ASSERT(peer.ValueIs("key", "value"));
+  // If our content changes, so does what's in the dictionary -- but
+  // only the contents of the buffer, not its length!
   snprintf(value, sizeof(value), "%s", "not_value");
-  ASSERT_STREQ(peer.GetSectionValue("key"), "not_value");
+  ASSERT(peer.ValueIs("key", "not_v"));   // sizeof("not_v") == sizeof("value")
 }
 
 static void TestSetValueWithNUL() {
@@ -189,13 +190,11 @@ static void TestSetValueWithNUL() {
   dict.SetGlobalValue(string("GOO\0GAR", 7), string("GUX\0GUUX", 8));
 
   // FOO should not match FOO\0BAR
-  ASSERT_STREQ(peer.GetSectionValue("FOO"), "");
-  ASSERT_STREQ(peer.GetSectionValue("GOO"), "");
+  ASSERT(peer.ValueIs("FOO", ""));
+  ASSERT(peer.ValueIs("GOO", ""));
 
-  const char* r = peer.GetSectionValue(string("FOO\0BAR", 7));
-  ASSERT(memcmp(r, "QUX\0QUUX", 8) == 0);
-  r = peer.GetSectionValue(string("GOO\0GAR", 7));
-  ASSERT(memcmp(r, "GUX\0GUUX", 8) == 0);
+  ASSERT(peer.ValueIs(string("FOO\0BAR", 7), string("QUX\0QUUX", 8)));
+  ASSERT(peer.ValueIs(string("GOO\0GAR", 7), string("GUX\0GUUX", 8)));
 
   string dump;
   dict.DumpToString(&dump);
@@ -223,8 +222,8 @@ static void TestSetIntValue() {
   // - is an illegal varname in templates, but perfectly fine in dicts
   dict.SetIntValue("-INT", -5);
 
-  ASSERT_STREQ(peer.GetSectionValue("INT"), "5");
-  ASSERT_STREQ(peer.GetSectionValue("-INT"), "-5");
+  ASSERT(peer.ValueIs("INT", "5"));
+  ASSERT(peer.ValueIs("-INT", "-5"));
   string dump;
   dict.DumpToString(&dump);
   ASSERT_STRSTR(dump.c_str(), "\n   INT: >5<\n");
@@ -238,7 +237,7 @@ static void TestSetFormattedValue() {
   dict.SetFormattedValue(TemplateString("PRINTF", sizeof("PRINTF")-1),
                          "%s test %04d", "template test", 1);
 
-  ASSERT_STREQ(peer.GetSectionValue("PRINTF"), "template test test 0001");
+  ASSERT(peer.ValueIs("PRINTF", "template test test 0001"));
   string dump;
   dict.DumpToString(&dump);
   ASSERT_STRSTR(dump.c_str(), "\n   PRINTF: >template test test 0001<\n");
@@ -250,7 +249,7 @@ static void TestSetFormattedValue() {
   for (int i = 0; i < 4443; ++i)
     expected.append("0");
   expected.append("2");
-  ASSERT_STREQ(peer.GetSectionValue("PRINTF"), expected.c_str());
+  ASSERT(peer.ValueIs("PRINTF", expected.c_str()));
   string dump2;
   dict.DumpToString(&dump2);
   expected = string("\n   PRINTF: >") + expected + string("<\n");
@@ -270,13 +269,13 @@ static void TestSetEscapedValue() {
   dict.SetEscapedValue("query escape 0", "",
                        url_query_escape);
 
-  ASSERT_STREQ(peer.GetSectionValue("hardest HTML"),
-               "&lt;A HREF=&#39;foo&#39; id=&quot;bar  &amp;&amp; "
-               "baz&quot;&gt;");
-  ASSERT_STREQ(peer.GetSectionValue("hardest JS"),
-               "f \\x3d \\x27foo\\x27;\\r\\n\\tprint \\x22\\\\\\x26foo "
-               "\\x3d \\b\\x22, \\x22foo\\x22");
-  ASSERT_STREQ(peer.GetSectionValue("query escape 0"), "");
+  ASSERT(peer.ValueIs("hardest HTML",
+                      "&lt;A HREF=&#39;foo&#39; id=&quot;bar  &amp;&amp; "
+                      "baz&quot;&gt;"));
+  ASSERT(peer.ValueIs("hardest JS",
+                      "f \\x3d \\x27foo\\x27;\\r\\n\\tprint \\x22\\\\\\x26foo "
+                      "\\x3d \\b\\x22, \\x22foo\\x22"));
+  ASSERT(peer.ValueIs("query escape 0", ""));
 
   // Test using hand-made modifiers.
   FooEscaper foo_escaper;
@@ -293,14 +292,14 @@ static void TestSetEscapedValue() {
                        "print \"<A HREF='foo'>\";\r\n\\1;",
                        double_escaper);
 
-  ASSERT_STREQ(peer.GetSectionValue("easy foo"), "foo");
-  ASSERT_STREQ(peer.GetSectionValue("harder foo"), "foo");
-  ASSERT_STREQ(peer.GetSectionValue("easy double"), "doo");
-  ASSERT_STREQ(peer.GetSectionValue("harder double"),
-               "\\x3cA HREF\\x3d\\x27foo\\x27\\x3e\\n");
-  ASSERT_STREQ(peer.GetSectionValue("hardest double"),
-               "print \\x22\\x3cA HREF\\x3d\\x27foo\\x27\\x3e\\x22;"
-               "\\r\\n\\\\1;");
+  ASSERT(peer.ValueIs("easy foo", "foo"));
+  ASSERT(peer.ValueIs("harder foo", "foo"));
+  ASSERT(peer.ValueIs("easy double", "doo"));
+  ASSERT(peer.ValueIs("harder double",
+                      "\\x3cA HREF\\x3d\\x27foo\\x27\\x3e\\n"));
+  ASSERT(peer.ValueIs("hardest double",
+                      "print \\x22\\x3cA HREF\\x3d\\x27foo\\x27\\x3e\\x22;"
+                      "\\r\\n\\\\1;"));
 }
 
 static void TestSetEscapedFormattedValue() {
@@ -316,14 +315,13 @@ static void TestSetEscapedFormattedValue() {
   dict.SetEscapedFormattedValue("XML", xml_escape,
                                 "This&is%s -- ok?", "just&");
 
-  ASSERT_STREQ(peer.GetSectionValue("HTML"),
-               "This is &lt;a &amp; b&gt; #0.3333");
-  ASSERT_STREQ(peer.GetSectionValue("PRE"),
-               "if (a &lt; 1 &amp;&amp; b &gt; 2)\n\t x = 0.3333;");
-  ASSERT_STREQ(peer.GetSectionValue("URL"), "pageviews-r%3Fegex");
+  ASSERT(peer.ValueIs("HTML",
+                      "This is &lt;a &amp; b&gt; #0.3333"));
+  ASSERT(peer.ValueIs("PRE",
+                      "if (a &lt; 1 &amp;&amp; b &gt; 2)\n\t x = 0.3333;"));
+  ASSERT(peer.ValueIs("URL", "pageviews-r%3Fegex"));
 
-  ASSERT_STREQ(peer.GetSectionValue("XML"),
-               "This&amp;isjust&amp; -- ok?");
+  ASSERT(peer.ValueIs("XML", "This&amp;isjust&amp; -- ok?"));
 }
 
 static const StaticTemplateString kSectName =
@@ -352,30 +350,30 @@ static void TestAddSectionDictionary() {
 
   // Verify that all variables that should be look-up-able are, and that
   // we have proper precedence.
-  ASSERT_STREQ(peer.GetSectionValue("GLOBAL"), "top");
-  ASSERT_STREQ(peer.GetSectionValue("TOPLEVEL"), "foo");
-  ASSERT_STREQ(peer.GetSectionValue("TOPLEVEL2"), "foo2");
-  ASSERT_STREQ(peer.GetSectionValue("SUBLEVEL"), "");
+  ASSERT(peer.ValueIs("GLOBAL", "top"));
+  ASSERT(peer.ValueIs("TOPLEVEL", "foo"));
+  ASSERT(peer.ValueIs("TOPLEVEL2", "foo2"));
+  ASSERT(peer.ValueIs("SUBLEVEL", ""));
 
-  ASSERT_STREQ(subdict_1a_peer.GetSectionValue("GLOBAL"), "top");
-  ASSERT_STREQ(subdict_1a_peer.GetSectionValue("TOPLEVEL"), "foo");
-  ASSERT_STREQ(subdict_1a_peer.GetSectionValue("TOPLEVEL2"), "foo2");
-  ASSERT_STREQ(subdict_1a_peer.GetSectionValue("SUBLEVEL"), "subfoo");
+  ASSERT(subdict_1a_peer.ValueIs("GLOBAL", "top"));
+  ASSERT(subdict_1a_peer.ValueIs("TOPLEVEL", "foo"));
+  ASSERT(subdict_1a_peer.ValueIs("TOPLEVEL2", "foo2"));
+  ASSERT(subdict_1a_peer.ValueIs("SUBLEVEL", "subfoo"));
 
-  ASSERT_STREQ(subdict_1b_peer.GetSectionValue("GLOBAL"), "top");
-  ASSERT_STREQ(subdict_1b_peer.GetSectionValue("TOPLEVEL"), "foo");
-  ASSERT_STREQ(subdict_1b_peer.GetSectionValue("TOPLEVEL2"), "foo2");
-  ASSERT_STREQ(subdict_1b_peer.GetSectionValue("SUBLEVEL"), "subbar");
+  ASSERT(subdict_1b_peer.ValueIs("GLOBAL", "top"));
+  ASSERT(subdict_1b_peer.ValueIs("TOPLEVEL", "foo"));
+  ASSERT(subdict_1b_peer.ValueIs("TOPLEVEL2", "foo2"));
+  ASSERT(subdict_1b_peer.ValueIs("SUBLEVEL", "subbar"));
 
-  ASSERT_STREQ(subdict_2_peer.GetSectionValue("GLOBAL"), "top");
-  ASSERT_STREQ(subdict_2_peer.GetSectionValue("TOPLEVEL"), "bar");
-  ASSERT_STREQ(subdict_2_peer.GetSectionValue("TOPLEVEL2"), "foo2");
-  ASSERT_STREQ(subdict_2_peer.GetSectionValue("SUBLEVEL"), "");
+  ASSERT(subdict_2_peer.ValueIs("GLOBAL", "top"));
+  ASSERT(subdict_2_peer.ValueIs("TOPLEVEL", "bar"));
+  ASSERT(subdict_2_peer.ValueIs("TOPLEVEL2", "foo2"));
+  ASSERT(subdict_2_peer.ValueIs("SUBLEVEL", ""));
 
-  ASSERT_STREQ(subdict_2_1_peer.GetSectionValue("GLOBAL"), "21");
-  ASSERT_STREQ(subdict_2_1_peer.GetSectionValue("TOPLEVEL"), "bar");
-  ASSERT_STREQ(subdict_2_1_peer.GetSectionValue("TOPLEVEL2"), "foo2");
-  ASSERT_STREQ(subdict_2_1_peer.GetSectionValue("SUBLEVEL"), "");
+  ASSERT(subdict_2_1_peer.ValueIs("GLOBAL", "21"));
+  ASSERT(subdict_2_1_peer.ValueIs("TOPLEVEL", "bar"));
+  ASSERT(subdict_2_1_peer.ValueIs("TOPLEVEL2", "foo2"));
+  ASSERT(subdict_2_1_peer.ValueIs("SUBLEVEL", ""));
 
   // Verify that everyone knows about its sub-dictionaries, and also
   // that these go 'up the chain' on lookup failure
@@ -394,25 +392,18 @@ static void TestAddSectionDictionary() {
   ASSERT(peer.GetSectionDictionaries("section2", &dummy) == 1);
   ASSERT(subdict_2_peer.GetSectionDictionaries("sub", &dummy) == 1);
   // Test some of the values
-  ASSERT_STREQ(TemplateDictionaryPeer(GetSectionDict(&dict, "section1", 0))
-               .GetSectionValue("SUBLEVEL"),
-               "subfoo");
-  ASSERT_STREQ(TemplateDictionaryPeer(GetSectionDict(&dict, "section1", 1))
-               .GetSectionValue("SUBLEVEL"),
-               "subbar");
-  ASSERT_STREQ(TemplateDictionaryPeer(GetSectionDict(&dict, "section2", 0))
-               .GetSectionValue("TOPLEVEL"),
-               "bar");
-  ASSERT_STREQ(TemplateDictionaryPeer(
-                   GetSectionDict(GetSectionDict(&dict, "section2", 0),
-                                  "sub", 0))
-               .GetSectionValue("TOPLEVEL"),
-               "bar");
-  ASSERT_STREQ(TemplateDictionaryPeer(
-                   GetSectionDict(GetSectionDict(&dict, "section2", 0),
-                                  "sub", 0))
-               .GetSectionValue("GLOBAL"),
-               "21");
+  ASSERT(TemplateDictionaryPeer(GetSectionDict(&dict, "section1", 0))
+         .ValueIs("SUBLEVEL", "subfoo"));
+  ASSERT(TemplateDictionaryPeer(GetSectionDict(&dict, "section1", 1))
+         .ValueIs("SUBLEVEL", "subbar"));
+  ASSERT(TemplateDictionaryPeer(GetSectionDict(&dict, "section2", 0))
+         .ValueIs("TOPLEVEL", "bar"));
+  ASSERT(TemplateDictionaryPeer(
+           GetSectionDict(GetSectionDict(&dict, "section2", 0), "sub", 0))
+         .ValueIs("TOPLEVEL", "bar"));
+  ASSERT(TemplateDictionaryPeer(
+             GetSectionDict(GetSectionDict(&dict, "section2", 0), "sub", 0))
+         .ValueIs("GLOBAL", "21"));
 
   // Make sure we're making descriptive names
   ASSERT_STREQ(dict.name().c_str(),
@@ -475,7 +466,7 @@ static void TestShowSection() {
   subdict->SetValue("TOPLEVEL", "bar");
   dict.ShowSection("section3");
 
-  ASSERT_STREQ(subdict_peer.GetSectionValue("TOPLEVEL"), "bar");
+  ASSERT(subdict_peer.ValueIs("TOPLEVEL", "bar"));
 
   // Since ShowSection() doesn't return a sub-dict, the only way to
   // probe what the dicts look like is via Dump()
@@ -576,13 +567,10 @@ static void TestSetTemplateGlobalValue() {
   // Setting a template value after sub dictionaries are created should
   // affect the sub dictionaries as well.
   dict.SetTemplateGlobalValue("TEMPLATEVAL", "templateval");
-  ASSERT_STREQ(peer.GetSectionValue("TEMPLATEVAL"), "templateval");
-  ASSERT_STREQ(subdict_peer.GetSectionValue("TEMPLATEVAL"),
-               "templateval");
-  ASSERT_STREQ(subsubdict_peer.GetSectionValue("TEMPLATEVAL"),
-               "templateval");
-  ASSERT_STREQ(includedict_peer.GetSectionValue("TEMPLATEVAL"),
-               "templateval");
+  ASSERT(peer.ValueIs("TEMPLATEVAL", "templateval"));
+  ASSERT(subdict_peer.ValueIs("TEMPLATEVAL", "templateval"));
+  ASSERT(subsubdict_peer.ValueIs("TEMPLATEVAL", "templateval"));
+  ASSERT(includedict_peer.ValueIs("TEMPLATEVAL", "templateval"));
 
   // sub dictionaries after you set the template value should also
   // get the template value
@@ -591,54 +579,37 @@ static void TestSetTemplateGlobalValue() {
   TemplateDictionaryPeer subdict2_peer(subdict2);
   TemplateDictionaryPeer includedict2_peer(includedict2);
 
-  ASSERT_STREQ(subdict2_peer.GetSectionValue("TEMPLATEVAL"),
-               "templateval");
-  ASSERT_STREQ(includedict2_peer.GetSectionValue("TEMPLATEVAL"),
-               "templateval");
+  ASSERT(subdict2_peer.ValueIs("TEMPLATEVAL", "templateval"));
+  ASSERT(includedict2_peer.ValueIs("TEMPLATEVAL", "templateval"));
 
   // setting a template value on a sub dictionary should affect all the other
   // sub dictionaries and the parent as well
   subdict->SetTemplateGlobalValue("TEMPLATEVAL2", "templateval2");
-  ASSERT_STREQ(peer.GetSectionValue("TEMPLATEVAL2"), "templateval2");
-  ASSERT_STREQ(subdict_peer.GetSectionValue("TEMPLATEVAL2"),
-               "templateval2");
-  ASSERT_STREQ(subsubdict_peer.GetSectionValue("TEMPLATEVAL2"),
-               "templateval2");
-  ASSERT_STREQ(includedict_peer.GetSectionValue("TEMPLATEVAL2"),
-               "templateval2");
-  ASSERT_STREQ(subdict2_peer.GetSectionValue("TEMPLATEVAL2"),
-               "templateval2");
-  ASSERT_STREQ(includedict2_peer.GetSectionValue("TEMPLATEVAL2"),
-               "templateval2");
+  ASSERT(peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  ASSERT(subdict_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  ASSERT(subsubdict_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  ASSERT(includedict_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  ASSERT(subdict2_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  ASSERT(includedict2_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
 
   includedict->SetTemplateGlobalValue("TEMPLATEVAL3", "templateval3");
-  ASSERT_STREQ(peer.GetSectionValue("TEMPLATEVAL3"), "templateval3");
-  ASSERT_STREQ(subdict_peer.GetSectionValue("TEMPLATEVAL3"),
-               "templateval3");
-  ASSERT_STREQ(subsubdict_peer.GetSectionValue("TEMPLATEVAL3"),
-               "templateval3");
-  ASSERT_STREQ(includedict_peer.GetSectionValue("TEMPLATEVAL3"),
-               "templateval3");
-  ASSERT_STREQ(subdict2_peer.GetSectionValue("TEMPLATEVAL3"),
-               "templateval3");
-  ASSERT_STREQ(includedict2_peer.GetSectionValue("TEMPLATEVAL3"),
-               "templateval3");
+  ASSERT(peer.ValueIs("TEMPLATEVAL3", "templateval3"));
+  ASSERT(subdict_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
+  ASSERT(subsubdict_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
+  ASSERT(includedict_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
+  ASSERT(subdict2_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
+  ASSERT(includedict2_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
 
   // you should be able to override a template value with a regular value
   // and the overwritten regular value should pass on to its children
   subdict->SetValue("TEMPLATEVAL2", "subdictval");
   includedict->SetValue("TEMPLATEVAL2", "includedictval");
-  ASSERT_STREQ(peer.GetSectionValue("TEMPLATEVAL2"), "templateval2");
-  ASSERT_STREQ(subdict_peer.GetSectionValue("TEMPLATEVAL2"),
-               "subdictval");
-  ASSERT_STREQ(subsubdict_peer.GetSectionValue("TEMPLATEVAL2"),
-               "subdictval");
-  ASSERT_STREQ(includedict_peer.GetSectionValue("TEMPLATEVAL2"),
-               "includedictval");
-  ASSERT_STREQ(subdict2_peer.GetSectionValue("TEMPLATEVAL2"),
-               "templateval2");
-  ASSERT_STREQ(includedict2_peer.GetSectionValue("TEMPLATEVAL2"),
-               "templateval2");
+  ASSERT(peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  ASSERT(subdict_peer.ValueIs("TEMPLATEVAL2", "subdictval"));
+  ASSERT(subsubdict_peer.ValueIs("TEMPLATEVAL2", "subdictval"));
+  ASSERT(includedict_peer.ValueIs("TEMPLATEVAL2", "includedictval"));
+  ASSERT(subdict2_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  ASSERT(includedict2_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
 
   // A section shown template-globally will be shown in all its children.
   dict.ShowTemplateGlobalSection("ShownTemplateGlobalSection");
@@ -670,10 +641,11 @@ static void TestSetTemplateGlobalValueWithoutCopy() {
   // We shouldn't have copied the value string.
   ASSERT(ptr == arena.Alloc(0));
 
-  ASSERT_STREQ(peer.GetSectionValue("key"), "value");
-  // If our value changes, so does what's in the dictionary.
+  ASSERT(peer.ValueIs("key", "value"));
+  // If our content changes, so does what's in the dictionary -- but
+  // only the contents of the buffer, not its length!
   snprintf(value, sizeof(value), "%s", "not_value");
-  ASSERT_STREQ(peer.GetSectionValue("key"), "not_value");
+  ASSERT(peer.ValueIs("key", "not_v"));   // sizeof("not_v") == sizeof("value")
 }
 
 static void TestAddIncludeDictionary() {
@@ -706,33 +678,33 @@ static void TestAddIncludeDictionary() {
   // Verify that all variables that should be look-up-able are, and that
   // we have proper precedence.  Unlike with sections, includes lookups
   // do not go 'up the chain'.
-  ASSERT_STREQ(peer.GetSectionValue("GLOBAL"), "top");
-  ASSERT_STREQ(peer.GetSectionValue("TOPLEVEL"), "foo");
-  ASSERT_STREQ(peer.GetSectionValue("TOPLEVEL2"), "foo2");
-  ASSERT_STREQ(peer.GetSectionValue("TEMPLATELEVEL"), "foo3");
-  ASSERT_STREQ(peer.GetSectionValue("SUBLEVEL"), "");
+  ASSERT(peer.ValueIs("GLOBAL", "top"));
+  ASSERT(peer.ValueIs("TOPLEVEL", "foo"));
+  ASSERT(peer.ValueIs("TOPLEVEL2", "foo2"));
+  ASSERT(peer.ValueIs("TEMPLATELEVEL", "foo3"));
+  ASSERT(peer.ValueIs("SUBLEVEL", ""));
 
-  ASSERT_STREQ(subdict_1a_peer.GetSectionValue("GLOBAL"), "top");
-  ASSERT_STREQ(subdict_1a_peer.GetSectionValue("TOPLEVEL"), "");
-  ASSERT_STREQ(subdict_1a_peer.GetSectionValue("TOPLEVEL2"), "");
-  ASSERT_STREQ(subdict_1a_peer.GetSectionValue("TEMPLATELEVEL"), "foo3");
-  ASSERT_STREQ(subdict_1a_peer.GetSectionValue("SUBLEVEL"), "subfoo");
+  ASSERT(subdict_1a_peer.ValueIs("GLOBAL", "top"));
+  ASSERT(subdict_1a_peer.ValueIs("TOPLEVEL", ""));
+  ASSERT(subdict_1a_peer.ValueIs("TOPLEVEL2", ""));
+  ASSERT(subdict_1a_peer.ValueIs("TEMPLATELEVEL", "foo3"));
+  ASSERT(subdict_1a_peer.ValueIs("SUBLEVEL", "subfoo"));
 
-  ASSERT_STREQ(subdict_1b_peer.GetSectionValue("GLOBAL"), "top");
-  ASSERT_STREQ(subdict_1b_peer.GetSectionValue("TOPLEVEL"), "");
-  ASSERT_STREQ(subdict_1b_peer.GetSectionValue("TOPLEVEL2"), "");
-  ASSERT_STREQ(subdict_1b_peer.GetSectionValue("SUBLEVEL"), "subbar");
+  ASSERT(subdict_1b_peer.ValueIs("GLOBAL", "top"));
+  ASSERT(subdict_1b_peer.ValueIs("TOPLEVEL", ""));
+  ASSERT(subdict_1b_peer.ValueIs("TOPLEVEL2", ""));
+  ASSERT(subdict_1b_peer.ValueIs("SUBLEVEL", "subbar"));
 
-  ASSERT_STREQ(subdict_2_peer.GetSectionValue("GLOBAL"), "top");
-  ASSERT_STREQ(subdict_2_peer.GetSectionValue("TOPLEVEL"), "bar");
-  ASSERT_STREQ(subdict_2_peer.GetSectionValue("TOPLEVEL2"), "");
-  ASSERT_STREQ(subdict_2_peer.GetSectionValue("TEMPLATELEVEL"), "subfoo3");
-  ASSERT_STREQ(subdict_2_peer.GetSectionValue("SUBLEVEL"), "");
+  ASSERT(subdict_2_peer.ValueIs("GLOBAL", "top"));
+  ASSERT(subdict_2_peer.ValueIs("TOPLEVEL", "bar"));
+  ASSERT(subdict_2_peer.ValueIs("TOPLEVEL2", ""));
+  ASSERT(subdict_2_peer.ValueIs("TEMPLATELEVEL", "subfoo3"));
+  ASSERT(subdict_2_peer.ValueIs("SUBLEVEL", ""));
 
-  ASSERT_STREQ(subdict_2_1_peer.GetSectionValue("GLOBAL"), "21");
-  ASSERT_STREQ(subdict_2_1_peer.GetSectionValue("TOPLEVEL"), "");
-  ASSERT_STREQ(subdict_2_1_peer.GetSectionValue("TOPLEVEL2"), "");
-  ASSERT_STREQ(subdict_2_1_peer.GetSectionValue("SUBLEVEL"), "");
+  ASSERT(subdict_2_1_peer.ValueIs("GLOBAL", "21"));
+  ASSERT(subdict_2_1_peer.ValueIs("TOPLEVEL", ""));
+  ASSERT(subdict_2_1_peer.ValueIs("TOPLEVEL2", ""));
+  ASSERT(subdict_2_1_peer.ValueIs("SUBLEVEL", ""));
 
   // Verify that everyone knows about its sub-dictionaries, but that
   // these do not try to go 'up the chain' on lookup failure
@@ -756,25 +728,18 @@ static void TestAddIncludeDictionary() {
   ASSERT(peer.GetIncludeDictionaries("include2", &dummy) == 1);
   ASSERT(subdict_2_peer.GetIncludeDictionaries("sub", &dummy) == 1);
   // Test some of the values
-  ASSERT_STREQ(TemplateDictionaryPeer(GetIncludeDict(&dict, "include1", 0))
-               .GetSectionValue("SUBLEVEL"),
-               "subfoo");
-  ASSERT_STREQ(TemplateDictionaryPeer(GetIncludeDict(&dict, "include1", 1))
-               .GetSectionValue("SUBLEVEL"),
-               "subbar");
-  ASSERT_STREQ(TemplateDictionaryPeer(GetIncludeDict(&dict, "include2", 0))
-               .GetSectionValue("TOPLEVEL"),
-               "bar");
-  ASSERT_STREQ(TemplateDictionaryPeer(
-                   GetIncludeDict(GetIncludeDict(&dict, "include2", 0),
-                                  "sub", 0))
-               .GetSectionValue("TOPLEVEL"),
-               "");
-  ASSERT_STREQ(TemplateDictionaryPeer(
-                   GetIncludeDict(GetIncludeDict(&dict, "include2", 0),
-                                  "sub", 0))
-               .GetSectionValue("GLOBAL"),
-               "21");
+  ASSERT(TemplateDictionaryPeer(GetIncludeDict(&dict, "include1", 0))
+         .ValueIs("SUBLEVEL", "subfoo"));
+  ASSERT(TemplateDictionaryPeer(GetIncludeDict(&dict, "include1", 1))
+         .ValueIs("SUBLEVEL", "subbar"));
+  ASSERT(TemplateDictionaryPeer(GetIncludeDict(&dict, "include2", 0))
+         .ValueIs("TOPLEVEL", "bar"));
+  ASSERT(TemplateDictionaryPeer(
+           GetIncludeDict(GetIncludeDict(&dict, "include2", 0), "sub", 0))
+         .ValueIs("TOPLEVEL", ""));
+  ASSERT(TemplateDictionaryPeer(
+             GetIncludeDict(GetIncludeDict(&dict, "include2", 0), "sub", 0))
+         .ValueIs("GLOBAL", "21"));
   // We can test the include-names as well
   ASSERT_STREQ(peer.GetIncludeTemplateName("include1", 0), "incfile1a");
   ASSERT_STREQ(peer.GetIncludeTemplateName("include1", 1), "");

@@ -16,8 +16,10 @@ ctemplateincludedir = $(includedir)/ctemplate
 ## who install this package can include in their own applications.)
 ## We have to include both the .h and .h.in forms.  The latter we
 ## put in noinst_HEADERS.
+## NOTE: If you add a file here, also add it to the end of configure.ac
 nodist_ctemplateinclude_HEADERS = \
 	src/ctemplate/template.h \
+	src/ctemplate/template_cache.h \
 	src/ctemplate/template_string.h \
 	src/ctemplate/template_enums.h \
 	src/ctemplate/template_pathops.h \
@@ -30,6 +32,7 @@ nodist_ctemplateinclude_HEADERS = \
 	src/ctemplate/per_expand_data.h
 noinst_HEADERS = \
 	src/ctemplate/template.h.in \
+	src/ctemplate/template_cache.h.in \
 	src/ctemplate/template_string.h.in \
 	src/ctemplate/template_enums.h.in \
 	src/ctemplate/template_pathops.h.in \
@@ -111,7 +114,8 @@ libctemplate_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/base/small_map.h src/base/manual_constructor.h \
 	src/template_modifiers_internal.h src/indented_writer.h \
-	src/template.cc src/template_dictionary.cc src/template_modifiers.cc \
+	src/template.cc src/template_cache.cc \
+	src/template_dictionary.cc src/template_modifiers.cc \
 	src/template_annotator.cc src/per_expand_data.cc \
 	src/template_string.cc \
 	src/template_namelist.cc src/template_pathops.cc \
@@ -158,13 +162,18 @@ libctemplate_nothreads_debug_la_LDFLAGS = $(libctemplate_nothreads_la_LDFLAGS)
 # outweighs the costs.  If you'd like to use this library, please send
 # mail to google-ctemplate@googlegroups.com!
 ##lib_LTLIBRARIES += libctemplate_testing.la
-noinst_LTLIBRARIES += libctemplate_testing.la
+noinst_LTLIBRARIES += libctemplate_testing.la libctemplate_testing_nothreads.la
 libctemplate_testing_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
                                   src/tests/template_test_util.h \
                                   src/tests/template_test_util.cc
-libctemplate_testing_la_CXXFLAGS = $(AM_CXXFLAGS)
+libctemplate_testing_la_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 CTEMPLATE_TESTING_SYMBOLS = 'TemporaryRegisterTemplate|TemplateDictionaryPeer'
-libctemplate_testing_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS)
+libctemplate_testing_la_LDFLAGS = $(PTHREAD_CFLAGS) -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS)
+libctemplate_testing_la_LIBADD = $(PTHREAD_LIBS)
+libctemplate_testing_nothreads_la_SOURCES = $(libctemplate_testing_la_SOURCES)
+libctemplate_testing_nothreads_la_CXXFLAGS = $(AM_CXXFLAGS) -DNO_THREADS
+libctemplate_testing_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS)
+
 # This library depends on libctemplate, but it can use either libctemplate
 # or libctemplate_nothreads.  Rather than have two versions of this
 # library, I just leave out the deps entirely: you must be sure to specify
@@ -211,7 +220,7 @@ template_test_util_test_LDADD = libctemplate_testing.la libctemplate_debug.la \
                                  $(PTHREAD_LIBS)
 template_test_util_nothreads_test_SOURCES = $(template_test_util_test_SOURCES)
 template_test_util_nothreads_test_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
-template_test_util_nothreads_test_LDADD = libctemplate_testing.la \
+template_test_util_nothreads_test_LDADD = libctemplate_testing_nothreads.la \
                                           libctemplate_nothreads_debug.la
 
 TESTS += template_dictionary_unittest template_dictionary_nothreads_unittest
@@ -225,7 +234,7 @@ template_dictionary_unittest_LDADD = libctemplate_testing.la libctemplate_debug.
                                      $(PTHREAD_LIBS)
 template_dictionary_nothreads_unittest_SOURCES = $(template_dictionary_unittest_SOURCES)
 template_dictionary_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
-template_dictionary_nothreads_unittest_LDADD = libctemplate_testing.la \
+template_dictionary_nothreads_unittest_LDADD = libctemplate_testing_nothreads.la \
                                                libctemplate_nothreads_debug.la
 
 TESTS += template_modifiers_unittest template_modifiers_nothreads_unittest
@@ -238,7 +247,7 @@ template_modifiers_unittest_LDADD = libctemplate_testing.la libctemplate_debug.l
                                     $(PTHREAD_LIBS)
 template_modifiers_nothreads_unittest_SOURCES = $(template_modifiers_unittest_SOURCES)
 template_modifiers_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
-template_modifiers_nothreads_unittest_LDADD = libctemplate_testing.la \
+template_modifiers_nothreads_unittest_LDADD = libctemplate_testing_nothreads.la \
                                               libctemplate_nothreads_debug.la
 
 TESTS += template_setglobals_unittest template_setglobals_nothreads_unittest
@@ -251,8 +260,22 @@ template_setglobals_unittest_LDADD = libctemplate_testing.la libctemplate_debug.
                                      $(PTHREAD_LIBS)
 template_setglobals_nothreads_unittest_SOURCES = $(template_setglobals_unittest_SOURCES)
 template_setglobals_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
-template_setglobals_nothreads_unittest_LDADD = libctemplate_testing.la \
+template_setglobals_nothreads_unittest_LDADD = libctemplate_testing_nothreads.la \
                                                libctemplate_nothreads_debug.la
+
+TESTS += template_cache_test template_cache_nothreads_test
+WINDOWS_PROJECTS += vsprojects/template_cache_test/template_cache_test.vcproj
+template_cache_test_SOURCES = src/config_for_unittests.h \
+                              src/template_modifiers_internal.h \
+                              src/tests/template_cache_test.cc
+template_cache_test_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
+template_cache_test_LDFLAGS = $(PTHREAD_CFLAGS)
+template_cache_test_LDADD = libctemplate_testing.la libctemplate_debug.la \
+                            $(PTHREAD_LIBS)
+template_cache_nothreads_test_SOURCES = $(template_cache_test_SOURCES)
+template_cache_nothreads_test_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
+template_cache_nothreads_test_LDADD = libctemplate_testing_nothreads.la \
+                                      libctemplate_nothreads_debug.la
 
 TESTS += template_unittest template_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_unittest/template_unittest.vcproj
@@ -262,10 +285,12 @@ template_unittest_SOURCES = src/config_for_unittests.h \
                             src/tests/template_unittest.cc
 template_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
-template_unittest_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
-template_nothreads_unittest_SOURCES = src/tests/template_unittest.cc
+template_unittest_LDADD = libctemplate_testing.la libctemplate_debug.la \
+                          $(PTHREAD_LIBS)
+template_nothreads_unittest_SOURCES = $(template_unittest_SOURCES)
 template_nothreads_unittest_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
-template_nothreads_unittest_LDADD = libctemplate_nothreads_debug.la
+template_nothreads_unittest_LDADD = libctemplate_testing_nothreads.la \
+                                    libctemplate_nothreads_debug.la
 
 TESTS += template_regtest template_nothreads_regtest
 WINDOWS_PROJECTS += vsprojects/template_regtest/template_regtest.vcproj
@@ -411,5 +436,5 @@ EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb 
 	src/htmlparser/jsparser_fsm.config \
 	$(BUILT_SOURCES) \
 	src/windows/config.h src/windows/preprocess.sh \
-	src/windows/ctemplate src/windows/google $(WINDOWS_PROJECTS) \
+	src/windows/ctemplate $(WINDOWS_PROJECTS) \
 	src/solaris/libstdc++.la contrib

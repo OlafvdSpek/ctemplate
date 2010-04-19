@@ -351,15 +351,14 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
 
   // How Template::Expand() and its children access the template-dictionary.
   // These fill the API required by TemplateDictionaryInterface.
-  // TODO(csilvers): have GetSectionValue return a TemplateString.
-  virtual const char *GetSectionValue(const TemplateString& variable) const;
+  virtual TemplateString GetValue(const TemplateString& variable) const;
   virtual bool IsHiddenSection(const TemplateString& name) const;
   virtual bool IsUnhiddenSection(const TemplateString& name) const {
     return !IsHiddenSection(name);
   }
   virtual bool IsHiddenTemplate(const TemplateString& name) const;
-  virtual const char *GetIncludeTemplateName(const TemplateString& variable,
-                                             int dictnum) const;
+  virtual const char* GetIncludeTemplateName(
+      const TemplateString& variable, int dictnum) const;
 
   // Determine whether there's anything set in this dictionary
   bool Empty() const;
@@ -438,6 +437,7 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
   TemplateDictionary* parent_dict_;
   // The static, global dictionary, at the top of the parent-dictionary chain
   static GlobalDict* global_dict_;
+  static TemplateString* empty_string_;  // what is returned on lookup misses
 
   // The filename associated with this dictionary.  If set, this declares
   // what template the dictionary is supposed to be expanded with.  Required

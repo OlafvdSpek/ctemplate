@@ -50,6 +50,11 @@ _START_GOOGLE_NAMESPACE_
 #define EMIT_CLOSE_ANNOTATION(emitter, name)            \
   (emitter)->Emit("{{/" name "}}", 5 + sizeof(name)-1);
 
+#define EMIT_MISSING_ANNOTATION(emitter, name, value)   \
+  (emitter)->Emit("{{" name "=",  3 + sizeof(name)-1);  \
+  (emitter)->Emit(value);                               \
+  (emitter)->Emit("}}", 2);
+
 // Implementation note: TextTemplateAnnotator contains no state, and
 // code elsewhere is depending on this.  E.g., a statically allocated
 // instance is used as the default annotator in the implementation of
@@ -97,13 +102,9 @@ void TextTemplateAnnotator::EmitCloseVariable(ExpandEmitter* emitter) {
   EMIT_CLOSE_ANNOTATION(emitter, "VAR");
 }
 
-void TextTemplateAnnotator::EmitOpenMissingInclude(ExpandEmitter* emitter,
-                                                   const string& value) {
-  EMIT_OPEN_ANNOTATION(emitter, "MISSING_INC", value);
-}
-
-void TextTemplateAnnotator::EmitCloseMissingInclude(ExpandEmitter* emitter) {
-  EMIT_CLOSE_ANNOTATION(emitter, "MISSING_INC");
+void TextTemplateAnnotator::EmitFileIsMissing(ExpandEmitter* emitter,
+                                              const string& value) {
+  EMIT_MISSING_ANNOTATION(emitter,"MISSING_FILE", value);
 }
 
 _END_GOOGLE_NAMESPACE_

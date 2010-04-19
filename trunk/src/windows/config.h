@@ -126,6 +126,9 @@
 /* define if the compiler supports unordered_{map,set} */
 #undef HAVE_UNORDERED_MAP
 
+/* Define to 1 if you have the <utime.h> header file. */
+#undef HAVE_UTIME_H
+
 /* Define to 1 if the system has the type `u_int32_t'. */
 #undef HAVE_U_INT32_T
 
@@ -143,6 +146,9 @@
 
 /* The namespace to put the htmlparser code. */
 #define HTMLPARSER_NAMESPACE  google_ctemplate_streamhtmlparser
+
+/* define if first argument to InterlockedExchange is just LONG */
+#undef INTERLOCKED_EXCHANGE_NONVOLATILE
 
 /* Name of package */
 #undef PACKAGE

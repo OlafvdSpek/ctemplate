@@ -29,21 +29,31 @@
 
 // ---
 // Author: Jim Morrison
+//
+// Intended usage of TemplateDictionaryPeer:
+//    Use this class if you need to TEST that a dictionary has certain
+//    expected contents.  This should be fairly uncommon outside the
+//    template directory.
 
 #ifndef TEMPLATE_TEMPLATE_TEST_UTIL_H_
 #define TEMPLATE_TEMPLATE_TEST_UTIL_H_
 
 #include "config_for_unittests.h"
-#include <string>
-#include <vector>
-#include HASH_MAP_H           // defined in config.h
-#include <ctemplate/template_namelist.h>
+#include <time.h>        // for time_t
+#include <string>        // for string
+#include <vector>        // for vector<>
+#include <ctemplate/template.h>        // for Template::num_deletes_
+#include <ctemplate/template_cache.h>  // for TemplateCache
+#include <ctemplate/template_dictionary.h>  // for TemplateDictionary
 #include <ctemplate/template_dictionary_interface.h>
-#include <ctemplate/template_dictionary.h>
-#include <ctemplate/template_string.h>
+#include <ctemplate/template_enums.h>  // for Strip
+#include <ctemplate/template_namelist.h>
+#include <ctemplate/template_string.h>  // for TemplateString, TemplateId
 
 _START_GOOGLE_NAMESPACE_
 
+class PerExpandData;
+class TemplateCache;
 class TemplateDictionary;
 
 inline TemplateId GlobalIdForTest(const char* ptr, int len) {
@@ -54,6 +64,51 @@ inline TemplateId GlobalIdForTest(const char* ptr, int len) {
 // not guaranteed to be allocated for the entire length of the test.
 #define STS_INIT_FOR_TEST(ptr, len, arena) \
   { { arena->Memdup(ptr, len), len, GOOGLE_NAMESPACE::GlobalIdForTest(ptr, len) } };
+
+extern const std::string FLAGS_test_tmpdir;
+
+// These are routines that are useful for creating template files for testing.
+
+// Deletes all files named *template* in dir.
+void CreateOrCleanTestDir(const std::string& dirname);
+// This delets all files named *template*, and also sets dirname to be
+// the directory that all future StringToFile calls will place their
+// templates.
+void CreateOrCleanTestDirAndSetAsTmpdir(const std::string& dirname);
+
+// This writes s to the given file.  We want to make sure that every
+// time we create a file, it has a different mtime (just like would
+// be the case in real life), so we use a mock clock.  Filenames created
+// by this routine will all have an mtime of around Jan 1, 2000.
+void StringToFile(const std::string& s, const std::string& filename);
+
+// This is the (mock) time used when creating the last file in StringToFile.
+time_t Now();
+
+// This writes s to a file and returns the filename.
+std::string StringToTemplateFile(const std::string& s);
+
+// This writes s to a file and then loads it into a template object.
+Template* StringToTemplate(const std::string& s, Strip strip);
+
+// This is esp. useful for calling from within gdb.
+// The gdb nice-ness is balanced by the need for the caller to delete the buf.
+const char* ExpandIs(const Template* tpl, const TemplateDictionary *dict,
+                     PerExpandData* per_expand_data, bool expected);
+
+void AssertExpandWithDataIs(const Template* tpl,
+                            const TemplateDictionary *dict,
+                            PerExpandData* per_expand_data,
+                            const std::string& is, bool expected);
+
+void AssertExpandIs(const Template* tpl, const TemplateDictionary *dict,
+                    const std::string& is, bool expected);
+
+void AssertExpandWithCacheIs(TemplateCache* cache,
+                             const std::string& filename, Strip strip,
+                             const TemplateDictionary *dict,
+                             PerExpandData* per_expand_data,
+                             const std::string& is, bool expected);
 
 class TemporaryRegisterTemplate {
  public:
@@ -103,7 +158,13 @@ class TemplateDictionaryPeer {
   explicit TemplateDictionaryPeer(const TemplateDictionary* dict)
       : dict_(dict) {}
 
-  // Returns the value for the named variable.
+  // Returns whether the named variable has value equal to "expected".
+  bool ValueIs(const TemplateString& variable,
+               const TemplateString& expected) const;
+
+  // DEPRECATED: Returns the value of the named variable.  Does not
+  // deal properly with values that have an internal NUL.  Use ValueIs
+  // for new code.
   const char* GetSectionValue(const TemplateString& variable) const;
 
   // Returns true if the named section is hidden.
@@ -163,6 +224,54 @@ class TemplateDictionaryPeer {
   TemplateDictionaryPeer(const TemplateDictionaryPeer&);
   void operator=(const TemplateDictionaryPeer&);
 };
+
+class TemplateCachePeer {
+ public:
+  TemplateCachePeer(TemplateCache* cache)
+      : cache_(cache) {}
+
+  struct TemplateCacheKey : public TemplateCache::TemplateCacheKey {
+    TemplateCacheKey(const std::string& key, int strip) {
+      this->first = GlobalIdForTest(key.data(), key.length());
+      this->second = strip;
+    }
+  };
+
+  TemplateCache::TemplateMap* parsed_template_cache() {
+    return cache_->parsed_template_cache_;
+  }
+
+  bool TemplateIsCached(const TemplateCacheKey key) const {
+    return cache_->TemplateIsCached(key);
+  }
+
+  const Template* GetTemplate(const TemplateString& key, Strip strip) const {
+    return cache_->GetTemplate(key, strip);
+  }
+
+  int Refcount(const TemplateCacheKey key) const {
+    return cache_->Refcount(key);
+  }
+
+  void DoneWithGetTemplatePtrs() {
+    cache_->DoneWithGetTemplatePtrs();
+  }
+  void ClearCache() {
+    cache_->ClearCache();
+  }
+
+  static int NumTotalTemplateDeletes() {
+    return Template::num_deletes();
+  }
+
+ private:
+  TemplateCache* cache_;  // Not owned.
+
+  // Don't allow copying
+  TemplateCachePeer(const TemplateCachePeer&);
+  void operator=(const TemplateCachePeer&);
+};
+
 
 _END_GOOGLE_NAMESPACE_
 

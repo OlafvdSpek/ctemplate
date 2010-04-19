@@ -159,7 +159,7 @@ class CTEMPLATE_DLL_DECL TemplateString {
  public:
   TemplateString(const char* s)
       : ptr_(s ? s : ""), length_(strlen(ptr_)),
-        is_immutable_(InTextSegment(s)), id_(kIllegalTemplateId) {
+        is_immutable_(InTextSegment(ptr_)), id_(kIllegalTemplateId) {
   }
   TemplateString(const std::string& s)
       : ptr_(s.data()), length_(s.size()),
@@ -188,6 +188,10 @@ class CTEMPLATE_DLL_DECL TemplateString {
   // Only TemplateDictionaries and template expansion code can read these.
   friend class OldTemplateDictionary;
   friend class TemplateDictionary;
+  friend class TemplateDictionaryPeer;           // TDP::GetSectionValue()
+  friend class Template;                         // for StringToTemplate()
+  friend class VariableTemplateNode;             // VTN::Expand()
+  friend class TemplateCache;                    // for GetGlobalId
   friend class StaticTemplateStringInitializer;  // for AddToGlo...
   friend struct TemplateStringHasher;            // for GetGlobalId
   friend class ::TemplateStringTest;
@@ -225,6 +229,11 @@ class CTEMPLATE_DLL_DECL TemplateString {
   TemplateId GetGlobalId() const;
   // Adds this TemplateString to the map from global-id to name.
   void AddToGlobalIdToNameMap();
+
+  // Use sparingly. Converting to a string loses information about the
+  // id of the template string, making operations require extra hash_compare
+  // computations.
+  std::string ToString() const { return std::string(ptr_, length_); }
 
   // Does the reverse map from TemplateId to TemplateString contents.
   // Returns a TemplateString(kStsEmpty) if id isn't found.  Note that

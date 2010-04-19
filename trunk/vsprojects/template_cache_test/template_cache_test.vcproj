@@ -2,8 +2,8 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="7.10"
-	Name="template_regtest"
-	ProjectGUID="{0072B37E-DCDA-4128-BC12-7C0A7EF59016}"
+	Name="template_cache_test"
+	ProjectGUID="{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}"
 	Keyword="Win32Proj">
 	<Platforms>
 		<Platform
@@ -30,10 +30,10 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/template_regtest.exe"
+				OutputFile="$(OutDir)/template_cache_test.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile="$(OutDir)/template_regtest.pdb"
+				ProgramDatabaseFile="$(OutDir)/template_cache_test.pdb"
 				SubSystem="1"
 				TargetMachine="1"/>
 			<Tool
@@ -74,7 +74,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/template_regtest.exe"
+				OutputFile="$(OutDir)/template_cache_test.exe"
 				LinkIncremental="1"
 				GenerateDebugInformation="TRUE"
 				SubSystem="1"
@@ -111,7 +111,7 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
 			<File
-				RelativePath="..\..\src\tests\template_regtest.cc">
+				RelativePath="..\..\src\tests\template_test_util.cc">
 				<FileConfiguration
 					Name="Debug|Win32">
 					<Tool
@@ -128,7 +128,7 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="..\..\src\tests\template_test_util.cc">
+				RelativePath="..\..\src\tests\template_cache_test.cc">
 				<FileConfiguration
 					Name="Debug|Win32">
 					<Tool

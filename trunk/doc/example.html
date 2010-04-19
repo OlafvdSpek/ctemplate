@@ -8,7 +8,6 @@
       rel="shortcut icon">
 <link href="designstyle.css" type="text/css" rel="stylesheet">
 <style type="text/css">
-<!--
   ol.bluelist li {
     color: #3366ff;
     font-family: sans-serif;
@@ -21,22 +20,19 @@
     color: #000;
     font-family: "Times Roman", times, serif;
   }
-//-->
 </style>
 </head>
 
 <body>
 
 <h1>Template Examples</h1>
-<small>(as of 1 September 2006)</small>
-<br>
 
 
 <h2> Simple Example </h2>
 
 <p>One reason this example is so simple is that it doesn't even
 require a separate template file, but instead uses
-<code>TemplateFromString</code>.  It also doesn't use sections or
+<code>StringToTemplateCache()</code>.  It also doesn't use sections or
 template-includes.</p>
 
 <pre class=example>
@@ -44,8 +40,7 @@ template-includes.</p>
 int main() {
   static const char template_text[] =
     "ERROR: {{FUNCTION}}({{ARGS}}) returned {{ERROR_CODE}}: {{ERROR_MESSAGE}}\n";
-  ctemplate::Template* tpl = ctemplate::Template::StringToTemplate(
-      template_text, DO_NOT_STRIP);
+  ctemplate::StringToTemplateCache("mytpl", template_text, ctemplate::DO_NOT_STRIP);
   FILE* fp = fopen(argv[1], "r");
   if (fp == NULL) {
     int err_no = errno;   // squirrel this away
@@ -56,10 +51,9 @@ int main() {
     dict.SetValue("ERROR_MESSAGE", strerror(err_no));
 
     string error_text;
-    tpl->Expand(&error_text, &dict);
+    ctemplate::ExpandTemplate("mytpl", ctemplate::DO_NOT_STRIP, &dict, &error_text);
     puts(error_text.c_str());
   }
-  delete tpl;
 }
 
 </pre>
@@ -88,8 +82,7 @@ int main() {
   static const char template_text[] =
      "ERROR: {{FUNCTION}}({{ARGS}}) returned {{ERROR_CODE}}"
      "{{#MSG_SECTION}}: {{ERROR_MESSAGE}}{{/MSG_SECTION}}\n";
-  ctemplate::Template* tpl = ctemplate::Template::StringToTemplate(
-      template_text, DO_NOT_STRIP);
+  ctemplate::StringToTemplateCache("mytpl", template_text, ctemplate::DO_NOT_STRIP);
   FILE* fp = fopen(argv[1], "r");
   if (fp == NULL) {
     int err_no = errno;   // squirrel this away
@@ -102,7 +95,7 @@ int main() {
                                   "MSG_SECTION");
 
     string error_text;
-    tpl->Expand(&error_text, &dict);
+    ctemplate::ExpandTemplate("mytpl", ctemplate::DO_NOT_STRIP, &dict, &error_text);
     puts(error_text.c_str());
   }
   delete tpl;
@@ -152,16 +145,16 @@ search results page:</p>
 
     {{#CATEGORY_SECTION}}
         &lt;br>&lt;span class=f>Category:&lt;/span> &lt;a href="{{CAT_URL:html_escape}}" class=f>
-	{{CATEGORY:html_escape}}&lt;/a>
+        {{CATEGORY:html_escape}}&lt;/a>
     {{/CATEGORY_SECTION}}
 
     {{#LASTLINE_SECTION}}
         &lt;br>&lt;font color="{{ALT_TEXT_COLOR:h}}">{{URL:h}}
         {{#KS_SECTION}}} - {{KSIZE:h}}{{/KS_SECTION}}}
         {{#CACHE_SECTION}}} - &lt;a href="{{CACHE_URL:h}}" class=f>Cached&lt;/A>
-	{{/CACHE_SECTION}}}
+        {{/CACHE_SECTION}}}
         {{#SIM_SECTION}}} - &lt;a href="{{SIM_PAGES_URL:h}}" class=f>Similar pages&lt;/A>
-	{{/SIM_SECTION}}}
+        {{/SIM_SECTION}}}
 
         {{#STOCK_SECTION}}
              -  &lt;a href="{{STOCK_URL:h}}" class=f>Stock quotes: {{STOCK_SYMBOL:h}}&lt;/a>
@@ -195,7 +188,7 @@ RegisterTemplateFilename(SEARCH_RESULTS_FN, "search_results.tpl");
 #include "search_results.tpl.varnames.h"  // defines ksr_HEADER, etc.
 
 using ctemplate::TemplateDictionary;
-using ctemplate::Template;
+using ctemplate::ExpandTemplate;
 using ctemplate::STRIP_WHITESPACE;
 
 // IsEmpty
@@ -320,11 +313,10 @@ void fill_search_results_dictionary(TemplateDictionary *dictionary,
 }        
 
 void output_page(const Query* query) {
-  Template* tpl = Template::GetTemplate(SEARCH_RESULTS_FN, STRIP_WHITESPACE);
   TemplateDictionary dict("search-results dict");
   string output;
   fill_search_results_dictionary(&amp;dict, query);
-  tpl->Expand(&amp;output, &amp;dict);
+  ctemplate::ExpandTemplate(SEARCH_RESULTS_FN, STRIP_WHITESPACE, &amp;dict, &amp;output);
   // output now holds the expanded template
 }
 
@@ -333,7 +325,8 @@ void output_page(const Query* query) {
 
 <hr>
 <ul>
-  <li> <A HREF="howto.html">Howto</A> </li>
+  <li> <A HREF="guide.html">User's Guide</A> </li>
+  <li> <A HREF="reference.html">Reference Manual</A> </li>
   <li> <A HREF="auto_escape.html">Auto Escape</A> </li>
   <li> <A HREF="tips.html">Tips</A> </li>
 <!--
@@ -344,7 +337,10 @@ void output_page(const Query* query) {
 <hr>
 <address>
 Craig Silverstein<br>
-27 February 2006
+<script type=text/javascript>
+  var lm = new Date(document.lastModified);
+  document.write(lm.toDateString());
+</script>
 </address>
 
 </body>

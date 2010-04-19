@@ -44,10 +44,13 @@
 
 #ifdef _WIN32
 
+#define USING_PORT_CC
+
 #define WIN32_LEAN_AND_MEAN  /* We always want minimal includes */
 #include <windows.h>
 #include <io.h>              /* because we so often use open/close/etc */
 #include <direct.h>          /* for _getcwd() */
+#include <sys/utime.h>       /* for _utime() */
 #include <stdio.h>           /* read in vsnprintf decl. before redifining it */
 #include <stdarg.h>          /* template_dictionary.cc uses va_copy */
 #include <string.h>          /* for _strnicmp */
@@ -82,14 +85,14 @@
 #endif
 #define S_ISDIR(m)  (((m) & _S_IFMT) == _S_IFDIR)
 
+#define utime    _utime
+#define utimbuf  _utimbuf
+
 /* Not quite as lightweight as a hard-link, but more than good enough for us. */
 #define link(oldpath, newpath)  CopyFileA(oldpath, newpath, false)
 
 #define strcasecmp   _stricmp
 #define strncasecmp  _strnicmp
-
-/* In windows-land, hash<> is called hash_compare<> (from xhash.h) */
-#define hash  hash_compare
 
 /* Sleep is in ms, on windows */
 #define sleep(secs)  Sleep((secs) * 1000)
@@ -120,8 +123,10 @@ extern int CTEMPLATE_DLL_DECL safe_vsnprintf(char *str, size_t size,
 #include <string>
 #include <vector>
 
+_START_GOOGLE_NAMESPACE_
 extern CTEMPLATE_DLL_DECL std::string TmpFile(const char* basename);
-void CTEMPLATE_DLL_DECL CleanTestDir(const std::string& dirname);
+void CTEMPLATE_DLL_DECL CreateOrCleanTestDir(const std::string& dirname);
+_END_GOOGLE_NAMESPACE_
 void CTEMPLATE_DLL_DECL GetNamelist(const char* testdata_dir,
                                     std::vector<std::string>* namelist);
 #endif  /* __cplusplus */

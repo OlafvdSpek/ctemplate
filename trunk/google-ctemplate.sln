@@ -28,6 +28,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_setglobals_unittes
 		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_cache_test", "vsprojects\template_cache_test\template_cache_test.vcproj", "{5105C0FF-C28A-480B-8298-A66AB4F1F0C0}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
+	EndProjectSection
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "template_unittest", "vsprojects\template_unittest\template_unittest.vcproj", "{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}"
 	ProjectSection(ProjectDependencies) = postProject
 		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
@@ -101,6 +106,10 @@ Global
 		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Debug.Build.0 = Debug|Win32
 		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.ActiveCfg = Release|Win32
 		{5105C0FF-C28A-480B-8298-A66AB4F1F0CD}.Release.Build.0 = Release|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0C0}.Debug.ActiveCfg = Debug|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0C0}.Debug.Build.0 = Debug|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0C0}.Release.ActiveCfg = Release|Win32
+		{5105C0FF-C28A-480B-8298-A66AB4F1F0C0}.Release.Build.0 = Release|Win32
 		{ED69C82B-F593-418A-8D17-C64CBB11E603}.Debug.ActiveCfg = Debug|Win32
 		{ED69C82B-F593-418A-8D17-C64CBB11E603}.Debug.Build.0 = Debug|Win32
 		{ED69C82B-F593-418A-8D17-C64CBB11E603}.Release.ActiveCfg = Release|Win32

@@ -67,6 +67,7 @@ static Mutex g_static_mutex(Mutex::LINKER_INITIALIZED);
 /*static*/ UnsafeArena* const TemplateDictionary::NO_ARENA = NULL;
 /*static*/ TemplateDictionary::GlobalDict* TemplateDictionary::global_dict_
     = NULL;
+/*static*/ TemplateString* TemplateDictionary::empty_string_ = NULL;
 
 static const char* const kAnnotateOutput = "__ctemplate_annotate_output__";
 
@@ -210,6 +211,8 @@ void TemplateDictionary::HashInsert(MapType* m,
   // Initialize the built-ins
   HashInsert(global_dict_, TemplateString("BI_SPACE"), TemplateString(" "));
   HashInsert(global_dict_, TemplateString("BI_NEWLINE"), TemplateString("\n"));
+  // This is used for name-lookup misses.
+  empty_string_ = new TemplateString("");
 }
 
 // ----------------------------------------------------------------------
@@ -376,21 +379,22 @@ TemplateDictionary* TemplateDictionary::MakeCopy(
 
 int TemplateDictionary::StringAppendV(char* space, char** out,
                                       const char* format, va_list ap) {
+  const int kBufsize = 1024;
   // It's possible for methods that use a va_list to invalidate
   // the data in it upon use.  The fix is to make a copy
   // of the structure before using it and use that copy instead.
   va_list backup_ap;
   va_copy(backup_ap, ap);
-  int result = vsnprintf(space, sizeof(space), format, backup_ap);
+  int result = vsnprintf(space, kBufsize, format, backup_ap);
   va_end(backup_ap);
 
-  if ((result >= 0) && (result < sizeof(space))) {
+  if ((result >= 0) && (result < kBufsize)) {
     *out = space;
     return result;  // It fit
   }
 
   // Repeatedly increase buffer size until it fits
-  int length = 1024;    // sizeof(space)
+  int length = kBufsize;
   while (true) {
     if (result < 0) {
       // Older snprintf() behavior. :-(  Just try doubling the buffer size
@@ -904,14 +908,14 @@ TemplateString TemplateDictionary::Memdup(const char* s, size_t slen) {
 //    dictionary.  None of these functions ever returns NULL.
 // ----------------------------------------------------------------------
 
-const char *TemplateDictionary::GetSectionValue(
+TemplateString TemplateDictionary::GetValue(
     const TemplateString& variable) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->variable_dict_) {
       VariableDict::const_iterator it
           = d->variable_dict_->find(variable.GetGlobalId());
       if (it != d->variable_dict_->end())
-        return it->second.ptr_;
+        return it->second;
     }
   }
 
@@ -919,23 +923,22 @@ const char *TemplateDictionary::GetSectionValue(
   assert(template_global_dict_owner_ != NULL);
   if (template_global_dict_owner_->template_global_dict_
       && template_global_dict_owner_->template_global_dict_->variable_dict_) {
-    const VariableDict* template_global_vars = 
+    const VariableDict* template_global_vars =
         template_global_dict_owner_->template_global_dict_->variable_dict_;
 
     VariableDict::const_iterator it =
         template_global_vars->find(variable.GetGlobalId());
     if (it != template_global_vars->end())
-      return it->second.ptr_;
+      return it->second;
   }
 
   // No match in dict tree or template-global dict.  Last chance: global dict.
   {
     ReaderMutexLock ml(&g_static_mutex);
     GlobalDict::const_iterator it = global_dict_->find(variable.GetGlobalId());
-    const char* retval = "";    // what we'll return if global lookup fails
     if (it != global_dict_->end())
-      retval = it->second.ptr_;
-    return retval;
+      return it->second;
+    return *empty_string_;
   }
 }
 

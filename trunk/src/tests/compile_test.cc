@@ -37,7 +37,7 @@
 // as a compile check for the .h files.  It will not work if you use
 // a non-standard name for the package namespace (via
 //     ./configure --enable-namespace=foo
-// ).
+// ), though you can fix that by changing the namespace alias below.
 
 // These are all the .h files that we export
 #include <ctemplate/per_expand_data.h>
@@ -53,13 +53,24 @@
 #include <stdio.h>
 #include <string>
 
+// If you used ./configure --enable-namespace=foo, replace 'ctemplate'
+// here with 'foo'.
+namespace template_ns = ctemplate;
+
 int main() {
-  ctemplate::Template::StringToTemplateCache("key", "example");
-  ctemplate::Template* tpl = ctemplate::Template::GetTemplate(
-      "key", ctemplate::DO_NOT_STRIP);
-  ctemplate::TemplateDictionary dict("my dict");
+  template_ns::Template::StringToTemplateCache("key", "example");
+  template_ns::Template* tpl = template_ns::Template::GetTemplate(
+      "key", template_ns::DO_NOT_STRIP);
+  template_ns::TemplateDictionary dict("my dict");
   std::string nothing_will_come_of_nothing;
   tpl->Expand(&nothing_will_come_of_nothing, &dict);
+
+  // Try using a bit more functionality.
+  template_ns::PerExpandData data;
+  nothing_will_come_of_nothing.clear();
+  template_ns::ExpandWithData("key", template_ns::DO_NOT_STRIP, &dict, &data,
+                              &nothing_will_come_of_nothing);
+
   printf("PASS.\n");
   return 0;
 }

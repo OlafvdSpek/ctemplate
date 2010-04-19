@@ -7513,6 +7513,7 @@ AC_SUBST([am__untar])
 ]) # _AM_PROG_TAR
 
 m4_include([m4/ac_have_attribute.m4])
+m4_include([m4/ac_interlocked_exchange.m4])
 m4_include([m4/ac_rwlock.m4])
 m4_include([m4/acx_pthread.m4])
 m4_include([m4/compiler_characteristics.m4])
