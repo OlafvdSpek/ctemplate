@@ -1,3 +1,9 @@
+ctemplate (0.97-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Google Inc. <opensource@google.com>  Mon, 19 Apr 2010 15:55:23 -0700
+
 ctemplate (0.96-1) unstable; urgency=low
 
   * New upstream release.

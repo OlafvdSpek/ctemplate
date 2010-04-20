@@ -1,3 +1,15 @@
+Mon Apr 19 15:55:23 2010  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.97 release
+	* Major API revamp: +TemplateCache, -Template (panicker, csilvers)
+	* Major documentation revamp: howto -> guide + reference (csilvers)
+	* Protect auto-generated #include files with header guard (dnovillo)
+	* Allow ftp:// in ValidateUrl modifier (martone)
+	* Speed up template modifiers (turnidge)
+	* BUGFIX: Fix a dnagling pointer in template-modifiers (csilvers)
+	* PORTING: cygwin/mingw now compile (due to autoconf macros) (csilvers)
+	* PORTING: improve generate_fs_test on windows (csilvers)
+
 Mon Oct 19 11:42:57 2009  Google Inc. <opensource@google.com>
 
 	* ctemplate: version 0.96 release

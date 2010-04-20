@@ -51,6 +51,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>    // for toupper(), isalnum()
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -124,7 +125,7 @@ static void Version(FILE* outfile) {
 // Removes all non alphanumeric characters from a string to form a
 // valid C identifier to use as a double-inclusion guard.
 static void ConvertToIdentifier(string& s) {
-  for (int i = 0; i < s.size(); i++) {
+  for (string::size_type i = 0; i < s.size(); i++) {
     if (!isalnum(s[i]))
       s[i] = '_';
     else
