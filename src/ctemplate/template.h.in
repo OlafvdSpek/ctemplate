@@ -400,7 +400,7 @@ class @ac_windows_dllexport@ Template {
 
   // Template markers have the form {{VARIABLE}}, etc.  These constants
   // define the {{ and }} that delimit template markers.
-  struct MarkerDelimiters {
+  struct @ac_windows_dllexport@ MarkerDelimiters {
     const char* start_marker;
     size_t start_marker_len;
     const char* end_marker;
@@ -415,7 +415,7 @@ class @ac_windows_dllexport@ Template {
   };
 
   // The current parsing state.  Used in BuildTree() and subroutines
-  struct ParseState {
+  struct @ac_windows_dllexport@ ParseState {
     const char* bufstart;
     const char* bufend;
     enum { PS_UNUSED, GETTING_TEXT, GETTING_NAME } phase;

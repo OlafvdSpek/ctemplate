@@ -94,12 +94,12 @@ the appropriate escaping modifiers after your own.</p>
        that use but allows you to indicate a different choice as shown
        below:
 
-       <p><table border=1 cellpadding=3>
+       <table border="1" cellpadding="3" summary="Alternatives to modifiers">
        <tr><th>TemplateContext</th><th>Primary Modifier</th>
            <th>Accepted alternatives</th></tr>
 
        <tr>
-       <td><code>TC_HTML</code></code></td>
+       <td><code>TC_HTML</code></td>
        <td><code>:html_escape</code></td>
        <td><ul>
                <li><code>:pre_escape</code></li>
@@ -108,6 +108,7 @@ the appropriate escaping modifiers after your own.</p>
                <li><code>:html_escape_with_arg=url</code></li>
                <li><code>:url_query_escape</code></li>
                <li><code>:url_escape_with_arg=html</code></li>
+               <li><code>:img_src_url_escape_with_arg=html</code></li>
        </ul></td>
        </tr>
 
@@ -116,6 +117,7 @@ the appropriate escaping modifiers after your own.</p>
        <td><code>:cleanse_css</code></td>
        <td><ul>
                <li><code>:url_escape_with_arg=css</code></li>
+               <li><code>:img_src_url_escape_with_arg=css</code></li>
        </ul></td>
        </tr>
 
@@ -125,7 +127,7 @@ the appropriate escaping modifiers after your own.</p>
        <td><ul>
                <li><code>:html_escape</code></li>
                <li><code>:html_escape_with_arg=attribute</code></li>
-       </td></ul>
+       </ul></td>
        </tr>
 
        <tr>
@@ -133,10 +135,10 @@ the appropriate escaping modifiers after your own.</p>
        <td><code>:javascript_escape</code></td>
        <td><ul>
                <li><code>:json_escape</code></li>
-       </td></ul>
+       </ul></td>
        </tr>
 
-       </table></p></li>
+       </table></li>
 
     <li> To add additional escaping modifiers.  The Template System will
         never remove escaping directives you explicitly specify. </li>
@@ -159,13 +161,13 @@ the semantics of the variable therefore we fail the template
 initialization. An error is logged indicating the cause of
 the failure.</p>
 
-<table border=1 cellpadding=3>
-<tr bgcolor="RoyalBlue">
+<table border="1" cellpadding="3" summary="Contexts for using modifiers">
+<tr bgcolor="#4169E1">
   <th>Context</th><th>HTML Quoted?</th>
   <th>Examples</th><th>Action Performed</th>
 </tr>
 
-<tr bgcolor="AliceBlue">
+<tr bgcolor="#F0F8FF">
   <td>Regular HTML Body and HTML comments</td><td>Any</td>
   <td><pre>&lt;p&gt;Hello {{USER}}&lt;/p&gt;
       </pre></td>
@@ -173,95 +175,95 @@ the failure.</p>
       <code>:html_escape</code></td>
 </tr>
 
-<tr bgcolor="AntiqueWhite">
+<tr bgcolor="#FAEBD7">
   <td>In URL attribute: Starts at pos 0</td><td>Yes</td>
-  <td><pre>&lt;img src="{{URL}}"&gt;;</pre></td>
+  <td><pre>&lt;a href="{{URL}}"&gt;;</pre></td>
   <td>Escape <code>URL</code> using
       <code>:url_escape_with_arg=html</code></td>
 </tr>
 
-<tr bgcolor="AntiqueWhite">
+<tr bgcolor="#FAEBD7">
   <td>In URL attribute: Other</td><td>Yes</td>
   <td><pre>&lt;a href="/foo?q={{QUERY}}"&gt;</pre></td>
   <td>Escape <code>QUERY</code> using
       <code>:html_escape</code></td>
 </tr>
 
-<tr bgcolor="AntiqueWhite">
+<tr bgcolor="#FAEBD7">
   <td>In URL attribute: Starting at pos 0</td><td>No</td>
   <td><pre>&lt;form action={{URL}}&gt;</pre></td>
   <td><em>Fail template initialization</em></td>
 </tr>
 
-<tr bgcolor="AntiqueWhite">
+<tr bgcolor="#FAEBD7">
   <td>In URL attribute: Other</td><td>No</td>
   <td><pre>&lt;a href=/foo?q={{QUERY}}&gt;My Link&lt;/a&gt;</pre></td>
   <td>Escape <code>QUERY</code> using
       <code>:url_query_escape</code></td>
 </tr>
 
-<tr bgcolor="AliceBlue">
+<tr bgcolor="#F0F8FF">
   <td>In STYLE attribute</td><td>Yes</td>
   <td><pre>&lt;div style="color:{{COLOR}};"&gt;</pre></td>
   <td>Escape <code>COLOR</code> using
       <code>:cleanse_css</code></td>
 </tr>
 
-<tr bgcolor="AliceBlue">
+<tr bgcolor="#F0F8FF">
   <td>In STYLE attribute</td><td>No</td>
   <td><pre>&lt;div style=color:{{COLOR}};&gt;</pre></td>
   <td><em>Fail template initialization</em></td>
 </tr>
 
-<tr bgcolor="AntiqueWhite">
+<tr bgcolor="#FAEBD7">
   <td>In Javascript attribute: String literal</td><td>Yes</td>
   <td><pre>&lt;a href="url" onclick="doFoo('{{ARG}}');"&gt;</pre></td>
   <td>Escape <code>ARG</code> using
       <code>:javascript_escape</code></td>
 </tr>
 
-<tr bgcolor="AntiqueWhite">
+<tr bgcolor="#FAEBD7">
   <td>In Javascript attribute: Non-string literal</td><td>Yes</td>
   <td><pre>&lt;a href="url" onclick="doFoo({{ARG}});"&gt;</pre></td>
   <td>Escape <code>ARG</code> using
       <code>:javascript_escape_with_arg=number</code></td>
 </tr>
 
-<tr bgcolor="AntiqueWhite">
+<tr bgcolor="#FAEBD7">
   <td>In Javascript attribute: Any</td><td>No</td>
   <td><pre>&lt;a href="url" onclick=doFoo('{{ARG}}');&gt;</pre></td>
   <td><em>Fail template initialization.</em></td>
 </tr>
 
-<tr bgcolor="AliceBlue">
+<tr bgcolor="#F0F8FF">
   <td>In all other attributes</td><td>Yes</td>
   <td><pre>&lt;b class="{{CLASS}}"&gt;</pre></td>
   <td>Escape <code>CLASS</code> using
       <code>:html_escape</code></td>
 </tr>
 
-<tr bgcolor="AliceBlue">
+<tr bgcolor="#F0F8FF">
   <td>In all other attributes</td><td>No</td>
   <td><pre>&lt;table border={{BORDER}}&gt;</pre></td>
   <td>Escape <code>BORDER</code> using
       <code>:html_escape_with_arg=attribute</code></td>
 </tr>
 
-<tr bgcolor="AntiqueWhite">
+<tr bgcolor="#FAEBD7">
   <td>In Javascript code: In a string literal</td><td>Any</td>
   <td><pre>&lt;script&gt;var a = '{{VALUE}}';&lt;/script&gt;</pre></td>
   <td>Escape <code>VALUE</code> using
       <code>:javascript_escape</code></td>
 </tr>
 
-<tr bgcolor="AntiqueWhite">
+<tr bgcolor="#FAEBD7">
   <td>In Javascript code: Non-string literal</td><td>Any</td>
   <td><pre>&lt;script&gt;var a = {{VALUE}};&lt;/script&gt;</pre></td>
   <td>Escape <code>VALUE</code> using
       <code>:javascript_escape_with_arg=number</code></td>
 </tr>
 
-<tr bgcolor="AliceBlue">
+<tr bgcolor="#F0F8FF">
   <td>In a &lt;style&gt; tag</td><td>Any</td>
   <td><pre>&lt;style&gt;font-size={{FONTSIZE}};&lt;/style&gt;</pre></td>
   <td>Escape <code>FONTSIZE</code> using
@@ -270,7 +272,7 @@ the failure.</p>
 
 </table>
 
-<p><h4>Comments:</h4>
+<h4>Comments:</h4>
 <ul>
     <li>For values of URL-accepting attributes, we apply a different
         modifier if the variable is at the beginning of the attribute
@@ -357,7 +359,7 @@ restrictions governing the use of this template system.</p>
         Javascript (<code>TC_JS</code>) templates are well supported.
         Other template contexts have only basic support.
         For these contexts, variables are escaped as follows:</p>
-        <table border=1 cellpadding=3>
+        <table border="1" cellpadding="3" summary="HTML contexts for modifiers">
         <tr><th>TemplateContext</th><th>Escaping Applied</th></tr>
         <tr><td>TC_JSON</td>
             <td><code>:javascript_escape</code></td></tr>
@@ -406,7 +408,6 @@ it does not match the template type given, we log a warning.</p>
 
 
 
-<p>
 <hr>
 <address>
 Jad Boutros<br>

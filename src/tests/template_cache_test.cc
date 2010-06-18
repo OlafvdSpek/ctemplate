@@ -876,6 +876,7 @@ class TemplateCacheUnittest {
     AssertExpandIs(cache_tpl1, &dict, "{valid template}", true);
     const Template* cache_tpl2 = cache.GetTemplate(filename2, DO_NOT_STRIP);
     assert(cache_tpl2);
+    static_cast<void>(cache_tpl2);  // avoid unused var warning in opt mode
     AssertExpandWithCacheIs(&cache, filename2, DO_NOT_STRIP, &dict, NULL,
                             "hi  bar\n", true);
 
@@ -892,6 +893,7 @@ class TemplateCacheUnittest {
     string filename3 = StringToTemplateFile("{yet another valid template}");
     const Template* cache_tpl3 = cache.GetTemplate(filename3, STRIP_WHITESPACE);
     assert(!cache_tpl3);
+    static_cast<void>(cache_tpl3);  // avoid unused var warning in opt mode
 
     // 2. Reloading existing templates fails.
     StringToFile("{file1 contents changed}", filename1);

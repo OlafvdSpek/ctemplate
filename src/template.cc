@@ -35,8 +35,8 @@
 
 #include "base/mutex.h"     // This must go first so we get _XOPEN_SOURCE
 #include <assert.h>
-#include <errno.h>
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>          // for fwrite, fflush
 #include <stdlib.h>
 #include <string.h>
@@ -96,6 +96,15 @@ using HASH_NAMESPACE::hash_map;
 using HTMLPARSER_NAMESPACE::HtmlParser;
 
 #define arraysize(x)  ( sizeof(x) / sizeof(*(x)) )
+
+// TODO(csilvers): use our own tables for these?
+static bool ascii_isalnum(char c) {
+  return ((c & 0x80) == 0) && isalnum(c);  // 7-bit ascii, and an alnum
+}
+
+static bool ascii_isspace(char c) {
+  return ((c & 0x80) == 0) && isspace(c);  // 7-bit ascii, and a space
+}
 
 TemplateId GlobalIdForSTS_INIT(const TemplateString& s) {
   return s.GetGlobalId();   // normally this method is private
@@ -1779,7 +1788,7 @@ bool SectionTemplateNode::AddSubnode(Template *my_template) {
 // nothing else.
 static bool IsValidName(const char* name, int namelen) {
   for (const char *cur_char = name; cur_char - name <  namelen; ++cur_char) {
-    if (!isalnum(*cur_char) && *cur_char != '_')
+    if (!ascii_isalnum(*cur_char) && *cur_char != '_')
       return false;
   }
   return true;
@@ -2386,12 +2395,12 @@ bool Template::ParseDelimiters(const char* text, size_t textlen,
 // so we can take a size_t instead of an int.  The code is simple enough.
 static void StripTemplateWhiteSpace(const char** str, size_t* len) {
   // Strip off trailing whitespace.
-  while ((*len) > 0 && isspace((*str)[(*len)-1])) {
+  while ((*len) > 0 && ascii_isspace((*str)[(*len)-1])) {
     (*len)--;
   }
 
   // Strip off leading whitespace.
-  while ((*len) > 0 && isspace((*str)[0])) {
+  while ((*len) > 0 && ascii_isspace((*str)[0])) {
     (*len)--;
     (*str)++;
   }

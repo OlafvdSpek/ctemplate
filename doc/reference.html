@@ -68,8 +68,7 @@ templates.</p>
 option is set, which puts template code in namespace
 <code>ctemplate</code>.)</p>
 
-
-<h2> <A NAME="template">Expanding Templates </h2>
+<h2> <A NAME="template">Expanding Templates</A> </h2>
 
 
 <h3> The Template Language </h3>
@@ -526,8 +525,8 @@ code:
    ctemplate::TemplateDictionary::SetGlobalValue("NAME", "John Doe");
    ctemplate::TemplateDictionary dict_c("set_value_demo, part 2");
 
-   ctemplate::ExpandTemplate("A.tpl", ..., &dict);
-   ctemplate::ExpandTemplate("C.tpl", ..., &dict_c);
+   ctemplate::ExpandTemplate("A.tpl", ..., &amp;dict);
+   ctemplate::ExpandTemplate("C.tpl", ..., &amp;dict_c);
 </pre>
 
 <p>The first expand yields this:</p>
@@ -996,17 +995,67 @@ sign:</p>
 <p>Here are the modifiers that are built in to the template system.
 They are all defined in template_modifiers.cc:</p>
 
-<table border=1 cellpadding=3>
+<table border="1" cellpadding="3" summary="List of built-in modifiers">
 <tr><th>long name</th><th>short name</th><th>description</th></tr>
+
+<tr><td><code>:cleanse_css</code></td><td><code>:c</code></td>
+    <td>Removes characters not safe for a CSS value. Safe characters
+      are alphanumeric, space, underscore, period, coma, exclamation
+      mark, pound, percent, and dash.</td>
+</tr>
 
 <tr><td><code>:html_escape</code></td><td><code>:h</code></td>
     <td>html-escapes the variable before output
         (eg <code>&amp;</code> -> <code>&amp;amp;</code>)</td>
 </tr>
 
+<tr><td><code>:html_escape_with_arg</code></td><td><code>:H</code></td>
+  <td>special purpose html escaping. See
+    <a href="#html_escape_args">:H Arguments</a>
+    below for details.</td>
+</tr>
+
+<tr><td><code>:img_src_url_escape_with_arg</code></td><td><code>:I</code></td>
+    <td>special purpose image url escaping. See
+      <a href="#url_escape_args">:I and :U Arguments</a>
+      below for details.</td>
+</tr>
+
+<tr><td><code>:javascript_escape</code></td><td><code>:j</code></td>
+    <td>javascript-escapes the variable before output (eg
+        <code>&quot;</code> -> <code>\x27</code> and
+        <code>&amp;</code> -> <code>\x26</code>)</td>
+</tr>
+
+<tr><td><code>:javascript_escape_with_arg</code></td><td><code>:J</code>
+    </td>
+    <td>special purpose javascript escaping. See
+      <a href="#javascript_escape_args">:J Arguments</a>
+      below for details.</td>
+</tr>
+
+<tr><td><code>:json_escape</code></td><td><code>:o</code></td>
+    <td>json-escapes a variable before output as a string in json;
+        HTML characters are escaped using Unicode escape sequences
+        (e.g <code>&amp;</code> -> <code>\u0026</code>) to comply with
+        <a href="http://www.ietf.org/rfc/rfc4627.txt">RFC 4627</a>.
+    </td>
+</tr>
+
+<tr><td><code>:none</code></td><td></td>
+    <td>leaves the variable as is (used to disable <A
+    HREF="#auto_escape">auto-escaping</A>)</td>
+</tr>
+
 <tr><td><code>:pre_escape</code></td><td><code>:p</code></td>
     <td>pre-escapes the variable before output (same as html_escape but
       whitespace is preserved; useful for &lt;pre&gt;...&lt;/pre&gt;)</td>
+</tr>
+
+<tr><td><code>:url_escape_with_arg</code></td><td><code>:U</code></td>
+    <td>special purpose url escaping. See
+      <a href="#url_escape_args">:I and :U Arguments</a>
+      below for details.</td>
 </tr>
 
 <tr><td><code>:url_query_escape</code></td><td><code>:u</code></td>
@@ -1018,39 +1067,6 @@ They are all defined in template_modifiers.cc:</p>
     </td>
 </tr>
 
-<tr><td><code>:javascript_escape</code></td><td><code>:j</code></td>
-    <td>javascript-escapes the variable before output (eg
-        <code>&quot;</code> -> <code>\x27</code> and
-        <code>&amp;</code> -> <code>\x26</code>)</td>
-</tr>
-
-<tr><td><code>:javascript_escape_with_arg</code></td><td><code>:J</code>
-    </td>
-    <td>special purpose javascript escaping. See below for details.</td>
-</tr>
-
-<tr><td><code>:cleanse_css</code></td><td><code>:c</code></td>
-    <td>Removes characters not safe for a CSS value. Safe characters
-      are alphanumeric, space, underscore, period, coma, exclamation
-      mark, pound, percent, and dash.</td>
-</tr>
-
-<tr><td><code>:json_escape</code></td><td><code>:o</code></td>
-    <td>json-escapes a variable before output as a string in json;
-        HTML characters are escaped using Unicode escape sequences
-        (e.g <code>&amp;</code> -> <code>\u0026</code>) to comply with
-        <a href="http://www.ietf.org/rfc/rfc4627.txt">RFC 4627</a>.
-    </td>
-</tr>
-
-<tr><td><code>:html_escape_with_arg</code></td><td><code>:H</code></td>
-    <td>special purpose html escaping. See below for details.</td>
-</tr>
-
-<tr><td><code>:url_escape_with_arg</code></td><td><code>:U</code></td>
-    <td>special purpose url escaping. See below for details.</td>
-</tr>
-
 <tr><td><code>:xml_escape</code></td><td></td>
     <td>xml-escapes the variable before output
         (the five characters <code>&lt;&gt;&amp;&quot;&#39;</code> become
@@ -1059,19 +1075,16 @@ They are all defined in template_modifiers.cc:</p>
         for escaping content within CDATA blocks.</td>
 </tr>
 
-<tr><td><code>:none</code></td><td></td>
-    <td>leaves the variable as is (used to disable <A
-    HREF="#auto_escape">auto-escaping</A>)</td>
-</tr>
-
 </table>
 
 <p>The <code>*_with_arg</code> modifiers require an argument to
-specify the type of escaping to use.
+specify the type of escaping to use. The following sections list
+the supported arguments for each of these modifiers.
 
+<h4 id="html_escape_args">:H Arguments</h4>
 <p>Here are the values that are supported by
 the <code>html_escape_with_arg</code> modifier:</p>
-<table border=1 cellpadding=3>
+<table border="1" cellpadding="3" summary="Arguments for :H modifier">
 <tr><th>value</th><th>description</th></tr>
 
 <tr><td><code>=snippet</code></td>
@@ -1097,16 +1110,33 @@ the <code>html_escape_with_arg</code> modifier:</p>
 
 </table>
 
+<h4 id="url_escape_args">:I and :U Arguments</h4>
 <p>Here are the values that are supported by
-the <code>url_escape_with_arg</code> modifier:</p>
-<table border=1 cellpadding=3>
+the <code>img_src_url_escape_with_arg</code> and
+<code>url_escape_with_arg</code> modifiers:</p>
+<table border="1" cellpadding="3" summary="Arguments for :I and :U modifiers">
 <tr><th>value</th><th>description</th></tr>
 
 <tr><td><code>=html</code></td>
     <td>Ensures that a variable contains a safe URL. Safe means that
         it is either a http or https URL, or else it has no protocol
-        specified.  If the URL is safe it is html-escaped, otherwise
-        it is replaced with <code>#</code>.</td>
+        specified.
+        <ul>
+          <li>If the URL is safe, the modifier HTML-escapes the URL.
+          <li>Otherwise, the modifier replaces the unsafe URL with one of the
+          following values:
+            <ul>
+              <li><code>/images/cleardot.gif</code> (the <code>:I</code>
+              modifier)
+              <li><code>#</code> (the <code>:U</code> modifier)
+            </ul>
+          </li>
+        </ul>
+        <b>Do not use <code>:U</code> for image URLs.</b> Use <code>:I</code>
+        instead.  <code>#</code> is not a safe replacement for an image URL.
+        <code>&lt;img src=#&gt;</code> can cause each browser to request the
+        entire page again.
+    </td>
 </tr>
 
 <tr><td><code>=javascript</code></td>
@@ -1123,14 +1153,16 @@ the <code>url_escape_with_arg</code> modifier:</p>
 </tr>
 
 <tr><td><code>=query</code></td>
-    <td>Same as <code>url_query_escape</code>.</td>
+  <td>(Supported for <code>:U</code> only) Same as
+    <code>url_query_escape</code>.</td>
 </tr>
 
 </table>
 
+<h4 id="javascript_escape_args">:J Arguments</h4>
 <p>Here are the values that are supported by
 the <code>javascript_escape_with_arg</code> modifier:</p>
-<table border=1 cellpadding=3>
+<table border="1" cellpadding="3" summary="Arguments for :J modifier">
 <tr><th>value</th><th>description</th></tr>
 
 <tr><td><code>=number</code></td>
@@ -1148,12 +1180,6 @@ the <code>javascript_escape_with_arg</code> modifier:</p>
         arrays.</td>
 </tr>
 </table>
-
-<p><strong>NOTE:</strong> At the moment, there are no filters for
-handling XML attributes and text nodes. For HTML snippets, use the
-html filter; in other situations, it may be appropriate to use CDATA
-blocks.</p>
-
 
 <h3> Custom Modifiers </h3>
 
@@ -1480,7 +1506,7 @@ workflow: the common template use-case would be:</p>
 <pre>
    Template* tpl = Template::GetTemplate(filename, strip_mode);
    TemplateDictionary dict(name);
-   tpl->Expand(&dict, &outstring);
+   tpl->Expand(&amp;dict, &amp;outstring);
 </pre>
 
 <p>In current use, this model is deprecated in favor of the single

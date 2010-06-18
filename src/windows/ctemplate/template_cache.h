@@ -53,6 +53,11 @@ struct stat;
 // as a compiler flag in your project file to turn off the dllimports.
 #ifndef CTEMPLATE_DLL_DECL
 # define CTEMPLATE_DLL_DECL  __declspec(dllimport)
+extern template class __declspec(dllimport) std::allocator<std::string>;
+extern template class __declspec(dllimport) std::vector<std::string>;
+#else
+template class __declspec(dllexport) std::allocator<std::string>;
+template class __declspec(dllexport) std::vector<std::string>;
 #endif
 
 namespace ctemplate {

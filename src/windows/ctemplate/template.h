@@ -405,7 +405,7 @@ class CTEMPLATE_DLL_DECL Template {
 
   // Template markers have the form {{VARIABLE}}, etc.  These constants
   // define the {{ and }} that delimit template markers.
-  struct MarkerDelimiters {
+  struct CTEMPLATE_DLL_DECL MarkerDelimiters {
     const char* start_marker;
     size_t start_marker_len;
     const char* end_marker;
@@ -420,7 +420,7 @@ class CTEMPLATE_DLL_DECL Template {
   };
 
   // The current parsing state.  Used in BuildTree() and subroutines
-  struct ParseState {
+  struct CTEMPLATE_DLL_DECL ParseState {
     const char* bufstart;
     const char* bufend;
     enum { PS_UNUSED, GETTING_TEXT, GETTING_NAME } phase;

@@ -49,6 +49,10 @@ bool PerExpandData::DataEq::operator()(const char* s1, const char* s2) const {
 }
 #endif
 
+PerExpandData::~PerExpandData() {
+  delete map_;
+}
+
 TemplateAnnotator* PerExpandData::annotator() const {
   if (annotator_ != NULL) {
     return annotator_;
@@ -57,6 +61,21 @@ TemplateAnnotator* PerExpandData::annotator() const {
   // should be safe.
   static TextTemplateAnnotator g_default_annotator;
   return &g_default_annotator;
+}
+
+void PerExpandData::InsertForModifiers(const char* key, const void* value) {
+  if (!map_)
+    map_ = new DataMap;
+  (*map_)[key] = value;
+}
+
+  // Retrieve data specific to this Expand call. Returns NULL if key
+  // is not found.  This should only be used by template modifiers.
+const void* PerExpandData::LookupForModifiers(const char* key) const {
+  if (!map_)
+    return NULL;
+  const DataMap::const_iterator it = map_->find(key);
+  return it == map_->end() ? NULL : it->second;
 }
 
 }  // namespace ctemplate

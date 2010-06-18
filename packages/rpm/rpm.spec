@@ -10,7 +10,7 @@ Group: Development/Libraries
 URL: http://code.google.com/p/google-ctemplate
 License: BSD
 Vendor: Google
-Packager: Google Inc. <opensource@google.com>
+Packager: Google Inc. <google-ctemplate@googlegroups.com>
 Source: http://%{NAME}.googlecode.com/files/%{NAME}-%{VERSION}.tar.gz
 Distribution: Redhat 7 and above.
 Buildroot: %{_tmppath}/%{name}-root

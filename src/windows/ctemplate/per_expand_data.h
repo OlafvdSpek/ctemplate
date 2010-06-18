@@ -65,7 +65,10 @@ class CTEMPLATE_DLL_DECL PerExpandData {
   PerExpandData()
       : annotate_path_(NULL),
         annotator_(NULL),
-        expand_modifier_(NULL) { }
+        expand_modifier_(NULL),
+        map_(NULL) { }
+
+  ~PerExpandData();
 
   // Indicate that annotations should be inserted during template expansion.
   // template_path_start - the start of a template path.  When
@@ -115,16 +118,11 @@ class CTEMPLATE_DLL_DECL PerExpandData {
   // (see template_modifiers.h).  Call with value set to NULL to clear
   // any value previously set.  Caller is responsible for ensuring key
   // and value point to valid data for the lifetime of this object.
-  void InsertForModifiers(const char* key, const void* value) {
-    map_[key] = value;
-  }
+  void InsertForModifiers(const char* key, const void* value);
 
   // Retrieve data specific to this Expand call. Returns NULL if key
   // is not found.  This should only be used by template modifiers.
-  const void* LookupForModifiers(const char* key) const {
-    const DataMap::const_iterator it = map_.find(key);
-    return it == map_.end() ? NULL : it->second;
-  }
+  const void* LookupForModifiers(const char* key) const;
 
   // Same as Lookup, but casts the result to a c string.
   const char* LookupForModifiersAsString(const char* key) const {
@@ -145,7 +143,7 @@ class CTEMPLATE_DLL_DECL PerExpandData {
   const char* annotate_path_;
   TemplateAnnotator* annotator_;
   const TemplateModifier* expand_modifier_;
-  DataMap map_;
+  DataMap* map_;
 
   PerExpandData(const PerExpandData&);    // disallow evil copy constructor
   void operator=(const PerExpandData&);   // disallow evil operator=

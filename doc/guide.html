@@ -99,7 +99,7 @@ call "expanding"), here's the output we would get:</p>
 It's boring&lt;/body&gt;&lt;/html&gt;
 </pre>
 
-<p><code>{{TITLE}}</code> and <code>{{{BODY}}</code> are <b>template
+<p><code>{{TITLE}}</code> and <code>{{BODY}}</code> are <b>template
 elements</b>, also called <b>markers</b>.  In the dictionary,
 <code>TITLE</code>, <code>BODY</code>, and <code>DATE</code> are
 <b>dictionary names</b>, and the values associated with each one, such
@@ -728,7 +728,7 @@ as if it were a template file, and inserts it into the global cache
 with the key and strip-mode that you provide.  You can then use this
 key and strip-mode as the first two arguments to
 <code>ExpandTemplate</code>.  You can also use the key as the argument
-to <code>ctemplate::TemplateDictionary::SetFilename()<code>.</p>
+to <code>ctemplate::TemplateDictionary::SetFilename()</code>.</p>
 
 <p>Prefer file-based to string-based templates where possible.
 Updating a file-based template requires merely a data push, rather
