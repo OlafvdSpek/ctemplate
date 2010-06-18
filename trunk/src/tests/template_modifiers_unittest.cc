@@ -230,9 +230,49 @@ class TemplateModifiersUnittest {
     ASSERT_STREQ(peer.GetSectionValue("harder https URL"),
                  "https://www.google.com/search?q=f&amp;hl=en");
     ASSERT_STREQ(peer.GetSectionValue("easy javascript URL"),
-                 "#");
+                 ctemplate::ValidateUrl::kUnsafeUrlReplacement);
     ASSERT_STREQ(peer.GetSectionValue("harder javascript URL"),
-                 "#");
+                 ctemplate::ValidateUrl::kUnsafeUrlReplacement);
+    ASSERT_STREQ(peer.GetSectionValue("easy relative URL"),
+                 "foobar.html");
+    ASSERT_STREQ(peer.GetSectionValue("harder relative URL"),
+                 "/search?q=green flowers&amp;hl=en");
+    ASSERT_STREQ(peer.GetSectionValue("ftp URL"),
+                 "ftp://ftp.example.org/pub/file.txt");
+  }
+
+  static void TestValidateImgSrcUrlHtmlEscape() {
+    TemplateDictionary dict("TestValidateImgSrcUrlHtmlEscape", NULL);
+    dict.SetEscapedValue("easy http URL", "http://www.google.com",
+                         ctemplate::validate_img_src_url_and_html_escape);
+    dict.SetEscapedValue("harder https URL",
+                         "https://www.google.com/search?q=f&hl=en",
+                         ctemplate::validate_img_src_url_and_html_escape);
+    dict.SetEscapedValue("easy javascript URL",
+                         "javascript:alert(document.cookie)",
+                         ctemplate::validate_img_src_url_and_html_escape);
+    dict.SetEscapedValue("harder javascript URL",
+                         "javascript:alert(10/5)",
+                         ctemplate::validate_img_src_url_and_html_escape);
+    dict.SetEscapedValue("easy relative URL",
+                         "foobar.html",
+                         ctemplate::validate_img_src_url_and_html_escape);
+    dict.SetEscapedValue("harder relative URL",
+                         "/search?q=green flowers&hl=en",
+                         ctemplate::validate_img_src_url_and_html_escape);
+    dict.SetEscapedValue("ftp URL",
+                         "ftp://ftp.example.org/pub/file.txt",
+                         ctemplate::validate_img_src_url_and_html_escape);
+
+    TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
+    ASSERT_STREQ(peer.GetSectionValue("easy http URL"),
+                 "http://www.google.com");
+    ASSERT_STREQ(peer.GetSectionValue("harder https URL"),
+                 "https://www.google.com/search?q=f&amp;hl=en");
+    ASSERT_STREQ(peer.GetSectionValue("easy javascript URL"),
+                 ctemplate::ValidateUrl::kUnsafeImgSrcUrlReplacement);
+    ASSERT_STREQ(peer.GetSectionValue("harder javascript URL"),
+                 ctemplate::ValidateUrl::kUnsafeImgSrcUrlReplacement);
     ASSERT_STREQ(peer.GetSectionValue("easy relative URL"),
                  "foobar.html");
     ASSERT_STREQ(peer.GetSectionValue("harder relative URL"),
@@ -290,20 +330,84 @@ class TemplateModifiersUnittest {
                  "https://www.google.com/search?q\\x3df\\x26hl\\x3den");
     ASSERT_STREQ(peer.GetSectionValue("mangled http URL"),
                  "HTTP://www.google.com");
-    ASSERT_STREQ(peer.GetSectionValue("easy javascript URL"),
-                 "#");
+    ASSERT_STREQ(peer.GetSectionValue("easy javascript URL"), "#");
     ASSERT_STREQ(peer.GetSectionValue("harder javascript URL"),
-                 "#");
+                 ctemplate::ValidateUrl::kUnsafeUrlReplacement);
     ASSERT_STREQ(peer.GetSectionValue("easy relative URL"),
                  "foobar.html");
     ASSERT_STREQ(peer.GetSectionValue("harder relative URL"),
                  "/search?q\\x3dgreen flowers\\x26hl\\x3den");
     ASSERT_STREQ(peer.GetSectionValue("data URL"),
-                 "#");
+                 ctemplate::ValidateUrl::kUnsafeUrlReplacement);
     ASSERT_STREQ(peer.GetSectionValue("mangled javascript URL"),
-                 "#");
+                 ctemplate::ValidateUrl::kUnsafeUrlReplacement);
     ASSERT_STREQ(peer.GetSectionValue("harder mangled javascript URL"),
-                 "#");
+                 ctemplate::ValidateUrl::kUnsafeUrlReplacement);
+  }
+
+  static void TestValidateImgSrcUrlJavascriptEscape() {
+    TemplateDictionary dict("TestValidateImgSrcUrlJavascriptEscape", NULL);
+    dict.SetEscapedValue(
+        "easy http URL", "http://www.google.com",
+        ctemplate::validate_img_src_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "harder https URL",
+        "https://www.google.com/search?q=f&hl=en",
+        ctemplate::validate_img_src_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "mangled http URL", "HTTP://www.google.com",
+        ctemplate::validate_img_src_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "easy javascript URL",
+        "javascript:alert(document.cookie)",
+        ctemplate::validate_img_src_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "harder javascript URL",
+        "javascript:alert(10/5)",
+        ctemplate::validate_img_src_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "easy relative URL",
+        "foobar.html",
+        ctemplate::validate_img_src_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "harder relative URL",
+        "/search?q=green flowers&hl=en",
+        ctemplate::validate_img_src_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "data URL",
+        "data: text/html",
+        ctemplate::validate_img_src_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "mangled javascript URL",
+        "javaSCRIPT:alert(5)",
+        ctemplate::validate_img_src_url_and_javascript_escape);
+    dict.SetEscapedValue(
+        "harder mangled javascript URL",
+        "java\nSCRIPT:alert(5)",
+        ctemplate::validate_img_src_url_and_javascript_escape);
+
+
+    TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
+    ASSERT_STREQ(peer.GetSectionValue("easy http URL"),
+                 "http://www.google.com");
+    ASSERT_STREQ(peer.GetSectionValue("harder https URL"),
+                 "https://www.google.com/search?q\\x3df\\x26hl\\x3den");
+    ASSERT_STREQ(peer.GetSectionValue("mangled http URL"),
+                 "HTTP://www.google.com");
+    ASSERT_STREQ(peer.GetSectionValue("easy javascript URL"),
+                 ctemplate::ValidateUrl::kUnsafeImgSrcUrlReplacement);
+    ASSERT_STREQ(peer.GetSectionValue("harder javascript URL"),
+                 ctemplate::ValidateUrl::kUnsafeImgSrcUrlReplacement);
+    ASSERT_STREQ(peer.GetSectionValue("easy relative URL"),
+                 "foobar.html");
+    ASSERT_STREQ(peer.GetSectionValue("harder relative URL"),
+                 "/search?q\\x3dgreen flowers\\x26hl\\x3den");
+    ASSERT_STREQ(peer.GetSectionValue("data URL"),
+                 "/images/cleardot.gif");
+    ASSERT_STREQ(peer.GetSectionValue("mangled javascript URL"),
+                 ctemplate::ValidateUrl::kUnsafeImgSrcUrlReplacement);
+    ASSERT_STREQ(peer.GetSectionValue("harder mangled javascript URL"),
+                 ctemplate::ValidateUrl::kUnsafeImgSrcUrlReplacement);
   }
 
   static void TestValidateUrlCssEscape() {
@@ -327,7 +431,38 @@ class TemplateModifiersUnittest {
                  "http://www.google.com");
     ASSERT_STREQ(peer.GetSectionValue("harder https URL"),
                  "https://www.google.com/search?q=f&hl=en");
-    ASSERT_STREQ(peer.GetSectionValue("javascript URL"), "#");
+    ASSERT_STREQ(peer.GetSectionValue("javascript URL"),
+                 ctemplate::ValidateUrl::kUnsafeUrlReplacement);
+    ASSERT_STREQ(peer.GetSectionValue("relative URL"),
+                 "/search?q=green flowers&hl=en");
+    ASSERT_STREQ(peer.GetSectionValue("hardest URL"),
+                 "http://www.google.com/s?q=%27bla%27"
+                 "&a=%22%22&b=%28%3Ctag%3E%29&c=%2A%0D%0A%5C%5Cbla");
+  }
+
+  static void TestValidateImgSrcUrlCssEscape() {
+    TemplateDictionary dict("TestValidateImgSrcUrlCssEscape", NULL);
+    dict.SetEscapedValue("easy http URL", "http://www.google.com",
+                         ctemplate::validate_img_src_url_and_css_escape);
+    dict.SetEscapedValue("harder https URL",
+                         "https://www.google.com/search?q=f&hl=en",
+                         ctemplate::validate_img_src_url_and_css_escape);
+    dict.SetEscapedValue("javascript URL",
+                         "javascript:alert(document.cookie)",
+                         ctemplate::validate_img_src_url_and_css_escape);
+    dict.SetEscapedValue("relative URL", "/search?q=green flowers&hl=en",
+                         ctemplate::validate_img_src_url_and_css_escape);
+    dict.SetEscapedValue("hardest URL", "http://www.google.com/s?q='bla'"
+                         "&a=\"\"&b=(<tag>)&c=*\r\n\\\\bla",
+                         ctemplate::validate_img_src_url_and_css_escape);
+
+    TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
+    ASSERT_STREQ(peer.GetSectionValue("easy http URL"),
+                 "http://www.google.com");
+    ASSERT_STREQ(peer.GetSectionValue("harder https URL"),
+                 "https://www.google.com/search?q=f&hl=en");
+    ASSERT_STREQ(peer.GetSectionValue("javascript URL"),
+                 ctemplate::ValidateUrl::kUnsafeImgSrcUrlReplacement);
     ASSERT_STREQ(peer.GetSectionValue("relative URL"),
                  "/search?q=green flowers&hl=en");
     ASSERT_STREQ(peer.GetSectionValue("hardest URL"),
@@ -900,8 +1035,11 @@ int main(int argc, char** argv) {
   TemplateModifiersUnittest::TestPreEscape();
   TemplateModifiersUnittest::TestXmlEscape();
   TemplateModifiersUnittest::TestValidateUrlHtmlEscape();
+  TemplateModifiersUnittest::TestValidateImgSrcUrlHtmlEscape();
   TemplateModifiersUnittest::TestValidateUrlJavascriptEscape();
+  TemplateModifiersUnittest::TestValidateImgSrcUrlJavascriptEscape();
   TemplateModifiersUnittest::TestValidateUrlCssEscape();
+  TemplateModifiersUnittest::TestValidateImgSrcUrlCssEscape();
   TemplateModifiersUnittest::TestCleanseAttribute();
   TemplateModifiersUnittest::TestCleanseCss();
   TemplateModifiersUnittest::TestJavascriptEscape();

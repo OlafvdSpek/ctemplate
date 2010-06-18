@@ -124,12 +124,12 @@ static void Version(FILE* outfile) {
 
 // Removes all non alphanumeric characters from a string to form a
 // valid C identifier to use as a double-inclusion guard.
-static void ConvertToIdentifier(string& s) {
-  for (string::size_type i = 0; i < s.size(); i++) {
-    if (!isalnum(s[i]))
-      s[i] = '_';
+static void ConvertToIdentifier(string* s) {
+  for (string::size_type i = 0; i < s->size(); i++) {
+    if (!isalnum((*s)[i]))
+      (*s)[i] = '_';
     else
-      s[i] = toupper(s[i]);
+      (*s)[i] = toupper((*s)[i]);
   }
 }
 
@@ -256,7 +256,7 @@ int main(int argc, char **argv) {
                     "//\n");
 
     string guard(string("TPL_") + header_file);
-    ConvertToIdentifier(guard);
+    ConvertToIdentifier(&guard);
     guard.append("_H_");
 
     contents.append(string("#ifndef ") + guard + "\n");

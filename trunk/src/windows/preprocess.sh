@@ -58,6 +58,21 @@ DLLDEF_DEFINES="\
 # define $DLLDEF_MACRO_NAME  __declspec(dllimport)\n\
 #endif"
 
+# template_cache.h gets a special DEFINE to work around the
+# difficulties in dll-exporting stl containers.  Ugh.
+TEMPLATE_CACHE_DLLDEF_DEFINES="\
+// NOTE: if you are statically linking the template library into your binary\n\
+// (rather than using the template .dll), set '/D $DLLDEF_MACRO_NAME='\n\
+// as a compiler flag in your project file to turn off the dllimports.\n\
+#ifndef $DLLDEF_MACRO_NAME\n\
+# define $DLLDEF_MACRO_NAME  __declspec(dllimport)\n\
+extern template class __declspec(dllimport) std::allocator<std::string>;\n\
+extern template class __declspec(dllimport) std::vector<std::string>;\n\
+#else\n\
+template class __declspec(dllexport) std::allocator<std::string>;\n\
+template class __declspec(dllexport) std::vector<std::string>;\n\
+#endif"
+
 # Read all the windows config info into variables
 # In order for the 'set' to take, this requires putting all in a subshell.
 (
@@ -72,13 +87,16 @@ DLLDEF_DEFINES="\
      echo "Processing $file"
      outfile="$1/windows/ctemplate/`basename $file .in`"
 
+     if test "`basename $file`" = template_cache.h.in; then
+       MY_DLLDEF_DEFINES=$TEMPLATE_CACHE_DLLDEF_DEFINES
+     else
+       MY_DLLDEF_DEFINES=$DLLDEF_DEFINES
+     fi
+
      # Besides replacing @...@, we also need to turn on dllimport
      # We also need to replace hash by hash_compare (annoying we hard-code :-( )
-     # Finally, we get rid of the header files that try to find @ac_cv_unit64@
-     # We tell them by their comment: "a place @ac_cv_uint64@ might live".
-     # Except it has a typo and says "unit64", so I check for both.
      sed -e "s!@ac_windows_dllexport@!$DLLDEF_MACRO_NAME!g" \
-         -e "s!@ac_windows_dllexport_defines@!$DLLDEF_DEFINES!g" \
+         -e "s!@ac_windows_dllexport_defines@!$MY_DLLDEF_DEFINES!g" \
          -e "s!@ac_cv_cxx_hash_map@!$HASH_MAP_H!g" \
          -e "s!@ac_cv_cxx_hash_set@!$HASH_SET_H!g" \
          -e "s!@ac_cv_cxx_hash_map_class@!$HASH_NAMESPACE::hash_map!g" \

@@ -187,18 +187,31 @@ extern CTEMPLATE_DLL_DECL CleanseCss cleanse_css;
 // url that doesn't have a protocol hidden in it (ie [foo.html] is
 // fine, but not [javascript:foo]) and then performs another type of
 // escaping. Returns the url escaped with the specified modifier if
-// good, otherwise returns "#".
+// good, otherwise returns a safe replacement URL.
+// This is normally "#", but for <img> tags, it is not safe to set
+// the src attribute to "#".  This is because this causes some browsers
+// to reload the page, which can cause a DoS.
 class CTEMPLATE_DLL_DECL ValidateUrl : public TemplateModifier {
  public:
-  explicit ValidateUrl(const TemplateModifier& chained_modifier)
-      : chained_modifier_(chained_modifier) { }
+  explicit ValidateUrl(const TemplateModifier& chained_modifier,
+                       const char* unsafe_url_replacement)
+      : chained_modifier_(chained_modifier),
+        unsafe_url_replacement_(unsafe_url_replacement),
+        unsafe_url_replacement_length_(strlen(unsafe_url_replacement)) { }
   MODIFY_SIGNATURE_;
+  static const char* const kUnsafeUrlReplacement;
+  static const char* const kUnsafeImgSrcUrlReplacement;
  private:
   const TemplateModifier& chained_modifier_;
+  const char* unsafe_url_replacement_;
+  int unsafe_url_replacement_length_;
 };
 extern CTEMPLATE_DLL_DECL ValidateUrl validate_url_and_html_escape;
 extern CTEMPLATE_DLL_DECL ValidateUrl validate_url_and_javascript_escape;
 extern CTEMPLATE_DLL_DECL ValidateUrl validate_url_and_css_escape;
+extern CTEMPLATE_DLL_DECL ValidateUrl validate_img_src_url_and_html_escape;
+extern CTEMPLATE_DLL_DECL ValidateUrl validate_img_src_url_and_javascript_escape;
+extern CTEMPLATE_DLL_DECL ValidateUrl validate_img_src_url_and_css_escape;
 
 // Escapes < > & " ' to &lt; &gt; &amp; &quot; &#39; (same as in HtmlEscape).
 // If you use it within a CDATA section, you may be escaping more characters

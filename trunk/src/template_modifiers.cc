@@ -339,6 +339,11 @@ void CssUrlEscape::Modify(const char* in, size_t inlen,
 }
 CssUrlEscape css_url_escape;
 
+// These URLs replace unsafe URLs for :U and :I url-escaping modes.
+const char* const ValidateUrl::kUnsafeUrlReplacement = "#";
+const char* const ValidateUrl::kUnsafeImgSrcUrlReplacement =
+    "/images/cleardot.gif";
+
 void ValidateUrl::Modify(const char* in, size_t inlen,
                          const PerExpandData* per_expand_data,
                          ExpandEmitter* out, const string& arg) const {
@@ -359,16 +364,35 @@ void ValidateUrl::Modify(const char* in, size_t inlen,
       // and ftp
     } else {
       // It's a bad protocol, so return something safe                          
-      chained_modifier_.Modify("#", 1, per_expand_data, out, "");
+      chained_modifier_.Modify(unsafe_url_replacement_,
+                               unsafe_url_replacement_length_,
+                               per_expand_data,
+                               out,
+                               "");
       return;
     }
   }
   // If we get here, it's a valid url, so just escape it
   chained_modifier_.Modify(in, inlen, per_expand_data, out, "");
 }
-ValidateUrl validate_url_and_html_escape(html_escape);
-ValidateUrl validate_url_and_javascript_escape(javascript_escape);
-ValidateUrl validate_url_and_css_escape(css_url_escape);
+ValidateUrl validate_url_and_html_escape(
+    html_escape,
+    ValidateUrl::kUnsafeUrlReplacement);
+ValidateUrl validate_url_and_javascript_escape(
+    javascript_escape,
+    ValidateUrl::kUnsafeUrlReplacement);
+ValidateUrl validate_url_and_css_escape(
+    css_url_escape,
+    ValidateUrl::kUnsafeUrlReplacement);
+ValidateUrl validate_img_src_url_and_html_escape(
+    html_escape,
+    ValidateUrl::kUnsafeImgSrcUrlReplacement);
+ValidateUrl validate_img_src_url_and_javascript_escape(
+    javascript_escape,
+    ValidateUrl::kUnsafeImgSrcUrlReplacement);
+ValidateUrl validate_img_src_url_and_css_escape(
+    css_url_escape,
+    ValidateUrl::kUnsafeImgSrcUrlReplacement);
 
 void XmlEscape::Modify(const char* in, size_t inlen,
                        const PerExpandData*,
@@ -675,7 +699,9 @@ static struct ModifierWithAlternatives {
 } g_modifiers[] = {
   /* 0 */ { ModifierInfo("cleanse_css", 'c',
                          XSS_WEB_STANDARD, &cleanse_css),
-            {&g_modifiers[16].modifier_info} },  // url_escape_with_arg=css
+            {&g_modifiers[16].modifier_info,  // url_escape_with_arg=css
+             // img_src_url_escape_with_arg=css
+             &g_modifiers[19].modifier_info} },
   /* 1 */ { ModifierInfo("html_escape", 'h',
                          XSS_WEB_STANDARD, &html_escape),
             {&g_modifiers[2].modifier_info,   // html_escape_with_arg=snippet
@@ -685,7 +711,9 @@ static struct ModifierWithAlternatives {
              &g_modifiers[8].modifier_info,   // pre_escape
              &g_modifiers[9].modifier_info,   // url_query_escape
              &g_modifiers[11].modifier_info,  // url_escape_with_arg=html
-             &g_modifiers[12].modifier_info} },  // url_escape_with_arg=query
+             &g_modifiers[12].modifier_info,  // url_escape_with_arg=query
+             // img_src_url_escape_with_arg=html
+             &g_modifiers[18].modifier_info} },
 
   /* 2 */ { ModifierInfo("html_escape_with_arg=snippet", 'H',
                          XSS_WEB_STANDARD, &snippet_escape),
@@ -736,6 +764,15 @@ static struct ModifierWithAlternatives {
                           XSS_WEB_STANDARD, &javascript_number), {} },
   /* 16 */ { ModifierInfo("url_escape_with_arg=css", 'U',
                           XSS_WEB_STANDARD, &validate_url_and_css_escape), {} },
+  /* 17 */ { ModifierInfo("img_src_url_escape_with_arg=javascript", 'I',
+                          XSS_WEB_STANDARD,
+                          &validate_img_src_url_and_javascript_escape), {} },
+  /* 18 */ { ModifierInfo("img_src_url_escape_with_arg=html", 'I',
+                          XSS_WEB_STANDARD,
+                          &validate_img_src_url_and_html_escape), {} },
+  /* 19 */ { ModifierInfo("img_src_url_escape_with_arg=css", 'I',
+                          XSS_WEB_STANDARD,
+                          &validate_img_src_url_and_css_escape), {} },
 };
 
 static vector<const ModifierInfo*> g_extension_modifiers;
