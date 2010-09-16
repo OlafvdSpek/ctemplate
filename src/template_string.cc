@@ -216,14 +216,11 @@ struct TemplateStringHasher {
     assert(IsTemplateIdInitialized(id_b));
     return hasher(id_a, id_b);
   }
-  // static makes this compile under MSVC (shrug)
-  static const TemplateIdHasher hasher;
+  TemplateIdHasher hasher;
   // These two public members are required by msvc.  4 and 8 are defaults.
   static const size_t bucket_size = 4;
   static const size_t min_buckets = 8;
 };
-
-/*static*/ const TemplateIdHasher TemplateStringHasher::hasher = {};
 
 namespace {
 Mutex mutex(Mutex::LINKER_INITIALIZED);

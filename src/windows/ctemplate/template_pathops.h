@@ -57,6 +57,14 @@ bool CTEMPLATE_DLL_DECL IsDirectory(const std::string& path);   // ends in "/"?
 void CTEMPLATE_DLL_DECL NormalizeDirectory(std::string* dir);   // appends /
 std::string CTEMPLATE_DLL_DECL Basename(const std::string& path);
 
+// Returns true iff text contains the word as a full word, i.e. delimited by one
+// of [.,_-#*?:] on both the sides.
+// This is used while loading a template, to check that the file's name matches
+// the auto-escape mode specified by it.
+// NOTE: This assumes that the word doesn't contain any of the delimiter
+// characters.
+bool CTEMPLATE_DLL_DECL ContainsFullWord(const std::string& text, const std::string& word);
+
 }
 
 #endif  // TEMPLATE_TEMPLATE_PATHOPS_H_

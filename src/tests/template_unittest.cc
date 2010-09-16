@@ -1956,6 +1956,12 @@ class TemplateUnittest {
     expected_mods = "URL:U=html\nCLASS:h:H=attribute\nCOLOR:c\n";
     AssertCorrectModifiersInTemplate(tpl, text, expected_mods);
 
+    text = "{{%AUTOESCAPE context=\"HTML\" state=\"in_tag\"}}"  // lowercase ok
+        "href=\"{{URL}}\" class={{CLASS:h}} style=\"font:{{COLOR}}\"";
+    ASSERT(tpl = StringToTemplate(text, strip));
+    expected_mods = "URL:U=html\nCLASS:h:H=attribute\nCOLOR:c\n";
+    AssertCorrectModifiersInTemplate(tpl, text, expected_mods);
+
     // Repeat the test with trailing HTML that closes the tag. This is
     // undefined behavior. We test it to ensure the parser does not choke.
     text += ">Hello</a><span>Some text</span></body></html>";
@@ -1982,6 +1988,12 @@ class TemplateUnittest {
     AssertCorrectModifiersInTemplate(tpl, text, expected_mods);
 
     text = "{{%AUTOESCAPE context=\"XML\"}}"          // XML
+        "<PARAM name=\"{{VAL}}\">{{DATA:h}}";
+    ASSERT(tpl = StringToTemplate(text, strip));
+    expected_mods = "VAL:xml_escape\nDATA:h\n";
+    AssertCorrectModifiersInTemplate(tpl, text, expected_mods);
+
+    text = "{{%AUTOESCAPE context=\"xml\"}}"          // lower-case XML
         "<PARAM name=\"{{VAL}}\">{{DATA:h}}";
     ASSERT(tpl = StringToTemplate(text, strip));
     expected_mods = "VAL:xml_escape\nDATA:h\n";
@@ -2034,7 +2046,7 @@ class TemplateUnittest {
     ASSERT((tpl = StringToTemplate(text, strip)) == NULL);
     text = "{{%AUTOESCAPE context=\"HTML\" }}";               // extra whitesp
     ASSERT((tpl = StringToTemplate(text, strip)) == NULL);
-    text = "{{%AUTOESCAPE context=\"xml\"}}";                 // lower-case xml
+    text = "{{%AUTOESCAPE context=\"Xml\"}}";                 // mixed-case xml
     ASSERT((tpl = StringToTemplate(text, strip)) == NULL);
     text = "{{%AUTOESCAPE context=\"HTML\" state=\"tag\"}}";  // bad state
     ASSERT((tpl = StringToTemplate(text, strip)) == NULL);

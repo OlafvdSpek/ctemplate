@@ -311,8 +311,10 @@ TemplateCache::RefcountedTemplate* TemplateCache::GetTemplateLocked(
       // Create a new template, insert it into the cache under
       // template_cache_key, and DecRef() the old one to indicate
       // the cache no longer has a reference to it.
-      it->second.refcounted_tpl->DecRef();
       const Template* tpl = new Template(filename, strip, this);
+      // DecRef after creating the new template since DecRef may free up
+      // the storage for filename,
+      it->second.refcounted_tpl->DecRef();
       it->second = CachedTemplate(tpl, CachedTemplate::FILE_BASED);
     }
     it->second.should_reload = false;
@@ -670,10 +672,7 @@ void TemplateCache::ReloadAllIfChanged(ReloadType reload_type) {
     it->second.should_reload = true;
     if (reload_type == IMMEDIATE_RELOAD) {
       const Template* tpl = it->second.refcounted_tpl->tpl();
-      // TODO(csilvers): have template_file() return a TemplateString?
-      TemplateCacheKey template_cache_key = TemplateCacheKey(
-          TemplateString(tpl->template_file()).GetGlobalId(), tpl->strip());
-      GetTemplateLocked(tpl->template_file(), tpl->strip(), template_cache_key);
+      GetTemplateLocked(tpl->template_file(), tpl->strip(), it->first);
     }
   }
 }

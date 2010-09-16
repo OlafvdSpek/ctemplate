@@ -37,6 +37,7 @@
 #include "config.h"
 #include <string>
 #include <ctype.h>       // for isalpha, used on windows
+#include <string.h>      // for strchr
 #include <ctemplate/template_pathops.h>
 
 using std::string;
@@ -109,5 +110,37 @@ string Basename(const string& path) {
   return path;   // no path-separator found, so whole string is the basename
 }
 
+bool ContainsFullWord(const string& text, const string& word) {
+  // List of delimiter characters to be considered. Please update the comment in
+  // the header file if you change this list.
+  static const char* delim = ".,_-#*?:";
+
+  const int inputlength = text.length();
+  const int wordlength = word.length();
+
+  // corner cases
+  if (inputlength == 0 || wordlength == 0 || wordlength > inputlength) {
+    return false;
+  }
+
+  int nextmatchpos = 0;  // position from where search in the input string
+  while (nextmatchpos < inputlength) {
+    const int pos = text.find(word, nextmatchpos);
+    if (pos == string::npos) {
+      return false;  // no match at all
+    }
+
+    // if found, check that it is surrounded by delimiter characters.
+    bool pre_delimited = (pos == 0) ||
+        (strchr(delim, text.at(pos - 1)) != NULL);
+    bool post_delimited = (pos >= inputlength - wordlength) ||
+        (strchr(delim, text.at(pos + wordlength)) != NULL);
+    if (pre_delimited && post_delimited) return true;
+
+    nextmatchpos = (pos + wordlength + 1);
+  }
+
+  return false;
+}
 
 _END_GOOGLE_NAMESPACE_
