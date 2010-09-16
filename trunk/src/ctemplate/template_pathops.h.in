@@ -52,6 +52,14 @@ bool @ac_windows_dllexport@ IsDirectory(const std::string& path);   // ends in "
 void @ac_windows_dllexport@ NormalizeDirectory(std::string* dir);   // appends /
 std::string @ac_windows_dllexport@ Basename(const std::string& path);
 
+// Returns true iff text contains the word as a full word, i.e. delimited by one
+// of [.,_-#*?:] on both the sides.
+// This is used while loading a template, to check that the file's name matches
+// the auto-escape mode specified by it.
+// NOTE: This assumes that the word doesn't contain any of the delimiter
+// characters.
+bool @ac_windows_dllexport@ ContainsFullWord(const std::string& text, const std::string& word);
+
 @ac_google_end_namespace@
 
 #endif  // TEMPLATE_TEMPLATE_PATHOPS_H_

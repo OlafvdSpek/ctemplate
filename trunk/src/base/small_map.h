@@ -66,13 +66,13 @@ _START_GOOGLE_NAMESPACE_
 //            map type has a "key_equal" member (hash_map does), then that
 //            will be used by default.  Otherwise you must specify this
 //            manually.
-// MapInitFunctor: A functor that takes a ManualConstructor<NormalMap>*
-//            and uses it to initialize the map. This functor will be
-//            called at most once per small_map, when the map exceeds the
-//            threshold of kArraySize and we are about to copy values from
-//            the array to the map. The functor *must* call one of the Init()
-//            methods provided by ManualConstructor, since after it runs we
-//            assume that the NormalMap has been initialized.
+// MapInit: A functor that takes a ManualConstructor<NormalMap>* and uses it to
+//          initialize the map. This functor will be called at most once per
+//          small_map, when the map exceeds the threshold of kArraySize and we
+//          are about to copy values from the array to the map. The functor
+//          *must* call one of the Init() methods provided by
+//          ManualConstructor, since after it runs we assume that the NormalMap
+//          has been initialized.
 //
 // example:
 //   small_map<hash_map<string, int> > days;
@@ -83,6 +83,9 @@ _START_GOOGLE_NAMESPACE_
 //   days["thursday" ] = 4;
 //   days["friday"   ] = 5;
 //   days["saturday" ] = 6;
+//
+// You should assume that small_map might invalidate all the iterators
+// on any call to erase(), insert() and operator[].
 template <typename NormalMap>
 class small_map_default_init {
  public:
@@ -105,7 +108,7 @@ class small_map {
 
   small_map() : size_(0), functor_(MapInit()) {}
 
-  small_map(const MapInit& functor) : size_(0), functor_(functor) {}
+  explicit small_map(const MapInit& functor) : size_(0), functor_(functor) {}
 
   // Allow copy-constructor and assignment, since STL allows them too.
   small_map(const small_map& src) {
@@ -274,6 +277,7 @@ class small_map {
       return iterator(map()->find(key));
     }
   }
+
   const_iterator find(const key_type& key) const {
     key_equal compare;
     if (size_ >= 0) {
@@ -288,11 +292,14 @@ class small_map {
     }
   }
 
+  // Invalidates iterators.
   data_type& operator[](const key_type& key) {
     key_equal compare;
 
     if (size_ >= 0) {
-      for (int i = 0; i < size_; i++) {
+      // operator[] searches backwards, favoring recently-added
+      // elements.
+      for (int i = size_-1; i >= 0; --i) {
         if (compare(array_[i]->first, key)) {
           return array_[i]->second;
         }
@@ -309,6 +316,7 @@ class small_map {
     }
   }
 
+  // Invalidates iterators.
   std::pair<iterator, bool> insert(const value_type& x) {
     key_equal compare;
 
@@ -319,7 +327,7 @@ class small_map {
         }
       }
       if (size_ == kArraySize) {
-        ConvertToRealMap();
+        ConvertToRealMap();  // Invalidates all iterators!
         std::pair<typename NormalMap::iterator, bool> ret = map_->insert(x);
         return make_pair(iterator(ret.first), ret.second);
       } else {
@@ -332,6 +340,7 @@ class small_map {
     }
   }
 
+  // Invalidates iterators.
   template <class InputIterator>
   void insert(InputIterator f, InputIterator l) {
     while (f != l) {
@@ -381,16 +390,16 @@ class small_map {
     size_ = 0;
   }
 
+  // Invalidates iterators.
   void erase(const iterator& position) {
     if (size_ >= 0) {
       int i = position.array_iter_ - array_;
-      array_[i++].Destroy();
-      // Move the rest of the array back one.
-      for (; i < size_; i++) {
-        array_[i - 1].Init(*array_[i]);
-        array_[i].Destroy();
-      }
+      array_[i].Destroy();
       --size_;
+      if (i != size_) {
+        array_[i].Init(*array_[size_]);
+        array_[size_].Destroy();
+      }
     } else {
       map_->erase(position.hash_iter_);
     }
@@ -440,6 +449,7 @@ class small_map {
 
  private:
   int size_;  // negative = using hash_map
+
   MapInit functor_;
 
   // We want to call constructors and destructors manually, but we don't

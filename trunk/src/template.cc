@@ -445,18 +445,19 @@ static const char *memmatch(const char *haystack, size_t haystack_len,
 // we ignore it and just rely on the LOG(WARNING) in the logs.
 static bool FilenameValidForContext(const string& filename,
                                     TemplateContext context) {
-  // TODO(jad): Improve by also checking for "word" boundaries.
-  if ( filename.find("css") != string::npos ||
-       filename.find("stylesheet") != string::npos ||
-       filename.find("style") != string::npos) {
+  string stripped_filename = Basename(filename);
+
+  if (ctemplate::ContainsFullWord(stripped_filename, "css") ||
+      ctemplate::ContainsFullWord(stripped_filename, "stylesheet") ||
+      ctemplate::ContainsFullWord(stripped_filename, "style")) {
     if (context != TC_CSS) {
       LOG(WARNING) << "Template filename " << filename
                    << " indicates CSS but given TemplateContext"
                    << " was not TC_CSS." << endl;
       return false;
     }
-  } else if (filename.find("js") != string::npos ||
-             filename.find("javascript") != string::npos) {
+  } else if (ctemplate::ContainsFullWord(stripped_filename, "js") ||
+             ctemplate::ContainsFullWord(stripped_filename, "javascript")) {
     if (context != TC_JS) {
       LOG(WARNING) << "Template filename " << filename
                    << " indicates javascript but given TemplateContext"
@@ -489,15 +490,15 @@ static TemplateContext GetTemplateContextFromPragma(
   const string* context = pragma.GetAttributeValue("context");
   if (context == NULL)
     return TC_MANUAL;
-  if (*context == "HTML")
+  if (*context == "HTML" || *context == "html")
     return TC_HTML;
-  else if (*context == "JAVASCRIPT")
+  else if (*context == "JAVASCRIPT" || *context == "javascript")
     return TC_JS;
-  else if (*context == "CSS")
+  else if (*context == "CSS" || *context == "css")
     return TC_CSS;
-  else if (*context == "JSON")
+  else if (*context == "JSON" || *context == "json")
     return TC_JSON;
-  else if (*context == "XML")
+  else if (*context == "XML" || *context == "xml")
     return TC_XML;
   return TC_MANUAL;
 }
@@ -1940,7 +1941,8 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
         const string* parser_state = pragma.GetAttributeValue("state");
         bool in_tag = false;
         if (parser_state != NULL) {
-          if (context == TC_HTML && *parser_state == "IN_TAG")
+          if (context == TC_HTML && (*parser_state == "IN_TAG" ||
+                                     *parser_state == "in_tag"))
             in_tag = true;
           else if (*parser_state != "default")
             FAIL("Unsupported state '" + *parser_state +

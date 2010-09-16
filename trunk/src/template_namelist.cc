@@ -102,7 +102,9 @@ const TemplateNamelist::MissingListType& TemplateNamelist::GetMissingList(
       const string path = Template::FindTemplateFilename(*iter);
       if (path.empty() || access(path.c_str(), R_OK) != 0) {
         missing_list_->push_back(*iter);
-        std::cerr << "ERROR: Template file missing: " << path << std::endl;
+        std::cerr << "ERROR: Template file missing: " << *iter
+                  << " at path: " << (path.empty() ? "(empty path)" : path)
+                  << std::endl;
       }
     }
   }

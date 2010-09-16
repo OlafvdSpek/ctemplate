@@ -87,9 +87,8 @@ template<class T> void ArenaAllocator<T>::deallocate(pointer p, size_type n) {
   arena_->Free(p, n * sizeof(T));
 }
 
-// TODO(csilvers): sizeof(void*) may be too big.  But is probably ok.
 /*static*/ template<class T> const int ArenaAllocator<T>::kAlignment =
-    (1 == sizeof(T) ? 1 : sizeof(void*));
+    (1 == sizeof(T) ? 1 : BaseArena::kDefaultAlignment);
 
 // ----------------------------------------------------------------------
 // TemplateDictionary::map_arena_init
@@ -123,7 +122,8 @@ inline void TemplateDictionary::LazilyCreateDict(T** dict) {
   if (*dict != NULL)
     return;
   // Placement new: construct the map in the memory used by *dict.
-  void* buffer = arena_->AllocAligned(sizeof(**dict), sizeof(void*));
+  void* buffer = arena_->AllocAligned(sizeof(**dict),
+                                      BaseArena::kDefaultAlignment);
   new (buffer) T(arena_);
   *dict = reinterpret_cast<T*>(buffer);
 }
@@ -138,7 +138,8 @@ inline void TemplateDictionary::LazyCreateTemplateGlobalDict() {
 }
 
 inline TemplateDictionary::DictVector* TemplateDictionary::CreateDictVector() {
-  void* buffer = arena_->AllocAligned(sizeof(DictVector), sizeof(void*));
+  void* buffer = arena_->AllocAligned(sizeof(DictVector),
+                                      BaseArena::kDefaultAlignment);
   // Placement new: construct the vector in the memory used by buffer.
   new (buffer) DictVector(arena_);
   return reinterpret_cast<DictVector*>(buffer);
@@ -149,7 +150,8 @@ inline TemplateDictionary* TemplateDictionary::CreateTemplateSubdict(
     UnsafeArena* arena,
     TemplateDictionary* parent_dict,
     TemplateDictionary* template_global_dict_owner) {
-  void* buffer = arena->AllocAligned(sizeof(TemplateDictionary), sizeof(void*));
+  void* buffer = arena->AllocAligned(sizeof(TemplateDictionary),
+                                     BaseArena::kDefaultAlignment);
   // Placement new: construct the sub-tpl in the memory used by tplbuf.
   new (buffer) TemplateDictionary(name, arena, parent_dict,
                                   template_global_dict_owner);
