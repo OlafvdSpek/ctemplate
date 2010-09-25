@@ -78,3 +78,4 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/make_tpl_varnames_h
 %{_bindir}/template-converter
 %{_bindir}/diff_tpl_auto_escape
+%{_libdir}/pkgconfig/*.pc

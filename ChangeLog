@@ -1,3 +1,21 @@
+Fri Sep 24 11:38:27 PDT 2010  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.98 release
+	* Add new image URL modifier: :I=html, :I=css, etc (jshneier, dougy)
+	* Allow lowercase words in pragma contexts (csilvers)
+	* Enable full-word matching for tpl filenames (aneeshnaman)
+	* Performance improvements for small_map (wonchun)
+	* Avoid some compiler warnings (mac)
+	* Fix a c++ conformance bug involving const (chandlerc)
+	* BUGFIX: never reload string templates (panicker)
+	* BUGFIX: Fix refcounting to avoid accessing freed memory (panicker)
+	* PORTING: Avoid SIBGUS on sparc by aligning memory more (csilvers)
+	* PORTING: Use isascii_is*() to avoid langtype issues (csilvers)
+	* PORTING: Fix 'class not properly dll-epxorted' warnings (csilvers)
+	* PORTING: Rename README.windows to README_windows.txt (csilvers)
+	* Made NEWS file non-empty.
+	* Added ctemplate.pc + ctemplate_nothreads.pc for pkg-config (csilvers)
+
 Mon Apr 19 15:55:23 2010  Google Inc. <opensource@google.com>
 
 	* ctemplate: version 0.97 release
