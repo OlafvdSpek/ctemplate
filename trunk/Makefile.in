@@ -97,7 +97,7 @@ am__vpath_adj = case $$p in \
 am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
 am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" \
 	"$(DESTDIR)$(bindir)" "$(DESTDIR)$(docdir)" \
-	"$(DESTDIR)$(ctemplateincludedir)"
+	"$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(ctemplateincludedir)"
 libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES) $(noinst_LTLIBRARIES)
 am__DEPENDENCIES_1 =
@@ -490,7 +490,8 @@ DIST_SOURCES = $(am__libctemplate_la_SOURCES_DIST) \
 	$(template_test_util_test_SOURCES) \
 	$(template_unittest_SOURCES)
 dist_docDATA_INSTALL = $(INSTALL_DATA)
-DATA = $(dist_doc_DATA)
+pkgconfigDATA_INSTALL = $(INSTALL_DATA)
+DATA = $(dist_doc_DATA) $(pkgconfig_DATA)
 nodist_ctemplateincludeHEADERS_INSTALL = $(INSTALL_HEADER)
 HEADERS = $(nodist_ctemplateinclude_HEADERS) $(noinst_HEADERS)
 ETAGS = etags
@@ -949,13 +950,18 @@ htmlparser_test_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
 htmlparser_nothreads_test_SOURCES = $(htmlparser_test_SOURCES)
 htmlparser_nothreads_test_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 htmlparser_nothreads_test_LDADD = libctemplate_nothreads_debug.la
-CLEANFILES = statemachine.c
+CLEANFILES = statemachine.c $(pkgconfig_DATA)
 statemachine_test_SOURCES = src/tests/statemachine_test.c \
                             statemachine.c
 
 statemachine_test_CFLAGS = -I$(top_srcdir)/src/htmlparser
 generate_fsm_c_test_SOURCES = src/tests/generate_fsm_c_test.c
 generate_fsm_c_test_DEPENDENCIES = src/tests/htmlparser_testdata/sample_fsm.c
+
+# http://linux.die.net/man/1/pkg-config, http://pkg-config.freedesktop.org/wiki
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = lib${PACKAGE}.pc lib${PACKAGE}_nothreads.pc
+
 # In addition to the normal stuff, we include all the windows-specific
 # code, and also the code used to generate the html-parser fsm files.
 # NOTE: BUILT_SOURCES should come after the .config files, so they
@@ -2134,6 +2140,23 @@ uninstall-dist_docDATA:
 	  echo " rm -f '$(DESTDIR)$(docdir)/$$f'"; \
 	  rm -f "$(DESTDIR)$(docdir)/$$f"; \
 	done
+install-pkgconfigDATA: $(pkgconfig_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(pkgconfigdir)" || $(mkdir_p) "$(DESTDIR)$(pkgconfigdir)"
+	@list='$(pkgconfig_DATA)'; for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  f=$(am__strip_dir) \
+	  echo " $(pkgconfigDATA_INSTALL) '$$d$$p' '$(DESTDIR)$(pkgconfigdir)/$$f'"; \
+	  $(pkgconfigDATA_INSTALL) "$$d$$p" "$(DESTDIR)$(pkgconfigdir)/$$f"; \
+	done
+
+uninstall-pkgconfigDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(pkgconfig_DATA)'; for p in $$list; do \
+	  f=$(am__strip_dir) \
+	  echo " rm -f '$(DESTDIR)$(pkgconfigdir)/$$f'"; \
+	  rm -f "$(DESTDIR)$(pkgconfigdir)/$$f"; \
+	done
 install-nodist_ctemplateincludeHEADERS: $(nodist_ctemplateinclude_HEADERS)
 	@$(NORMAL_INSTALL)
 	test -z "$(ctemplateincludedir)" || $(mkdir_p) "$(DESTDIR)$(ctemplateincludedir)"
@@ -2414,7 +2437,7 @@ all-am: Makefile $(LTLIBRARIES) $(PROGRAMS) $(SCRIPTS) $(DATA) \
 install-binPROGRAMS: install-libLTLIBRARIES
 
 installdirs:
-	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(docdir)" "$(DESTDIR)$(ctemplateincludedir)"; do \
+	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(docdir)" "$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(ctemplateincludedir)"; do \
 	  test -z "$$dir" || $(mkdir_p) "$$dir"; \
 	done
 install: $(BUILT_SOURCES)
@@ -2468,7 +2491,7 @@ info: info-am
 info-am:
 
 install-data-am: install-dist_docDATA \
-	install-nodist_ctemplateincludeHEADERS
+	install-nodist_ctemplateincludeHEADERS install-pkgconfigDATA
 
 install-exec-am: install-binPROGRAMS install-binSCRIPTS \
 	install-libLTLIBRARIES
@@ -2502,7 +2525,8 @@ ps-am:
 uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
 	uninstall-dist_docDATA uninstall-info-am \
 	uninstall-libLTLIBRARIES \
-	uninstall-nodist_ctemplateincludeHEADERS
+	uninstall-nodist_ctemplateincludeHEADERS \
+	uninstall-pkgconfigDATA
 
 .PHONY: CTAGS GTAGS all all-am am--refresh check check-TESTS check-am \
 	clean clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
@@ -2516,14 +2540,16 @@ uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
 	install-data-am install-dist_docDATA install-exec \
 	install-exec-am install-info install-info-am \
 	install-libLTLIBRARIES install-man \
-	install-nodist_ctemplateincludeHEADERS install-strip \
-	installcheck installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-compile \
-	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags uninstall uninstall-am uninstall-binPROGRAMS \
-	uninstall-binSCRIPTS uninstall-dist_docDATA uninstall-info-am \
+	install-nodist_ctemplateincludeHEADERS install-pkgconfigDATA \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
+	pdf pdf-am ps ps-am tags uninstall uninstall-am \
+	uninstall-binPROGRAMS uninstall-binSCRIPTS \
+	uninstall-dist_docDATA uninstall-info-am \
 	uninstall-libLTLIBRARIES \
-	uninstall-nodist_ctemplateincludeHEADERS
+	uninstall-nodist_ctemplateincludeHEADERS \
+	uninstall-pkgconfigDATA
 
 
 # These files are auto-generated via generate_fsm.py.  Since we don't want
@@ -2556,6 +2582,29 @@ rpm: dist-gzip packages/rpm.sh packages/rpm/rpm.spec
 
 deb: dist-gzip packages/deb.sh packages/deb/*
 	@cd packages && ./deb.sh ${PACKAGE} ${VERSION}
+
+# I get the description and URL lines from the rpm spec. I use sed to
+# try to rewrite exec_prefix, libdir, and includedir in terms of
+# prefix, if possible.
+lib${PACKAGE}.pc: Makefile packages/rpm/rpm.spec
+	echo 'prefix=$(prefix)' > "$@".tmp
+	echo 'exec_prefix='`echo '$(exec_prefix)' | sed 's@^$(prefix)@$${prefix}@'` >> "$@".tmp
+	echo 'libdir='`echo '$(libdir)' | sed 's@^$(exec_prefix)@$${exec_prefix}@'` >> "$@".tmp
+	echo 'includedir='`echo '$(includedir)' | sed 's@^$(prefix)@$${prefix}@'` >> "$@".tmp
+	echo '' >> "$@".tmp
+	echo 'Name: $(PACKAGE)' >> "$@".tmp
+	echo 'Version: $(VERSION)' >> "$@".tmp
+	-grep '^Summary:' packages/rpm/rpm.spec | sed s/^Summary:/Description:/ | head -n1 >> "$@".tmp
+	-grep '^URL: ' packages/rpm/rpm.spec >> "$@".tmp
+	echo 'Requires:' >> "$@".tmp
+	echo 'Libs: -L$${libdir} -l$(PACKAGE)' >> "$@".tmp
+	echo 'Libs.private: $(PTHREAD_CFLAGS) $(PTHREAD_LIBS)' >> "$@".tmp
+	echo 'Cflags: -I$${includedir}' >> "$@".tmp
+	mv -f "$@".tmp "$@"
+
+# The nothreads version is mostly the same
+lib${PACKAGE}_nothreads.pc: lib${PACKAGE}.pc
+	grep -v Libs.private lib${PACKAGE}.pc | sed s/-l$(PACKAGE)/-l$(PACKAGE)_nothreads/ > "$@"
 
 # Windows wants write permission to .vcproj files and maybe even sln files.
 dist-hook:
