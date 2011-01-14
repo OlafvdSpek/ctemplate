@@ -50,6 +50,7 @@
 #include "base/mutex.h"
 #include "base/arena.h"
 #include "base/small_map.h"
+#include "base/thread_annotations.h"
 
 _START_GOOGLE_NAMESPACE_
 
@@ -66,7 +67,7 @@ static Mutex g_static_mutex(Mutex::LINKER_INITIALIZED);
 
 /*static*/ UnsafeArena* const TemplateDictionary::NO_ARENA = NULL;
 /*static*/ TemplateDictionary::GlobalDict* TemplateDictionary::global_dict_
-    = NULL;
+GUARDED_BY(g_static_mutex) PT_GUARDED_BY(g_static_mutex) = NULL;
 /*static*/ TemplateString* TemplateDictionary::empty_string_ = NULL;
 
 static const char* const kAnnotateOutput = "__ctemplate_annotate_output__";
@@ -208,7 +209,8 @@ void TemplateDictionary::HashInsert(MapType* m,
 //   GoogleOnceInit() is used to manage that initialization in a thread-safe
 //   way.
 // ----------------------------------------------------------------------
-/*static*/ void TemplateDictionary::SetupGlobalDict() {
+/*static*/ void TemplateDictionary::SetupGlobalDict()
+    NO_THREAD_SAFETY_ANALYSIS {
   global_dict_ = new TemplateDictionary::GlobalDict;
   // Initialize the built-ins
   HashInsert(global_dict_, TemplateString("BI_SPACE"), TemplateString(" "));
@@ -535,7 +537,7 @@ void TemplateDictionary::SetTemplateGlobalValueWithoutCopy(
 
 /*static*/ void TemplateDictionary::SetGlobalValue(
     const TemplateString variable,
-    const TemplateString value) {
+    const TemplateString value) LOCKS_EXCLUDED(g_static_mutex) {
   // We can't use memdup here, since we're a static method.  We do a strdup,
   // which is fine, since global_dict_ lives the entire program anyway.
   // It's unnecessary to copy the variable, since HashInsert takes care of
@@ -726,7 +728,7 @@ class TemplateDictionary::DictionaryPrinter {
   void DumpToString(const TemplateDictionary& dict) {
     // Show globals if we're a top-level dictionary
     if (dict.parent_dict_ == NULL) {
-      DumpGlobals(*dict.global_dict_);
+      DumpGlobals();
     }
 
     // Show template-globals
@@ -738,23 +740,25 @@ class TemplateDictionary::DictionaryPrinter {
   }
 
  private:
-  void DumpGlobals(const GlobalDict& global_dict) {
+  void FillSortedGlobalDictMap(map<string, string>* sorted_global_dict)
+      LOCKS_EXCLUDED(g_static_mutex) {
+      ReaderMutexLock ml(&g_static_mutex);
+      for (GlobalDict::const_iterator it = global_dict_->begin();
+           it != global_dict_->end(); ++it) {
+        const TemplateString key = TemplateDictionary::IdToString(it->first);
+        assert(!InvalidTemplateString(key));  // checks key.ptr_ != NULL
+        (*sorted_global_dict)[PrintableTemplateString(key)] =
+            PrintableTemplateString(it->second);
+      }
+  }
+  void DumpGlobals() {
     writer_.Write("global dictionary {\n");
     writer_.Indent();
 
     // We could be faster than converting every TemplateString into a
     // string and inserted into an ordered data structure, but why bother?
     map<string, string> sorted_global_dict;
-    {
-      ReaderMutexLock ml(&g_static_mutex);
-      for (GlobalDict::const_iterator it = global_dict.begin();
-           it != global_dict.end(); ++it) {
-        const TemplateString key = TemplateDictionary::IdToString(it->first);
-        assert(!InvalidTemplateString(key));  // checks key.ptr_ != NULL
-        sorted_global_dict[PrintableTemplateString(key)] =
-            PrintableTemplateString(it->second);
-      }
-    }
+    FillSortedGlobalDictMap(&sorted_global_dict);
     for (map<string, string>::const_iterator it = sorted_global_dict.begin();
          it != sorted_global_dict.end();  ++it) {
       writer_.Write(it->first + ": >" + it->second + "<\n");
@@ -773,7 +777,7 @@ class TemplateDictionary::DictionaryPrinter {
   }
 
   void DumpDictionary(const TemplateDictionary& dict) {
-    string intended_for = dict.filename_ && dict.filename_[0] ? 
+    string intended_for = dict.filename_ && dict.filename_[0] ?
         string(" (intended for ") + dict.filename_ + ")" : "";
     writer_.Write("dictionary '", PrintableTemplateString(dict.name_),
                   intended_for, "' {\n");
@@ -911,7 +915,7 @@ TemplateString TemplateDictionary::Memdup(const char* s, size_t slen) {
 // ----------------------------------------------------------------------
 
 TemplateString TemplateDictionary::GetValue(
-    const TemplateString& variable) const {
+    const TemplateString& variable) const LOCKS_EXCLUDED(g_static_mutex) {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->variable_dict_) {
       VariableDict::const_iterator it

@@ -274,6 +274,7 @@ class CTEMPLATE_DLL_DECL Template {
   // Retrieves the state, template-file, or strip mode of this Template.
   TemplateState state() const;
   const char *template_file() const;
+  const char *original_filename() const;
   Strip strip() const;
 
   // Work at the level of groups of templates, so just call through to

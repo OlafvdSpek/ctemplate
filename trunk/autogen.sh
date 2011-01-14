@@ -7,7 +7,7 @@
 # These are the files that this script might edit:
 #    aclocal.m4 configure Makefile.in src/config.h.in \
 #    depcomp config.guess config.sub install-sh missing mkinstalldirs \
-#    windows/google/* \
+#    src/windows/ctemplate/* \
 #    ltmain.sh
 #
 # Here's a command you can run to see what files aclocal will import:

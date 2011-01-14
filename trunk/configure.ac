@@ -5,9 +5,14 @@
 AC_PREREQ(2.57)
 
 AC_INIT(ctemplate, 0.98, opensource@google.com)
+# Update this value for every release!  (A:B:C will map to foo.so.(A-C).C.B)
+# http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
+SO_VERSION=0:1:0
+
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
 AC_CONFIG_SRCDIR(README)
+AC_CONFIG_MACRO_DIR([m4])
 AC_CANONICAL_HOST
 AM_INIT_AUTOMAKE([dist-zip])
 AM_CONFIG_HEADER(src/config.h)
@@ -44,6 +49,7 @@ AM_CONDITIONAL(MINGW, expr $host : '.*-mingw' >/dev/null 2>&1)
 # Uncomment this if you'll be exporting libraries (.so's)
 AC_PROG_LIBTOOL
 AC_SUBST(LIBTOOL_DEPS)
+AC_SUBST(SO_VERSION)
 
 AC_PROG_LN_S
 

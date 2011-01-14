@@ -659,6 +659,19 @@ void TemplateCache::DoneWithGetTemplatePtrs() {
 //    LAZY_RELOAD just sets the reload bit in the cache so that the next
 //    GetTemplate will reload and parse the template, if it changed.
 
+//    NOTE: ReloadAllIfChanged can have surprising behavior if the
+//    same file exists in several places on the template search path.
+//    Suppose the search path is "dira:dirb", and a template is
+//    created with name "foo", which resolves to "dirb/foo" because
+//    dira/foo does not exist.  Then suppose dira/foo is created and,
+//    dirb/foo is updated, and then ReloadAllIfChanged() is called.
+//    Then ReloadAllIfChanged() will replace the contents of the
+//    template with dira/foo, *not* dirb/foo.  On the other hand, if
+//    dira/foo is added but dirb/foo is *not* updated,
+//    ReloadAllIfChanged() will be a noop, and the template contents
+//    will stay at dirb/foo.  The possible lesson to draw from this is
+//    to not have the same template filename in different places on
+//    the search path.
 // ----------------------------------------------------------------------
 
 void TemplateCache::ReloadAllIfChanged(ReloadType reload_type) {
@@ -672,7 +685,10 @@ void TemplateCache::ReloadAllIfChanged(ReloadType reload_type) {
     it->second.should_reload = true;
     if (reload_type == IMMEDIATE_RELOAD) {
       const Template* tpl = it->second.refcounted_tpl->tpl();
-      GetTemplateLocked(tpl->template_file(), tpl->strip(), it->first);
+      // Reload should always use the original filename.
+      // For instance on reload, we may replace an existing template with a
+      // new one that came earlier on the search path.
+      GetTemplateLocked(tpl->original_filename(), tpl->strip(), it->first);
     }
   }
 }

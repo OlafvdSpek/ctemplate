@@ -42,6 +42,14 @@
 // reported to stderr  (in which case, no header file is created)
 //
 // Exit code is the number of templates we were unable to parse.
+//
+// Headers can be all written to one output file (via --outputfile)
+// or written to one output file per template processed (via --header_dir).
+// As such, we have a first stage where we load each template and generate
+// its headers and a second stage where we write the headers to disk.
+//
+// TODO(jad): Prevent -f and -o from being used together.
+//            Previously -o would be silently ignored.
 
 #include "config.h"
 // This is for windows.  Even though we #include config.h, just like
@@ -61,14 +69,31 @@
 #endif
 #include <errno.h>
 #include <string.h>
+
 #include <string>
+#include <set>
+#include <vector>
 #include <ctemplate/template_pathops.h>
 #include <ctemplate/template.h>
 
+
+using std::set;
 using std::string;
+using std::vector;
 using GOOGLE_NAMESPACE::Template;
 
 enum {LOG_INFO, LOG_WARNING, LOG_ERROR, LOG_FATAL};
+
+// Holds information on each template we process.
+struct TemplateRecord {
+  const string name;       // filename given on cmd-line (may be relative
+  bool error;              // true iff an error occurred during template loading
+  string header_entries;   // output of tpl->WriteHeaderEntries()
+
+  explicit TemplateRecord(const string& aname)
+      : name(aname), error(false) {
+  }
+};
 
 static void LogPrintf(int severity, int should_log_info, const char* pat, ...) {
   if (severity == LOG_INFO && !should_log_info)
@@ -86,7 +111,7 @@ static void LogPrintf(int severity, int should_log_info, const char* pat, ...) {
 
 // prints to outfile -- usually stdout or stderr
 static void Usage(const char* argv0, FILE* outfile) {
-  fprintf(outfile, "USAGE: %s [-t<dir>] [-h<dir>] [-s<suffix>] [-f<filename>]"
+  fprintf(outfile, "USAGE: %s [-t<dir>] [-o<dir>] [-s<suffix>] [-f<filename>]"
           " [-n] [-d] [-q] <template_filename> ...\n", argv0);
   fprintf(outfile,
           "       -t<dir> --template_dir=<dir>  Root directory of templates\n"
@@ -94,8 +119,8 @@ static void Usage(const char* argv0, FILE* outfile) {
           "       -s<suffix> --outputfile_suffix=<suffix>\n"
           "                                     outname = inname + suffix\n"
           "       -f<filename> --outputfile=<filename>\n"
-          "                                     outname = filename (Only allowed\n"
-          "                                     when processing a single input file)\n"
+          "                                     outname = filename (when given, \n"
+          "                                     --header_dir is ignored)\n"
           "       -n --noheader                 Just check syntax, no output\n"
           "       -d --dump_templates           Cause templates dump contents\n"
           "       -q --nolog_info               Only log on error\n"
@@ -131,6 +156,151 @@ static void ConvertToIdentifier(string* s) {
     else
       (*s)[i] = toupper((*s)[i]);
   }
+}
+
+// Returns the given header entries wrapped with a compiler guard
+// whose name is generated from the output_file name.
+static string WrapWithGuard(const string& output_file,
+                            const string& header_entries) {
+  string guard(string("TPL_") + output_file);
+  ConvertToIdentifier(&guard);
+  guard.append("_H_");
+
+  string out;
+  out.append(string("#ifndef ") + guard + "\n");
+  out.append(string("#define ") + guard + "\n\n");
+
+  // Now append the header-entry info to the intro above
+  out.append(header_entries);
+
+  out.append(string("\n#endif  // ") + guard + "\n");
+  return out;
+}
+
+// Generates a multi-line comment that will go at the top of the output file.
+// The comment includes the filename(s) that produced the output, one per line.
+static string Boilerplate(const string& progname,
+                          const vector<string>& filenames) {
+  string out(string("//\n"));
+  if (filenames.size() > 1)
+    out.append("// This header file auto-generated for the templates\n");
+  else
+    out.append("// This header file auto-generated for the template\n");
+
+  for (int i = 0; i < filenames.size(); ++i)
+    out.append("//    " + filenames[i] + "\n");
+
+  out.append("// by " + progname + "\n" +
+             "// DO NOT MODIFY THIS FILE DIRECTLY\n" +
+             "//\n");
+  return out;
+}
+
+// Returns true iff line is empty or only contains whitespace
+// (space, horizontal tab, vertical tab, form feed, carriage return).
+static bool LineIsAllWhitespace(const string& input) {
+  static const string kWhitespace(" \f\t\v\r");
+  if (input.find_first_not_of(kWhitespace) == string::npos)
+    return true;
+  return false;
+}
+
+// Splits the input string into lines using the newline (\n)
+// as delimiter. The newlines are discarded.
+// An empty string input results in one empty line output.
+//
+// Examples: "Hello\nWorld\n" input results in two lines,
+//           "Hello" and "World".
+//           Same result for "Hello\nWorld" (not newline terminated).
+//
+static vector<string> SplitIntoLines(const string &input) {
+  vector<string> lines;
+
+  string::size_type begin_index, end_index;
+  string::size_type input_len = input.length();
+  begin_index = 0;
+
+  while (1) {
+    end_index = input.find_first_of('\n', begin_index);
+    if (end_index == string::npos) {
+        lines.push_back(input.substr(begin_index));
+      break;
+    }
+    lines.push_back(input.substr(begin_index, (end_index - begin_index)));
+    begin_index = end_index + 1;
+    if (begin_index >= input_len)  // To avoid adding a trailing empty line.
+      break;
+  }
+  return lines;
+}
+
+// Receives header entries concatenated together from one or more
+// templates and returns a string with the duplicate lines removed.
+//
+// Duplicate lines that contain only whitespace are not removed,
+// all other duplicate lines (identical #include directives and
+// identical variable definitions) are removed. If the last
+// (or only) input line did not terminate with newline, we add one.
+//
+// Consider the following two templates:
+//   ex1.tpl: <p>{{USER}}</p>
+//   ex2.tpl: <a href="{{URL}}">{{USER}}</a>
+//
+// The header entries for ex1.tpl are:
+// #include <ctemplate/template_string.h>
+// static const ::ctemplate::StaticTemplateString ke_USER =
+//   STS_INIT_WITH_HASH(ke_USER, "USER", 3254611514008215315LLU);
+//
+// The header entries for ex2.tpl are:
+// #include <ctemplate/template_string.h>
+// static const ::ctemplate::StaticTemplateString ke_URL =
+//   STS_INIT_WITH_HASH(ke_URL, "URL", 1026025273225241985LLU);
+// static const ::ctemplate::StaticTemplateString ke_USER =
+//   STS_INIT_WITH_HASH(ke_USER, "USER", 3254611514008215315LLU);
+//
+// Simply concatenating both header entries will result in
+// duplicate #include directives and duplicate definitions of
+// the ke_USER variable. This function instead outputs:
+//
+// #include <ctemplate/template_string.h>
+// static const ::ctemplate::StaticTemplateString ke_USER =
+//   STS_INIT_WITH_HASH(ke_USER, "USER", 3254611514008215315LLU);
+// static const ::ctemplate::StaticTemplateString ke_URL =
+//   STS_INIT_WITH_HASH(ke_URL, "URL", 1026025273225241985LLU);
+//
+static string TextWithDuplicateLinesRemoved(const string& header_entries) {
+  string output;
+  set<string> lines_seen;
+  vector<string> lines = SplitIntoLines(header_entries);
+  const int lines_len = lines.size();
+  for (int i = 0; i < lines_len; ++i) {
+    const string& line = lines[i];
+    if (LineIsAllWhitespace(line) ||    // Blank lines always go in
+        lines_seen.find(line) == lines_seen.end()) {  // So do new lines
+      output.append(line);
+      output.append("\n");
+      lines_seen.insert(line);
+    }
+  }
+  return output;
+}
+
+// Writes the given text to the filename header_file.
+// Returns true if it succeeded, false otherwise.
+static bool WriteToDisk(bool log_info, const string& output_file,
+                        const string& text) {
+  FILE* outfile = fopen(output_file.c_str(), "wb");
+  if (!outfile) {
+    LogPrintf(LOG_ERROR, log_info, "Can't open %s", output_file.c_str());
+    return false;
+  }
+  LogPrintf(LOG_INFO, log_info, "Creating %s", output_file.c_str());
+  if (fwrite(text.c_str(), 1, text.length(), outfile) != text.length()) {
+    LogPrintf(LOG_ERROR, log_info, "Can't write %s: %s",
+              output_file.c_str(), strerror(errno));
+  }
+  fclose(outfile);
+  return true;
 }
 
 int main(int argc, char **argv) {
@@ -191,25 +361,27 @@ int main(int argc, char **argv) {
               "Must specify at least one template file on the command line.");
   }
 
-  // If --outputfile option is being used then --outputfile_suffix as well as
-  // --header_dir will be ignored. If there are multiple input files then an
-  // error needs to be reported.
-  if (!FLAG_outputfile.empty() && optind != argc - 1) {
-    LogPrintf(LOG_FATAL, FLAG_log_info,
-              "Only one template file allowed when specifying an explicit "
-              "output filename.");
-  }
-
   Template::SetTemplateRootDirectory(FLAG_template_dir);
 
-  int num_errors = 0;
+  // Initialize the TemplateRecord array. It holds one element per
+  // template given on the command-line.
+  vector<TemplateRecord*> template_records;
   for (int i = optind; i < argc; ++i) {
-    LogPrintf(LOG_INFO, FLAG_log_info, "\n------ Checking %s ------", argv[i]);
+    TemplateRecord *template_rec = new TemplateRecord(argv[i]);
+    template_records.push_back(template_rec);
+  }
+
+  // Iterate through each template and (unless -n is given), write
+  // its header entries into the headers array.
+  int num_errors = 0;
+  for (int i = 0; i < template_records.size(); ++i) {
+    const char* tplname = template_records[i]->name.c_str();
+    LogPrintf(LOG_INFO, FLAG_log_info, "\n------ Checking %s ------", tplname);
 
     // The last two arguments in the following call do not matter
     // since they control how the template gets expanded and we never
     // expand the template after loading it here
-    Template * tpl = Template::GetTemplate(argv[i], GOOGLE_NAMESPACE::DO_NOT_STRIP);
+    Template * tpl = Template::GetTemplate(tplname, GOOGLE_NAMESPACE::DO_NOT_STRIP);
 
     // The call to GetTemplate (above) loads the template from disk
     // and attempts to parse it. If it cannot find the file or if it
@@ -224,11 +396,13 @@ int main(int argc, char **argv) {
     // If that happens, since the parsing errors have already been reported
     // we just continue on to the next one.
     if (!tpl) {
-      LogPrintf(LOG_ERROR, FLAG_log_info, "Could not load file: %s", argv[i]);
+      LogPrintf(LOG_ERROR, FLAG_log_info, "Could not load file: %s", tplname);
       num_errors++;
+      template_records[i]->error = true;
       continue;
     } else {
-      LogPrintf(LOG_INFO, FLAG_log_info, "No syntax errors detected in %s", argv[i]);
+      LogPrintf(LOG_INFO, FLAG_log_info, "No syntax errors detected in %s",
+                tplname);
       if (FLAG_dump_templates)
         tpl->Dump(tpl->template_file());
     }
@@ -237,54 +411,59 @@ int main(int argc, char **argv) {
     if (!FLAG_header)
       continue;            // They don't want header files
 
-    // If there is no explicit output filename set, figure out the
-    // filename by removing any path before the template_file filename
-    string header_file;
-    if (!FLAG_outputfile.empty()) {
-      header_file = FLAG_outputfile;
-    } else {
-      string basename = GOOGLE_NAMESPACE::Basename(argv[i]);
-      header_file = GOOGLE_NAMESPACE::PathJoin(FLAG_header_dir,
-                                        basename + FLAG_outputfile_suffix);
-    }
-
-    string contents(string("//\n") +
-                    "// This header file auto-generated for the template\n" +
-                    "//    " + argv[i] + "\n" +
-                    "// by " + argv[0] + "\n" +
-                    "// DO NOT MODIFY THIS FILE DIRECTLY\n" +
-                    "//\n");
-
-    string guard(string("TPL_") + header_file);
-    ConvertToIdentifier(&guard);
-    guard.append("_H_");
-
-    contents.append(string("#ifndef ") + guard + "\n");
-    contents.append(string("#define ") + guard + "\n\n");
-
-    // Now append the header-entry info to the intro above
-    tpl->WriteHeaderEntries(&contents);
-
-    contents.append(string("\n#endif  // ") + guard + "\n");
-
-    // Write the results to disk.
-    FILE* header = fopen(header_file.c_str(), "wb");
-    if (!header) {
-      LogPrintf(LOG_ERROR, FLAG_log_info, "Can't open %s", header_file.c_str());
-      num_errors++;
-      continue;
-    } else {
-      LogPrintf(LOG_INFO, FLAG_log_info, "Creating %s", header_file.c_str());
-    }
-
-    if (fwrite(contents.c_str(), 1, contents.length(), header)
-        != contents.length()) {
-      LogPrintf(LOG_ERROR, FLAG_log_info, "Can't write %s: %s",
-                header_file.c_str(), strerror(errno));
-      num_errors++;
-    }
-    fclose(header);
+    tpl->WriteHeaderEntries(&template_records[i]->header_entries);
   }
+
+  // We have headers to emit:
+  // . If --outputfile was given, we combine all the header entries and
+  //   write them to the given output file. If any template had errors,
+  //   we fail and do not generate an output file.
+  // . Otherwise, we write one output file per template we processed.
+  // . In both cases, we add proper boilerplate first.
+  if (FLAG_header) {
+    string progname = argv[0];
+
+    if (!FLAG_outputfile.empty()) {  // All header entries written to one file.
+      // If any template had an error, we do not produce an output file.
+      if (num_errors == 0) {
+        vector<string> template_filenames;
+        string all_header_entries;
+        for (int i = 0; i < template_records.size(); ++i) {
+          all_header_entries.append(template_records[i]->header_entries);
+          template_filenames.push_back(template_records[i]->name);
+        }
+        string output = Boilerplate(progname, template_filenames);
+        const string cleantext =
+            TextWithDuplicateLinesRemoved(all_header_entries);
+        output.append(WrapWithGuard(FLAG_outputfile, cleantext));
+        if (!WriteToDisk(FLAG_log_info, FLAG_outputfile, output))
+          num_errors++;
+      }
+    } else {
+      // Each template will have its own output file. Skip any that had errors.
+      for (int i = 0; i < template_records.size(); ++i) {
+        if (template_records[i]->error)
+          continue;
+        string basename = GOOGLE_NAMESPACE::Basename(template_records[i]->name);
+        string output_file =
+            GOOGLE_NAMESPACE::PathJoin(FLAG_header_dir,
+                                basename + FLAG_outputfile_suffix);
+        vector<string> template_filenames;   // Contains one template filename.
+        template_filenames.push_back(template_records[i]->name);
+        string output = Boilerplate(progname, template_filenames);
+        output.append(WrapWithGuard(output_file,
+                                    template_records[i]->header_entries));
+        if (!WriteToDisk(FLAG_log_info, output_file, output))
+          num_errors++;
+      }
+    }
+  }
+
+  // Free dynamic memory
+  for (int i = 0; i < template_records.size(); ++i) {
+    delete template_records[i];
+  }
+
   // Cap at 127 to avoid causing problems with return code
   return num_errors > 127 ? 127 : num_errors;
 }

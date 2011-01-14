@@ -149,7 +149,8 @@ class @ac_windows_dllexport@ PreEscape : public TemplateModifier { MODIFY_SIGNAT
 extern @ac_windows_dllexport@ PreEscape pre_escape;
 
 // Like HtmlEscape but allows HTML entities, <br> tags, <wbr> tags,
-// matched <b> and </b> tags, and matched <i> and </i> tags.
+// matched <b> and </b> tags, matched <i> and </i> tags, matched <em> and </em>
+// tags, and matched <span dir=(rtl|ltr)> tags.
 class @ac_windows_dllexport@ SnippetEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
 extern @ac_windows_dllexport@ SnippetEscape snippet_escape;
 
