@@ -58,6 +58,7 @@
 #include <vector>
 #include <utility>          // for pair
 #include HASH_MAP_H         // defined in config.h
+#include "base/thread_annotations.h"
 #include "htmlparser/htmlparser_cpp.h"
 #include "template_modifiers_internal.h"
 #include <ctemplate/per_expand_data.h>
@@ -168,16 +169,16 @@ static int kVerbosity = 0;   // you can change this by hand to get vlogs
 #define LOG_TEMPLATE_NAME(severity, template) \
    LOG(severity) << "Template " << template->template_file() << ": "
 
-#define LOG_AUTO_ESCAPE_ERROR(error_msg, my_template) do { \
-      LOG_TEMPLATE_NAME(ERROR, my_template); \
-      LOG(ERROR) << "Auto-Escape: " << error_msg << endl; \
-} while (0)
+#define LOG_AUTO_ESCAPE_ERROR(error_msg, my_template) do {      \
+    LOG_TEMPLATE_NAME(ERROR, my_template);                      \
+    LOG(ERROR) << "Auto-Escape: " << error_msg << endl;         \
+  } while (0)
 
 // We are in auto-escape mode.
 #define AUTO_ESCAPE_MODE(context) ((context) != TC_MANUAL)
 
 // Auto-Escape contexts which utilize the HTML Parser.
-#define AUTO_ESCAPE_PARSING_CONTEXT(context) \
+#define AUTO_ESCAPE_PARSING_CONTEXT(context)                            \
   ((context) == TC_HTML || (context) == TC_JS || (context) == TC_CSS)
 
 // ----------------------------------------------------------------------
@@ -389,7 +390,7 @@ PragmaMarker::PragmaMarker(const char* token_start, const char* token_end,
       if (!error.empty())  // Failed to parse attribute value.
         break;
       names_and_values_.push_back(pair<const string, const string>(
-                                      attribute_name, attribute_value));
+          attribute_name, attribute_value));
     }
   }
   if (error.empty())   // Success
@@ -608,15 +609,16 @@ static size_t FindLongestMatch(
 #define AS_STR1(x)  #x
 #define AS_STR(x)   AS_STR1(x)
 
-static void WriteOneHeaderEntry(string *outstring,
-                                const string& variable,
-                                const string& full_pathname) {
+static void WriteOneHeaderEntry(
+    string *outstring, const string& variable, const string& full_pathname)
+    LOCKS_EXCLUDED(g_header_mutex) {
   MutexLock ml(&g_header_mutex);
 
   // we use hash_map instead of hash_set just to keep the stl size down
-  static hash_map<string, bool, StringHash> vars_seen;
-  static string current_file;
-  static string prefix;
+  static hash_map<string, bool, StringHash> vars_seen
+      GUARDED_BY(g_header_mutex);
+  static string current_file GUARDED_BY(g_header_mutex);
+  static string prefix GUARDED_BY(g_header_mutex);
 
   if (full_pathname != current_file) {
     // changed files so re-initialize the static variables
@@ -1812,14 +1814,14 @@ static const char* MaybeEatNewline(const char* start, const char* end,
 }
 
 // When the parse fails, we take several actions.  msg is a stream
-#define FAIL(msg)   do {                                                  \
-  LOG_TEMPLATE_NAME(ERROR, my_template);                                  \
-  LOG(ERROR) << msg << endl;                                              \
-  my_template->set_state(TS_ERROR);                                       \
-  /* make extra-sure we never try to parse anything more */               \
-  my_template->parse_state_.bufstart = my_template->parse_state_.bufend;  \
-  return TemplateToken(TOKENTYPE_NULL, "", 0, NULL);                      \
-} while (0)
+#define FAIL(msg)   do {                                                \
+    LOG_TEMPLATE_NAME(ERROR, my_template);                              \
+    LOG(ERROR) << msg << endl;                                          \
+    my_template->set_state(TS_ERROR);                                   \
+    /* make extra-sure we never try to parse anything more */           \
+    my_template->parse_state_.bufstart = my_template->parse_state_.bufend; \
+    return TemplateToken(TOKENTYPE_NULL, "", 0, NULL);                  \
+  } while (0)
 
 // Parses the text of the template file in the input_buffer as
 // follows: If the buffer is empty, return the null token.  If getting
@@ -1894,8 +1896,8 @@ TemplateToken SectionTemplateNode::GetNextToken(Template *my_template) {
           // Keep token_start the same; the token includes the leading '='.
           // But we have to figure token-end specially: it should be "=}}".
           if (ps->bufend > (token_start + 1))
-              token_end = (char*)memchr(token_start + 1, '=',
-                                        ps->bufend - (token_start + 1));
+            token_end = (char*)memchr(token_start + 1, '=',
+                                      ps->bufend - (token_start + 1));
           if (!token_end ||
               token_end + ps->current_delimiters.end_marker_len > ps->bufend ||
               memcmp(token_end + 1, ps->current_delimiters.end_marker,
@@ -2271,7 +2273,7 @@ void Template::DumpToString(const char *filename, string *out) const {
   if (!out)
     return;
   out->append("------------Start Template Dump [" + string(filename) +
-                        "]--------------\n");
+              "]--------------\n");
   if (tree_) {
     tree_->DumpToString(1, out);
   } else {
@@ -2284,11 +2286,13 @@ void Template::DumpToString(const char *filename, string *out) const {
 // Template::state()
 // Template::set_state()
 // Template::template_file()
+// Template::original_filename()
 // Template::strip()
 // Template::mtime()
 //    Various introspection methods.  state() is the parse-state
 //    (success, error).  template_file() is the resolved filename of a
-//    given template object's input. strip() is the Strip type. mtime() is
+//    given template object's input. original_filename() is the unresolved,
+//    original filename, strip() is the Strip type. mtime() is
 //    the lastmod time. For string-based templates, not backed by a file,
 //    mtime() returns 0.
 // -------------------------------------------------------------------------
@@ -2303,6 +2307,10 @@ TemplateState Template::state() const {
 
 const char *Template::template_file() const {
   return resolved_filename_.c_str();
+}
+
+const char *Template::original_filename() const {
+  return original_filename_.c_str();
 }
 
 Strip Template::strip() const {
@@ -2467,11 +2475,11 @@ size_t Template::InsertLine(const char *line, size_t len, Strip strip,
     StripTemplateWhiteSpace(&line, &len);
     add_newline = false;
 
-  // IsBlankOrOnlyHasOneRemovableMarker may modify the two input
-  // parameters if the line contains only spaces or only one input
-  // marker.  This modification must be done before the line is
-  // written to the input buffer. Hence the need for the boolean flag
-  // add_newline to be referenced after the Write statement.
+    // IsBlankOrOnlyHasOneRemovableMarker may modify the two input
+    // parameters if the line contains only spaces or only one input
+    // marker.  This modification must be done before the line is
+    // written to the input buffer. Hence the need for the boolean flag
+    // add_newline to be referenced after the Write statement.
   } else if (strip >= STRIP_BLANK_LINES
              && IsBlankOrOnlyHasOneRemovableMarker(&line, &len, delim)) {
     add_newline = false;
@@ -2558,7 +2566,8 @@ void Template::StripBuffer(char **buffer, size_t* len) {
 // Besides being called when locked, it's also ok to call this from
 // the constructor, when you know nobody else will be messing with
 // this object.
-bool Template::ReloadIfChangedLocked() {
+bool Template::ReloadIfChangedLocked()
+    EXCLUSIVE_LOCKS_REQUIRED(g_template_mutex) {
   // TODO(panicker): Remove this duplicate code when constructing the template,
   // after deprecating this method.
   // TemplateCache::GetTemplate() already checks if the template filename is
@@ -2569,7 +2578,7 @@ bool Template::ReloadIfChangedLocked() {
   // if a template is string-based, instead use the boolean 'string_based'
   // in the template cache.
   if (original_filename_.empty()) {
-  // string-based templates don't reload
+    // string-based templates don't reload
     return false;
   }
 
@@ -2651,7 +2660,7 @@ bool Template::ReloadIfChangedLocked() {
   }
 }
 
-bool Template::ReloadIfChanged() {
+bool Template::ReloadIfChanged() LOCKS_EXCLUDED(g_template_mutex) {
   // ReloadIfChanged() is protected by g_template_mutex so when it's
   // called from different threads, they don't stomp on tree_ and
   // state_.  (This is the only write-locker on g_template_mutex.)
@@ -2672,7 +2681,8 @@ bool Template::ReloadIfChanged() {
 bool Template::ExpandLocked(ExpandEmitter *expand_emitter,
                             const TemplateDictionaryInterface *dict,
                             PerExpandData *per_expand_data,
-                            const TemplateCache *cache) const {
+                            const TemplateCache *cache) const
+    SHARED_LOCKS_REQUIRED(g_template_mutex) {
   // Accumulator for the results of Expand for each sub-tree.
   bool error_free = true;
 
@@ -2725,10 +2735,11 @@ bool Template::ExpandLocked(ExpandEmitter *expand_emitter,
   return error_free;
 }
 
-bool Template::ExpandWithDataAndCache(ExpandEmitter *expand_emitter,
-                                      const TemplateDictionaryInterface *dict,
-                                      PerExpandData *per_expand_data,
-                                      const TemplateCache *cache) const {
+bool Template::ExpandWithDataAndCache(
+    ExpandEmitter *expand_emitter,
+    const TemplateDictionaryInterface *dict,
+    PerExpandData *per_expand_data,
+    const TemplateCache *cache) const LOCKS_EXCLUDED(g_template_mutex) {
   // We hold g_template_mutex the entire time we expand, because
   // ReloadIfChanged(), which also holds template_mutex, is allowed to
   // delete tree_, and we want to make sure it doesn't do that (in another

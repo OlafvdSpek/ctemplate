@@ -113,6 +113,7 @@ WINDOWS_PROJECTS += vsprojects/libctemplate/libctemplate.vcproj
 libctemplate_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/base/arena.h src/base/arena.cc src/base/mutex.h \
 	src/base/small_map.h src/base/manual_constructor.h \
+	src/base/thread_annotations.h \
 	src/template_modifiers_internal.h src/indented_writer.h \
 	src/template.cc src/template_cache.cc \
 	src/template_dictionary.cc src/template_modifiers.cc \
@@ -124,7 +125,10 @@ libctemplate_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/htmlparser/statemachine.h src/htmlparser/statemachine.cc \
 	src/htmlparser/htmlparser_cpp.h
 libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG $(AM_CXXFLAGS)
-libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) -export-symbols-regex $(CTEMPLATE_SYMBOLS)
+# -version-info gets passed to libtool
+libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) \
+                          -export-symbols-regex $(CTEMPLATE_SYMBOLS) \
+                          -version-info @SO_VERSION@
 libctemplate_la_LIBADD = $(PTHREAD_LIBS)
 
 # For MinGW, we need to bring in the windows port files
@@ -138,7 +142,8 @@ lib_LTLIBRARIES += libctemplate_nothreads.la
 libctemplate_nothreads_la_SOURCES = $(libctemplate_la_SOURCES)
 libctemplate_nothreads_la_DEPENDENCIES = $(libctemplate_la_DEPENDENCIES)
 libctemplate_nothreads_la_CXXFLAGS = -DNDEBUG -DNO_THREADS $(AM_CXXFLAGS)
-libctemplate_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_SYMBOLS)
+libctemplate_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_SYMBOLS) \
+                                    -version-info @SO_VERSION@
 
 # For our tests, we want versions of these libraries that include asserts.
 noinst_LTLIBRARIES += libctemplate_debug.la
@@ -168,11 +173,14 @@ libctemplate_testing_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
                                   src/tests/template_test_util.cc
 libctemplate_testing_la_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 CTEMPLATE_TESTING_SYMBOLS = 'TemporaryRegisterTemplate|TemplateDictionaryPeer'
-libctemplate_testing_la_LDFLAGS = $(PTHREAD_CFLAGS) -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS)
+libctemplate_testing_la_LDFLAGS = $(PTHREAD_CFLAGS) \
+                                  -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS) \
+                                  -version-info @SO_VERSION@
 libctemplate_testing_la_LIBADD = $(PTHREAD_LIBS)
 libctemplate_testing_nothreads_la_SOURCES = $(libctemplate_testing_la_SOURCES)
 libctemplate_testing_nothreads_la_CXXFLAGS = $(AM_CXXFLAGS) -DNO_THREADS
-libctemplate_testing_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS)
+libctemplate_testing_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS) \
+                                            -version-info @SO_VERSION@
 
 # This library depends on libctemplate, but it can use either libctemplate
 # or libctemplate_nothreads.  Rather than have two versions of this

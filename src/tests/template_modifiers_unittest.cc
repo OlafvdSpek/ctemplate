@@ -133,6 +133,53 @@ class TemplateModifiersUnittest {
     dict.SetEscapedValue("close i b",
                          "<b><i>foo",
                          snippet_escape);
+    dict.SetEscapedValue("em",
+                         "<em>foo</em>",
+                         snippet_escape);
+    dict.SetEscapedValue("nested em",
+                         "<b>This is foo<em>...</em></b>",
+                         snippet_escape);
+    dict.SetEscapedValue("unclosed em",
+                         "<em>foo",
+                         snippet_escape);
+    dict.SetEscapedValue("wrongly closed em",
+                         "foo</em>",
+                         snippet_escape);
+    dict.SetEscapedValue("misnested em",
+                         "<i><em>foo</i></em>",
+                         snippet_escape);
+    dict.SetEscapedValue("span ltr",
+                         "<span dir=ltr>bidi text</span>",
+                         snippet_escape);
+    dict.SetEscapedValue("span rtl",
+                         "<span dir=rtl>bidi text</span>",
+                         snippet_escape);
+    dict.SetEscapedValue("span garbage dir attr",
+                         "<span dir=foo>bidi text</span>",
+                         snippet_escape);
+    dict.SetEscapedValue("span no dir",
+                         "<span>bidi text</span>",
+                         snippet_escape);
+    dict.SetEscapedValue("span bad attribute",
+                         "<span onclick=alert('foo')>bidi text</span>",
+                         snippet_escape);
+    dict.SetEscapedValue("span quotes",
+                         "<span dir=\"rtl\">bidi text</span>",
+                         snippet_escape);
+    dict.SetEscapedValue("nested span",
+                         "<b>This is <span dir=rtl>bidi text</span></b>",
+                         snippet_escape);
+    dict.SetEscapedValue("doubly-nested span",
+                         "<span dir=rtl>This is <span dir=rtl>"
+                         "bidi text</span></span>",
+                         snippet_escape);
+    dict.SetEscapedValue("two spans",
+                         "<b>This is <span dir=rtl>text</span> that is "
+                         "<span dir=rtl>bidi.</span></b>",
+                         snippet_escape);
+    dict.SetEscapedValue("unclosed span",
+                         "<b>This is <span dir=rtl>bidi text",
+                         snippet_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("easy snippet"), "foo");
@@ -158,6 +205,34 @@ class TemplateModifiersUnittest {
     ASSERT_STREQ(peer.GetSectionValue("unterminated 5"), "<b>foo&lt;/b</b>");
     ASSERT_STREQ(peer.GetSectionValue("close b i"), "<i><b>foo</b></i>");
     ASSERT_STREQ(peer.GetSectionValue("close i b"), "<b><i>foo</i></b>");
+    ASSERT_STREQ(peer.GetSectionValue("em"), "<em>foo</em>");
+    ASSERT_STREQ(peer.GetSectionValue("nested em"),
+                 "<b>This is foo<em>...</em></b>");
+    ASSERT_STREQ(peer.GetSectionValue("unclosed em"), "<em>foo</em>");
+    ASSERT_STREQ(peer.GetSectionValue("wrongly closed em"), "foo&lt;/em&gt;");
+    ASSERT_STREQ(peer.GetSectionValue("misnested em"), "<i><em>foo</i></em>");
+    ASSERT_STREQ(peer.GetSectionValue("span ltr"),
+                 "<span dir=ltr>bidi text</span>");
+    ASSERT_STREQ(peer.GetSectionValue("span rtl"),
+                 "<span dir=rtl>bidi text</span>");
+    ASSERT_STREQ(peer.GetSectionValue("span garbage dir attr"),
+                 "&lt;span dir=foo&gt;bidi text&lt;/span&gt;");
+    ASSERT_STREQ(peer.GetSectionValue("span no dir"),
+                 "&lt;span&gt;bidi text&lt;/span&gt;");
+    ASSERT_STREQ(peer.GetSectionValue("span bad attribute"),
+                 "&lt;span onclick=alert(&#39;foo&#39;)&gt;bidi text&lt;/span&gt;");
+    ASSERT_STREQ(peer.GetSectionValue("span quotes"),
+                 "&lt;span dir=&quot;rtl&quot;&gt;bidi text&lt;/span&gt;");
+    ASSERT_STREQ(peer.GetSectionValue("nested span"),
+                 "<b>This is <span dir=rtl>bidi text</span></b>");
+    ASSERT_STREQ(peer.GetSectionValue("doubly-nested span"),
+                 "<span dir=rtl>This is &lt;span dir=rtl&gt;bidi text"
+                 "</span>&lt;/span&gt;");
+    ASSERT_STREQ(peer.GetSectionValue("two spans"),
+                 "<b>This is <span dir=rtl>text</span> that is "
+                 "<span dir=rtl>bidi.</span></b>");
+    ASSERT_STREQ(peer.GetSectionValue("unclosed span"),
+                 "<b>This is <span dir=rtl>bidi text</span></b>");
   }
 
   static void TestPreEscape() {
@@ -917,8 +992,8 @@ class TemplateModifiersUnittest {
     ASSERT(CheckXSSAlternative("url_query_escape", "",
                                "url_escape_with_arg", "=query"));
 
-    // H=(pre|snippet|attribute), p, u, U=query and U=html (a.k.a H=url)
-    // are all alternatives to h.
+    // H=(pre|snippet|attribute), p, u, U=query, U=html (a.k.a H=url)
+    // and I=html are all alternatives to h.
     ASSERT(CheckXSSAlternative("h", "", "H", "=pre"));
     ASSERT(CheckXSSAlternative("h", "", "H", "=snippet"));
     ASSERT(CheckXSSAlternative("h", "", "H", "=attribute"));
@@ -927,10 +1002,12 @@ class TemplateModifiersUnittest {
     ASSERT(CheckXSSAlternative("h", "", "u", ""));
     ASSERT(CheckXSSAlternative("h", "", "U", "=query"));
     ASSERT(CheckXSSAlternative("h", "", "U", "=html"));
+    ASSERT(CheckXSSAlternative("h", "", "I", "=html"));
 
-    // But h is not an alternative to H=attribute
+    // But h is not an alternative to H=attribute and I=html,
     // nor is json_escape an alternative to h.
     ASSERT(!CheckXSSAlternative("H", "=attribute", "h", ""));
+    ASSERT(!CheckXSSAlternative("I", "=html", "h", ""));
     ASSERT(!CheckXSSAlternative("h", "", "json_escape", ""));
 
     // H=snippet and H=attribute are alternatives to H=pre
@@ -942,6 +1019,19 @@ class TemplateModifiersUnittest {
     // javascript_escape is an alternative to json_escape and vice versa
     ASSERT(CheckXSSAlternative("json_escape", "", "javascript_escape", ""));
     ASSERT(CheckXSSAlternative("javascript_escape", "", "json_escape", ""));
+
+    // I=javascript is an alternative to :j and :U=javascript but not
+    // vice versa
+    ASSERT(CheckXSSAlternative("javascript_escape", "", "I", "=javascript"));
+    ASSERT(CheckXSSAlternative("U", "=javascript", "I", "=javascript"));
+    ASSERT(!CheckXSSAlternative("I", "=javascript", "javascript_escape", ""));
+    ASSERT(!CheckXSSAlternative("I", "=javascript", "U", "=javascript"));
+
+    // U=css and I=css are alternatives to :c but not vice versa
+    ASSERT(CheckXSSAlternative("c", "", "U", "=css"));
+    ASSERT(CheckXSSAlternative("c", "", "I", "=css"));
+    ASSERT(!CheckXSSAlternative("U", "=css", "c", ""));
+    ASSERT(!CheckXSSAlternative("I", "=css", "c", ""));
 
     // Extended modifier should not match any other except itself.
     ASSERT(!CheckXSSAlternative("x-bla", "", "x-foo", ""));

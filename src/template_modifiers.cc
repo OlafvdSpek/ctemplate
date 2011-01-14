@@ -60,6 +60,8 @@ using std::vector;
 
 using HTMLPARSER_NAMESPACE::HtmlParser;
 
+#define strliterallen(s)  (sizeof("" s "") - 1)
+
 // Really we should be using uint_16_t or something, but this is good
 // enough, and more portable...
 typedef unsigned int uint16;
@@ -146,13 +148,81 @@ void PreEscape::Modify(const char* in, size_t inlen,
 }
 PreEscape pre_escape;
 
+// We encode the presence and ordering of unclosed tags in a string, using the
+// letters b, i, s, and e to stand for <b>, <i>, <span>, and <em> respectively.
+// The most recently opened tag is appended onto the end of the string, so in
+// the common case of properly nested tags, we need only look at the last
+// character.  If we don't find it there, we need to continue looking at
+// everything until we find it, because tags may not necessarily be in order.
+// Similarly, when we add a tag, we need to check each existing tag for a match
+// so that we don't nest.
+class UnclosedSnippetTags {
+ public:
+  // We could use ordinary ints for the enum values, but using mnemonic
+  // characters potentially makes debugging easier.
+  typedef enum {
+    TAG_B = 'b',
+    TAG_I = 'i',
+    TAG_EM = 'e',
+    TAG_SPAN = 's',
+  } Tag;
+
+  UnclosedSnippetTags() : tag_length(0) {
+    memset(tags, 0, 5);
+  }
+
+  // Adds a tag to the set of open tags if it's not already open, or otherwise
+  // return false.
+  inline bool MaybeAdd(Tag tag) {
+    if (strchr(tags, tag)) {
+      return false;
+    } else {
+      tags[tag_length++] = tag;
+      return true;
+    }
+  }
+
+  // Removes a tag from the set of open tags if it's open, or otherwise return
+  // false.
+  inline bool MaybeRemove(Tag tag) {
+    char* tag_location = strchr(tags, tag);
+    if (tag_location) {
+      for (char* c = tag_location; *c; ++c) {
+        // Have to copy all later tags down by one so we don't leave a gap in the
+        // array.
+        *c = *(c + 1);
+      }
+      --tag_length;
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  inline void PrintClosingTags(ExpandEmitter* out) {
+    for (int i = tag_length; i >= 0; --i) {
+      switch (tags[i]) {
+        case TAG_B:
+          out->Emit("</b>"); break;
+        case TAG_I:
+          out->Emit("</i>"); break;
+        case TAG_EM:
+          out->Emit("</em>"); break;
+        case TAG_SPAN:
+          out->Emit("</span>"); break;
+      }
+    }
+  }
+
+ private:
+  char tags[5];
+  int tag_length;
+};
+
 void SnippetEscape::Modify(const char* in, size_t inlen,
                            const PerExpandData*,
                            ExpandEmitter* out, const string& arg) const {
-  enum { NONE, B, I, B_THEN_I, I_THEN_B } state = NONE;
-  static const char* kCloser[] =
-      { "", "</b>", "</i>", "</i></b>", "</b></i>" };
-
+  UnclosedSnippetTags unclosed;
   const char* pos = in;
   const char* start = pos;
   const char* const limit = in + inlen;
@@ -170,30 +240,44 @@ void SnippetEscape::Modify(const char* in, size_t inlen,
         const char* const next_pos = pos + 1;
         const int chars_left = limit - next_pos;
         if ((chars_left >= 2) && !memcmp(next_pos, "b>", 2)
-            && (state == NONE || state == I)) {
-          state = (state == I) ? I_THEN_B : B;
-          pos += 3;  // length of <b>
+            && unclosed.MaybeAdd(UnclosedSnippetTags::TAG_B)) {
+          pos += strliterallen("<b>");
           continue;
         } else if ((chars_left >= 2) && !memcmp(next_pos, "i>", 2)
-                   && (state == NONE || state == B)) {
-          state = (state == B) ? B_THEN_I : I;
-          pos += 3;  // length of <i>
+                   && unclosed.MaybeAdd(UnclosedSnippetTags::TAG_I)) {
+          pos += strliterallen("<i>");
+          continue;
+        } else if ((chars_left >= 3) && !memcmp(next_pos, "em>", 3)
+                   && unclosed.MaybeAdd(UnclosedSnippetTags::TAG_EM)) {
+          pos += strliterallen("<em>");
+          continue;
+        } else if ((chars_left >= 13) && !memcmp(next_pos, "span dir=", 9)
+                   && (!memcmp(next_pos + 9, "ltr>", 4) ||
+                       !memcmp(next_pos + 9, "rtl>", 4))
+                   && unclosed.MaybeAdd(UnclosedSnippetTags::TAG_SPAN)) {
+          pos += strliterallen("<span dir=ltr>");
           continue;
         } else if ((chars_left >= 3) && !memcmp(next_pos, "/b>", 3)
-                   && (state != NONE && state != I)) {
-          state = (state == B) ? NONE : I;
-          pos += 4;  // length of </b>
+                   && unclosed.MaybeRemove(UnclosedSnippetTags::TAG_B)) {
+          pos += strliterallen("</b>");
           continue;
         } else if ((chars_left >= 3) && !memcmp(next_pos, "/i>", 3)
-                   && (state != NONE && state != B)) {
-          state = (state == I) ? NONE : B;
-          pos += 4;  // length of </i>
+                   && unclosed.MaybeRemove(UnclosedSnippetTags::TAG_I)) {
+          pos += strliterallen("</i>");
+          continue;
+        } else if ((chars_left >= 4) && !memcmp(next_pos, "/em>", 4)
+                   && unclosed.MaybeRemove(UnclosedSnippetTags::TAG_EM)) {
+          pos += strliterallen("</em>");
+          continue;
+        } else if ((chars_left >= 6) && !memcmp(next_pos, "/span>", 6)
+                   && unclosed.MaybeRemove(UnclosedSnippetTags::TAG_SPAN)) {
+          pos += strliterallen("</span>");
           continue;
         } else if ((chars_left >= 3) && !memcmp(next_pos, "br>", 3)) {
-          pos += 4;  // length of <br>
+          pos += strliterallen("<br>");
           continue;
         } else if ((chars_left >= 4) && !memcmp(next_pos, "wbr>", 4)) {
-          pos += 5;  // length of <wbr>
+          pos += strliterallen("<wbr>");
           continue;
         }
 
@@ -226,9 +310,7 @@ void SnippetEscape::Modify(const char* in, size_t inlen,
     start = ++pos;
   }
   EmitRun(start, pos, out);
-  if (state != NONE) {
-    out->Emit(kCloser[state]);
-  }
+  unclosed.PrintClosingTags(out);
 }
 SnippetEscape snippet_escape;
 
@@ -419,27 +501,47 @@ void XmlEscape::Modify(const char* in, size_t inlen,
 }
 XmlEscape xml_escape;
 
+// This table maps initial characters to code lengths.  This could be
+// done with a 16-byte table and a shift, but there's a substantial
+// performance increase by eliminating the shift.
+static const char kCodeLengths[256] = {
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+
+  2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+  2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+  3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+};
+
 // Returns the UTF-8 code-unit starting at start, or the special codepoint
 // 0xFFFD if the input ends abruptly or is not well-formed UTF-8.
 // start -- address of the start of the code unit which also receives the
 //          address past the end of the code unit returned.
 // end -- exclusive end of the string
 static inline uint16 UTF8CodeUnit(const char** start, const char *end) {
-  size_t code_unit_len = 1;
-  switch (**start & 0xF0) {
-    case 0xC0: case 0xD0:  // 110x xxxx  10xx xxxx
-      code_unit_len = 2;
-      break;
-    case 0xE0:             // 1110 xxxx  10xx xxxx  10xx xxxx
-      code_unit_len = 3;
-      break;
-    default:
-      // Return the current byte as a codepoint.
-      // Either it is a valid single byte codepoint, or it's not part of a valid
-      // UTF-8 sequence, and so has to be handled individually.
-      char first_char = **start;
-      ++*start;
-      return static_cast<unsigned char>(first_char);
+  // Use kCodeLengths table to calculate the length of the code unit
+  // from the first character.
+  unsigned char first_char = static_cast<unsigned char>(**start);
+  size_t code_unit_len = kCodeLengths[first_char];
+  if (code_unit_len == 1) {
+    // Return the current byte as a codepoint.
+    // Either it is a valid single byte codepoint, or it's not part of a valid
+    // UTF-8 sequence, and so has to be handled individually.
+    ++*start;
+    return first_char;
   }
   const char *code_unit_end = *start + code_unit_len;
   if (code_unit_end < *start || code_unit_end > end) {  // Truncated code unit.
@@ -474,40 +576,51 @@ void JavascriptEscape::Modify(const char* in, size_t inlen,
   while (pos < limit) {
     const char* next_pos = pos;
     uint16 code_unit = UTF8CodeUnit(&next_pos, limit);
-    switch (code_unit) {
-      default:
-        // Increment our counter and look at the next character.
+
+    // Test for 16-bit values outside the switch below, because gcc
+    // will emit chained branches rather than a jump table for such a
+    // wide range of values.
+    if (code_unit & 0xFF00) {
+      // Linebreaks according to EcmaScript 262 which cannot appear in strings.
+      if (code_unit == 0x2028) {
+        // Line separator
+        EmitRun(start, pos, out); APPEND("\\u2028");
+      } else if (code_unit == 0x2029) {
+        // Paragraph separator
+        EmitRun(start, pos, out); APPEND("\\u2029");
+      } else {
         pos = next_pos;
         continue;
+      }
+    } else {
+      switch (code_unit) {
+        default:
+          // Increment our counter and look at the next character.
+          pos = next_pos;
+          continue;
 
-      case '\0': EmitRun(start, pos, out); APPEND("\\x00"); break;
-      case '"':  EmitRun(start, pos, out); APPEND("\\x22"); break;
-      case '\'': EmitRun(start, pos, out); APPEND("\\x27"); break;
-      case '\\': EmitRun(start, pos, out); APPEND("\\\\");  break;
-      case '\t': EmitRun(start, pos, out); APPEND("\\t");   break;
-      case '\r': EmitRun(start, pos, out); APPEND("\\r");   break;
-      case '\n': EmitRun(start, pos, out); APPEND("\\n");   break;
-      case '\b': EmitRun(start, pos, out); APPEND("\\b");   break;
-      case '\f': EmitRun(start, pos, out); APPEND("\\f");   break;
-      case '&':  EmitRun(start, pos, out); APPEND("\\x26"); break;
-      case '<':  EmitRun(start, pos, out); APPEND("\\x3c"); break;
-      case '>':  EmitRun(start, pos, out); APPEND("\\x3e"); break;
-      case '=':  EmitRun(start, pos, out); APPEND("\\x3d"); break;
+        case '\0': EmitRun(start, pos, out); APPEND("\\x00"); break;
+        case '"':  EmitRun(start, pos, out); APPEND("\\x22"); break;
+        case '\'': EmitRun(start, pos, out); APPEND("\\x27"); break;
+        case '\\': EmitRun(start, pos, out); APPEND("\\\\");  break;
+        case '\t': EmitRun(start, pos, out); APPEND("\\t");   break;
+        case '\r': EmitRun(start, pos, out); APPEND("\\r");   break;
+        case '\n': EmitRun(start, pos, out); APPEND("\\n");   break;
+        case '\b': EmitRun(start, pos, out); APPEND("\\b");   break;
+        case '\f': EmitRun(start, pos, out); APPEND("\\f");   break;
+        case '&':  EmitRun(start, pos, out); APPEND("\\x26"); break;
+        case '<':  EmitRun(start, pos, out); APPEND("\\x3c"); break;
+        case '>':  EmitRun(start, pos, out); APPEND("\\x3e"); break;
+        case '=':  EmitRun(start, pos, out); APPEND("\\x3d"); break;
 
-      case '\v':
-        // Do not escape vertical tabs to "\\v" since it is interpreted as 'v'
-        // by JScript according to section 2.1 of
-        // http://wiki.ecmascript.org/lib/exe/fetch.php?id=resources%3Aresources
-        // &cache=cache&media=resources:jscriptdeviationsfromes3.pdf
-        EmitRun(start, pos, out); APPEND("\\x0b"); break;
-
-      // Linebreaks according to EcmaScript 262 which cannot appear in strings.
-      case 0x2028:
-        // Line separator
-        EmitRun(start, pos, out); APPEND("\\u2028"); break;
-      case 0x2029:
-        // Paragraph separator
-        EmitRun(start, pos, out); APPEND("\\u2029"); break;
+        case '\v':
+          // Do not escape vertical tabs to "\\v" since it is interpreted as 'v'
+          // by JScript according to section 2.1 of
+          // http://wiki.ecmascript.org/lib/exe/fetch.php?
+          // id=resources%3Aresources&cache=cache&
+          // media=resources:jscriptdeviationsfromes3.pdf
+          EmitRun(start, pos, out); APPEND("\\x0b"); break;
+      }
     }
     start = pos = next_pos;
   }
@@ -714,7 +827,6 @@ static struct ModifierWithAlternatives {
              &g_modifiers[12].modifier_info,  // url_escape_with_arg=query
              // img_src_url_escape_with_arg=html
              &g_modifiers[18].modifier_info} },
-
   /* 2 */ { ModifierInfo("html_escape_with_arg=snippet", 'H',
                          XSS_WEB_STANDARD, &snippet_escape),
             {&g_modifiers[1].modifier_info,   // html_escape
@@ -734,10 +846,15 @@ static struct ModifierWithAlternatives {
   /* 4 */ { ModifierInfo("html_escape_with_arg=attribute", 'H',
                          XSS_WEB_STANDARD, &cleanse_attribute), {} },
   /* 5 */ { ModifierInfo("html_escape_with_arg=url", 'H',
-                         XSS_WEB_STANDARD, &validate_url_and_html_escape), {} },
+                         XSS_WEB_STANDARD, &validate_url_and_html_escape),
+            // img_src_url_escape_with_arg=html
+            {&g_modifiers[18].modifier_info} },
   /* 6 */ { ModifierInfo("javascript_escape", 'j',
                          XSS_WEB_STANDARD, &javascript_escape),
-            {&g_modifiers[7].modifier_info} },  // json_escape
+            {&g_modifiers[7].modifier_info,   // json_escape
+             &g_modifiers[10].modifier_info,  // url_escape_with_arg=javascript
+             // img_src_url_escape_with_arg=javascript
+             &g_modifiers[17].modifier_info} },
   /* 7 */ { ModifierInfo("json_escape", 'o', XSS_WEB_STANDARD, &json_escape),
             {&g_modifiers[6].modifier_info} },  // javascript_escape
   /* 8 */ { ModifierInfo("pre_escape", 'p', XSS_WEB_STANDARD, &pre_escape),
@@ -751,9 +868,13 @@ static struct ModifierWithAlternatives {
                          XSS_WEB_STANDARD, &url_query_escape), {} },
   /* 10 */ { ModifierInfo("url_escape_with_arg=javascript", 'U',
                           XSS_WEB_STANDARD,
-                          &validate_url_and_javascript_escape), {} },
+                          &validate_url_and_javascript_escape),
+             // img_src_url_escape_with_arg=javascript
+             {&g_modifiers[17].modifier_info} },
   /* 11 */ { ModifierInfo("url_escape_with_arg=html", 'U',
-                          XSS_WEB_STANDARD, &validate_url_and_html_escape), {} },
+                          XSS_WEB_STANDARD, &validate_url_and_html_escape),
+             // img_src_url_escape_with_arg=html
+             {&g_modifiers[18].modifier_info} },
   /* 12 */ { ModifierInfo("url_escape_with_arg=query", 'U',
                           XSS_WEB_STANDARD, &url_query_escape), {} },
   /* 13 */ { ModifierInfo("none", '\0', XSS_SAFE, &null_modifier), {} },

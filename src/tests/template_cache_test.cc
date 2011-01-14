@@ -479,7 +479,129 @@ class TemplateCacheUnittest {
                                                               STRIP_WHITESPACE);
     ASSERT(tpl2_post_reload == tpl2);
 
+    // Test delete & re-add: delete tpl2, and reload.
+    unlink(filename2.c_str());
+    cache1.ReloadAllIfChanged(TemplateCache::IMMEDIATE_RELOAD);
+    ASSERT(!cache_peer.GetTemplate(filename2, STRIP_WHITESPACE));
+    // Re-add tpl2 and ensure it reloads.
+    StringToFile("{re-add valid template contents}", filename2);
+    cache1.ReloadAllIfChanged(TemplateCache::IMMEDIATE_RELOAD);
+    ASSERT(cache_peer.GetTemplate(filename2, STRIP_WHITESPACE));
+
+    // Ensure that string templates don't reload
+    const string cache_key_a = "cache key a";
+    const string text = "Test template 1";
+    const Template *str_tpl;
+    ASSERT(cache1.StringToTemplateCache(cache_key_a, text, DO_NOT_STRIP));
+    str_tpl = cache1.GetTemplate(cache_key_a, DO_NOT_STRIP);
+    AssertExpandIs(str_tpl, &dict, text, true);
+    cache1.ReloadAllIfChanged(TemplateCache::IMMEDIATE_RELOAD);
+    ASSERT(cache1.GetTemplate(cache_key_a, DO_NOT_STRIP) == str_tpl);
+
     cache1.ClearCache();
+  }
+
+  static void TestReloadImmediateWithDifferentSearchPaths() {
+    TemplateDictionary dict("empty");
+    TemplateCache cache1;
+    TemplateCachePeer cache_peer(&cache1);
+
+    const string pathA = PathJoin(FLAGS_test_tmpdir, "a/");
+    const string pathB = PathJoin(FLAGS_test_tmpdir, "b/");
+    CreateOrCleanTestDir(pathA);
+    CreateOrCleanTestDir(pathB);
+
+    cache1.SetTemplateRootDirectory(pathA);
+    cache1.AddAlternateTemplateRootDirectory(pathB);
+    ASSERT(cache1.template_root_directory() == pathA);
+
+    // Add b/foo
+    const string path_b_foo = PathJoin(pathB, "template_foo");
+    StringToFile("b/template_foo", path_b_foo);
+    ASSERT_STREQ(path_b_foo.c_str(),
+                 cache1.FindTemplateFilename("template_foo").c_str());
+    const Template* b_foo = cache1.GetTemplate("template_foo", DO_NOT_STRIP);
+
+    // Add a/foo
+    const string path_a_foo = PathJoin(pathA, "template_foo");
+    StringToFile("a/template_foo", path_a_foo);
+    ASSERT_STREQ(path_a_foo.c_str(),
+                 cache1.FindTemplateFilename("template_foo").c_str());
+
+    // Since we didn't touch b/foo, on reload it doesn't get overridden by a/foo
+    cache1.ReloadAllIfChanged(TemplateCache::IMMEDIATE_RELOAD);
+    // Ensure that foo contains b/foo
+    ASSERT(b_foo = cache1.GetTemplate("template_foo", DO_NOT_STRIP));
+
+    // Now update (or touch) b/foo
+    StringToFile("{updated b/template_foo}", path_b_foo);
+
+    // Now, on reload we pick up foo from the earlier search path: a/foo
+    cache1.ReloadAllIfChanged(TemplateCache::IMMEDIATE_RELOAD);
+    const Template* foo_post_reload = cache_peer.GetTemplate("template_foo",
+                                                             STRIP_WHITESPACE);
+    AssertExpandIs(foo_post_reload, &dict, "a/template_foo",
+                   true);
+
+    // Delete a/foo and reload. Now we pick up the next available foo: b/foo
+    unlink(path_a_foo.c_str());
+    cache1.ReloadAllIfChanged(TemplateCache::IMMEDIATE_RELOAD);
+    foo_post_reload = cache_peer.GetTemplate("template_foo",
+                                             STRIP_WHITESPACE);
+    AssertExpandIs(foo_post_reload, &dict, "{updated b/template_foo}",
+                   true);
+  }
+
+  static void TestReloadLazyWithDifferentSearchPaths() {
+    // Identical test as above with but with LAZY_RELOAD
+    TemplateDictionary dict("empty");
+    TemplateCache cache1;
+    TemplateCachePeer cache_peer(&cache1);
+
+    const string pathA = PathJoin(FLAGS_test_tmpdir, "a/");
+    const string pathB = PathJoin(FLAGS_test_tmpdir, "b/");
+    CreateOrCleanTestDir(pathA);
+    CreateOrCleanTestDir(pathB);
+
+    cache1.SetTemplateRootDirectory(pathA);
+    cache1.AddAlternateTemplateRootDirectory(pathB);
+    ASSERT(cache1.template_root_directory() == pathA);
+
+    // Add b/foo
+    const string path_b_foo = PathJoin(pathB, "template_foo");
+    StringToFile("b/template_foo", path_b_foo);
+    ASSERT_STREQ(path_b_foo.c_str(),
+                 cache1.FindTemplateFilename("template_foo").c_str());
+    const Template* b_foo = cache1.GetTemplate("template_foo", DO_NOT_STRIP);
+
+    // Add a/foo
+    const string path_a_foo = PathJoin(pathA, "template_foo");
+    StringToFile("a/template_foo", path_a_foo);
+    ASSERT_STREQ(path_a_foo.c_str(),
+                 cache1.FindTemplateFilename("template_foo").c_str());
+
+    // Since we didn't touch b/foo, on reload it doesn't get overridden by a/foo
+    cache1.ReloadAllIfChanged(TemplateCache::LAZY_RELOAD);
+    // Ensure that foo contains b/foo
+    ASSERT(b_foo = cache1.GetTemplate("template_foo", DO_NOT_STRIP));
+
+    // Now update (or touch) b/foo
+    StringToFile("{updated b/template_foo}", path_b_foo);
+
+    // Now, on reload we pick up foo from the earlier search path: a/foo
+    cache1.ReloadAllIfChanged(TemplateCache::LAZY_RELOAD);
+    const Template* foo_post_reload = cache_peer.GetTemplate("template_foo",
+                                                             STRIP_WHITESPACE);
+    AssertExpandIs(foo_post_reload, &dict, "a/template_foo",
+                   true);
+
+    // Delete a/foo and reload. Now we pick up the next available foo: b/foo
+    unlink(path_a_foo.c_str());
+    cache1.ReloadAllIfChanged(TemplateCache::LAZY_RELOAD);
+    foo_post_reload = cache_peer.GetTemplate("template_foo",
+                                             STRIP_WHITESPACE);
+    AssertExpandIs(foo_post_reload, &dict, "{updated b/template_foo}",
+                   true);
   }
 
   static void TestRefcounting() {
@@ -939,6 +1061,8 @@ int main(int argc, char** argv) {
   TemplateCacheUnittest::TestTemplateCache();
   TemplateCacheUnittest::TestReloadAllIfChangedLazyLoad();
   TemplateCacheUnittest::TestReloadAllIfChangedImmediateLoad();
+  TemplateCacheUnittest::TestReloadImmediateWithDifferentSearchPaths();
+  TemplateCacheUnittest::TestReloadLazyWithDifferentSearchPaths();
   TemplateCacheUnittest::TestRefcounting();
   TemplateCacheUnittest::TestDoneWithGetTemplatePtrs();
   TemplateCacheUnittest::TestCloneStringTemplates();

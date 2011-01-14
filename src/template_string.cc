@@ -45,6 +45,7 @@
 #include HASH_SET_H
 #include <ctemplate/template_string.h>
 #include "base/arena.h"
+#include "base/thread_annotations.h"
 
 // This is all to figure out endian-ness and byte-swapping on various systems
 #if defined(HAVE_ENDIAN_H)
@@ -233,16 +234,18 @@ typedef HASH_NAMESPACE::hash_set<TemplateString, TemplateStringHasher>
     TemplateStringSet;
 #endif
 
-TemplateStringSet* template_string_set;
-UnsafeArena* arena;
-}  // namespace
+TemplateStringSet* template_string_set
+GUARDED_BY(mutex) PT_GUARDED_BY(mutex) = NULL;
 
+UnsafeArena* arena
+GUARDED_BY(mutex) PT_GUARDED_BY(mutex) = NULL;
+}  // namespace
 
 size_t StringHash::Hash(const char* s, size_t slen) const {
   return static_cast<size_t>(MurmurHash64(s, slen));
 }
 
-void TemplateString::AddToGlobalIdToNameMap() {
+void TemplateString::AddToGlobalIdToNameMap() LOCKS_EXCLUDED(mutex) {
   // shouldn't be calling this if we don't have an id.
   assert(IsTemplateIdInitialized(id_));
   {
@@ -261,10 +264,13 @@ void TemplateString::AddToGlobalIdToNameMap() {
   }
   WriterMutexLock writer_lock(&mutex);
   // First initialize our data structures if we need to.
-  if (!template_string_set)
+  if (!template_string_set) {
     template_string_set = new TemplateStringSet;
-  if (!arena)
+  }
+
+  if (!arena) {
     arena = new UnsafeArena(1024);  // 1024 was picked out of a hat.
+  }
 
   if (template_string_set->find(*this) != template_string_set->end()) {
     return;
@@ -290,7 +296,7 @@ TemplateId TemplateString::GetGlobalId() const {
 }
 
 // static
-TemplateString TemplateString::IdToString(TemplateId id) {
+TemplateString TemplateString::IdToString(TemplateId id) LOCKS_EXCLUDED(mutex) {
   ReaderMutexLock reader_lock(&mutex);
   if (!template_string_set)
     return TemplateString(kStsEmpty);
@@ -313,15 +319,16 @@ StaticTemplateStringInitializer::StaticTemplateStringInitializer(
   // correct.  This is necessary because static-init id's are, by
   // nature, pre-computed, and the id-generating algorithm may have
   // changed between the time they were computed and now.
-  if (sts->do_not_use_directly_.id_ == 0)
+  if (sts->do_not_use_directly_.id_ == 0) {
     sts->do_not_use_directly_.id_ = TemplateString(*sts).GetGlobalId();
-  else
+  } else {
     // Don't use the TemplateString(const StaticTemplateString& sts)
     // constructor below, since if we do, GetGlobalId will just return
     // sts->do_not_use_directly_.id_ and the check will be pointless.
     assert(TemplateString(sts->do_not_use_directly_.ptr_,
                           sts->do_not_use_directly_.length_).GetGlobalId()
            == sts->do_not_use_directly_.id_);
+  }
 
   // Now add this id/name pair to the backwards map from id to name.
   TemplateString ts_copy_of_sts(*sts);

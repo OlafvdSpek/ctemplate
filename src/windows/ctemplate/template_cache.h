@@ -251,6 +251,11 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   //   causes less of a latency spike, since it does not require
   //   loading lots of templates from disk at the same time.  If in
   //   doubt, LAZY_RELOAD is probably a better choice.
+
+  //   If a file with the same name as an existing template-file, is added
+  //   in another search path, ReloadAllIfChanged will pick up the file in the
+  //   earlier search-path. The file will only be reloaded if the orginal file
+  //   is updated (touched, updated, deleted etc). See .cc file for more detail.
   enum ReloadType { LAZY_RELOAD, IMMEDIATE_RELOAD };
   void ReloadAllIfChanged(ReloadType reload_tyle)  /*LOCKS_EXCLUDED(mutex_)*/;
 
