@@ -1,38 +1,3 @@
-Ctemplate-Specific Install Notes
-================================
-
-This code should work on any modern C++ system.  It has been tested on
-the following systems:
-   FreeBSD 6.0
-   Linux Fedora Core 3
-   Linux Fedora Core 4
-   Linux Fedora Core 5
-   Linux Fedora Core 6
-   Linux RedHat 9
-   Linux Ubuntu 6.06.1
-   Mac OS X 10.3.9 (Panther)
-   Mac OS X 10.4.8 (Tiger)
-   Solaris 10 (x86)
-   Windows XP, Visual Studio 2003 (VC++7.1)
-   Windows XP, Visual Studio 2005 (VC++8)
-
-The only known problem is with Mac OS X 10.3.9 (Panther), which may
-have problems with the export-symbols optimization this library does
-to limit its exposed API.  If you have problems compiling that seem to
-involve nmedit, the solution is to edit the Makefile and remove all
-instances of
-   -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS)
-Just remove that string exactly.  After that, code should build.
-
-For Solaris 10 6/06, we have tested only with gcc (not the Sun
-compiler).  To get this to work, and to work around a bug in Solaris,
-install as follows:
-   % PATH=${PATH}:/usr/sfw/bin/:/usr/ccs/bin ./configure LDFLAGS="-Lsrc/solaris -lrt"
-   % PATH=${PATH}:/usr/sfw/bin/:/usr/ccs/bin make
-
-See README.windows for installation instructions for Windows.
-
-
 Installation Instructions
 *************************
 

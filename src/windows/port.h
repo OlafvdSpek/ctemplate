@@ -89,7 +89,7 @@
 #define utimbuf  _utimbuf
 
 /* Not quite as lightweight as a hard-link, but more than good enough for us. */
-#define link(oldpath, newpath)  CopyFileA(oldpath, newpath, false)
+#define link(oldpath, newpath)  (!CopyFileA(oldpath, newpath, false))
 
 #define strcasecmp   _stricmp
 #define strncasecmp  _strnicmp

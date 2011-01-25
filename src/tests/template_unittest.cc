@@ -1292,7 +1292,7 @@ class TemplateUnittest {
 
     string filename = StringToTemplateFile("{valid template}");
     string nonexistent = StringToTemplateFile("dummy");
-    unlink(nonexistent.c_str());
+    ASSERT(unlink(nonexistent.c_str()) == 0);
 
     Template* tpl = Template::GetTemplate(filename, STRIP_WHITESPACE);
     assert(tpl);
@@ -1317,7 +1317,7 @@ class TemplateUnittest {
     ASSERT(!tpl2->ReloadIfChanged()); // false: file hasn't changed
     ASSERT(!tpl2->ReloadIfChanged()); // false: file *still* hasn't changed
 
-    unlink(nonexistent.c_str());      // here today...
+    ASSERT(unlink(nonexistent.c_str()) == 0);      // here today...
     ASSERT(!tpl2->ReloadIfChanged()); // false: file has disappeared
     // The old template content should be forgotten
     ASSERT(NULL == Template::GetTemplate(nonexistent, STRIP_WHITESPACE));
@@ -1522,9 +1522,9 @@ class TemplateUnittest {
     ASSERT(TemplateNamelist::IsAllSyntaxOkay(DO_NOT_STRIP));
 
     // Now create those files
-    link(f1.c_str(), f1_copy.c_str());
-    link(f2.c_str(), f2_copy.c_str());
-    link(f3.c_str(), f3_copy.c_str());
+    ASSERT(link(f1.c_str(), f1_copy.c_str()) == 0);
+    ASSERT(link(f2.c_str(), f2_copy.c_str()) == 0);
+    ASSERT(link(f3.c_str(), f3_copy.c_str()) == 0);
     // We also have to clear the template cache, since we created a new file.
     // ReloadAllIfChanged() would probably work, too.
     Template::ClearCache();
