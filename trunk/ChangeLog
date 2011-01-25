@@ -1,4 +1,16 @@
-Fri Sep 24 11:38:27 PDT 2010  Google Inc. <opensource@google.com>
+Mon Jan 24 15:38:31 2011  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 0.99 release
+	* Accept . as part of tag/attr names when autoescaping (falmeida)
+	* Optimize javascript template escaping (blount)
+	* Allow <span dir=...> inside :H=snippet modifiers (jdtang)
+	* make_tpl_varnames can write multiple tpls to one file (jad)
+	* Add a few escaping modifier equivalences (jad)
+	* BUGFIX: Fix ReloadAllIfChanged() with path (panicker)
+	* PORTING: Relace tr with more portable sed, in tests (csilvers)
+	* Updated from autoconf 2.64 to autoconf 2.65
+
+Fri Sep 24 11:38:27 2010  Google Inc. <opensource@google.com>
 
 	* ctemplate: version 0.98 release
 	* Add new image URL modifier: :I=html, :I=css, etc (jshneier, dougy)

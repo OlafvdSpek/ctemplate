@@ -1,3 +1,16 @@
+== 24 January 2011 ==
+
+I've just released ctemplate 0.99.  I expect this to be the last
+release before ctemplate 1.0.  Code has settled down; the big change
+here is some efficiency improvements to javascript template escaping.
+There is also a bugfix for an obscure case where ReloadAllIfChanged()
+is used with multiple ctemplate search paths, where files are deleted
+in one part of the search path between reloads.  Unless you need
+either of the above, there's no particular reason to upgrade.
+
+A full list of changes is available in the
+[http://google-ctemplate.googlecode.com/svn/tags/ctemplate-0.99/ChangeLog ChangeLog].
+
 === 23 September 2010 ===
 
 I've just released ctemplate 0.98.  The changes are settling down as
@@ -56,8 +69,7 @@ There are some more minor changes as well, such as the addition of
 multiply-include them.  I've also been continuing the portability
 work: ctemplate should now work under Cygwin and MinGW.  A full list
 of changes is available in the
-[http://google-ctemplate.googlecode.com/svn/tags/ctemplate-0.97/ChangeLog
-ChangeLog].
+[http://google-ctemplate.googlecode.com/svn/tags/ctemplate-0.97/ChangeLog ChangeLog].
 
 I know I've said this before, but I don't expect major API changes
 before the 1.0 release.  The most significant changes I expect to see

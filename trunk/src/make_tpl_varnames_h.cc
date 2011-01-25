@@ -187,7 +187,7 @@ static string Boilerplate(const string& progname,
   else
     out.append("// This header file auto-generated for the template\n");
 
-  for (int i = 0; i < filenames.size(); ++i)
+  for (vector<string>::size_type i = 0; i < filenames.size(); ++i)
     out.append("//    " + filenames[i] + "\n");
 
   out.append("// by " + progname + "\n" +
@@ -374,8 +374,9 @@ int main(int argc, char **argv) {
   // Iterate through each template and (unless -n is given), write
   // its header entries into the headers array.
   int num_errors = 0;
-  for (int i = 0; i < template_records.size(); ++i) {
-    const char* tplname = template_records[i]->name.c_str();
+  for (vector<TemplateRecord*>::iterator it = template_records.begin();
+       it != template_records.end(); ++it) {
+    const char* tplname = (*it)->name.c_str();
     LogPrintf(LOG_INFO, FLAG_log_info, "\n------ Checking %s ------", tplname);
 
     // The last two arguments in the following call do not matter
@@ -398,7 +399,7 @@ int main(int argc, char **argv) {
     if (!tpl) {
       LogPrintf(LOG_ERROR, FLAG_log_info, "Could not load file: %s", tplname);
       num_errors++;
-      template_records[i]->error = true;
+      (*it)->error = true;
       continue;
     } else {
       LogPrintf(LOG_INFO, FLAG_log_info, "No syntax errors detected in %s",
@@ -411,7 +412,7 @@ int main(int argc, char **argv) {
     if (!FLAG_header)
       continue;            // They don't want header files
 
-    tpl->WriteHeaderEntries(&template_records[i]->header_entries);
+    tpl->WriteHeaderEntries(&((*it)->header_entries));
   }
 
   // We have headers to emit:
@@ -428,9 +429,10 @@ int main(int argc, char **argv) {
       if (num_errors == 0) {
         vector<string> template_filenames;
         string all_header_entries;
-        for (int i = 0; i < template_records.size(); ++i) {
-          all_header_entries.append(template_records[i]->header_entries);
-          template_filenames.push_back(template_records[i]->name);
+        for (vector<TemplateRecord*>::const_iterator
+             it = template_records.begin(); it != template_records.end(); ++it) {
+          all_header_entries.append((*it)->header_entries);
+          template_filenames.push_back((*it)->name);
         }
         string output = Boilerplate(progname, template_filenames);
         const string cleantext =
@@ -441,18 +443,18 @@ int main(int argc, char **argv) {
       }
     } else {
       // Each template will have its own output file. Skip any that had errors.
-      for (int i = 0; i < template_records.size(); ++i) {
-        if (template_records[i]->error)
+      for (vector<TemplateRecord*>::const_iterator
+           it = template_records.begin(); it != template_records.end(); ++it) {
+        if ((*it)->error)
           continue;
-        string basename = GOOGLE_NAMESPACE::Basename(template_records[i]->name);
+        string basename = GOOGLE_NAMESPACE::Basename((*it)->name);
         string output_file =
             GOOGLE_NAMESPACE::PathJoin(FLAG_header_dir,
                                 basename + FLAG_outputfile_suffix);
         vector<string> template_filenames;   // Contains one template filename.
-        template_filenames.push_back(template_records[i]->name);
+        template_filenames.push_back((*it)->name);
         string output = Boilerplate(progname, template_filenames);
-        output.append(WrapWithGuard(output_file,
-                                    template_records[i]->header_entries));
+        output.append(WrapWithGuard(output_file, (*it)->header_entries));
         if (!WriteToDisk(FLAG_log_info, output_file, output))
           num_errors++;
       }
@@ -460,8 +462,9 @@ int main(int argc, char **argv) {
   }
 
   // Free dynamic memory
-  for (int i = 0; i < template_records.size(); ++i) {
-    delete template_records[i];
+  for (vector<TemplateRecord*>::iterator it = template_records.begin();
+       it != template_records.end(); ++it) {
+    delete *it;
   }
 
   // Cap at 127 to avoid causing problems with return code
