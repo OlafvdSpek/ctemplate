@@ -44,29 +44,73 @@
 #ifndef UTIL_GTL_MANUAL_CONSTRUCTOR_H_
 #define UTIL_GTL_MANUAL_CONSTRUCTOR_H_
 
+#include "config.h"
+
 _START_GOOGLE_NAMESPACE_
 
-namespace util {
-namespace gtl {
-namespace internal {
+// ------- define ALIGNED_CHAR_ARRAY --------------------------------
 
-// The Aligner template is used to ensure proper alignment of the
-// ManualConstructor space_
-template <int size>
-struct Aligner {
-  typedef void* AlignType;
-};
+// Because MSVC and older GCCs require that the argument to their alignment
+// construct to be a literal constant integer, we use a template instantiated
+// at all the possible powers of two.
+#ifndef SWIG
+template<int alignment, int size> struct AlignType { };
+template<int size> struct AlignType<0, size> { typedef char result[size]; };
+#if defined(_MSC_VER)
+#define BASE_PORT_H_ALIGN_ATTRIBUTE(X) __declspec(align(X))
+#define BASE_PORT_H_ALIGN_OF(T) __alignof(T)
+#elif defined(HAVE___ATTRIBUTE__)
+#define BASE_PORT_H_ALIGN_ATTRIBUTE(X) __attribute__((aligned(X)))
+#define BASE_PORT_H_ALIGN_OF(T) __alignof__(T)
+#endif
 
-template <>
-struct Aligner<1> {
-  typedef char AlignType;
-};
+#if defined(BASE_PORT_H_ALIGN_ATTRIBUTE)
 
-// We could do better for the 2/3/4 case as well (int16/int32/int32).
+#define BASE_PORT_H_ALIGNTYPE_TEMPLATE(X) \
+  template<int size> struct AlignType<X, size> { \
+    typedef BASE_PORT_H_ALIGN_ATTRIBUTE(X) char result[size]; \
+  }
 
-}  // namespace
-}  // namespace
-}  // namespace
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(1);
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(2);
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(4);
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(8);
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(16);
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(32);
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(64);
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(128);
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(256);
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(512);
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(1024);
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(2048);
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(4096);
+BASE_PORT_H_ALIGNTYPE_TEMPLATE(8192);
+// Any larger and MSVC++ will complain.
+
+#define ALIGNED_CHAR_ARRAY(T, Size) \
+  typename AlignType<BASE_PORT_H_ALIGN_OF(T), sizeof(T) * Size>::result
+
+#undef BASE_PORT_H_ALIGNTYPE_TEMPLATE
+#undef BASE_PORT_H_ALIGN_ATTRIBUTE
+
+#else  // defined(BASE_PORT_H_ALIGN_ATTRIBUTE)
+#define ALIGNED_CHAR_ARRAY you_must_define_ALIGNED_CHAR_ARRAY_for_your_compiler
+#endif // defined(BASE_PORT_H_ALIGN_ATTRIBUTE)
+
+#else  // !SWIG
+
+// SWIG can't represent alignment and doesn't care about alignment on data
+// members (it works fine without it).
+template<typename Size>
+struct AlignType { typedef char result[Size]; };
+#define ALIGNED_CHAR_ARRAY(T, Size) AlignType<Size * sizeof(T)>::result
+
+#endif // !SWIG
+
+#undef BASE_PORT_H_ALIGNTYPE_TEMPLATE
+#undef BASE_PORT_H_ALIGN_ATTRIBUTE
+
+// --------------------------------------------------------
 
 template <typename Type>
 class ManualConstructor {
@@ -114,15 +158,64 @@ class ManualConstructor {
     new(space_) Type(p1, p2, p3, p4);
   }
 
+  template <typename T1, typename T2, typename T3, typename T4, typename T5>
+  inline void Init(const T1& p1, const T2& p2, const T3& p3, const T4& p4,
+                   const T5& p5) {
+    new(space_) Type(p1, p2, p3, p4, p5);
+  }
+
+  template <typename T1, typename T2, typename T3, typename T4, typename T5,
+            typename T6>
+  inline void Init(const T1& p1, const T2& p2, const T3& p3, const T4& p4,
+                   const T5& p5, const T6& p6) {
+    new(space_) Type(p1, p2, p3, p4, p5, p6);
+  }
+
+  template <typename T1, typename T2, typename T3, typename T4, typename T5,
+            typename T6, typename T7>
+  inline void Init(const T1& p1, const T2& p2, const T3& p3, const T4& p4,
+                   const T5& p5, const T6& p6, const T7& p7) {
+    new(space_) Type(p1, p2, p3, p4, p5, p6, p7);
+  }
+
+  template <typename T1, typename T2, typename T3, typename T4, typename T5,
+            typename T6, typename T7, typename T8>
+  inline void Init(const T1& p1, const T2& p2, const T3& p3, const T4& p4,
+                   const T5& p5, const T6& p6, const T7& p7, const T8& p8) {
+    new(space_) Type(p1, p2, p3, p4, p5, p6, p7, p8);
+  }
+
+  template <typename T1, typename T2, typename T3, typename T4, typename T5,
+            typename T6, typename T7, typename T8, typename T9>
+  inline void Init(const T1& p1, const T2& p2, const T3& p3, const T4& p4,
+                   const T5& p5, const T6& p6, const T7& p7, const T8& p8,
+                   const T9& p9) {
+    new(space_) Type(p1, p2, p3, p4, p5, p6, p7, p8, p9);
+  }
+
+  template <typename T1, typename T2, typename T3, typename T4, typename T5,
+            typename T6, typename T7, typename T8, typename T9, typename T10>
+  inline void Init(const T1& p1, const T2& p2, const T3& p3, const T4& p4,
+                   const T5& p5, const T6& p6, const T7& p7, const T8& p8,
+                   const T9& p9, const T10& p10) {
+    new(space_) Type(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10);
+  }
+
+  template <typename T1, typename T2, typename T3, typename T4, typename T5,
+            typename T6, typename T7, typename T8, typename T9, typename T10,
+            typename T11>
+  inline void Init(const T1& p1, const T2& p2, const T3& p3, const T4& p4,
+                   const T5& p5, const T6& p6, const T7& p7, const T8& p8,
+                   const T9& p9, const T10& p10, const T11& p11) {
+    new(space_) Type(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11);
+  }
+
   inline void Destroy() {
     get()->~Type();
   }
 
  private:
-  union {
-    typename util::gtl::internal::Aligner<sizeof(Type)>::AlignType alignment_;
-    char space_[sizeof(Type)];
-  };
+  ALIGNED_CHAR_ARRAY(Type, 1) space_;
 };
 
 _END_GOOGLE_NAMESPACE_

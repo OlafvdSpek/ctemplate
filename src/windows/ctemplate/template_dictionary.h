@@ -47,6 +47,7 @@
 #ifndef TEMPLATE_TEMPLATE_DICTIONARY_H_
 #define TEMPLATE_TEMPLATE_DICTIONARY_H_
 
+#include <cstddef>       // for size_t and ptrdiff_t
 #include <stdlib.h>      // for NULL
 #include <stdarg.h>      // for StringAppendV()
 #include <sys/types.h>   // for size_t

@@ -249,7 +249,7 @@ static void TestSetFormattedValue() {
   for (int i = 0; i < 4443; ++i)
     expected.append("0");
   expected.append("2");
-  ASSERT(peer.ValueIs("PRINTF", expected.c_str()));
+  ASSERT(peer.ValueIs("PRINTF", expected));
   string dump2;
   dict.DumpToString(&dump2);
   expected = string("\n   PRINTF: >") + expected + string("<\n");
