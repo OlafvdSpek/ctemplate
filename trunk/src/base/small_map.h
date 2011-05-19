@@ -49,6 +49,7 @@
 #define UTIL_GTL_SMALL_MAP_H_
 
 #include <config.h>
+#include <assert.h>
 #include <utility>   // for make_pair()
 #include "base/manual_constructor.h"
 

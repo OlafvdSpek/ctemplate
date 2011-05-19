@@ -483,7 +483,21 @@ void XmlEscape::Modify(const char* in, size_t inlen,
   const char* start = pos;
   const char* const limit = in + inlen;
   while (pos < limit) {
-    switch (*pos) {
+    char ch = *pos;
+
+    // According to section 2.2 of the spec
+    // http://www.w3.org/TR/REC-xml/#charsets control characters in range
+    // 0x00-0x1F (except \t, \r and \n) are not valid XML characters. In
+    // particular, conformant parsers are allowed to die when encountering a FF
+    // char in PCDATA sections. These chars are replaced by a space.
+    if (ch >= 0x00 && ch < 0x20 && ch != '\t' && ch != '\r' && ch != '\n') {
+      EmitRun(start, pos, out);
+      out->Emit(' ');
+      start = ++pos;
+      continue;
+    }
+
+    switch (ch) {
       default:
         // Increment our counter and look at the next character.
         ++pos;

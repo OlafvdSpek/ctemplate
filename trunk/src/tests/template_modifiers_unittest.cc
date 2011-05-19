@@ -264,6 +264,14 @@ class TemplateModifiersUnittest {
                          xml_escape);
     dict.SetEscapedValue("hardest XML", "<<b>>&!''\"\"foo",
                          xml_escape);
+    // Characters 0x00-0x1F (except \t, \r and \n) are not valid for XML and
+    // compliant parsers are allowed to die when they encounter them. They
+    // should be replaced with spaces.
+    dict.SetEscapedValue("Spacey XML", " \r\n\f",
+                         xml_escape);
+    dict.SetEscapedValue("XML with control chars",
+                         "\x01\x02\x03\x09\x0A\x0B\x0D\x15\x16\x1F",
+                         xml_escape);
 
     TemplateDictionaryPeer peer(&dict);  // peer can look inside the dict
     ASSERT_STREQ(peer.GetSectionValue("no XML"), "");
@@ -274,6 +282,10 @@ class TemplateModifiersUnittest {
                  "Hello&lt;script&gt;alert(&#39;&amp;&#39;)&lt;/script&gt;");
     ASSERT_STREQ(peer.GetSectionValue("hardest XML"),
                  "&lt;&lt;b&gt;&gt;&amp;!&#39;&#39;&quot;&quot;foo");
+    ASSERT_STREQ(peer.GetSectionValue("Spacey XML"),
+                 " \r\n ");
+    ASSERT_STREQ(peer.GetSectionValue("XML with control chars"),
+                 "   \t\n \r   ");
   }
 
   static void TestValidateUrlHtmlEscape() {

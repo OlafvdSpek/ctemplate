@@ -50,7 +50,8 @@ docdir = $(prefix)/share/doc/$(PACKAGE)-$(VERSION)
 ## top-level boilerplate files.  Also add a TODO file if you have one.
 dist_doc_DATA = AUTHORS COPYING ChangeLog INSTALL NEWS README README_windows.txt \
 	doc/designstyle.css doc/index.html \
-	doc/howto.html doc/tips.html doc/example.html doc/auto_escape.html \
+	doc/howto.html doc/guide.html doc/reference.html \
+	doc/tips.html doc/example.html doc/auto_escape.html \
 	doc/xss_resources.html
 
 ## The libraries (.so's) you want to install
