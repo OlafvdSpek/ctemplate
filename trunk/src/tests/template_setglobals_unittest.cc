@@ -1,4 +1,4 @@
-// Copyright (c) 2006, Google Inc.
+// Copyright (c) 2002, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Frank H. Jernigan
 
 #include "config_for_unittests.h"
 #include <assert.h>
@@ -36,59 +35,36 @@
 #include <ctemplate/template.h>
 #include <ctemplate/template_dictionary.h>
 #include "tests/template_test_util.h"
+#include "base/util.h"
+TEST_INIT   // defines RUN_ALL_TESTS()
 
-#define ASSERT(cond)  do {                                      \
-  if (!(cond)) {                                                \
-    printf("ASSERT FAILED, line %d: '" #cond "'\n", __LINE__);  \
-    assert(cond);                                               \
-    exit(1);                                                    \
-  }                                                             \
-} while (0)
+using GOOGLE_NAMESPACE::Template;
+using GOOGLE_NAMESPACE::TemplateDictionary;
 
-#define ASSERT_STREQ(a, b)  do {                                          \
-  if (strcmp((a), (b))) {                                                 \
-    printf("ASSERT FAILED, line %d: '%s' != '%s'\n", __LINE__, (a), (b)); \
-    assert(!strcmp((a), (b)));                                            \
-    exit(1);                                                              \
-  }                                                                       \
-} while (0)
+TEST(SetGlobalValue, TemplateDictionary) {
+  // Test to see that the global dictionary object gets created when you
+  // first call the static function TemplateDictionary::SetGlobalValue().
+  TemplateDictionary::SetGlobalValue("TEST_GLOBAL_VAR", "test_value");
+  TemplateDictionary tpl("empty");
+  GOOGLE_NAMESPACE::TemplateDictionaryPeer peer(&tpl);
+  EXPECT_STREQ(peer.GetSectionValue("TEST_GLOBAL_VAR"),
+               "test_value");
 
-_START_GOOGLE_NAMESPACE_
+}
 
-// This is just to make friendship easier
-class TemplateSetGlobalsUnittest {
- public:
-  static void TestTemplateDictionarySetGlobalValue() {
-    // Test to see that the global dictionary object gets created when you
-    // first call the static function TemplateDictionary::SetGlobalValue().
-    TemplateDictionary::SetGlobalValue("TEST_GLOBAL_VAR", "test_value");
-    TemplateDictionary tpl("empty");
-    TemplateDictionaryPeer peer(&tpl);
-    ASSERT_STREQ(peer.GetSectionValue("TEST_GLOBAL_VAR"),
-                "test_value");
-  }
-
-  static void TestTemplateSetRootDirectory() {
-    // Test to see that the Template static variables get created when you
-    // first call the static function Template::SetRootDirectory().
-    Template::SetTemplateRootDirectory("/some/directory/path");
-    // We don't know if we appended a / or a \, so we test indirectly
-    ASSERT(Template::template_root_directory().size() ==
-           strlen("/some/directory/path")+1);   // assert they added a char
-    ASSERT(memcmp(Template::template_root_directory().c_str(),
-                  "/some/directory/path",
-                  strlen("/some/directory/path")) == 0);
-  }
-};
-
-_END_GOOGLE_NAMESPACE_
-
-using GOOGLE_NAMESPACE::TemplateSetGlobalsUnittest;
+TEST(SetGlobalValue, SetRootDirectory) {
+  // Test to see that the Template static variables get created when you
+  // first call the static function Template::SetRootDirectory().
+  Template::SetTemplateRootDirectory("/some/directory/path");
+  // We don't know if we appended a / or a \, so we test indirectly
+  EXPECT_EQ(strlen("/some/directory/path")+1,   // assert they added a char
+            Template::template_root_directory().size());
+  EXPECT_EQ(0, memcmp(Template::template_root_directory().c_str(),
+                      "/some/directory/path",
+                      strlen("/some/directory/path")));
+}
 
 int main(int argc, char **argv) {
-  TemplateSetGlobalsUnittest::TestTemplateDictionarySetGlobalValue();
-  TemplateSetGlobalsUnittest::TestTemplateSetRootDirectory();
 
-  printf("PASS\n");
-  return 0;
+  return RUN_ALL_TESTS();
 }

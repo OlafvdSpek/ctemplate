@@ -1,4 +1,4 @@
-// Copyright (c) 2006, Google Inc.
+// Copyright (c) 2005, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Craig Silverstein
+// Author: csilvers@google.com (Craig Silverstein)
 //
 // This test consists of creating a pretty complicated
 // dictionary, and then applying it to a bunch of templates
@@ -60,33 +60,28 @@
 # ifdef HAVE_NDIR_H
 #  include <ndir.h>
 # endif
-#endif
-#include <algorithm>   // for sort() and stable_partition()
-#include <vector>
+#endif       // for opendir() etc
+#include <algorithm>      // for sort() and stable_partition
 #include <string>
-#include "ctemplate/template.h"
-#include "ctemplate/template_pathops.h"
-#include "ctemplate/template_modifiers.h"
-#include "ctemplate/template_dictionary.h"
+#include <vector>
+#include <ctemplate/template.h>
+#include <ctemplate/template_dictionary.h>
+#include <ctemplate/template_modifiers.h>
+#include <ctemplate/template_pathops.h>
+#include "base/util.h"
 
 using std::vector;
 using std::string;
 using std::sort;
-using GOOGLE_NAMESPACE::Template;
-using GOOGLE_NAMESPACE::TemplateDictionary;
+
 using GOOGLE_NAMESPACE::DO_NOT_STRIP;
+using GOOGLE_NAMESPACE::PerExpandData;
 using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
 using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
 using GOOGLE_NAMESPACE::TC_HTML;
 using GOOGLE_NAMESPACE::TC_MANUAL;
-using GOOGLE_NAMESPACE::PerExpandData;
-
-// This default value is only used when the TEMPLATE_ROOTDIR envvar isn't set
-#ifndef DEFAULT_TEMPLATE_ROOTDIR
-# define DEFAULT_TEMPLATE_ROOTDIR  "."
-#endif
-
-#define PFATAL(s)  do { perror(s); exit(1); } while (0)
+using GOOGLE_NAMESPACE::Template;
+using GOOGLE_NAMESPACE::TemplateDictionary;
 
 #define ASSERT(cond)  do {                                      \
   if (!(cond)) {                                                \
@@ -147,17 +142,22 @@ struct Testdata {
   vector<string> annotated_output;  // used to test annotations
 };
 
-static void ReadToString(const char* filename, string* s) {
+static void ReadToString(const string& filename, string* s) {
   const int bufsize = 8092;
   char buffer[bufsize];
   size_t n;
-  FILE* fp = fopen(filename, "rb");
-  if (!fp)  PFATAL(filename);
+  FILE* fp = fopen(filename.c_str(), "rb");
+  if (!fp)  PFATAL(filename.c_str());
   while ((n=fread(buffer, 1, bufsize, fp)) > 0) {
-    if (ferror(fp))  PFATAL(filename);
+    if (ferror(fp))  PFATAL(filename.c_str());
     s->append(string(buffer, n));
   }
   fclose(fp);
+}
+
+static bool EndsWith(const string& s, const string& suffix) {
+  return (s.length() >= suffix.length() &&
+          s.substr(s.length() - suffix.length()) == suffix);
 }
 
 #ifndef USING_PORT_CC  /* windows defines its own version in windows/port.cc */
@@ -186,16 +186,14 @@ static vector<Testdata> ReadDataFiles(const char* testdata_dir) {
   for (vector<string>::const_iterator it = namelist.begin();
        it != namelist.end(); ++it) {
     vector<string>* new_output = NULL;
-    char fname[PATH_MAX];
-    snprintf(fname, sizeof(fname), "%s/%s", testdata_dir, it->c_str());
-    // happily, due to strncmp above, we know namelist[i] is bigger than 20
-    if (!strcmp(fname + strlen(fname) - 3, ".in")) {
+    const string fname = string(testdata_dir) + "/" + it->c_str();
+    if (EndsWith(fname, ".in")) {
       retval.push_back(Testdata());
       retval.back().input_template_name = *it;
       ReadToString(fname, &retval.back().input_template);
-    } else if (!strcmp(fname + strlen(fname) - 4, ".out")) {
+    } else if (EndsWith(fname, ".out")) {
       new_output = &retval.back().output;
-    } else if (!strcmp(fname + strlen(fname) - 9, ".anno_out")) {
+    } else if (EndsWith(fname, ".anno_out")) {
       new_output = &retval.back().annotated_output;
     } else {
       ASSERT(false);  // Filename must end in either .in, .out, or .anno_out.
@@ -206,7 +204,7 @@ static vector<Testdata> ReadDataFiles(const char* testdata_dir) {
       // input file is foo.in, and output is foo_dictYY.out.  This gets to YY.
       const char* dictnum_pos = (it->c_str() +
                                  retval.back().input_template_name.length() + 2);
-      int dictnum = atoi(dictnum_pos);   // just ignore chars after the YY
+      int dictnum = atoi32(dictnum_pos);   // just ignore chars after the YY
       ASSERT(dictnum);                   // dictnums should start with 01
       while (new_output->size() <
              static_cast<vector<string>::size_type>(dictnum))
@@ -414,41 +412,39 @@ static void TestExpand(const vector<Testdata>::const_iterator& begin,
       // If we're expecting output, the template better not have had an error
       ASSERT(tpl_none && tpl_lines && tpl_ws);
       ASSERT(tplstr_none && tplstr_lines && tplstr_ws);
-      string output_none, output_lines, output_ws;
-      string output_strnone, output_strlines, output_strws;
-      // These test using the string form of Expand rather than iobuf
-      string stroutput_none, stroutput_lines, stroutput_ws;
-      string stroutput_strnone, stroutput_strlines, stroutput_strws;
 
       TemplateDictionary* dict = MakeDictionary(dictnum);
 
-      tpl_none->Expand(&output_none, dict);
-      tpl_lines->Expand(&output_lines, dict);
-      tpl_ws->Expand(&output_ws, dict);
+      string stroutput_none, stroutput_lines, stroutput_ws;
+      string stroutput_strnone, stroutput_strlines, stroutput_strws;
 
-      tplstr_none->Expand(&output_strnone, dict);
-      tplstr_lines->Expand(&output_strlines, dict);
-      tplstr_ws->Expand(&output_strws, dict);
-
-      delete dict;          // it's our responsibility
+      tpl_none->Expand(&stroutput_none, dict);
+      tpl_lines->Expand(&stroutput_lines, dict);
+      tpl_ws->Expand(&stroutput_ws, dict);
+      tplstr_none->Expand(&stroutput_strnone, dict);
+      tplstr_lines->Expand(&stroutput_strlines, dict);
+      tplstr_ws->Expand(&stroutput_strws, dict);
 
       // "out" is the output for STRIP_WHITESPACE mode.
-      ASSERT_STRING_EQ(*out, output_ws);
+      ASSERT_STRING_EQ(*out, stroutput_ws);
 
-      // Now compare the variants against each other
+      // Now compare the variants against each other.
       // NONE and STRIP_LINES may actually be the same on simple inputs
       //ASSERT(output_none != output_lines);
-      ASSERT(output_none != output_ws);
-      ASSERT(output_lines != output_ws);
-      ASSERT_STREQ_EXCEPT(output_none.c_str(), output_lines.c_str(),
+      ASSERT(stroutput_none != stroutput_ws);
+      ASSERT(stroutput_lines != stroutput_ws);
+      ASSERT_STREQ_EXCEPT(stroutput_none.c_str(), stroutput_lines.c_str(),
                           " \t\v\f\r\n");
-      ASSERT_STREQ_EXCEPT(output_none.c_str(), output_ws.c_str(),
+      ASSERT_STREQ_EXCEPT(stroutput_none.c_str(), stroutput_ws.c_str(),
                           " \t\v\f\r\n");
 
-      // It shouldn't matter if we read stuff from a file or a string
-      ASSERT(output_none == output_strnone);
-      ASSERT(output_lines == output_strlines);
-      ASSERT(output_ws == output_strws);
+      // It shouldn't matter if we read stuff from a file or a string.
+      ASSERT(stroutput_none == stroutput_strnone);
+      ASSERT(stroutput_lines == stroutput_strlines);
+      ASSERT(stroutput_ws == stroutput_strws);
+
+
+      delete dict;          // it's our responsibility
     }
 
     // The annotation test is a bit simpler; we only strip one way
@@ -476,6 +472,7 @@ static void TestExpand(const vector<Testdata>::const_iterator& begin,
   }
 }
 
+
 int main(int argc, char** argv) {
   // If TEMPLATE_ROOTDIR is set in the environment, it overrides the
   // default of ".".  We use an env-var rather than argv because
@@ -489,6 +486,11 @@ int main(int argc, char** argv) {
 
   vector<Testdata> testdata = ReadDataFiles(
       Template::template_root_directory().c_str());
+  if (testdata.empty()) {
+    printf("FATAL ERROR: No test files found for template_regtest\n");
+    return 1;
+  }
+
   TestExpand(testdata.begin(), testdata.end());
 
   printf("DONE\n");

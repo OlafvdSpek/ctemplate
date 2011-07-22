@@ -1,3 +1,15 @@
+Fri Jul 22 15:31:05 2011  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 1.0rc1 release
+	* BUGFIX: Dumpers were ignoring a tpl-string 'length' (csilvers)
+	* BUGFIX: Add a needed $(top_srcdir) to Makefile.am
+	* Replace 0x00-0x1F with space in xml_escape (alexvod)
+	* Fix xml encoding to handle form-feed properly (ghurley)
+	* DOCUMENTATION: Wer missing some docs in the tarball (csilvers)
+	* BUILD: Update acx_pthread.m4 for nostdlib (Kacper)
+	* BUGFIX: Make CreateSectionIterator check tpl-globals (williasr)
+	* PORTING: Fix solaris build by getting rid of PATH_MAX (csilvers)
+
 Mon Jan 24 15:38:31 2011  Google Inc. <opensource@google.com>
 
 	* ctemplate: version 0.99 release

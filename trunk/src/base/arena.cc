@@ -1,4 +1,4 @@
-// Copyright (c) 2006, Google Inc.
+// Copyright (c) 2000, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -26,9 +26,8 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 // ---
-// Author: Daniel Dulitz
+//
 // Reorganized by Craig Silverstein
 // "Handles" by Ilan Horn
 //
@@ -40,27 +39,38 @@
 // suggested by Ron van der Wal and Scott Meyers at
 //     http://www.aristeia.com/BookErrata/M27Comments_frames.html
 
-#include "config.h"
+#include <config.h>
+#include "base/arena.h"
+#include "base/arena-inl.h"
+#include <assert.h>
+#include <algorithm>
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
+#endif
+#include <vector>
 #include <sys/types.h>         // one place uintptr_t might be
 #ifdef HAVE_INTTYPES_H
-# include <inttypes.h>         // another place uintptr_t might be
-#endif
-#ifdef HAVE_UNISTD_H           // last place uintptr_t might be
-# include <unistd.h>           // also, for getpagesize()
-#endif
-#include "base/arena.h"
+# include <inttypes.h>
+#endif          // another place uintptr_t might be
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
+#endif            // last place uintptr_t might be
+#include "base/macros.h"       // for uint64
+#include "base/mutex.h"
+#include "base/util.h"         // for DCHECK_*
+
+using std::min;
+using std::vector;
+
+// TODO(csilvers): add in a portable implementation of aligned_malloc
+static void* aligned_malloc(size_t size, size_t alignment) {
+  CHECK(false) << "page_aligned_ not currently supported\n";
+}
+
+// The value here doesn't matter until page_aligned_ is supported.
+static const int kPageSize = 8192;   // should be getpagesize()
 
 _START_GOOGLE_NAMESPACE_
-
-#if defined(HAVE_U_INT64_T)
-typedef u_int64_t uint64;
-#elif defined(HAVE_UINT64_T)
-typedef uint64_t uint64;
-#elif defined(HAVE___INT64)
-typedef unsigned __int64 uint64;
-#endif
-
-using std::vector;
 
 // We used to only keep track of how much space has been allocated in
 // debug mode. Now we track this for optimized builds, as well. If you
@@ -70,21 +80,6 @@ using std::vector;
 // via bytes_allocated()).
 #define ARENASET(x) (x)
 
-// Starting with Visual C++ 2005, WinNT.h includes ARRAYSIZE.
-#if !defined(_MSC_VER) || _MSC_VER < 1400
-#define ARRAYSIZE(a) \
-  ((sizeof(a) / sizeof(*(a))) / \
-   static_cast<size_t>(!(sizeof(a) % sizeof(*(a)))))
-#endif
-
-// These could be made more elaborate.
-#define CHECK(x) assert(x);
-#define DCHECK(x) assert(x);
-#define CHECK_LT(x, y) assert(x < y);
-#define DCHECK_LT(x, y) assert(x < y);
-#define CHECK_GE(x, y) assert(x >= y);
-#define DCHECK_GE(x, y) assert(x >= y);
-
 // ----------------------------------------------------------------------
 // BaseArena::BaseArena()
 // BaseArena::~BaseArena()
@@ -92,7 +87,7 @@ using std::vector;
 // ----------------------------------------------------------------------
 
 
-BaseArena::BaseArena(char* first, const size_t block_size)
+BaseArena::BaseArena(char* first, const size_t block_size, bool align_to_page)
   : remaining_(0),
     first_block_we_own_(first ? 1 : 0),
     block_size_(block_size),
@@ -100,6 +95,7 @@ BaseArena::BaseArena(char* first, const size_t block_size)
     last_alloc_(NULL),
     blocks_alloced_(1),
     overflow_blocks_(NULL),
+    page_aligned_(align_to_page),
     handle_alignment_(1),
     handle_alignment_bits_(0),
     block_size_bits_(0) {
@@ -109,10 +105,30 @@ BaseArena::BaseArena(char* first, const size_t block_size)
     ++block_size_bits_;
   }
 
-  if (first)
+  if (page_aligned_) {
+    // kPageSize must be power of 2, so make sure of this.
+    CHECK(kPageSize > 0 && 0 == (kPageSize & (kPageSize - 1)))
+                              << "kPageSize[ " << kPageSize << "] is not "
+                              << "correctly initialized: not a power of 2.";
+  }
+
+  if (first) {
+    CHECK(!page_aligned_ ||
+          (reinterpret_cast<uintptr_t>(first) & (kPageSize - 1)) == 0);
     first_blocks_[0].mem = first;
-  else
-    first_blocks_[0].mem = reinterpret_cast<char*>(malloc(block_size_));
+  } else {
+    if (page_aligned_) {
+      // Make sure the blocksize is page multiple, as we need to end on a page
+      // boundary.
+      CHECK_EQ(block_size & (kPageSize - 1), 0) << "block_size is not a"
+                                                << "multiple of kPageSize";
+      first_blocks_[0].mem = reinterpret_cast<char*>(aligned_malloc(block_size_,
+                                                                    kPageSize));
+      PCHECK(NULL != first_blocks_[0].mem);
+    } else {
+      first_blocks_[0].mem = reinterpret_cast<char*>(malloc(block_size_));
+    }
+  }
   first_blocks_[0].size = block_size_;
 
   Reset();
@@ -197,8 +213,18 @@ BaseArena::AllocatedBlock*  BaseArena::AllocNewBlock(const size_t block_size) {
     block = &overflow_blocks_->back();
   }
 
-  block->mem = reinterpret_cast<char*>(malloc(block_size));
-  block->size = block_size;
+  if (page_aligned_) {
+    // We need the size to be multiple of kPageSize to mprotect it later.
+    size_t num_pages = ((block_size - 1) / kPageSize) + 1;
+    size_t new_block_size = num_pages * kPageSize;
+    block->mem = reinterpret_cast<char*>(aligned_malloc(new_block_size,
+                                                        kPageSize));
+    PCHECK(NULL != block->mem);
+    block->size = new_block_size;
+  } else {
+    block->mem = reinterpret_cast<char*>(malloc(block_size));
+    block->size = block_size;
+  }
 
   ARENASET(status_.bytes_allocated_ += block_size);
 
@@ -250,6 +276,8 @@ void* BaseArena::GetMemoryFallback(const size_t size, const int align_as_int) {
   if (block_size_ == 0 || size > block_size_/4) {
     // then it gets its own block in the arena
     assert(align <= kDefaultAlignment);   // because that's what new gives us
+    // This block stays separate from the rest of the world; in particular
+    // we don't update last_alloc_ so you can't reclaim space on this block.
     return AllocNewBlock(size)->mem;
   }
 
@@ -370,8 +398,8 @@ void* BaseArena::GetMemoryWithHandle(
       break;
     }
   }
-  CHECK_GE(block_index, 0); // "Failed to find block that was allocated from"
-  CHECK(block != NULL);  // "Failed to find block that was allocated from"
+  CHECK_GE(block_index, 0) << "Failed to find block that was allocated from";
+  CHECK(block != NULL) << "Failed to find block that was allocated from";
   const uint64 offset = reinterpret_cast<char*>(p) - block->mem;
   DCHECK_LT(offset, block_size_);
   DCHECK((offset & ((1 << handle_alignment_bits_) - 1)) == 0);
@@ -429,8 +457,10 @@ void* BaseArena::HandleToPointer(const Handle& h) const {
   return reinterpret_cast<void*>(block->mem + block_offset);
 }
 
+
 // ----------------------------------------------------------------------
 // UnsafeArena::Realloc()
+// SafeArena::Realloc()
 //    If you decide you want to grow -- or shrink -- a memory region,
 //    we'll do it for you here.  Typically this will involve copying
 //    the existing memory to somewhere else on the arena that has
@@ -454,7 +484,21 @@ char* UnsafeArena::Realloc(char* s, size_t oldsize, size_t newsize) {
     return s;  // no need to do anything; we're ain't reclaiming any memory!
   }
   char * newstr = Alloc(newsize);
-  memcpy(newstr, s, oldsize < newsize ? oldsize : newsize);
+  memcpy(newstr, s, min(oldsize, newsize));
+  return newstr;
+}
+
+char* SafeArena::Realloc(char* s, size_t oldsize, size_t newsize) {
+  assert(oldsize >= 0 && newsize >= 0);
+  { MutexLock lock(&mutex_);
+    if ( AdjustLastAlloc(s, newsize) )           // in case s was last alloc
+      return s;
+  }
+  if ( newsize <= oldsize ) {
+    return s;  // no need to do anything; we're ain't reclaiming any memory!
+  }
+  char * newstr = Alloc(newsize);
+  memcpy(newstr, s, min(oldsize, newsize));
   return newstr;
 }
 

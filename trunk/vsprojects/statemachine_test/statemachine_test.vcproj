@@ -117,14 +117,16 @@
 					<Tool
 						Name="VCCLCompilerTool"
 						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
-						RuntimeLibrary="3"/>
+						RuntimeLibrary="3"
+						CompileAs="1"/>
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Release|Win32">
 					<Tool
 						Name="VCCLCompilerTool"
 						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
-						RuntimeLibrary="2"/>
+						RuntimeLibrary="2"
+						CompileAs="1"/>
 				</FileConfiguration>
 			</File>
 			<File
@@ -135,7 +137,7 @@
 						Name="VCCLCompilerTool"
 						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
 						RuntimeLibrary="3"
-						CompileAs="2"/>
+						CompileAs="1"/>
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Release|Win32">
@@ -143,24 +145,7 @@
 						Name="VCCLCompilerTool"
 						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
 						RuntimeLibrary="2"
-						CompileAs="2"/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\..\src\template_pathops.cc">
-				<FileConfiguration
-					Name="Debug|Win32">
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
-						RuntimeLibrary="3"/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32">
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
-						RuntimeLibrary="2"/>
+						CompileAs="1"/>
 				</FileConfiguration>
 			</File>
 			<File
@@ -170,14 +155,16 @@
 					<Tool
 						Name="VCCLCompilerTool"
 						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
-						RuntimeLibrary="3"/>
+						RuntimeLibrary="3"
+						CompileAs="1"/>
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Release|Win32">
 					<Tool
 						Name="VCCLCompilerTool"
 						AdditionalIncludeDirectories="..\..\src\windows; ..\..\src"
-						RuntimeLibrary="2"/>
+						RuntimeLibrary="2"
+						CompileAs="1"/>
 				</FileConfiguration>
 			</File>
 		</Filter>
@@ -185,9 +172,6 @@
 			Name="Header Files">
 			<File
 				RelativePath="..\..\src\htmlparser\statemachine.h">
-			</File>
-			<File
-				RelativePath="..\..\src\windows\ctemplate\template_pathops.h">
 			</File>
 			<File
 				RelativePath="..\..\src\windows\config.h">

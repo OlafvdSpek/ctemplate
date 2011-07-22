@@ -1,44 +1,46 @@
-// Copyright (c) 2007, Google Inc.
-// All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
-// ---
-// Author: Filipe Almeida
+/*
+ * Copyright (c) 2007, Google Inc.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ * copyright notice, this list of conditions and the following disclaimer
+ * in the documentation and/or other materials provided with the
+ * distribution.
+ *     * Neither the name of Google Inc. nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * ---
+ *
+ * Author: falmeida@google.com (Filipe Almeida)
+ */
 
 #ifndef SECURITY_STREAMHTMLPARSER_HTMLPARSER_H
 #define SECURITY_STREAMHTMLPARSER_HTMLPARSER_H
 
-#include "config.h"
-#include "statemachine.h"
-#include "jsparser.h"
+#include <config.h>
+#include "htmlparser/statemachine.h"
+#include "htmlparser/jsparser.h"
 
-// Annoying stuff for windows -- make sure clients (in this case
-// unittests) can import the class definitions and variables.
+// Annoying stuff for windows in opensource-land -- make sure clients
+// (in this case unittests) can import the functions.
 #ifndef CTEMPLATE_DLL_DECL
 # ifdef _MSC_VER
 #   define CTEMPLATE_DLL_DECL  __declspec(dllimport)
@@ -128,20 +130,20 @@ typedef struct entityfilter_ctx_s {
 
 /* Resets the entityfilter to its initial state so it can be reused.
  */
-CTEMPLATE_DLL_DECL void entityfilter_reset(entityfilter_ctx *ctx);
+void entityfilter_reset(entityfilter_ctx *ctx);
 
 /* Initializes a new entity filter object.
  */
-CTEMPLATE_DLL_DECL entityfilter_ctx *entityfilter_new(void);
+entityfilter_ctx *entityfilter_new(void);
 
 /* Deallocates an entity filter object.
  */
-CTEMPLATE_DLL_DECL void entityfilter_delete(entityfilter_ctx *ctx);
+void entityfilter_delete(entityfilter_ctx *ctx);
 
 /* Copies the context of the entityfilter pointed to by src to the entityfilter
  * dst.
  */
-CTEMPLATE_DLL_DECL void entityfilter_copy(entityfilter_ctx *dst, entityfilter_ctx *src);
+void entityfilter_copy(entityfilter_ctx *dst, entityfilter_ctx *src);
 
 /* Processes a character from the input stream and decodes any html entities
  * in the accumulated buffer.
@@ -151,7 +153,7 @@ CTEMPLATE_DLL_DECL void entityfilter_copy(entityfilter_ctx *dst, entityfilter_ct
  * such this string should be duplicated before subsequent calls to
  * entityfilter_process().
  */
-CTEMPLATE_DLL_DECL const char *entityfilter_process(entityfilter_ctx *ctx, char c);
+const char *entityfilter_process(entityfilter_ctx *ctx, char c);
 
 
 /* html parser */
@@ -206,7 +208,8 @@ typedef struct htmlparser_ctx_s {
  * statemachine are reset to its original values as if the object was just
  * created.
  */
-CTEMPLATE_DLL_DECL void htmlparser_reset(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+void htmlparser_reset(htmlparser_ctx *ctx);
 
 /* Resets the parser to its initial state and changes the parser mode.
  * All internal context like tag name, attribute name or the state of the
@@ -223,7 +226,8 @@ CTEMPLATE_DLL_DECL void htmlparser_reset(htmlparser_ctx *ctx);
  *                                following context: <a $template>
  *
  */
-CTEMPLATE_DLL_DECL void htmlparser_reset_mode(htmlparser_ctx *ctx, int mode);
+extern CTEMPLATE_DLL_DECL
+void htmlparser_reset_mode(htmlparser_ctx *ctx, int mode);
 
 /* Initializes a new htmlparser instance.
  *
@@ -231,7 +235,8 @@ CTEMPLATE_DLL_DECL void htmlparser_reset_mode(htmlparser_ctx *ctx, int mode);
  * Initialization failure is fatal, and if this function fails it may not
  * deallocate all previsouly allocated memory.
  */
-CTEMPLATE_DLL_DECL htmlparser_ctx *htmlparser_new(void);
+extern CTEMPLATE_DLL_DECL
+htmlparser_ctx *htmlparser_new(void);
 
 /* Copies the context of the htmlparser pointed to by src to the htmlparser dst.
  *
@@ -239,13 +244,15 @@ CTEMPLATE_DLL_DECL htmlparser_ctx *htmlparser_new(void);
  * entity filter but not the statemachine definition since this one is read
  * only.
  */
-CTEMPLATE_DLL_DECL void htmlparser_copy(htmlparser_ctx *dst, const htmlparser_ctx *src);
+extern CTEMPLATE_DLL_DECL
+void htmlparser_copy(htmlparser_ctx *dst, const htmlparser_ctx *src);
 
 /* Receives an htmlparser context and returns the current html state.
  *
  * The return value will be one of the states of htmlparser_state_external_enum.
  */
-CTEMPLATE_DLL_DECL int htmlparser_state(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+int htmlparser_state(htmlparser_ctx *ctx);
 
 /* Parses the input html stream and returns the finishing state.
  *
@@ -254,16 +261,19 @@ CTEMPLATE_DLL_DECL int htmlparser_state(htmlparser_ctx *ctx);
  * unspecified. At this point, htmlparser_reset() or htmlparser_reset_mode()
  * can be called to reset the state.
  */
-CTEMPLATE_DLL_DECL int htmlparser_parse(htmlparser_ctx *ctx, const char *str, int size);
+extern CTEMPLATE_DLL_DECL
+int htmlparser_parse(htmlparser_ctx *ctx, const char *str, int size);
 
 /* Returns true if the parser is inside an attribute value and the value is
  * surrounded by single or double quotes. */
-CTEMPLATE_DLL_DECL int htmlparser_is_attr_quoted(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+int htmlparser_is_attr_quoted(htmlparser_ctx *ctx);
 
 /* Returns true if the parser is currently in javascript. This can be a
  * an attribute that takes javascript, a javascript block or the parser
  * can just be in MODE_JS. */
-CTEMPLATE_DLL_DECL int htmlparser_in_js(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+int htmlparser_in_js(htmlparser_ctx *ctx);
 
 /* Returns the current tag or NULL if not available or we haven't seen the
  * entire tag yet.
@@ -288,17 +298,20 @@ CTEMPLATE_DLL_DECL int htmlparser_in_js(htmlparser_ctx *ctx);
  * tracking stack in the future for completeness.
  *
  */
-CTEMPLATE_DLL_DECL const char *htmlparser_tag(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+const char *htmlparser_tag(htmlparser_ctx *ctx);
 
 /* Returns the current attribute name if after an attribute name or in an
  * attribute value. Returns NULL otherwise. */
-CTEMPLATE_DLL_DECL const char *htmlparser_attr(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+const char *htmlparser_attr(htmlparser_ctx *ctx);
 
 /* Returns the contents of the current attribute value.
  *
  * Returns NULL if not inside an attribute value.
  */
-CTEMPLATE_DLL_DECL const char *htmlparser_value(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+const char *htmlparser_value(htmlparser_ctx *ctx);
 
 /* Returns true if the parser is currently inside a CSS construct.
  *
@@ -306,22 +319,26 @@ CTEMPLATE_DLL_DECL const char *htmlparser_value(htmlparser_ctx *ctx);
  * the parser was reset in HTMLPARSER_MODE_CSS using
  * htmlparser_reset_mode().
  */
-CTEMPLATE_DLL_DECL int htmlparser_in_css(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+int htmlparser_in_css(htmlparser_ctx *ctx);
 
 /* Returns the current state of the javascript state machine.
  *
  * Currently only present for testing purposes.
  */
-CTEMPLATE_DLL_DECL int htmlparser_js_state(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+int htmlparser_js_state(htmlparser_ctx *ctx);
 
 /* Returns non-zero if currently inside a javascript string literal and zero
  * otherwise.
  */
-CTEMPLATE_DLL_DECL int htmlparser_is_js_quoted(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+int htmlparser_is_js_quoted(htmlparser_ctx *ctx);
 
 /* Returns non-zero if currently inside an attribute value and zero otherwise.
  */
-CTEMPLATE_DLL_DECL int htmlparser_value_index(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+int htmlparser_value_index(htmlparser_ctx *ctx);
 
 /* Returns true if this is the first character of a url inside an attribute.
  *
@@ -339,7 +356,8 @@ CTEMPLATE_DLL_DECL int htmlparser_value_index(htmlparser_ctx *ctx);
  *
  * For any other attributes, the result will always be false.
  */
-CTEMPLATE_DLL_DECL int htmlparser_is_url_start(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+int htmlparser_is_url_start(htmlparser_ctx *ctx);
 
 /* Returns the current attribute type.
  *
@@ -350,25 +368,31 @@ CTEMPLATE_DLL_DECL int htmlparser_is_url_start(htmlparser_ctx *ctx);
  *   HTMLPARSER_ATTR_JS - Inside a javascript attribute.
  *   HTMLPARSER_ATTR_STYLE - Inside a css style attribute.
  */
-CTEMPLATE_DLL_DECL int htmlparser_attr_type(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+int htmlparser_attr_type(htmlparser_ctx *ctx);
 
 /* Return the current line number. */
-CTEMPLATE_DLL_DECL int htmlparser_get_line_number(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+int htmlparser_get_line_number(htmlparser_ctx *ctx);
 
 /* Set the current line number. */
-CTEMPLATE_DLL_DECL void htmlparser_set_line_number(htmlparser_ctx *ctx, int line);
+extern CTEMPLATE_DLL_DECL
+void htmlparser_set_line_number(htmlparser_ctx *ctx, int line);
 
 /* Return the current column number. */
-CTEMPLATE_DLL_DECL int htmlparser_get_column_number(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+int htmlparser_get_column_number(htmlparser_ctx *ctx);
 
 /* Set the current column number. */
-CTEMPLATE_DLL_DECL void htmlparser_set_column_number(htmlparser_ctx *ctx, int column);
+extern CTEMPLATE_DLL_DECL
+void htmlparser_set_column_number(htmlparser_ctx *ctx, int column);
 
 /* Retrieve a human readable error message in case an error occurred.
  *
  * NULL is returned if the parser didn't encounter an error.
  */
-CTEMPLATE_DLL_DECL const char *htmlparser_get_error_msg(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+const char *htmlparser_get_error_msg(htmlparser_ctx *ctx);
 
 /* Invoked by the caller when text is expanded by the caller.
  *
@@ -394,11 +418,13 @@ CTEMPLATE_DLL_DECL const char *htmlparser_get_error_msg(htmlparser_ctx *ctx);
  *
  * and would interpret alt=alternate_text as the value of the href attribute.
  */
-CTEMPLATE_DLL_DECL int htmlparser_insert_text(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+int htmlparser_insert_text(htmlparser_ctx *ctx);
 
 /* Deallocates an htmlparser context object.
  */
-CTEMPLATE_DLL_DECL void htmlparser_delete(htmlparser_ctx *ctx);
+extern CTEMPLATE_DLL_DECL
+void htmlparser_delete(htmlparser_ctx *ctx);
 
 #define htmlparser_parse_chr(a,b) htmlparser_parse(a, &(b), 1);
 #ifdef __cplusplus
@@ -409,7 +435,7 @@ CTEMPLATE_DLL_DECL void htmlparser_delete(htmlparser_ctx *ctx);
 #endif
 
 #ifdef __cplusplus
-}  /* namespace HTMLPARSER_NAMESPACE */
+}  /* namespace security_streamhtmlparser */
 #endif
 
 #endif /* SECURITY_STREAMHTMLPARSER_HTMLPARSER_H */

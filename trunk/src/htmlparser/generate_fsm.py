@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Copyright (c) 2008, Google Inc.
 # All rights reserved.
@@ -28,14 +28,13 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 # ---
-# Author: Filipe Almeida
 #
 # Generate a C include file from a finite state machine definition.
 #
-# Right now the form is the one expected by htmlparser.cc so this file is pretty
-# tightly coupled with htmlparser.cc.
+# Right now the form is the one expected by htmlparser.c so this file is pretty
+# tightly coupled with htmlparser.c.
+#
 
 __author__ = 'falmeida@google.com (Filipe Almeida)'
 

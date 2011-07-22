@@ -1,4 +1,22 @@
-== 24 January 2011 ==
+== 22 July 2011 ==
+
+I've just released ctemplate 1.0rc1.  If no problems are found in the
+next week or two, I will release ctemplate 1.0.
+
+ctemplate 1.0rc1 has relatively few changes from ctemplate 0.99.
+xml-escaping has been improved a bit.  A couple of bugs have been
+fixed, including one where we were ignoring template-global sections
+(a relatively new feature) in some places.  A full list of changes is
+available in the
+[http://google-ctemplate.googlecode.com/svn/tags/ctemplate-1.0rc1/ChangeLog ChangeLog].
+
+I've also changed the internal tools used to integrate
+Google-supplied patches to ctemplate into the opensource release.
+These new tools should result in more frequent updates with better
+change descriptions.  They will also result in future ChangeLog
+entries being much more verbose (for better or for worse).
+
+=== 24 January 2011 ===
 
 I've just released ctemplate 0.99.  I expect this to be the last
 release before ctemplate 1.0.  Code has settled down; the big change

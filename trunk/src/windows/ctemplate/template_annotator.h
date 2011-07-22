@@ -28,7 +28,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Ryoji Watanabe
 //
 // The template expansion system provides a set of hooks that allow for
 // the insertion of diagnostic content into the output stream for the use
@@ -138,5 +137,6 @@ class CTEMPLATE_DLL_DECL TextTemplateAnnotator : public TemplateAnnotator {
 };
 
 }
+
 
 #endif  // TEMPLATE_TEMPLATE_ANNOTATOR_H_

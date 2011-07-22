@@ -28,7 +28,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Frank H. Jernigan
 //
 // Alas that we can't forward-declare enums!  These are the ones
 // used by multiple files
@@ -43,5 +42,6 @@ enum Strip { DO_NOT_STRIP, STRIP_BLANK_LINES, STRIP_WHITESPACE,
              NUM_STRIPS };   // sentinel value
 
 }
+
 
 #endif  // TEMPLATE_TEMPLATE_ENUMS_H_

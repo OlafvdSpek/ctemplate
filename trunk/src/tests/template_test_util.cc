@@ -1,4 +1,4 @@
-// Copyright (c) 2007, Google Inc.
+// Copyright (c) 2006, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -28,14 +28,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Jim Morrison
 
 #include "config_for_unittests.h"
 #include "base/mutex.h"  // must come first, for _XOPEN_SOURCE
 #include "tests/template_test_util.h"
 #include <assert.h>      // for assert()
 #ifdef HAVE_DIRENT_H
-# include <dirent.h>     // for DIR, dirent, closedir(), opendir(), etc
+# include <dirent.h>       // for opendir() etc
 #else
 # define dirent direct
 # ifdef HAVE_SYS_NDIR_H
@@ -47,7 +46,7 @@
 # ifdef HAVE_NDIR_H
 #  include <ndir.h>
 # endif
-#endif
+#endif      // for DIR, dirent, closedir(), opendir(), etc
 #include <stdio.h>       // for printf(), FILE, fclose(), fopen(), etc
 #include <stdlib.h>      // for exit()
 #include <string.h>      // for strcmp(), strcpy(), strstr()
@@ -55,11 +54,11 @@
 #include <sys/types.h>   // for mode_t
 #include <time.h>        // for time_t
 #ifdef HAVE_UTIME_H
-#include <utime.h>       // for utime()
-#endif
+# include <utime.h>
+#endif       // for utime()
 #ifdef HAVE_UNISTD_H
-#include <unistd.h>      // for unlink()
-#endif
+# include <unistd.h>
+#endif      // for unlink()
 #include <vector>        // for vector<>, vector<>::size_type
 #include <ctemplate/template.h>  // for Template
 #include <ctemplate/template_dictionary.h>  // for TemplateDictionary
@@ -67,7 +66,6 @@
 #include <ctemplate/template_enums.h>  // for Strip
 #include <ctemplate/template_namelist.h>  // for TemplateNamelist, etc
 #include <ctemplate/template_pathops.h>  // for PathJoin()
-
 using std::string;
 using std::vector;
 
@@ -100,16 +98,13 @@ void CreateOrCleanTestDir(const string& dirname) {
       unlink(PathJoin(dirname, d->d_name).c_str());
   }
   closedir(dir);
-
-  delete[] g_tmpdir;
-  g_tmpdir = new char[dirname.length() + 1];
-  strcpy(g_tmpdir, dirname.c_str());
 }
 
 static string TmpFile(const char* basename) {
   return string("/tmp/") + basename;
 }
-#endif
+
+#endif  // #ifndef USING_PORT_CC
 
 void CreateOrCleanTestDirAndSetAsTmpdir(const string& dirname) {
   CreateOrCleanTestDir(dirname);
@@ -123,7 +118,7 @@ const string FLAGS_test_tmpdir(TmpFile("template_unittest_dir"));
 // This writes s to the given file.  We want to make sure that every
 // time we create a file, it has a different mtime (just like would
 // be the case in real life), so we use a mock clock.
-static Mutex g_time_mutex(Mutex::LINKER_INITIALIZED);
+static Mutex g_time_mutex(base::LINKER_INITIALIZED);
 static time_t mock_time = 946713600;   // jan 1, 2000, in california
 
 void StringToFile(const string& s, const string& filename) {
@@ -174,6 +169,7 @@ const char* ExpandIs(const Template* tpl, const TemplateDictionary *dict,
   else
     ASSERT(expected == tpl->Expand(&outstring, dict));
 
+
   char* buf = new char[outstring.size()+1];
   strcpy(buf, outstring.c_str());
   return buf;
@@ -186,6 +182,7 @@ const char* ExpandWithCacheIs(TemplateCache* cache,
   string outstring;
   ASSERT(expected == cache->ExpandWithData(filename, strip, dict,
                                            per_expand_data, &outstring));
+
 
   char* buf = new char[outstring.size()+1];
   strcpy(buf, outstring.c_str());
@@ -276,7 +273,7 @@ int TemplateDictionaryPeer::GetSectionDictionaries(
   TemplateDictionaryInterface::Iterator* di =
       dict_->CreateSectionIterator(section_name);
   while (di->HasNext())
-    dicts->push_back(static_cast<const TemplateDictionary*>(&di->Next()));
+    dicts->push_back(down_cast<const TemplateDictionary*>(&di->Next()));
   delete di;
 
   return static_cast<int>(dicts->size());
@@ -292,7 +289,7 @@ int TemplateDictionaryPeer::GetIncludeDictionaries(
   TemplateDictionaryInterface::Iterator* di =
       dict_->CreateTemplateIterator(section_name);
   while (di->HasNext())
-    dicts->push_back(static_cast<const TemplateDictionary*>(&di->Next()));
+    dicts->push_back(down_cast<const TemplateDictionary*>(&di->Next()));
   delete di;
 
   return static_cast<int>(dicts->size());

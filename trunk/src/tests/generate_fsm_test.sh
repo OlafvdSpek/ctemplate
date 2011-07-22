@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Copyright (c) 2008, Google Inc.
 # All rights reserved.
@@ -28,29 +28,36 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
 # ---
-# Author: Filipe Almeida
+#
+# Author: falmeida@google.com (Filipe Almeida)
 
 die() {
-    echo "Test failed: $@" 1>&2
-    exit 1
+  echo "Test failed: $@" 1>&2
+  exit 1
 }
-
 TEST_SRCDIR=${1:-$TEST_SRCDIR}
+TOOLS_DIR="$TEST_SRCDIR/src/htmlparser"
+TESTDATA_DIR="$TEST_SRCDIR/src/tests/htmlparser_testdata"
 
 # Find input files
-INPUT_FILE="$TEST_SRCDIR/src/tests/htmlparser_testdata/sample_fsm.config"
-OUTPUT_FILE="$TEST_SRCDIR/src/tests/htmlparser_testdata/sample_fsm.c"
-GENERATE_FSM="$TEST_SRCDIR/src/htmlparser/generate_fsm.py"
+INPUT_FILE="$TESTDATA_DIR/sample_fsm.config"
+OUTPUT_FILE="$TESTDATA_DIR/sample_fsm.c"
+GENERATE_FSM="$TOOLS_DIR/generate_fsm.py"
 
 EXPECTED="`cat $OUTPUT_FILE`"
 if [ -z "$EXPECTED" ]; then die "Error reading $OUTPUT_FILE"; fi
 
 # Let's make sure the script works with python2.2 and above
-for PYTHON in "python" "python2.2" "python2.4" "python2.5"; do
+for PYTHON in "" "python2.2" "python2.3" "python2.4" "python2.5" "python2.6"; do
   # Skip the versions of python that are not installed.
-  [ -z "$PYTHON" ] || $PYTHON -h >/dev/null 2>/dev/null || continue
+  if [ -n "$PYTHON" ]; then
+    $PYTHON -h >/dev/null 2>/dev/null || continue
+  else    # use the python that's in the shebang line
+    SHEBANG_PYTHON=`head -n1 "$GENERATE_FSM" | tr -d '#!'`
+    # SHEBANG_PYTHON could be something like "env python" so don't quotify it
+    $SHEBANG_PYTHON -h >/dev/null 2>/dev/null || continue
+  fi
   echo "-- Running $PYTHON $GENERATE_FSM $INPUT_FILE"
   # The tr is to get rid of windows-style line endings (\r)
   GENERATED="`$PYTHON $GENERATE_FSM $INPUT_FILE | tr -d '\015'`"

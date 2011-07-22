@@ -28,7 +28,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Scott Williams
+// Author: williasr@google.com (Scott Williams)
 
 #ifndef TEMPLATE_INDENTED_WRITER_H_
 #define TEMPLATE_INDENTED_WRITER_H_
@@ -38,12 +38,14 @@
 
 _START_GOOGLE_NAMESPACE_
 
+using std::string;
+
 // An indented writer is a wrapper around a string buffer. It takes care of
 // tracking and applying leading whitespace to the buffer at the beginning of
 // new lines.
 class IndentedWriter {
  public:
-  IndentedWriter(std::string* out, int starting_indentation)
+  IndentedWriter(string* out, int starting_indentation)
     : out_(out), current_indentation_(starting_indentation),
       original_indentation_(starting_indentation), line_state_(AT_BEGINNING) { }
 
@@ -55,13 +57,13 @@ class IndentedWriter {
   // the output buffer will be indented before the next Write() call. If the
   // output contains embedded newlines, these won't have proper indentation, so
   // call Write() at least once per physical line of output.
-  void Write(std::string s1,
-             std::string s2 = std::string(),
-             std::string s3 = std::string(),
-             std::string s4 = std::string(),
-             std::string s5 = std::string(),
-             std::string s6 = std::string(),
-             std::string s7 = std::string()) {
+  void Write(string s1,
+             string s2 = string(),
+             string s3 = string(),
+             string s4 = string(),
+             string s5 = string(),
+             string s6 = string(),
+             string s7 = string()) {
     DoWrite(s1);
     if (!s2.empty()) DoWrite(s2);
     if (!s3.empty()) DoWrite(s3);
@@ -91,10 +93,10 @@ class IndentedWriter {
   // Get access to the underlying indentation level and string buffer. Most
   // useful for interfacing with non-IndentedWriter printing code.
   int GetIndent() const { return current_indentation_; }
-  std::string* GetBuffer() { return out_; }
+  string* GetBuffer() { return out_; }
 
  private:
-  void DoWrite(const std::string& line) {
+  void DoWrite(const string& line) {
     if (line_state_ == AT_BEGINNING) {
       IndentLine();
     }
@@ -106,17 +108,17 @@ class IndentedWriter {
     }
   }
 
-  static bool EndsWithNewline(const std::string& line) {
+  static bool EndsWithNewline(const string& line) {
     return !line.empty() && (*(line.end() - 1) == '\n');
   }
 
   void IndentLine() {
     assert(line_state_ == AT_BEGINNING);
-    out_->append(std::string(current_indentation_, ' ') +
+    out_->append(string(current_indentation_, ' ') +
                  (current_indentation_ ? " " : ""));
   }
 
-  std::string* out_;
+  string* out_;
   int current_indentation_;
   int original_indentation_;
   enum LineState {

@@ -28,15 +28,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Craig Silverstein
+// Author: csilvers@google.com (Craig Silverstein)
 
 #ifndef TEMPLATE_TEMPLATE_PATHOPS_H_
 #define TEMPLATE_TEMPLATE_PATHOPS_H_
 
 #include <string>
-
-// These functions are all for internal use (hence the extra
-// namespace), so no need to worry about dll-exporting for windows.
 
 // NOTE: if you are statically linking the template library into your binary
 // (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
@@ -47,15 +44,25 @@
 
 namespace ctemplate {
 
-extern CTEMPLATE_DLL_DECL const char kCWD[];       // equivalent to "./"
-extern CTEMPLATE_DLL_DECL const char kRootdir[];   // equivalent to "/"
+extern CTEMPLATE_DLL_DECL
+const char kCWD[];       // a string that's equivalent to "./"
+extern CTEMPLATE_DLL_DECL
+const char kRootdir[];   // a string that's equivalent to "/"
 
-std::string CTEMPLATE_DLL_DECL PathJoin(const std::string& a,
-                                            const std::string& b);
-bool CTEMPLATE_DLL_DECL IsAbspath(const std::string& path);
-bool CTEMPLATE_DLL_DECL IsDirectory(const std::string& path);   // ends in "/"?
-void CTEMPLATE_DLL_DECL NormalizeDirectory(std::string* dir);   // appends /
-std::string CTEMPLATE_DLL_DECL Basename(const std::string& path);
+extern CTEMPLATE_DLL_DECL
+std::string PathJoin(const std::string& a, const std::string& b);
+
+extern CTEMPLATE_DLL_DECL
+bool IsAbspath(const std::string& path);
+
+extern CTEMPLATE_DLL_DECL
+bool IsDirectory(const std::string& path);         // checks if path ends with /
+
+extern CTEMPLATE_DLL_DECL
+void NormalizeDirectory(std::string* dir);         // adds trailing / if needed
+
+extern CTEMPLATE_DLL_DECL
+std::string Basename(const std::string& path);          // everything after last /
 
 // Returns true iff text contains the word as a full word, i.e. delimited by one
 // of [.,_-#*?:] on both the sides.
@@ -63,7 +70,8 @@ std::string CTEMPLATE_DLL_DECL Basename(const std::string& path);
 // the auto-escape mode specified by it.
 // NOTE: This assumes that the word doesn't contain any of the delimiter
 // characters.
-bool CTEMPLATE_DLL_DECL ContainsFullWord(const std::string& text, const std::string& word);
+extern CTEMPLATE_DLL_DECL
+bool ContainsFullWord(const std::string& text, const std::string& word);
 
 }
 

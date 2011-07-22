@@ -28,29 +28,36 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Craig Silverstein
+// Author: csilvers@google.com (Craig Silverstein)
 
 #ifndef TEMPLATE_TEMPLATE_PATHOPS_H_
 #define TEMPLATE_TEMPLATE_PATHOPS_H_
 
 #include <string>
 
-// These functions are all for internal use (hence the extra
-// namespace), so no need to worry about dll-exporting for windows.
-
 @ac_windows_dllexport_defines@
 
 @ac_google_start_namespace@
 
-extern @ac_windows_dllexport@ const char kCWD[];       // equivalent to "./"
-extern @ac_windows_dllexport@ const char kRootdir[];   // equivalent to "/"
+extern @ac_windows_dllexport@
+const char kCWD[];       // a string that's equivalent to "./"
+extern @ac_windows_dllexport@
+const char kRootdir[];   // a string that's equivalent to "/"
 
-std::string @ac_windows_dllexport@ PathJoin(const std::string& a,
-                                            const std::string& b);
-bool @ac_windows_dllexport@ IsAbspath(const std::string& path);
-bool @ac_windows_dllexport@ IsDirectory(const std::string& path);   // ends in "/"?
-void @ac_windows_dllexport@ NormalizeDirectory(std::string* dir);   // appends /
-std::string @ac_windows_dllexport@ Basename(const std::string& path);
+extern @ac_windows_dllexport@
+std::string PathJoin(const std::string& a, const std::string& b);
+
+extern @ac_windows_dllexport@
+bool IsAbspath(const std::string& path);
+
+extern @ac_windows_dllexport@
+bool IsDirectory(const std::string& path);         // checks if path ends with /
+
+extern @ac_windows_dllexport@
+void NormalizeDirectory(std::string* dir);         // adds trailing / if needed
+
+extern @ac_windows_dllexport@
+std::string Basename(const std::string& path);          // everything after last /
 
 // Returns true iff text contains the word as a full word, i.e. delimited by one
 // of [.,_-#*?:] on both the sides.
@@ -58,7 +65,8 @@ std::string @ac_windows_dllexport@ Basename(const std::string& path);
 // the auto-escape mode specified by it.
 // NOTE: This assumes that the word doesn't contain any of the delimiter
 // characters.
-bool @ac_windows_dllexport@ ContainsFullWord(const std::string& text, const std::string& word);
+extern @ac_windows_dllexport@
+bool ContainsFullWord(const std::string& text, const std::string& word);
 
 @ac_google_end_namespace@
 

@@ -30,8 +30,9 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # ---
-# Author: Jad Boutros
+# Author: jad@google.com (Jad Boutros)
 # Heavily inspired from make_tpl_varnames_h_unittest.sh
+#
 #
 # TODO(jad): Add better testing of Strip mode.
 # TODO(jad): Add testing for (lame) suppressed diffs.

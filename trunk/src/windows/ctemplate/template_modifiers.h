@@ -28,7 +28,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Craig Silverstein
+// Author: csilvers@google.com (Craig Silverstein)
 //
 // We allow template variables to have modifiers, each possibly with a
 // value associated with it.  Format is
@@ -66,7 +66,7 @@
 #include <sys/types.h>   // for size_t
 #include <string>
 #include <ctemplate/template_emitter.h>   // so we can inline operator()
-#include <ctemplate/per_expand_data.h>    // so we can inline operator()
+#include <ctemplate/per_expand_data.h>    // could probably just forward-declare
 
 // NOTE: if you are statically linking the template library into your binary
 // (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
@@ -78,7 +78,6 @@
 namespace ctemplate {
 
 class Template;
-
 
 #define MODIFY_SIGNATURE_                                               \
  public:                                                                \
@@ -141,22 +140,30 @@ class CTEMPLATE_DLL_DECL TemplateModifier {
 
 
 // Returns the input verbatim (for testing)
-class CTEMPLATE_DLL_DECL NullModifier : public TemplateModifier { MODIFY_SIGNATURE_; };
+class CTEMPLATE_DLL_DECL NullModifier : public TemplateModifier {
+  MODIFY_SIGNATURE_;
+};
 extern CTEMPLATE_DLL_DECL NullModifier null_modifier;
 
 // Escapes < > " ' & <non-space whitespace> to &lt; &gt; &quot;
 // &#39; &amp; <space>
-class CTEMPLATE_DLL_DECL HtmlEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+class CTEMPLATE_DLL_DECL HtmlEscape : public TemplateModifier {
+  MODIFY_SIGNATURE_;
+};
 extern CTEMPLATE_DLL_DECL HtmlEscape html_escape;
 
 // Same as HtmlEscape but leaves all whitespace alone. Eg. for <pre>..</pre>
-class CTEMPLATE_DLL_DECL PreEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+class CTEMPLATE_DLL_DECL PreEscape : public TemplateModifier {
+  MODIFY_SIGNATURE_;
+};
 extern CTEMPLATE_DLL_DECL PreEscape pre_escape;
 
 // Like HtmlEscape but allows HTML entities, <br> tags, <wbr> tags,
 // matched <b> and </b> tags, matched <i> and </i> tags, matched <em> and </em>
 // tags, and matched <span dir=(rtl|ltr)> tags.
-class CTEMPLATE_DLL_DECL SnippetEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+class CTEMPLATE_DLL_DECL SnippetEscape : public TemplateModifier {
+  MODIFY_SIGNATURE_;
+};
 extern CTEMPLATE_DLL_DECL SnippetEscape snippet_escape;
 
 // Replaces characters not safe for an unquoted attribute with underscore.
@@ -175,13 +182,17 @@ extern CTEMPLATE_DLL_DECL SnippetEscape snippet_escape;
 // HTML tag and ends with an equal sign, a browser may possibly end up
 // interpreting the next token as the value of this string rather than
 // a new attribute (esoteric).
-class CTEMPLATE_DLL_DECL CleanseAttribute : public TemplateModifier { MODIFY_SIGNATURE_; };
+class CTEMPLATE_DLL_DECL CleanseAttribute : public TemplateModifier {
+  MODIFY_SIGNATURE_;
+};
 extern CTEMPLATE_DLL_DECL CleanseAttribute cleanse_attribute;
 
 // Removes characters not safe for a CSS value. Safe characters are
 // alphanumeric, space, underscore, period, coma, exclamation mark,
 // pound, percent, and dash.
-class CTEMPLATE_DLL_DECL CleanseCss : public TemplateModifier { MODIFY_SIGNATURE_; };
+class CTEMPLATE_DLL_DECL CleanseCss : public TemplateModifier {
+  MODIFY_SIGNATURE_;
+};
 extern CTEMPLATE_DLL_DECL CleanseCss cleanse_css;
 
 // Checks that a url is either an absolute http(s) URL or a relative
@@ -218,14 +229,18 @@ extern CTEMPLATE_DLL_DECL ValidateUrl validate_img_src_url_and_css_escape;
 // If you use it within a CDATA section, you may be escaping more characters
 // than strictly necessary. If this turns out to be an issue, we will need
 // to add a variant just for CDATA.
-class CTEMPLATE_DLL_DECL XmlEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+class CTEMPLATE_DLL_DECL XmlEscape : public TemplateModifier {
+  MODIFY_SIGNATURE_;
+};
 extern CTEMPLATE_DLL_DECL XmlEscape xml_escape;
 
 // Escapes characters that cannot appear unescaped in a javascript string
 // assuming UTF-8 encoded input.
 // This does NOT escape all characters that cannot appear unescaped in a
 // javascript regular expression literal.
-class CTEMPLATE_DLL_DECL JavascriptEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+class CTEMPLATE_DLL_DECL JavascriptEscape : public TemplateModifier {
+  MODIFY_SIGNATURE_;
+};
 extern CTEMPLATE_DLL_DECL JavascriptEscape javascript_escape;
 
 // Checks that the input is a valid javascript non-string literal
@@ -256,18 +271,24 @@ extern CTEMPLATE_DLL_DECL JavascriptEscape javascript_escape;
 //   so can also accept invalid numbers such as the number 5..45--10.
 // . "true" and "false" (without quotes) are also accepted and that's it.
 //
-class CTEMPLATE_DLL_DECL JavascriptNumber : public TemplateModifier { MODIFY_SIGNATURE_; };
+class CTEMPLATE_DLL_DECL JavascriptNumber : public TemplateModifier {
+  MODIFY_SIGNATURE_;
+};
 extern CTEMPLATE_DLL_DECL JavascriptNumber javascript_number;
 
 // Escapes characters not in [0-9a-zA-Z.,_:*/~!()-] as %-prefixed hex.
 // Space is encoded as a +.
-class CTEMPLATE_DLL_DECL UrlQueryEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+class CTEMPLATE_DLL_DECL UrlQueryEscape : public TemplateModifier {
+  MODIFY_SIGNATURE_;
+};
 extern CTEMPLATE_DLL_DECL UrlQueryEscape url_query_escape;
 
 // Escapes " \ / <FF> <CR> <LF> <BS> <TAB> to \" \\ \/ \f \r \n \b \t
 // Also escapes < > & to their corresponding \uXXXX representation
 // (\u003C, \u003E, \u0026 respectively).
-class CTEMPLATE_DLL_DECL JsonEscape : public TemplateModifier { MODIFY_SIGNATURE_; };
+class CTEMPLATE_DLL_DECL JsonEscape : public TemplateModifier {
+  MODIFY_SIGNATURE_;
+};
 extern CTEMPLATE_DLL_DECL JsonEscape json_escape;
 
 // Inserts the given prefix (given as the argument to this modifier)
@@ -276,7 +297,9 @@ extern CTEMPLATE_DLL_DECL JsonEscape json_escape;
 // that prefix will already be present before this text, in the
 // template.  This is meant to be used internally, and is not exported
 // via the g_modifiers list.
-class CTEMPLATE_DLL_DECL PrefixLine : public TemplateModifier { MODIFY_SIGNATURE_; };
+class CTEMPLATE_DLL_DECL PrefixLine : public TemplateModifier {
+  MODIFY_SIGNATURE_;
+};
 extern CTEMPLATE_DLL_DECL PrefixLine prefix_line;
 
 
@@ -297,7 +320,8 @@ extern CTEMPLATE_DLL_DECL PrefixLine prefix_line;
 // VAR1 and VAR3 would get modified by my_modifierA, VAR2 by my_modifierB,
 // and VAR4 by my_modifierC.  The order of the AddModifier calls is not
 // significant.
-extern CTEMPLATE_DLL_DECL bool AddModifier(const char* long_name, const TemplateModifier* modifier);
+extern CTEMPLATE_DLL_DECL
+bool AddModifier(const char* long_name, const TemplateModifier* modifier);
 
 // Same as AddModifier() above except that the modifier is considered
 // to produce safe output that can be inserted in any context without
@@ -323,9 +347,11 @@ extern CTEMPLATE_DLL_DECL bool AddModifier(const char* long_name, const Template
 //   (say HTML-escape). This may be dangerous when the modifier
 //   is used in a different context (say Javascript) where this
 //   escaping may be inadequate.
-extern CTEMPLATE_DLL_DECL bool AddXssSafeModifier(const char* long_name,
+extern CTEMPLATE_DLL_DECL
+bool AddXssSafeModifier(const char* long_name,
                         const TemplateModifier* modifier);
 
 }
+
 
 #endif  // TEMPLATE_TEMPLATE_MODIFIERS_H_

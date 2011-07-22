@@ -30,15 +30,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # ---
-# Author: Craig Silverstein
-
+# Author: csilvers@google.com (Craig Silverstein)
+#
 
 die() {
     echo "Test failed: $@" 1>&2
     exit 1
 }
 
-# Optional first argument is where the executable lives
 MAKETPL=${1-"$TEST_SRCDIR/make_tpl_varnames_h"}
 
 # Optional second argument is tmpdir to use
@@ -149,15 +148,10 @@ EOF`
 # Note that both variables in ok4.tpl will be duplicates and hence not returned.
 expected_ok1and4=`echo "$expected_ok1" | sed s/ok1/ok1and4/g`
 
-# The "by <program>" line is messed up when using libtool.  Thus, we just
-# strip it out when doing the comparisons.  In fact, get rid of all comments.
+# Suppress unimportant aspects of the make_tpl_varnames_h output.
 Cleanse() {
   # Replace the file name guard with %%%OUTPUT_NAME%%% so we can use
   # the same expected_ok* variables for different file names.
-  # We use 'basename' plus .* (in the sed) to match the filename,
-  # because mingw automatically converts mingw directories to windows
-  # directories sometimes, and we want both to match.  It's not perfect.
-  #
   # Note that we only append 'H_' to the end of the string, instead
   # of '_H_'.  This is because the first call to 'tr' is already
   # adding a '_' at the end of the converted $1 (due to the newline

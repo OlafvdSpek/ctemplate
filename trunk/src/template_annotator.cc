@@ -28,17 +28,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Ryoji Watanabe
 
-#include "config.h"
+#include <config.h>
 #include <ctemplate/template_annotator.h>
-
 #include <string>
 #include <ctemplate/template_emitter.h>
-
-using std::string;
-
-_START_GOOGLE_NAMESPACE_
 
 // Emits an open annotation string.  'name' must be a string literal.
 #define EMIT_OPEN_ANNOTATION(emitter, name, value)      \
@@ -54,6 +48,10 @@ _START_GOOGLE_NAMESPACE_
   (emitter)->Emit("{{" name "=",  3 + sizeof(name)-1);  \
   (emitter)->Emit(value);                               \
   (emitter)->Emit("}}", 2);
+
+_START_GOOGLE_NAMESPACE_
+
+using std::string;
 
 // Implementation note: TextTemplateAnnotator contains no state, and
 // code elsewhere is depending on this.  E.g., a statically allocated

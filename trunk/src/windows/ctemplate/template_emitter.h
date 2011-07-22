@@ -28,7 +28,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Craig Silverstein
+// Author: csilvers@google.com (Craig Silverstein)
 //
 // When we expand a template, we expand into an abstract "emitter".
 // This is typically a string, but could be a file-wrapper, or any
@@ -71,5 +71,6 @@ class CTEMPLATE_DLL_DECL StringEmitter : public ExpandEmitter {
 };
 
 }
+
 
 #endif  // TEMPLATE_TEMPLATE_EMITTER_H_

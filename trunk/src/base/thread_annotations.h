@@ -26,27 +26,26 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 // ---
-// Author: Le-Chun Wu
+//
 //
 // This header file contains the macro definitions for thread safety
 // annotations that allow the developers to document the locking policies
 // of their multi-threaded code. The annotations can also help program
 // analysis tools to identify potential thread safety issues.
 //
+//
 // The annotations are implemented using GCC's "attributes" extension.
 // Using the macros defined here instead of the raw GCC attributes allows
 // for portability and future compatibility.
 //
-// This functionality is not yet fully implemented in perftools,
-// but may be one day.
 
 #ifndef BASE_THREAD_ANNOTATIONS_H_
 #define BASE_THREAD_ANNOTATIONS_H_
 
 
-#if defined(__GNUC__) && defined(__SUPPORT_TS_ANNOTATION__) && (!defined(SWIG))
+#include <config.h>
+#if defined(__GNUC__) && defined(__SUPPORT_TS_ANNOTATION__) && !defined(SWIG)
 #define THREAD_ANNOTATION_ATTRIBUTE__(x)   __attribute__((x))
 #else
 #define THREAD_ANNOTATION_ATTRIBUTE__(x)   // no-op
@@ -95,7 +94,6 @@
   THREAD_ANNOTATION_ATTRIBUTE__(shared_locks_required(x))
 
 // Document the locks acquired in the body of the function. These locks
-// cannot be held when calling this function (as google3's Mutex locks are
 // non-reentrant).
 #define LOCKS_EXCLUDED(x) \
   THREAD_ANNOTATION_ATTRIBUTE__(locks_excluded(x))

@@ -28,31 +28,30 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Craig Silverstein
+// Author: csilvers@google.com (Craig Silverstein)
 //
 // Based on the 'old' TemplateDictionary by Frank Jernigan.
 
-#include "config.h"
+#include <config.h>
 #include "base/mutex.h"         // This must go first so we get _XOPEN_SOURCE
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdarg.h>             // for varargs with StringAppendV
-#include <string>
+#include <stdarg.h>
 #include <algorithm>            // for sort()
+#include HASH_MAP_H
+#include <map>
+#include <string>
 #include <utility>              // for pair<>
 #include <vector>
-#include <map>
+
+#include "base/arena-inl.h"
+#include "base/thread_annotations.h"
+#include "indented_writer.h"
 #include <ctemplate/template_dictionary.h>
 #include <ctemplate/template_modifiers.h>
-#include "indented_writer.h"
-
-#include "base/mutex.h"
-#include "base/arena.h"
 #include "base/small_map.h"
-#include "base/thread_annotations.h"
-
-_START_GOOGLE_NAMESPACE_
+#include "base/util.h"   // for DCHECK
 
 using std::vector;
 using std::string;
@@ -60,36 +59,22 @@ using std::map;
 using std::pair;
 using std::make_pair;
 
+typedef long int64;   // used with SetIntValue
+
+_START_GOOGLE_NAMESPACE_
+
 // Guards the initialization of the global dictionary.
 static GoogleOnceType g_once = GOOGLE_ONCE_INIT;
 // Guard access to the global dictionary.
-static Mutex g_static_mutex(Mutex::LINKER_INITIALIZED);
+static Mutex g_static_mutex(base::LINKER_INITIALIZED);
 
 /*static*/ UnsafeArena* const TemplateDictionary::NO_ARENA = NULL;
 /*static*/ TemplateDictionary::GlobalDict* TemplateDictionary::global_dict_
 GUARDED_BY(g_static_mutex) PT_GUARDED_BY(g_static_mutex) = NULL;
 /*static*/ TemplateString* TemplateDictionary::empty_string_ = NULL;
 
+
 static const char* const kAnnotateOutput = "__ctemplate_annotate_output__";
-
-// ----------------------------------------------------------------------
-// ArenaAllocator::allocate()
-// ArenaAllocator::deallocate()
-//    These are in the .cc file because that's where we #include arena.h
-// ----------------------------------------------------------------------
-
-template<class T>
-typename ArenaAllocator<T>::pointer ArenaAllocator<T>::allocate(
-    size_type n, std::allocator<void>::const_pointer /*hint*/) {
-  return reinterpret_cast<T*>(arena_->AllocAligned(n * sizeof(T), kAlignment));
-}
-
-template<class T> void ArenaAllocator<T>::deallocate(pointer p, size_type n) {
-  arena_->Free(p, n * sizeof(T));
-}
-
-/*static*/ template<class T> const int ArenaAllocator<T>::kAlignment =
-    (1 == sizeof(T) ? 1 : BaseArena::kDefaultAlignment);
 
 // ----------------------------------------------------------------------
 // TemplateDictionary::map_arena_init
@@ -158,6 +143,7 @@ inline TemplateDictionary* TemplateDictionary::CreateTemplateSubdict(
                                   template_global_dict_owner);
   return reinterpret_cast<TemplateDictionary*>(buffer);
 }
+
 
 // ----------------------------------------------------------------------
 // TemplateDictionary::HashInsert()
@@ -286,6 +272,7 @@ TemplateDictionary* TemplateDictionary::InternalMakeCopy(
     UnsafeArena* arena,
     TemplateDictionary* parent_dict,
     TemplateDictionary* template_global_dict_owner) {
+
   TemplateDictionary* newdict;
   if (template_global_dict_owner_ == this) {
     // We're a root-level template.  We want the copy to be just like
@@ -319,6 +306,7 @@ TemplateDictionary* TemplateDictionary::InternalMakeCopy(
         template_global_dict_->name(), newdict->arena_, newdict,
         newdict->template_global_dict_owner_);
   }
+  // Copy the section dictionary
   if (section_dict_) {
     newdict->LazilyCreateDict(&newdict->section_dict_);
     for (SectionDict::iterator it = section_dict_->begin();
@@ -450,7 +438,7 @@ void TemplateDictionary::SetValueWithoutCopy(const TemplateString variable,
 }
 
 void TemplateDictionary::SetIntValue(const TemplateString variable,
-                                     long value) {
+                                     int64 value) {
   char buffer[64];   // big enough for any int
   int valuelen = snprintf(buffer, sizeof(buffer), "%ld", value);
   LazilyCreateDict(&variable_dict_);
@@ -564,6 +552,15 @@ void TemplateDictionary::SetTemplateGlobalValueWithoutCopy(
 //    to AddSectionDictionary("empty_dict").
 // ----------------------------------------------------------------------
 
+/*static*/ string TemplateDictionary::CreateSubdictName(
+    const TemplateString& dict_name, const TemplateString& sub_name,
+    size_t index, const char* suffix) {
+  char index_str[64];
+  snprintf(index_str, sizeof(index_str), "%"PRIuS, index);
+  return (PrintableTemplateString(dict_name) + "/" +
+          PrintableTemplateString(sub_name) + "#" + index_str + suffix);
+}
+
 TemplateDictionary* TemplateDictionary::AddSectionDictionary(
     const TemplateString section_name) {
   DictVector* dicts = NULL;
@@ -580,15 +577,14 @@ TemplateDictionary* TemplateDictionary::AddSectionDictionary(
     dicts = it->second;
   }
   assert(dicts != NULL);
-  char dictsize[64];
-  snprintf(dictsize, sizeof(dictsize), "%"PRIuS, dicts->size() + 1);
-  string newname(string(name_.ptr_, name_.length_) + "/" + section_name.ptr_
-                 + "#" + dictsize);
+  const string newname(CreateSubdictName(name_, section_name,
+                                         dicts->size() + 1, ""));
   TemplateDictionary* retval = CreateTemplateSubdict(
       newname, arena_, this, template_global_dict_owner_);
   dicts->push_back(retval);
   return retval;
 }
+
 
 void TemplateDictionary::ShowSection(const TemplateString section_name) {
   LazilyCreateDict(&section_dict_);
@@ -658,15 +654,14 @@ TemplateDictionary* TemplateDictionary::AddIncludeDictionary(
     dicts = it->second;
   }
   assert(dicts != NULL);
-  char dictsize[64];
-  snprintf(dictsize, sizeof(dictsize), "%"PRIuS, dicts->size() + 1);
-  string newname(string(name_.ptr_, name_.length_) + "/" + include_name.ptr_
-                 + "#" + dictsize);
+  const string newname(CreateSubdictName(name_, include_name,
+                                         dicts->size() + 1, ""));
   TemplateDictionary* retval = CreateTemplateSubdict(
       newname, arena_, NULL, template_global_dict_owner_);
   dicts->push_back(retval);
   return retval;
 }
+
 
 // ----------------------------------------------------------------------
 // TemplateDictionary::SetFilename()
@@ -701,10 +696,12 @@ void TemplateDictionary::SetFilename(const TemplateString filename) {
   // Verify that if this id is already in the map, it's there with our
   // contents.  If not, that would mean a hash collision (since our
   // id's are hash values).
-  assert(TemplateString::IdToString(id) == kStsEmpty ||
+  DCHECK(TemplateString::IdToString(id) == kStsEmpty ||
          memcmp(str.ptr_, TemplateString::IdToString(id).ptr_,
-                str.length_) == 0);
-
+                str.length_) == 0)
+                    << string(str.ptr_, str.length_) << " vs "
+                    << string(TemplateString::IdToString(id).ptr_,
+                              TemplateString::IdToString(id).length_);
   TemplateString str_with_id(str.ptr_, str.length_, str.is_immutable(), id);
   str_with_id.AddToGlobalIdToNameMap();
 }
@@ -792,9 +789,11 @@ class TemplateDictionary::DictionaryPrinter {
       DumpVariables(*dict.variable_dict_);
     }
 
+
     if (dict.section_dict_) {  // Show section sub-dictionaries
       DumpSectionDict(*dict.section_dict_);
     }
+
 
     if (dict.include_dict_) {  // Show template-include sub-dictionaries
       DumpIncludeDict(*dict.include_dict_);
@@ -815,6 +814,7 @@ class TemplateDictionary::DictionaryPrinter {
       writer_.Write(it->first + ": >" + it->second + "<\n");
     }
   }
+
 
   template<typename MyMap, typename MySectionDict>
   void SortSections(MyMap* sorted_section_dict,
@@ -987,7 +987,7 @@ const char *TemplateDictionary::GetIncludeTemplateName(
       }
     }
   }
-  assert("Call IsHiddenTemplate before GetIncludeTemplateName" == NULL);
+  assert("Call IsHiddenTemplate before GetIncludeTemplateName" && 0);
   abort();
 }
 
@@ -1030,7 +1030,7 @@ TemplateDictionary::CreateTemplateIterator(
       }
     }
   }
-  assert("Call IsHiddenTemplate before CreateTemplateIterator" == NULL);
+  assert("Call IsHiddenTemplate before CreateTemplateIterator" && 0);
   abort();
 }
 
@@ -1047,7 +1047,19 @@ TemplateDictionary::CreateSectionIterator(
       }
     }
   }
-  assert("Call IsHiddenSection before GetDictionaries" == NULL);
+  // Check the template global dictionary.
+  assert(template_global_dict_owner_);
+  const TemplateDictionary* template_global_dict =
+      template_global_dict_owner_->template_global_dict_;
+  if (template_global_dict && template_global_dict->section_dict_) {
+    SectionDict::const_iterator it =
+        template_global_dict->section_dict_->find(
+            section_name.GetGlobalId());
+    if (it != template_global_dict->section_dict_->end()) {
+      return MakeIterator(*it->second);
+    }
+  }
+  assert("Call IsHiddenSection before GetDictionaries" && 0);
   abort();
 }
 
