@@ -28,7 +28,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Scott Williams
+// Author: williasr@google.com (Scott Williams)
 //
 // This file implements the TemplateDictionaryInterface class. This interface
 // forms the root of the TemplateDictionary class tree, but the interface is
@@ -37,6 +37,7 @@
 // Template: it doesn't constrain how data gets into the
 // TemplateDictionaryInterface class to begin with. For these methods, see
 // TemplateDictionary.
+//
 
 #ifndef TEMPLATE_TEMPLATE_DICTIONARY_INTERFACE_H_
 #define TEMPLATE_TEMPLATE_DICTIONARY_INTERFACE_H_
@@ -143,5 +144,6 @@ class CTEMPLATE_DLL_DECL TemplateDictionaryInterface {
 };
 
 }
+
 
 #endif  // TEMPLATE_TEMPLATE_DICTIONARY_INTERFACE_H_

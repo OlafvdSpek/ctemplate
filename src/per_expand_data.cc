@@ -28,19 +28,18 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Ryoji Watanabe
 //
 // This contains some implementation of PerExpandData that is still simple
 // but is not conveniently defined in the header file, e.g., because it would
 // introduce new include dependencies.
 
-#include "config.h"
+#include <config.h>
 #include <ctemplate/per_expand_data.h>
 #include <ctemplate/template_annotator.h>
 
-using std::string;
-
 _START_GOOGLE_NAMESPACE_
+
+using std::string;
 
 #ifndef _MSC_VER
 bool PerExpandData::DataEq::operator()(const char* s1, const char* s2) const {
@@ -78,4 +77,4 @@ const void* PerExpandData::LookupForModifiers(const char* key) const {
   return it == map_->end() ? NULL : it->second;
 }
 
-}  // namespace ctemplate
+_END_GOOGLE_NAMESPACE_

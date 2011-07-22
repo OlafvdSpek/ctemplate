@@ -82,7 +82,7 @@ template class __declspec(dllexport) std::vector<std::string>;\n\
   done
 
   # Process all the .in files in the "google" subdirectory
-  mkdir -p "$1/windows/google"
+  mkdir -p "$1/windows/ctemplate"
   for file in "$1"/ctemplate/*.in; do
      echo "Processing $file"
      outfile="$1/windows/ctemplate/`basename $file .in`"

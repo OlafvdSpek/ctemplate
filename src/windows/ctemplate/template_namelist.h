@@ -28,23 +28,23 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Frank H. Jernigan
 //
 // This class implements some template helper classes, that manage
 // template files and make it easier to monitor them.
 //
 // For information about how to use these classes and macros, and to
-// write the templates it takes as input, see doc/howto.html
+// write the templates it takes as input,
+// see the doc/ directory.
 
 #ifndef TEMPLATE_TEMPLATE_NAMELIST_H_
 #define TEMPLATE_TEMPLATE_NAMELIST_H_
 
 #include <time.h>    // for time_t
+#include <hash_set>
 #include <string>
 #include <vector>
-#include <hash_set>
-#include <ctemplate/template_enums.h>   // for Strip
-#include <ctemplate/template_string.h>  // for StringHash
+#include <ctemplate/template_enums.h>    // for Strip
+#include <ctemplate/template_string.h>   // for StringHash
 
 // NOTE: if you are statically linking the template library into your binary
 // (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
@@ -52,6 +52,8 @@
 #ifndef CTEMPLATE_DLL_DECL
 # define CTEMPLATE_DLL_DECL  __declspec(dllimport)
 #endif
+
+namespace ctemplate {
 
 // RegisterTemplateFilename
 //   Used to define a reference variable for the name of a template file. E.g:
@@ -68,9 +70,6 @@
 // header files, when and if the macro pre-processor supports that
 #define RegisterTemplateFilename(var, name)         \
   const char* const var = ctemplate::TemplateNamelist::RegisterTemplate(name);
-
-
-namespace ctemplate {
 
 // Class: TemplateNamelist
 //   Each time this class is instantiated, the name passed to
@@ -165,5 +164,6 @@ class CTEMPLATE_DLL_DECL TemplateNamelist {
 };
 
 }
+
 
 #endif  // TEMPLATE_TEMPLATE_NAMELIST_H_

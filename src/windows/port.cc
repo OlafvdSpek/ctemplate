@@ -31,21 +31,15 @@
  * Author: Craig Silverstein
  */
 
+#include "windows/config.h"
 #ifndef _WIN32
 # error You should only be including windows/port.cc in a windows environment!
 #endif
 
-#include "config.h"
 #include <stdarg.h>    // for va_list, va_start, va_end
 #include <string.h>    // for strstr()
 #include <assert.h>
-#include <string>
-#include <vector>
 #include "port.h"
-#include <ctemplate/template_pathops.h>
-
-using std::string;
-using std::vector;
 
 // These call the windows _vsnprintf, but always NUL-terminate.
 #if !defined(__MINGW32__) && !defined(__MINGW64__)  /* mingw already defines */
@@ -57,13 +51,22 @@ int safe_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 }
 
 int snprintf(char *str, size_t size, const char *format, ...) {
+  int r;
   va_list ap;
   va_start(ap, format);
-  const int r = vsnprintf(str, size, format, ap);
+  r = vsnprintf(str, size, format, ap);
   va_end(ap);
   return r;
 }
 #endif  /* #if !defined(__MINGW32__) && !defined(__MINGW64__) */
+
+#ifdef __cplusplus
+#include <string>
+#include <vector>
+#include <ctemplate/template_pathops.h>
+
+using std::string;
+using std::vector;
 
 _START_GOOGLE_NAMESPACE_
 
@@ -110,3 +113,5 @@ void GetNamelist(const char* testdata_dir, vector<string>* namelist) {
   } while (FindNextFileA(hFind, &found) != FALSE);  // A is for Ansi
   FindClose(hFind);
 }
+
+#endif  /* __cplusplus */

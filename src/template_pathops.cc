@@ -28,19 +28,17 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Craig Silverstein
+// Author: csilvers@google.com (Craig Silverstein)
 //
 // Routines for dealing with filesystem paths.  Mostly to make porting
 // to windows easier, though it's nice to have an API for this kind of
 // thing.
 
-#include "config.h"
+#include <config.h>
 #include <string>
 #include <ctype.h>       // for isalpha, used on windows
 #include <string.h>      // for strchr
 #include <ctemplate/template_pathops.h>
-
-using std::string;
 
 #ifndef PATH_SEP
 # ifdef _WIN32
@@ -52,14 +50,7 @@ using std::string;
 
 _START_GOOGLE_NAMESPACE_
 
-// ----------------------------------------------------------------------
-// PathJoin()
-//    Joins a and b together to form a path.  If 'b' starts with '/'
-//    then we just return b, otherwise a + b.  If 'a' does not end in
-//    a slash we put a slash in the middle.  Does *not* resolve ..'s
-//    and stuff like that, for now.  Not very efficient.
-//    Returns a string which is the joining.
-// ----------------------------------------------------------------------
+using std::string;
 
 const char kCWD[] = { '.', PATH_SEP, '\0' };
 const char kRootdir[] = { PATH_SEP, '\0' };
@@ -73,6 +64,14 @@ inline bool IsPathSep(char c) {
   return c == PATH_SEP;
 }
 
+// ----------------------------------------------------------------------
+// PathJoin()
+//    Joins a and b together to form a path.  If 'b' starts with '/'
+//    then we just return b, otherwise a + b.  If 'a' does not end in
+//    a slash we put a slash in the middle.  Does *not* resolve ..'s
+//    and stuff like that, for now.  Not very efficient.
+//    Returns a string which is the joining.
+// ----------------------------------------------------------------------
 
 string PathJoin(const string& a, const string& b) {
   if (b.empty()) return a;                        // degenerate case 1

@@ -112,19 +112,35 @@ CTEMPLATE_SYMBOLS = '(ctemplate|template_modifiers|BaseArena|UnsafeArena|[^A-Za-
 lib_LTLIBRARIES += libctemplate.la
 WINDOWS_PROJECTS += vsprojects/libctemplate/libctemplate.vcproj
 libctemplate_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
-	src/base/arena.h src/base/arena.cc src/base/mutex.h \
-	src/base/small_map.h src/base/manual_constructor.h \
+	src/base/aligned_char_array.h \
+	src/base/arena-inl.h \
+	src/base/arena.cc \
+	src/base/arena.h \
+	src/base/fileutil.h \
+	src/base/macros.h \
+	src/base/manual_constructor.h \
+	src/base/mutex.h \
+	src/base/small_map.h \
 	src/base/thread_annotations.h \
-	src/template_modifiers_internal.h src/indented_writer.h \
-	src/template.cc src/template_cache.cc \
-	src/template_dictionary.cc src/template_modifiers.cc \
-	src/template_annotator.cc src/per_expand_data.cc \
+	src/base/util.h \
+	src/indented_writer.h \
+	src/per_expand_data.cc \
+	src/template.cc \
+	src/template_annotator.cc \
+	src/template_cache.cc \
+	src/template_dictionary.cc \
+	src/template_modifiers.cc \
+	src/template_modifiers_internal.h \
+	src/template_namelist.cc \
+	src/template_pathops.cc \
 	src/template_string.cc \
-	src/template_namelist.cc src/template_pathops.cc \
-	src/htmlparser/htmlparser.h src/htmlparser/htmlparser.cc \
-	src/htmlparser/jsparser.h src/htmlparser/jsparser.cc \
-	src/htmlparser/statemachine.h src/htmlparser/statemachine.cc \
-	src/htmlparser/htmlparser_cpp.h
+	src/htmlparser/htmlparser.cc \
+	src/htmlparser/htmlparser.h \
+	src/htmlparser/htmlparser_cpp.h \
+	src/htmlparser/jsparser.cc \
+	src/htmlparser/jsparser.h \
+	src/htmlparser/statemachine.cc \
+	src/htmlparser/statemachine.h
 libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG $(AM_CXXFLAGS)
 # -version-info gets passed to libtool
 libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) \
@@ -220,7 +236,7 @@ compile_nothreads_test_LDADD = libctemplate_nothreads_debug.la
 
 TESTS += template_test_util_test template_test_util_nothreads_test
 WINDOWS_PROJECTS += vsprojects/template_test_util_test/template_test_util_test.vcproj
-template_test_util_test_SOURCES = src/config_for_unittests.h \
+template_test_util_test_SOURCES = src/tests/config_for_unittests.h \
                                    src/template_dictionary.cc \
                                    src/tests/template_test_util_test.cc
 template_test_util_test_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
@@ -234,7 +250,7 @@ template_test_util_nothreads_test_LDADD = libctemplate_testing_nothreads.la \
 
 TESTS += template_dictionary_unittest template_dictionary_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_dictionary_unittest/template_dictionary_unittest.vcproj
-template_dictionary_unittest_SOURCES = src/config_for_unittests.h \
+template_dictionary_unittest_SOURCES = src/tests/config_for_unittests.h \
                                        src/base/arena.h \
                                        src/tests/template_dictionary_unittest.cc
 template_dictionary_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
@@ -248,7 +264,7 @@ template_dictionary_nothreads_unittest_LDADD = libctemplate_testing_nothreads.la
 
 TESTS += template_modifiers_unittest template_modifiers_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_modifiers_unittest/template_modifiers_unittest.vcproj
-template_modifiers_unittest_SOURCES = src/config_for_unittests.h \
+template_modifiers_unittest_SOURCES = src/tests/config_for_unittests.h \
                                       src/tests/template_modifiers_unittest.cc
 template_modifiers_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_modifiers_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
@@ -261,7 +277,7 @@ template_modifiers_nothreads_unittest_LDADD = libctemplate_testing_nothreads.la 
 
 TESTS += template_setglobals_unittest template_setglobals_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_setglobals_unittest/template_setglobals_unittest.vcproj
-template_setglobals_unittest_SOURCES = src/config_for_unittests.h \
+template_setglobals_unittest_SOURCES = src/tests/config_for_unittests.h \
                                        src/tests/template_setglobals_unittest.cc
 template_setglobals_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_setglobals_unittest_LDFLAGS = $(PTHREAD_CFLAGS)
@@ -274,7 +290,7 @@ template_setglobals_nothreads_unittest_LDADD = libctemplate_testing_nothreads.la
 
 TESTS += template_cache_test template_cache_nothreads_test
 WINDOWS_PROJECTS += vsprojects/template_cache_test/template_cache_test.vcproj
-template_cache_test_SOURCES = src/config_for_unittests.h \
+template_cache_test_SOURCES = src/tests/config_for_unittests.h \
                               src/template_modifiers_internal.h \
                               src/tests/template_cache_test.cc
 template_cache_test_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
@@ -289,7 +305,7 @@ template_cache_nothreads_test_LDADD = libctemplate_testing_nothreads.la \
 TESTS += template_unittest template_nothreads_unittest
 WINDOWS_PROJECTS += vsprojects/template_unittest/template_unittest.vcproj
 WINDOWS_PROJECTS += vsprojects/template_unittest_static/template_unittest_static.vcproj
-template_unittest_SOURCES = src/config_for_unittests.h \
+template_unittest_SOURCES = src/tests/config_for_unittests.h \
                             src/template_modifiers_internal.h \
                             src/tests/template_unittest.cc
 template_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
@@ -344,7 +360,7 @@ TESTDATA += \
 
 TESTS += htmlparser_test htmlparser_nothreads_test
 WINDOWS_PROJECTS += vsprojects/htmlparser_test/htmlparser_test.vcproj
-htmlparser_test_SOURCES = src/tests/htmlparser_test.cc
+htmlparser_test_SOURCES = src/tests/htmlparser_cpp_test.cc
 htmlparser_test_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 htmlparser_test_LDFLAGS = $(PTHREAD_CFLAGS)
 htmlparser_test_LDADD = libctemplate_debug.la $(PTHREAD_LIBS)
@@ -390,7 +406,7 @@ generate_fsm_test_sh: src/tests/generate_fsm_test.sh \
                       src/tests/htmlparser_testdata/sample_fsm.config \
                       src/tests/htmlparser_testdata/sample_fsm.c \
                       src/htmlparser/generate_fsm.py
-	$(top_srcdir)/src/tests/generate_fsm_test.sh $(top_srcdir)
+	sh $(top_srcdir)/src/tests/generate_fsm_test.sh $(top_srcdir)
 TESTDATA += \
    src/tests/htmlparser_testdata/sample_fsm.config \
    src/tests/htmlparser_testdata/sample_fsm.c
@@ -399,18 +415,15 @@ check_SCRIPTS += make_tpl_varnames_h_unittest_sh
 noinst_SCRIPTS += src/tests/make_tpl_varnames_h_unittest.sh
 make_tpl_varnames_h_unittest_sh: src/tests/make_tpl_varnames_h_unittest.sh \
                                  make_tpl_varnames_h
-	$(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
+	sh $(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
 	   $(top_builddir)/make_tpl_varnames_h /tmp/$@_dir
 
-## diff_tpl_auto_escape.cc has the following comment (as of April 2009):
-##    // TODO(jad): This script is currently broken. Fix me.
-## Uncomment this unittest when that TODO is resolved
-#check_SCRIPTS += diff_tpl_auto_escape_unittest_sh
-#noinst_SCRIPTS += src/tests/diff_tpl_auto_escape_unittest.sh
-#diff_tpl_auto_escape_unittest_sh: src/tests/diff_tpl_auto_escape_unittest.sh \
-#                                  diff_tpl_auto_escape
-#	$(top_srcdir)/src/tests/diff_tpl_auto_escape_unittest.sh \
-#	   $(top_builddir)/diff_tpl_auto_escape /tmp/$@_dir
+check_SCRIPTS += diff_tpl_auto_escape_unittest_sh
+noinst_SCRIPTS += src/tests/diff_tpl_auto_escape_unittest.sh
+diff_tpl_auto_escape_unittest_sh: src/tests/diff_tpl_auto_escape_unittest.sh \
+                                  diff_tpl_auto_escape
+	sh $(top_srcdir)/src/tests/diff_tpl_auto_escape_unittest.sh \
+	   $(top_builddir)/diff_tpl_auto_escape /tmp/$@_dir
 
 ## ^^^^ END OF RULES TO MAKE THE LIBRARIES, BINARIES, AND UNITTESTS
 
@@ -440,8 +453,8 @@ lib${PACKAGE}.pc: Makefile packages/rpm/rpm.spec
 	echo '' >> "$@".tmp
 	echo 'Name: $(PACKAGE)' >> "$@".tmp
 	echo 'Version: $(VERSION)' >> "$@".tmp
-	-grep '^Summary:' packages/rpm/rpm.spec | sed s/^Summary:/Description:/ | head -n1 >> "$@".tmp
-	-grep '^URL: ' packages/rpm/rpm.spec >> "$@".tmp
+	-grep '^Summary:' $(top_srcdir)/packages/rpm/rpm.spec | sed s/^Summary:/Description:/ | head -n1 >> "$@".tmp
+	-grep '^URL: ' $(top_srcdir)/packages/rpm/rpm.spec >> "$@".tmp
 	echo 'Requires:' >> "$@".tmp
 	echo 'Libs: -L$${libdir} -l$(PACKAGE)' >> "$@".tmp
 	echo 'Libs.private: $(PTHREAD_CFLAGS) $(PTHREAD_LIBS)' >> "$@".tmp
@@ -467,7 +480,6 @@ libtool: $(LIBTOOL_DEPS)
 # come later (and thus end up with a later timestamp) when we tar/untar.
 EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb \
 	$(SCRIPTS) $(TESTDATA) libtool \
-	src/htmlparser/README \
 	src/htmlparser/generate_fsm.py src/htmlparser/fsm_config.py \
 	src/tests/statemachine_test_fsm.config \
 	src/htmlparser/htmlparser_fsm.config \

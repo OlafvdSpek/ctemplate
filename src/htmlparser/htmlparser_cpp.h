@@ -1,4 +1,4 @@
-// Copyright (c) 2008, Google Inc.
+// Copyright (c) 2007, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -26,20 +26,19 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
 // ---
-// Author: Filipe Almeida
+// Author: falmeida@google.com (Filipe Almeida)
 //
 // c++ bindings for htmlparser.
 
-#ifndef SECURITY_STREAMHTMLPARSER_HTMLPARSER_CPP_H_
-#define SECURITY_STREAMHTMLPARSER_HTMLPARSER_CPP_H_
+#ifndef SECURITY_STREAMHTMLPARSER_HTMLPARSER_CPP_H__
+#define SECURITY_STREAMHTMLPARSER_HTMLPARSER_CPP_H__
 
-#include "config.h"
-#include <assert.h>
+#include <config.h>
 #include <string>
-#include "htmlparser.h"
-#include "jsparser.h"
+#include "htmlparser/htmlparser.h"
+#include "htmlparser/jsparser.h"
+#include "base/util.h"
 
 namespace HTMLPARSER_NAMESPACE {
 
@@ -88,7 +87,7 @@ class HtmlParser {
 
     HtmlParser() {
       parser_ = htmlparser_new();
-      assert(parser_ != NULL);
+      CHECK(parser_ != NULL);
     };
 
     /* Parses the input html stream and returns the finishing state.
@@ -299,8 +298,8 @@ class HtmlParser {
      * current object.
      */
     void CopyFrom(const HtmlParser *source) {
-      assert(this != source);
-      assert(source != NULL);
+      CHECK(this != source);
+      CHECK(source != NULL);
       htmlparser_copy(parser_, source->parser_);
     }
 
@@ -311,10 +310,9 @@ class HtmlParser {
 
   private:
     htmlparser_ctx *parser_;
-    HtmlParser(const HtmlParser&);      // disallow copy
-    void operator=(const HtmlParser&);  // and assign
+    DISALLOW_COPY_AND_ASSIGN(HtmlParser);
 };
 
-}  // namespace HTMLPARSER_NAMESPACE
+}  // namespace security_streamhtmlparser
 
-#endif  // SECURITY_STREAMHTMLPARSER_HTMLPARSER_CPP_H_
+#endif  // SECURITY_STREAMHTMLPARSER_HTMLPARSER_CPP_H__

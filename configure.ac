@@ -4,10 +4,10 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 0.99, opensource@google.com)
+AC_INIT(ctemplate, 1.0rc1, opensource@google.com)
 # Update this value for every release!  (A:B:C will map to foo.so.(A-C).C.B)
 # http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
-SO_VERSION=1:0:1
+SO_VERSION=1:1:1
 
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
@@ -19,6 +19,7 @@ AM_CONFIG_HEADER(src/config.h)
 
 # Checks for programs.
 AC_PROG_CC
+AM_PROG_CC_C_O
 AC_PROG_CPP
 AC_PROG_CXX
 AM_CONDITIONAL(GCC, test "$GCC" = yes)   # let the Makefile know if we're gcc

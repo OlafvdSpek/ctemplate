@@ -26,11 +26,18 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// ---
+// Author: csilvers@google.com (Craig Silerstein)
 
 #ifndef TEMPLATE_TEMPLATE_STRING_H_
 #define TEMPLATE_TEMPLATE_STRING_H_
 
 #include <string.h>      // for memcmp() and size_t
+#include <hash_map>
+#include <string>
+#include <vector>
+
 #include <assert.h>
 #if 0
 #include <stdint.h>       // one place @ac_cv_unit64@ might live
@@ -39,16 +46,13 @@
 #include <inttypes.h>     // another place @ac_cv_unit64@ might live
 #endif
 #include <sys/types.h>    // final place @ac_cv_unit64@ might live
-#include <hash_map>
-#include <string>
-#include <vector>
 
 class TemplateStringTest;          // needed for friendship declaration
 class StaticTemplateStringTest;
 
 #if 0
-extern char _start[] __attribute__((weak));  // the linker emits this: start of .text
-extern char data_start[] __attribute__((weak));        // start of .data
+extern char _start[] __attribute__((weak));     // linker emits: start of .text
+extern char data_start[] __attribute__((weak));               // start of .data
 #endif
 
 // NOTE: if you are statically linking the template library into your binary
@@ -126,7 +130,7 @@ struct CTEMPLATE_DLL_DECL StaticTemplateString {
   } do_not_use_directly_;
 
   // This class is a good hash_compare functor to pass in as the third
-  // argument to hash_map<>, when creating a map whose keys are
+  // argument to stdext::hash_map<>, when creating a map whose keys are
   // StaticTemplateString.  NOTE: This class isn't that safe to use,
   // because it requires that StaticTemplateStringInitializer has done
   // its job.  Unfortunately, even when you use the STS_INIT macro
@@ -208,7 +212,7 @@ class CTEMPLATE_DLL_DECL TemplateString {
 
   // This returns true if s is in the .text segment of the binary.
   // (Note this only checks .text of the main executable, not of
-  // shared libraries.  So it may not be all that useful.)
+// shared libraries.  So it may not be all that useful.)
   // This requires the gnu linker (and probably elf), to define
   // _start and data_start.
   static bool InTextSegment(const char* s) {
@@ -294,7 +298,8 @@ inline bool StaticTemplateString::Hasher::operator()(
 }
 
 inline std::string StaticTemplateString::ToString() const {
-  return std::string(do_not_use_directly_.ptr_, do_not_use_directly_.length_);
+  return std::string(do_not_use_directly_.ptr_,
+                                     do_not_use_directly_.length_);
 }
 
 inline bool StaticTemplateString::operator==(
@@ -380,5 +385,6 @@ const StaticTemplateString kStsEmpty =
     STS_INIT_WITH_HASH(kStsEmpty, "", 1457976849674613049ULL);
 
 }
+
 
 #endif  // TEMPLATE_TEMPLATE_STRING_H_

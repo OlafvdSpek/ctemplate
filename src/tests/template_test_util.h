@@ -1,4 +1,4 @@
-// Copyright (c) 2007, Google Inc.
+// Copyright (c) 2006, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -28,12 +28,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Jim Morrison
 //
 // Intended usage of TemplateDictionaryPeer:
 //    Use this class if you need to TEST that a dictionary has certain
 //    expected contents.  This should be fairly uncommon outside the
 //    template directory.
+//
+
 
 #ifndef TEMPLATE_TEMPLATE_TEST_UTIL_H_
 #define TEMPLATE_TEMPLATE_TEST_UTIL_H_
@@ -42,6 +43,7 @@
 #include <time.h>        // for time_t
 #include <string>        // for string
 #include <vector>        // for vector<>
+#include HASH_MAP_H      // UNUSED
 #include <ctemplate/template.h>        // for Template::num_deletes_
 #include <ctemplate/template_cache.h>  // for TemplateCache
 #include <ctemplate/template_dictionary.h>  // for TemplateDictionary
@@ -51,6 +53,8 @@
 #include <ctemplate/template_string.h>  // for TemplateString, TemplateId
 
 _START_GOOGLE_NAMESPACE_
+
+using std::string;
 
 class PerExpandData;
 class TemplateCache;
@@ -70,26 +74,26 @@ extern const std::string FLAGS_test_tmpdir;
 // These are routines that are useful for creating template files for testing.
 
 // Deletes all files named *template* in dir.
-void CreateOrCleanTestDir(const std::string& dirname);
+void CreateOrCleanTestDir(const string& dirname);
 // This delets all files named *template*, and also sets dirname to be
 // the directory that all future StringToFile calls will place their
 // templates.
-void CreateOrCleanTestDirAndSetAsTmpdir(const std::string& dirname);
+void CreateOrCleanTestDirAndSetAsTmpdir(const string& dirname);
 
 // This writes s to the given file.  We want to make sure that every
 // time we create a file, it has a different mtime (just like would
 // be the case in real life), so we use a mock clock.  Filenames created
 // by this routine will all have an mtime of around Jan 1, 2000.
-void StringToFile(const std::string& s, const std::string& filename);
+void StringToFile(const string& s, const string& filename);
 
 // This is the (mock) time used when creating the last file in StringToFile.
 time_t Now();
 
 // This writes s to a file and returns the filename.
-std::string StringToTemplateFile(const std::string& s);
+string StringToTemplateFile(const string& s);
 
 // This writes s to a file and then loads it into a template object.
-Template* StringToTemplate(const std::string& s, Strip strip);
+Template* StringToTemplate(const string& s, Strip strip);
 
 // This is esp. useful for calling from within gdb.
 // The gdb nice-ness is balanced by the need for the caller to delete the buf.
@@ -99,24 +103,24 @@ const char* ExpandIs(const Template* tpl, const TemplateDictionary *dict,
 void AssertExpandWithDataIs(const Template* tpl,
                             const TemplateDictionary *dict,
                             PerExpandData* per_expand_data,
-                            const std::string& is, bool expected);
+                            const string& is, bool expected);
 
 void AssertExpandIs(const Template* tpl, const TemplateDictionary *dict,
-                    const std::string& is, bool expected);
+                    const string& is, bool expected);
 
 void AssertExpandWithCacheIs(TemplateCache* cache,
-                             const std::string& filename, Strip strip,
+                             const string& filename, Strip strip,
                              const TemplateDictionary *dict,
                              PerExpandData* per_expand_data,
-                             const std::string& is, bool expected);
+                             const string& is, bool expected);
 
 class TemporaryRegisterTemplate {
  public:
   explicit TemporaryRegisterTemplate(const char* name);
   ~TemporaryRegisterTemplate();
  private:
-  TemplateNamelist::NameListType* old_namelist_;
-  TemplateNamelist::NameListType namelist_;
+  GOOGLE_NAMESPACE::TemplateNamelist::NameListType* old_namelist_;
+  GOOGLE_NAMESPACE::TemplateNamelist::NameListType namelist_;
 
   // disallow copy constructor and assignment
   TemporaryRegisterTemplate(const TemporaryRegisterTemplate&);
@@ -186,7 +190,8 @@ class TemplateDictionaryPeer {
   // use.  That is, it assumes that all section dictionaries have been added
   // with AddSectionDictionary rather than AddOldstyleSectionDictionary.
   int GetSectionDictionaries(const TemplateString& section_name,
-                             std::vector<const TemplateDictionary*>* dicts) const;
+                             std::vector<const TemplateDictionary*>* dicts)
+      const;
 
   // Retrieves included TemplateDictionary instances for the given name.  The
   // caller does not assume ownership of the returned TemplateDictionary
@@ -197,7 +202,8 @@ class TemplateDictionaryPeer {
   // use.  That is, it assumes that all section dictionaries have been added
   // with AddIncludeDictionary rather than AddOldstyleIncludeDictionary.
   int GetIncludeDictionaries(const TemplateString& section_name,
-                             std::vector<const TemplateDictionary*>* dicts) const;
+                             std::vector<const TemplateDictionary*>* dicts)
+      const;
 
   const char* GetIncludeTemplateName(const TemplateString& variable,
                                      int dictnum) const;
@@ -231,7 +237,7 @@ class TemplateCachePeer {
       : cache_(cache) {}
 
   struct TemplateCacheKey : public TemplateCache::TemplateCacheKey {
-    TemplateCacheKey(const std::string& key, int strip) {
+    TemplateCacheKey(const string& key, int strip) {
       this->first = GlobalIdForTest(key.data(), key.length());
       this->second = strip;
     }
@@ -272,7 +278,7 @@ class TemplateCachePeer {
   void operator=(const TemplateCachePeer&);
 };
 
-
 _END_GOOGLE_NAMESPACE_
+
 
 #endif  // TEMPLATE_TEMPLATE_TEST_UTIL_H_

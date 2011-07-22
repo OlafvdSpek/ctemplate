@@ -28,25 +28,27 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Shubhie Panicker
-// Author: Craig Silverstein
 //
 // This file implements the Template Cache used to store templates.
 
 #ifndef TEMPLATE_TEMPLATE_CACHE_H_
 #define TEMPLATE_TEMPLATE_CACHE_H_
 
-#include <hash_map>      // for hash_map<>
-#include <utility>       // for pair
+#include "base/mutex.h"  // Must go first to get _XOPEN_SOURCE (in opensource)
+#include <hash_map>      // for stdext::hash_map<>
 #include <string>        // for string
+#include <utility>       // for pair
 #include <vector>        // for vector<>
+#include "base/thread_annotations.h"  // for EXCLUSIVE_LOCKS_REQUIRED, etc
 #include <ctemplate/template_emitter.h>  // for ExpandEmitter, etc
 #include <ctemplate/template_enums.h>  // for Strip
 #include <ctemplate/template_string.h>
 #include <ctemplate/per_expand_data.h>
 
+namespace ctemplate {
+class FileStat;
+}
 class TemplateCacheUnittest;
-struct stat;
 
 // NOTE: if you are statically linking the template library into your binary
 // (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
@@ -111,7 +113,7 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   // at either the beginning or end of a line.  See template constructor
   // for more details.
   bool LoadTemplate(const TemplateString& filename, Strip strip)
-      /*LOCKS_EXCLUDED(mutex_)*/;
+      LOCKS_EXCLUDED(mutex_);
 
   // Parses the string as a template file (e.g. "Hello {{WORLD}}"),
   // and inserts it into the parsed template cache, so it can later be
@@ -126,7 +128,7 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   // the string-template.
   bool StringToTemplateCache(const TemplateString& key,
                              const TemplateString& content,
-                             Strip strip)  /*LOCKS_EXCLUDED(mutex_)*/;
+                             Strip strip)  LOCKS_EXCLUDED(mutex_);
   bool StringToTemplateCache(const TemplateString& key,
                              const char* content,
                              size_t content_len,
@@ -148,7 +150,7 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   bool ExpandWithData(const TemplateString& filename, Strip strip,
                       const TemplateDictionaryInterface *dictionary,
                       PerExpandData* per_expand_data,
-                      ExpandEmitter* output)  /*LOCKS_EXCLUDED(mutex_)*/;
+                      ExpandEmitter* output)  LOCKS_EXCLUDED(mutex_);
   bool ExpandWithData(const TemplateString& filename, Strip strip,
                       const TemplateDictionaryInterface* dictionary,
                       PerExpandData* per_expand_data,
@@ -176,7 +178,7 @@ class CTEMPLATE_DLL_DECL TemplateCache {
                     const TemplateDictionaryInterface *dictionary,
                     PerExpandData* per_expand_data,
                     ExpandEmitter* output) const
-      /*LOCKS_EXCLUDED(mutex_)*/;
+      LOCKS_EXCLUDED(mutex_);
   bool ExpandNoLoad(const TemplateString& filename, Strip strip,
                     const TemplateDictionaryInterface* dictionary,
                     PerExpandData* per_expand_data,
@@ -206,7 +208,8 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   // Given an unresolved filename, look through the template search
   // path to see if the template can be found. If so, return the path
   // of the resolved filename, otherwise return an empty string.
-  std::string FindTemplateFilename(const std::string& unresolved) const;
+  std::string FindTemplateFilename(const std::string& unresolved)
+      const;
 
   // ---- MANAGING THE CACHE -------
   //   Freeze
@@ -219,13 +222,13 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   // the cache can no longer be modified by loading new templates or
   // reloading existing templates. During expansion only cached
   // included templates will be used, they won't be loaded on-demand.
-  void Freeze()  /*LOCKS_EXCLUDED(mutex_)*/;
+  void Freeze()  LOCKS_EXCLUDED(mutex_);
 
   // Delete
   //   Deletes one template object from the cache, if it exists.
   //   This can be used for either file- or string-based templates.
   //   Returns true if the object was deleted, false otherwise.
-  bool Delete(const TemplateString& key)  /*LOCKS_EXCLUDED(mutex_)*/;
+  bool Delete(const TemplateString& key)  LOCKS_EXCLUDED(mutex_);
 
   // ClearCache
   //   Deletes all the template objects in the cache and all raw
@@ -236,7 +239,7 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   //   this one.) Note: this method is not necessary unless you are
   //   testing for memory leaks. Calling this before exiting the
   //   program will prevent unnecessary reporting in that case.
-  void ClearCache()  /*LOCKS_EXCLUDED(mutex_)*/;
+  void ClearCache()  LOCKS_EXCLUDED(mutex_);
 
   // ReloadAllIfChanged
   //   If IMMEDIATE_RELOAD, reloads and parses all templates right away,
@@ -257,18 +260,18 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   //   earlier search-path. The file will only be reloaded if the orginal file
   //   is updated (touched, updated, deleted etc). See .cc file for more detail.
   enum ReloadType { LAZY_RELOAD, IMMEDIATE_RELOAD };
-  void ReloadAllIfChanged(ReloadType reload_tyle)  /*LOCKS_EXCLUDED(mutex_)*/;
+  void ReloadAllIfChanged(ReloadType reload_tyle)  LOCKS_EXCLUDED(mutex_);
 
   // Clone
   //   Returns a copy of the cache. It makes a shallow copy of the
   //   parsed_template_cache_, incrementing refcount of templates.
   //   The caller is responsible for deallocating the returned TemplateCache.
-  //   NOTE(tehmle): Annotalysis expects this method to have a lock for
+  //   NOTE(user): Annotalysis expects this method to have a lock for
   //                 a TemplateCache instance local to the method, but we
   //                 know that no other threads will have access to the
   //                 instance, so ignore thread safety errors.
-  TemplateCache* Clone() const /*LOCKS_EXCLUDED(mutex_)
-                               NO_THREAD_SAFETY_ANALYSIS*/;
+  TemplateCache* Clone() const LOCKS_EXCLUDED(mutex_)
+                               NO_THREAD_SAFETY_ANALYSIS;
 
   // ---- INSPECTING THE CACHE -------
   //   Dump
@@ -294,17 +297,18 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   typedef stdext::hash_map<TemplateCacheKey, CachedTemplate, TemplateCacheHash>
     TemplateMap;
   typedef stdext::hash_map<RefcountedTemplate*, int, RefTplPtrHash> TemplateCallMap;
-  typedef std::vector<std::string> TemplateSearchPath;  // where to search for files
+  // Where to search for files.
+  typedef std::vector<std::string> TemplateSearchPath;
 
   // GetTemplate
   //   This method is deprecated. It exists here because it is called by
   //   Template::GetTemplate. Also this is used in tests.
   const Template* GetTemplate(const TemplateString& key, Strip strip)
-      /*LOCKS_EXCLUDED(mutex_)*/;
+      LOCKS_EXCLUDED(mutex_);
 
   bool ResolveTemplateFilename(const std::string& unresolved,
                                std::string* resolved,
-                               struct stat* statbuf) const;
+                               FileStat* statbuf) const;
 
   // This is used only for internal (recursive) calls to Expand due
   // to internal template-includes.  It doesn't try to acquire the
@@ -313,11 +317,11 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   bool ExpandLocked(const TemplateString& filename, Strip strip,
                     ExpandEmitter* output,
                     const TemplateDictionaryInterface *dictionary,
-                    PerExpandData* per_expand_data)  /*LOCKS_EXCLUDED(mutex_)*/;
+                    PerExpandData* per_expand_data)  LOCKS_EXCLUDED(mutex_);
 
   bool AddAlternateTemplateRootDirectoryHelper(
       const std::string& directory,
-      bool clear_template_search_path)  /*LOCKS_EXCLUDED(search_path_mutex_)*/;
+      bool clear_template_search_path)  LOCKS_EXCLUDED(search_path_mutex_);
 
   // DoneWithGetTemplatePtrs
   //   For historical reasons, GetTemplate() returns a raw Template
@@ -330,13 +334,13 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   //   GetTemplate).  Most likely, the user will call this indirectly,
   //   via ClearCache().
   //   TODO(panicker): Consider making this method public.
-  void DoneWithGetTemplatePtrs()  /*LOCKS_EXCLUDED(mutex_)*/;
+  void DoneWithGetTemplatePtrs()  LOCKS_EXCLUDED(mutex_);
 
   // ValidTemplateFilename
   //   Validates the user provided filename before constructing the template
   bool IsValidTemplateFilename(const std::string& filename,
                                std::string* resolved_filename,
-                               struct stat* statbuf) const;
+                               FileStat* statbuf) const;
 
   // GetTemplateLocked
   //   Internal version of GetTemplate. It's used when the function already
@@ -347,7 +351,7 @@ class CTEMPLATE_DLL_DECL TemplateCache {
       const TemplateString& filename,
       Strip strip,
       const TemplateCacheKey& key)
-      /*EXCLUSIVE_LOCKS_REQUIRED(mutex_)*/;
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Refcount
   //  Testing only. Returns the refcount of a template, given its cache key.
@@ -357,9 +361,9 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   //  Debug only. Returns whether the cache key is in the parsed cache.
   bool TemplateIsCached(const TemplateCacheKey template_cache_key) const;
 
-  TemplateMap* parsed_template_cache_   /*GUARDED_BY(mutex_)*/;
-  bool is_frozen_                       /*GUARDED_BY(mutex_)*/;
-  TemplateSearchPath search_path_       /*GUARDED_BY(search_path_mutex_)*/;
+  TemplateMap* parsed_template_cache_   GUARDED_BY(mutex_);
+  bool is_frozen_                       GUARDED_BY(mutex_);
+  TemplateSearchPath search_path_       GUARDED_BY(search_path_mutex_);
 
   // Since GetTemplate() returns a raw pointer, it's impossible for
   // the caller to call DecRef() on the returned template when it's
@@ -367,7 +371,7 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   // GetTemplate in this data structure.  Then the user can call
   // DecRef() on all of them at once, via a DoneWithGetTemplatePtrs()
   // (which they will probably get at via a call to ClearCache()).
-  TemplateCallMap* get_template_calls_  /*GUARDED_BY(mutex_)*/;
+  TemplateCallMap* get_template_calls_  GUARDED_BY(mutex_);
 
   mutable class Mutex* mutex_;
   mutable class Mutex* search_path_mutex_;

@@ -28,7 +28,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Craig Silverstein
+// Author: csilvers@google.com (Craig Silverstein)
 //
 // template_modifiers.h has a description of what each escape-routine does.
 //
@@ -43,28 +43,48 @@
 // introduce the possibility for cross-site scripting attacks.  If you
 // do change a modifier, be careful that it does not affect
 // the list of Safe XSS Alternatives.
+//
 
-#include "config.h"
+#include <config.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
 #include <string>
 #include <vector>
 #include "htmlparser/htmlparser_cpp.h"
-#include "template_modifiers_internal.h"
 #include <ctemplate/template_modifiers.h>
+#include "template_modifiers_internal.h"
 #include <ctemplate/per_expand_data.h>
-
 using std::string;
 using std::vector;
-
-using HTMLPARSER_NAMESPACE::HtmlParser;
 
 #define strliterallen(s)  (sizeof("" s "") - 1)
 
 // Really we should be using uint_16_t or something, but this is good
 // enough, and more portable...
 typedef unsigned int uint16;
+
+namespace URL {
+bool HasInsecureProtocol(const char* in, int inlen) {
+  if (inlen > strliterallen("http://") &&
+      strncasecmp(in, "http://", strliterallen("http://")) == 0) {
+    return false;  // We're ok, it's an http protocol
+  }
+  if (inlen > strliterallen("https://") &&
+      strncasecmp(in, "https://", strliterallen("https://")) == 0) {
+    return false;  // https is ok as well
+  }
+  if (inlen > strliterallen("ftp://") &&
+      strncasecmp(in, "ftp://", strliterallen("ftp://")) == 0) {
+    return false;  // and ftp
+  }
+  return true;
+}
+}  // namespace URL
+
+_START_GOOGLE_NAMESPACE_
+
+using HTMLPARSER_NAMESPACE::HtmlParser;
 
 // A most-efficient way to append a string literal to the var named 'out'.
 // The ""s ensure literal is actually a string literal
@@ -75,8 +95,6 @@ typedef unsigned int uint16;
 #define STR_IS(str, len, literal) \
   ((len) == sizeof(""literal"")-1 && \
    memcmp(str, literal, sizeof(""literal"")-1) == 0)
-
-_START_GOOGLE_NAMESPACE_
 
 TemplateModifier::~TemplateModifier() {}
 
@@ -434,25 +452,15 @@ void ValidateUrl::Modify(const char* in, size_t inlen,
     slashpos = in + inlen;
   }
   const void* colonpos = memchr(in, ':', slashpos - in);
-  if (colonpos != NULL) {   // colon before first slash, could be a protocol    
-    if (inlen > sizeof("http://")-1 &&
-        strncasecmp(in, "http://", sizeof("http://")-1) == 0) {
-      // We're ok, it's an http protocol                                        
-    } else if (inlen > sizeof("https://")-1 &&
-               strncasecmp(in, "https://", sizeof("https://")-1) == 0) {
-      // https is ok as well                                                    
-    } else if (inlen > sizeof("ftp://")-1 &&
-               strncasecmp(in, "ftp://", sizeof("ftp://")-1) == 0) {
-      // and ftp
-    } else {
-      // It's a bad protocol, so return something safe                          
-      chained_modifier_.Modify(unsafe_url_replacement_,
-                               unsafe_url_replacement_length_,
-                               per_expand_data,
-                               out,
-                               "");
-      return;
-    }
+  // colon before first slash, could be a protocol
+  if (colonpos != NULL && URL::HasInsecureProtocol(in, inlen)) {
+    // It's a bad protocol, so return something safe
+    chained_modifier_.Modify(unsafe_url_replacement_,
+                             unsafe_url_replacement_length_,
+                             per_expand_data,
+                             out,
+                             "");
+    return;
   }
   // If we get here, it's a valid url, so just escape it
   chained_modifier_.Modify(in, inlen, per_expand_data, out, "");
@@ -820,6 +828,7 @@ PrefixLine prefix_line;
 // point to other ones within that same array so elements
 // may not be re-ordered easily. Also you need to change
 // the global g_am_dirs correspondingly.
+//
 static struct ModifierWithAlternatives {
   ModifierInfo modifier_info;
   ModifierInfo* safe_alt_mods[MAX_SAFE_ALTERNATIVES];
@@ -1308,9 +1317,9 @@ vector<const ModifierAndValue*> GetModifierForHtmlJs(
             modvals.push_back(g_am_dirs[AM_JS_NUMBER]);
           break;
         case HtmlParser::ATTR_NONE:
-          assert("We should be in attribute!" == NULL);
+          assert("We should be in attribute!" && 0);
         default:
-          assert("Should not be able to get here." == NULL);
+          assert("Should not be able to get here." && 0);
           return modvals;  // Empty
       }
       // In STATE_VALUE particularly, the parser may get out of sync with
@@ -1350,11 +1359,11 @@ vector<const ModifierAndValue*> GetModifierForHtmlJs(
       return modvals;
     }
     default:{
-      assert("Should not be able to get here." == NULL);
+      assert("Should not be able to get here." && 0);
       return modvals;   // Empty
     }
   }
-  assert("Should not be able to get here." == NULL);
+  assert("Should not be able to get here." && 0);
   return modvals;   // Empty
 }
 

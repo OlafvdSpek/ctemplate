@@ -28,7 +28,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 // ---
-// Author: Craig Silverstein and Jad Boutros
+// Author: csilvers@google.com (Craig Silverstein)
 //
 // These are used by template.cc and when registering new modifiers.
 // (Or more exactly, registering new modifier/value pairs.)
@@ -45,7 +45,7 @@
 #ifndef TEMPLATE_TEMPLATE_MODIFIERS_INTERNAL_H_
 #define TEMPLATE_TEMPLATE_MODIFIERS_INTERNAL_H_
 
-#include "config.h"
+#include <config.h>
 #include <sys/types.h>   // for size_t
 #include <string.h>      // for strchr
 #include <string>
@@ -61,6 +61,10 @@
 #   define CTEMPLATE_DLL_DECL  /* should be the empty string for non-windows */
 # endif
 #endif
+
+using std::string;
+using std::vector;
+
 
 namespace HTMLPARSER_NAMESPACE {
 class HtmlParser;
@@ -109,12 +113,12 @@ struct ModifierInfo {
   // in, such that any other modifier in the class could be applied
   // after this modifier without affecting its XSS-safety.  If in
   // doubt, say XSS_UNIQUE, which is the most conservative choice.
-  ModifierInfo(std::string ln, char sn, XssClass xc, const TemplateModifier* m)
+  ModifierInfo(string ln, char sn, XssClass xc, const TemplateModifier* m)
       : long_name(ln), short_name(sn),
         modval_required(strchr(ln.c_str(), '=') != NULL),
         is_registered(m != NULL), xss_class(xc),
         modifier(m ? m : &null_modifier) { }
-  std::string long_name;
+  string long_name;
   char short_name;
   bool modval_required;           // true iff ln has an '=' in it
   bool is_registered;             // true for built-in and AddModifier mods
@@ -143,15 +147,16 @@ struct ModifierAndValue {
 //      list (vector) of safe alternative modifier functions.
 // Note that this function is not commutative therefore
 // IsSafeXSSAlternative(a, b) may not be equal to IsSafeXSSAlternative(b, a).
-extern CTEMPLATE_DLL_DECL bool IsSafeXSSAlternative(const ModifierInfo& our,
+extern CTEMPLATE_DLL_DECL
+bool IsSafeXSSAlternative(const ModifierInfo& our,
                           const ModifierInfo& candidate);
 
 // modname is the name of the modifier (shortname or longname).
 // value is the modifier-value (empty string if there is no modval).
 // Returns a pointer into g_modifiers, or NULL if not found.
-extern CTEMPLATE_DLL_DECL const ModifierInfo* FindModifier(
-    const char* modname, size_t modname_len,
-    const char* modval, size_t modval_len);
+extern CTEMPLATE_DLL_DECL
+const ModifierInfo* FindModifier(const char* modname, size_t modname_len,
+                                 const char* modval, size_t modval_len);
 
 
 // Convenience function to dump the (zero or more) modifiers (and values)
@@ -159,12 +164,13 @@ extern CTEMPLATE_DLL_DECL const ModifierInfo* FindModifier(
 // :<modifier1>[=<val1>]<seperator>[:<modifier2>][=<val2>]...
 // If the modifier does not have a short_name, we print its long_name instead.
 // The separator may be an empty string.
-extern CTEMPLATE_DLL_DECL std::string PrettyPrintModifiers(
-    const std::vector<const ModifierAndValue*>& modvals,
-    const std::string& separator);
+extern CTEMPLATE_DLL_DECL
+string PrettyPrintModifiers(
+    const vector<const ModifierAndValue*>& modvals,
+    const string& separator);
 
-extern CTEMPLATE_DLL_DECL std::string PrettyPrintOneModifier(
-    const ModifierAndValue& modval);
+extern CTEMPLATE_DLL_DECL
+string PrettyPrintOneModifier(const ModifierAndValue& modval);
 
 // Returns the appropriate escaping directives to escape content in an
 // HTML or Javascript context. HTML and Javascript contexts exercise
@@ -175,8 +181,8 @@ extern CTEMPLATE_DLL_DECL std::string PrettyPrintOneModifier(
 // we never need to chain escaping directives. However, this is subject
 // to change.
 extern CTEMPLATE_DLL_DECL
-std::vector<const ModifierAndValue*> GetModifierForHtmlJs(
-    HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, std::string* error_msg);
+vector<const ModifierAndValue*> GetModifierForHtmlJs(
+    HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, string* error_msg);
 
 // Returns the appropriate escaping directives to escape content
 // in a CSS context.
@@ -185,16 +191,16 @@ std::vector<const ModifierAndValue*> GetModifierForHtmlJs(
 // distinguish between different CSS contexts, in particular CSS properties
 // that take URLs, which require a different escaping function (non-existent).
 extern CTEMPLATE_DLL_DECL
-std::vector<const ModifierAndValue*> GetModifierForCss(
-    HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, std::string* error_msg);
+vector<const ModifierAndValue*> GetModifierForCss(
+    HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, string* error_msg);
 
 // Returns the appropriate escaping directives to escape content
 // in an XML context.
 // Currently always returns xml_escape and hence does not require the
 // parser nor can it fail. This may change once the parser can parse XML.
 extern CTEMPLATE_DLL_DECL
-std::vector<const ModifierAndValue*> GetModifierForXml(
-    HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, std::string* error_msg);
+vector<const ModifierAndValue*> GetModifierForXml(
+    HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, string* error_msg);
 
 // Returns the appropriate escaping directives to escape content
 // in a JSON context.
@@ -202,8 +208,8 @@ std::vector<const ModifierAndValue*> GetModifierForXml(
 // parser nor can it fail. This may change once the parser can parse
 // and distinguish different contexts within JSON.
 extern CTEMPLATE_DLL_DECL
-std::vector<const ModifierAndValue*> GetModifierForJson(
-    HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, std::string* error_msg);
+vector<const ModifierAndValue*> GetModifierForJson(
+    HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, string* error_msg);
 
 // Return the default escaping directives to escape content for the given
 // context. These methods are useful when the caller does not have

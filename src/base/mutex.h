@@ -28,7 +28,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // ---
-// Author: Craig Silverstein.
 //
 // A simple mutex wrapper, supporting locks and read-write locks.
 // You should assume the locks are *not* re-entrant.
@@ -112,12 +111,16 @@
 #ifndef GOOGLE_MUTEX_H_
 #define GOOGLE_MUTEX_H_
 
-#include "config.h"           // to figure out pthreads support
-
+#include <config.h>
 #if defined(NO_THREADS)
   typedef int MutexType;      // to keep a lock-count
 #elif defined(_WIN32) || defined(__CYGWIN32__) || defined(__CYGWIN64__)
-# define WIN32_LEAN_AND_MEAN  // We only need minimal includes
+# ifndef WIN32_LEAN_AND_MEAN
+#   define WIN32_LEAN_AND_MEAN  // We only need minimal includes
+# endif
+# ifndef NOMINMAX
+#   define NOMINMAX             // Don't want windows to override min()/max()
+# endif
 # ifdef GMUTEX_TRYLOCK
   // We need Windows NT or later for TryEnterCriticalSection().  If you
   // don't need that functionality, you can remove these _WIN32_WINNT
@@ -134,12 +137,19 @@
   // *does* cause problems for FreeBSD, or MacOSX, but isn't needed
   // for locking there.)
 # ifdef __linux__
-#   define _XOPEN_SOURCE 500  // may be needed to get the rwlock calls
+#   if _XOPEN_SOURCE < 500      // including not being defined at all
+#     undef _XOPEN_SOURCE
+#     define _XOPEN_SOURCE 500  // may be needed to get the rwlock calls
+#   endif
 # endif
+#if defined(HAVE_PTHREAD) && !defined(NO_THREADS)
 # include <pthread.h>
+#endif
   typedef pthread_rwlock_t MutexType;
 #elif defined(HAVE_PTHREAD)
+#if defined(HAVE_PTHREAD) && !defined(NO_THREADS)
 # include <pthread.h>
+#endif
   typedef pthread_mutex_t MutexType;
 #else
 # error Need to implement mutex.h for your architecture, or #define NO_THREADS
@@ -150,13 +160,17 @@
 
 #define MUTEX_NAMESPACE ctemplate_mutex_namespace
 
+_START_GOOGLE_NAMESPACE_
+namespace base {
+// This is used for the single-arg constructor
+enum LinkerInitialized { LINKER_INITIALIZED };
+}
+_END_GOOGLE_NAMESPACE_
+
 namespace MUTEX_NAMESPACE {
 
 class Mutex {
  public:
-  // This is used for the single-arg constructor
-  enum LinkerInitialized { LINKER_INITIALIZED };
-
   // Create a Mutex that is not held by anybody.  This constructor is
   // typically used for Mutexes allocated on the heap or the stack.
   inline Mutex();
@@ -164,7 +178,7 @@ class Mutex {
   // It inhibits work being done by the destructor, which makes it
   // safer for code that tries to acqiure this mutex in their global
   // destructor.
-  inline Mutex(LinkerInitialized);
+  inline Mutex(GOOGLE_NAMESPACE::base::LinkerInitialized);
 
   // Destructor
   inline ~Mutex();
@@ -219,7 +233,7 @@ class Mutex {
 // assert.
 
 Mutex::Mutex() : mutex_(0) { }
-Mutex::Mutex(Mutex::LinkerInitialized) : mutex_(0) { }
+Mutex::Mutex(GOOGLE_NAMESPACE::base::LinkerInitialized) : mutex_(0) { }
 Mutex::~Mutex()            { assert(mutex_ == 0); }
 void Mutex::Lock()         { assert(--mutex_ == -1); }
 void Mutex::Unlock()       { assert(mutex_++ == -1); }
@@ -244,7 +258,7 @@ Mutex::Mutex() : destroy_(true) {
   InitializeCriticalSection(&mutex_);
   SetIsSafe();
 }
-Mutex::Mutex(LinkerInitialized) : destroy_(false) {
+Mutex::Mutex(GOOGLE_NAMESPACE::base::LinkerInitialized) : destroy_(false) {
   InitializeCriticalSection(&mutex_);
   SetIsSafe();
 }
@@ -294,7 +308,7 @@ Mutex::Mutex() : destroy_(true) {
   SetIsSafe();
   if (is_safe_ && pthread_rwlock_init(&mutex_, NULL) != 0) abort();
 }
-Mutex::Mutex(Mutex::LinkerInitialized) : destroy_(false) {
+Mutex::Mutex(GOOGLE_NAMESPACE::base::LinkerInitialized) : destroy_(false) {
   SetIsSafe();
   if (is_safe_ && pthread_rwlock_init(&mutex_, NULL) != 0) abort();
 }
@@ -326,7 +340,7 @@ Mutex::Mutex() : destroy_(true) {
   SetIsSafe();
   if (is_safe_ && pthread_mutex_init(&mutex_, NULL) != 0) abort();
 }
-Mutex::Mutex(Mutex::LinkerInitialized) : destroy_(false) {
+Mutex::Mutex(GOOGLE_NAMESPACE::base::LinkerInitialized) : destroy_(false) {
   SetIsSafe();
   if (is_safe_ && pthread_mutex_init(&mutex_, NULL) != 0) abort();
 }

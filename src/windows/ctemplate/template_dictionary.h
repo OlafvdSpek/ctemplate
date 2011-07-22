@@ -28,7 +28,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Craig Silverstein
+// Author: csilvers@google.com (Craig Silverstein)
 //
 // Based on the 'old' TemplateDictionary by Frank Jernigan.
 //
@@ -43,21 +43,22 @@
 //
 // For (many) more details, see the doc/ directory.
 
-
 #ifndef TEMPLATE_TEMPLATE_DICTIONARY_H_
 #define TEMPLATE_TEMPLATE_DICTIONARY_H_
 
-#include <cstddef>       // for size_t and ptrdiff_t
-#include <stdlib.h>      // for NULL
 #include <stdarg.h>      // for StringAppendV()
-#include <sys/types.h>   // for size_t
+#include <stddef.h>      // for size_t and ptrdiff_t
+#include <stdlib.h>      // for NULL
+#include <sys/types.h>
 #include <functional>    // for less<>
 #include <map>
 #include <string>
 #include <vector>
+
+#include "base/arena-inl.h"   // for ArenaAllocator
 #include <ctemplate/template_dictionary_interface.h>
-#include <ctemplate/template_string.h>
 #include <ctemplate/template_modifiers.h>
+#include <ctemplate/template_string.h>
 
 // NOTE: if you are statically linking the template library into your binary
 // (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='
@@ -67,58 +68,13 @@
 #endif
 
 namespace ctemplate {
-
 class UnsafeArena;
 template<typename A, int B, typename C, typename D> class small_map;
 template<typename NormalMap> class small_map_default_init;  // in small_map.h
+}
 
-template <class T> class ArenaAllocator {
- public:
-  typedef T value_type;
-  typedef size_t size_type;
-  typedef ptrdiff_t difference_type;
+namespace ctemplate {
 
-  typedef T* pointer;
-  typedef const T* const_pointer;
-  typedef T& reference;
-  typedef const T& const_reference;
-  pointer address(reference r) const  { return &r; }
-  const_pointer address(const_reference r) const  { return &r; }
-  size_type max_size() const  { return size_t(-1) / sizeof(T); }
-
-  // DO NOT USE! The default constructor is for gcc3 compatibility only.
-  ArenaAllocator() : arena_(0) { }
-  ArenaAllocator(UnsafeArena* arena) : arena_(arena) { }
-  ~ArenaAllocator() { }
-
-  pointer allocate(size_type n, std::allocator<void>::const_pointer /*hint*/ = 0);
-  void deallocate(pointer p, size_type n);
-  void construct(pointer p, const T & val) {
-    new(reinterpret_cast<void*>(p)) T(val);
-  }
-  void destroy(pointer p) { p->~T(); }
-
-  UnsafeArena* arena(void) const { return arena_; }
-
-  template<class U> struct rebind {
-    typedef ArenaAllocator<U> other;
-  };
-
-  template<class U> ArenaAllocator(const ArenaAllocator<U>& other)
-    : arena_(other.arena()) { }
-
-  template<class U> bool operator==(const ArenaAllocator<U>& other) const {
-    return arena_ == other.arena();
-  }
-
-  template<class U> bool operator!=(const ArenaAllocator<U>& other) const {
-    return arena_ != other.arena();
-  }
-
- protected:
-  static const int kAlignment;
-  UnsafeArena* arena_;
-};
 
 class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface {
  public:
@@ -132,7 +88,9 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // If you want to be explicit, you can use NO_ARENA as a synonym to NULL.
   static UnsafeArena* const NO_ARENA;
 
-  std::string name() const { return std::string(name_.ptr_, name_.length_); }
+  std::string name() const {
+    return std::string(name_.ptr_, name_.length_);
+  }
 
   // Returns a recursive copy of this dictionary.  This dictionary
   // *must* be a "top-level" dictionary (that is, not created via
@@ -149,12 +107,12 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // either a char* or a C++ string, or a TemplateString(s, slen).
 
   void SetValue(const TemplateString variable, const TemplateString value);
-  void SetIntValue(const TemplateString variable, long value);
+void SetIntValue(const TemplateString variable, long value);
   void SetFormattedValue(const TemplateString variable, const char* format, ...)
 #if 0
-       __attribute__((__format__ (__printf__, 3, 4)))
+      __attribute__((__format__ (__printf__, 3, 4)))
 #endif
-      ;  // starts at 3 because of implicit 1st arg 'this'
+     ;  // starts at 3 because of implicit 1st arg 'this'
 
   // We also let you set values in the 'global' dictionary which is
   // referenced when all other dictionaries fail.  Note this is a
@@ -236,7 +194,8 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // Dump goes to stdout/stderr, while DumpToString goes to the given string.
   // 'indent' is how much to indent each line of the output.
   void Dump(int indent=0) const;
-  void DumpToString(std::string* out, int indent=0) const;
+  virtual void DumpToString(std::string* out, int indent=0) const;
+
 
   // --- DEPRECATED ESCAPING FUNCTIONALITY
 
@@ -249,13 +208,14 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
                                 const TemplateModifier& escfn,
                                 const char* format, ...)
 #if 0
-       __attribute__((__format__ (__printf__, 4, 5)))
+      __attribute__((__format__ (__printf__, 4, 5)))
 #endif
-      ;  // starts at 4 because of implicit 1st arg 'this'
+     ;  // starts at 4 because of implicit 1st arg 'this'
   void SetEscapedValueAndShowSection(const TemplateString variable,
                                      const TemplateString value,
                                      const TemplateModifier& escfn,
                                      const TemplateString section_name);
+
 
  private:
   friend class SectionTemplateNode;   // for access to GetSectionValue(), etc.
@@ -264,36 +224,41 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   // For unittesting code using a TemplateDictionary.
   friend class TemplateDictionaryPeer;
 
-  class DictionaryPrinter;
+  class DictionaryPrinter;  // nested class
+  friend class DictionaryPrinter;
 
   // We need this functor to tell small_map how to create a map<> when
   // it decides to do so: we want it to create that map on the arena.
   class map_arena_init;
 
   typedef std::vector<TemplateDictionary*,
-                      ArenaAllocator<TemplateDictionary*> >
+                      ArenaAllocator<TemplateDictionary*, UnsafeArena> >
       DictVector;
   // The '4' here is the size where small_map switches from vector<> to map<>.
   typedef small_map<std::map<TemplateId, TemplateString, std::less<TemplateId>,
-                             ArenaAllocator<std::pair<const TemplateId, TemplateString> > >,
+                     ArenaAllocator<std::pair<const TemplateId, TemplateString>,
+                                    UnsafeArena> >,
                     4, std::equal_to<TemplateId>, map_arena_init>
       VariableDict;
   typedef small_map<std::map<TemplateId, DictVector*, std::less<TemplateId>,
-                             ArenaAllocator<std::pair<const TemplateId, DictVector*> > >,
+                     ArenaAllocator<std::pair<const TemplateId, DictVector*>,
+                                    UnsafeArena> >,
                     4, std::equal_to<TemplateId>, map_arena_init>
       SectionDict;
   typedef small_map<std::map<TemplateId, DictVector*, std::less<TemplateId>,
-                             ArenaAllocator<std::pair<const TemplateId, DictVector*> > >,
+                    ArenaAllocator<std::pair<const TemplateId, DictVector*>,
+                                   UnsafeArena> >,
                     4, std::equal_to<TemplateId>, map_arena_init>
       IncludeDict;
   // This is used only for global_dict_, which is just like a VariableDict
   // but does not bother with an arena (since this memory lives forever).
-  typedef small_map< std::map<TemplateId, TemplateString, std::less<TemplateId> >,
-                     4, std::equal_to<TemplateId>,
-                     small_map_default_init<
+  typedef small_map<std::map<TemplateId, TemplateString, std::less<TemplateId> >,
+                    4, std::equal_to<TemplateId>,
+                    small_map_default_init<
                        std::map<TemplateId, TemplateString,
                                 std::less<TemplateId> > > >
       GlobalDict;
+
 
   // These are helper functions to allocate the parts of the dictionary
   // on the arena.
@@ -347,6 +312,11 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
       TemplateDictionary* parent_dict,
       TemplateDictionary* template_global_dict_owner);
 
+  // A helper for creating section and include dicts.
+  static std::string CreateSubdictName(
+      const TemplateString& dict_name, const TemplateString& sub_name,
+      size_t index, const char* suffix);
+
   // Must be called whenever we add a value to one of the dictionaries above,
   // to ensure that we can reconstruct the id -> string mapping.
   static void AddToIdToNameMap(TemplateId id, const TemplateString& str);
@@ -371,11 +341,17 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
 
   // This is needed by DictionaryPrinter because it's not a friend
   // of TemplateString, but we are
-  static std::string PrintableTemplateString(const TemplateString& ts) {
+  static std::string PrintableTemplateString(
+      const TemplateString& ts) {
     return std::string(ts.ptr_, ts.length_);
   }
   static bool InvalidTemplateString(const TemplateString& ts) {
     return ts.ptr_ == NULL;
+  }
+  // Compilers differ about whether nested classes inherit our friendship.
+  // The only thing DictionaryPrinter needs is IdToString, so just re-export.
+  static TemplateString IdToString(TemplateId id) {   // for DictionaryPrinter
+    return TemplateString::IdToString(id);
   }
 
   // CreateTemplateIterator
@@ -395,7 +371,7 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
       const TemplateString& section_name) const;
 
   // TemplateDictionary-specific implementation of dictionary iterators.
-  template <typename T>   // T is TemplateDictionary::const_iterator
+  template <typename T>   // T is *TemplateDictionary::const_iterator
   class Iterator : public TemplateDictionaryInterface::Iterator {
    protected:
     friend class TemplateDictionary;
@@ -427,6 +403,7 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   SectionDict* section_dict_;
   IncludeDict* include_dict_;
 
+
   // The template_global_dict is consulted if a lookup in the variable, section,
   // or include dicts named above fails. It forms a convenient place to store
   // session-specific data that's applicable to all templates in the dictionary
@@ -439,7 +416,7 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   TemplateDictionary* template_global_dict_owner_;
 
   // My parent dictionary, used when variable lookups at this level fail.
-  // Note this is only for *variables*, not sections or templates.
+  // Note this is only for *variables* and *sections*, not templates.
   TemplateDictionary* parent_dict_;
   // The static, global dictionary, at the top of the parent-dictionary chain
   static GlobalDict* global_dict_;
@@ -451,16 +428,12 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
   const char* filename_;
 
  private:
-  // Used by our nested class (friendship rules require us to forward this).
-  static TemplateString IdToString(TemplateId id) {
-    return TemplateString::IdToString(id);
-  }
-
   // Can't invoke copy constructor or assignment operator
   TemplateDictionary(const TemplateDictionary&);
   void operator=(const TemplateDictionary&);
 };
 
 }
+
 
 #endif  // TEMPLATE_TEMPLATE_DICTIONARY_H_

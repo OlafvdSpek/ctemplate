@@ -28,7 +28,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Jad Boutros
 // Heavily inspired from make_tpl_varnames_h.cc
 //
 // A utility for evaluating the changes in escaping modifiers
@@ -54,6 +53,7 @@
 //         For correct operation of Auto-Escape, ensure this matches
 //         the Strip mode you normally use on these templates.
 //
+//
 // Exit code is zero if there were no differences. It is non-zero
 // if we failed to load the templates or we found one or more
 // differences.
@@ -61,26 +61,25 @@
 // TODO(jad): Add flag to optionally report differences when a variable
 //            does not have modifiers in either template.
 
-#include "config.h"
-// This is for windows.  Even though we #include config.h, just like
-// the files used to compile the dll, we are actually a *client* of
-// the dll, so we don't get to decl anything.
+// This is for opensource ctemplate on windows.  Even though we
+// #include config.h, just like the files used to compile the dll, we
+// are actually a *client* of the dll, so we don't get to decl anything.
+#include <config.h>
 #undef CTEMPLATE_DLL_DECL
 
 #include <stdlib.h>
 #include <stdio.h>
 #ifdef HAVE_UNISTD_H
-#include <unistd.h>
+# include <unistd.h>
 #endif
 #include <stdarg.h>
-#ifndef _WIN32
-#include <getopt.h>
+#ifdef HAVE_GETOPT_H
+# include <getopt.h>
 #endif
 #include <string.h>
 #include <string>
 #include <ctemplate/template.h>
 #include <ctemplate/template_pathops.h>
-
 using std::string;
 using std::vector;
 using GOOGLE_NAMESPACE::Template;
@@ -272,13 +271,7 @@ bool DiffTemplates(const char* filename_a, const char* filename_b,
 }
 
 int main(int argc, char **argv) {
-
-#if defined(_WIN32)
-  // TODO(csilvers): implement something reasonable for windows
-# define GETOPT(argc, argv)  -1
-  int optind = 1;    // first non-opt argument
-  const char* optarg = "";   // not used
-#elif defined(HAVE_GETOPT_LONG)
+#if defined(HAVE_GETOPT_LONG)
   static struct option longopts[] = {
     {"help", 0, NULL, 'h'},
     {"strip", 1, NULL, 's'},
@@ -290,8 +283,13 @@ int main(int argc, char **argv) {
   int option_index;
 # define GETOPT(argc, argv)  getopt_long(argc, argv, "t:s:hvV", \
                                          longopts, &option_index)
-#else
+#elif defined(HAVE_GETOPT_H)
 # define GETOPT(argc, argv)  getopt(argc, argv, "t:s:hvV")
+#else
+  // TODO(csilvers): implement something reasonable for windows/etc
+# define GETOPT(argc, argv)  -1
+  int optind = 1;    // first non-opt argument
+  const char* optarg = "";   // not used
 #endif
 
   int r = 0;
@@ -308,6 +306,7 @@ int main(int argc, char **argv) {
   }
 
   Template::SetTemplateRootDirectory(FLAG_template_dir);
+
 
   if (argc != (optind + 2))
     LogPrintf(LOG_FATAL,

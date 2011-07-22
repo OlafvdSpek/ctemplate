@@ -1,50 +1,59 @@
-// Copyright 2008 Google Inc. All Rights Reserved.
+// Copyright (c) 2008, Google Inc.
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//     * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "config_for_unittests.h"
+#include "tests/template_test_util.h"
+
 #include <stdio.h>
-#include <assert.h>
 #include <string>
 #include <vector>
+
 #include "base/arena.h"
-#include "tests/template_test_util.h"
 #include <ctemplate/template_dictionary.h>
 #include <ctemplate/template_string.h>
+#include "base/util.h"
+TEST_INIT   // defines RUN_ALL_TESTS()
+
+#define ASSERT_EQ(a, b)  EXPECT_EQ(a, b)
 
 using std::vector;
 using std::string;
+using GOOGLE_NAMESPACE::UnsafeArena;
+
 using GOOGLE_NAMESPACE::TemplateDictionary;
 using GOOGLE_NAMESPACE::TemplateDictionaryPeer;
 using GOOGLE_NAMESPACE::TemplateString;
 using GOOGLE_NAMESPACE::StaticTemplateString;
-using GOOGLE_NAMESPACE::UnsafeArena;
 
 namespace {
 
-// This works in both debug mode and NDEBUG mode.
-#define EXPECT_FALSE(cond)  do {                                \
-  if (cond) {                                                   \
-    printf("%s: %d: ASSERT FAILED: %s\n", __FILE__, __LINE__,   \
-           #cond);                                              \
-    assert(!(cond));                                            \
-    exit(1);                                                    \
-  }                                                             \
-} while (0)
-
-#define EXPECT_TRUE(cond)  EXPECT_FALSE(!(cond))
-
-#define EXPECT_EQ(a, b)  EXPECT_TRUE(a == b)
-
-#define EXPECT_STREQ(a, b)  do {                                          \
-  if (strcmp((a), (b))) {                                                 \
-    printf("%s: %d: ASSERT FAILED: '%s' != '%s'\n", __FILE__, __LINE__,   \
-           (a), (b));                                                     \
-    assert(!strcmp((a), (b)));                                            \
-    exit(1);                                                              \
-  }                                                                       \
-} while (0)
-
-
-void Test_GetSectionValue() {
+TEST(TemplateTestUtilTest, GetSectionValue) {
   TemplateDictionary dict("test_GetSectionValue");
   dict.SetValue("VALUE", "value");
 
@@ -52,7 +61,7 @@ void Test_GetSectionValue() {
   EXPECT_STREQ("value", peer.GetSectionValue("VALUE"));
 }
 
-void Test_IsHiddenSection() {
+TEST(TemplateTestUtilTest, IsHiddenSection) {
   TemplateDictionary dict("test_IsHiddenSection");
 
   {
@@ -68,7 +77,7 @@ void Test_IsHiddenSection() {
   }
 }
 
-void Test_GetSectionDictionaries() {
+TEST(TemplateTestUtilTest, GetSectionDictionaries) {
   TemplateDictionary dict("test_GetSectionDictionaries");
 
   {
@@ -86,7 +95,7 @@ void Test_GetSectionDictionaries() {
   {
     TemplateDictionaryPeer peer(&dict);
     vector<const TemplateDictionary*> dicts;
-    EXPECT_EQ(1, peer.GetSectionDictionaries("SECTION", &dicts));
+    ASSERT_EQ(1, peer.GetSectionDictionaries("SECTION", &dicts));
 
     TemplateDictionaryPeer peer_section(dicts[0]);
     EXPECT_STREQ("0", peer_section.GetSectionValue("SECTION_VALUE"));
@@ -98,7 +107,7 @@ void Test_GetSectionDictionaries() {
   {
     TemplateDictionaryPeer peer(&dict);
     vector<const TemplateDictionary*> dicts;
-    EXPECT_EQ(2, peer.GetSectionDictionaries("SECTION", &dicts));
+    ASSERT_EQ(2, peer.GetSectionDictionaries("SECTION", &dicts));
 
     TemplateDictionaryPeer peer_section0(dicts[0]);
     EXPECT_STREQ("0", peer_section0.GetSectionValue("SECTION_VALUE"));
@@ -108,7 +117,7 @@ void Test_GetSectionDictionaries() {
   }
 }
 
-void Test_GetIncludeDictionaries() {
+TEST(TemplateTestUtilTest, GetIncludeDictionaries) {
   TemplateDictionary dict("test_GetIncludeDictionaries");
 
   {
@@ -126,7 +135,7 @@ void Test_GetIncludeDictionaries() {
   {
     TemplateDictionaryPeer peer(&dict);
     vector<const TemplateDictionary*> dicts;
-    EXPECT_EQ(1, peer.GetIncludeDictionaries("SECTION", &dicts));
+    ASSERT_EQ(1, peer.GetIncludeDictionaries("SECTION", &dicts));
 
     TemplateDictionaryPeer peer_section(dicts[0]);
     EXPECT_STREQ("0", peer_section.GetSectionValue("SECTION_VALUE"));
@@ -138,7 +147,7 @@ void Test_GetIncludeDictionaries() {
   {
     TemplateDictionaryPeer peer(&dict);
     vector<const TemplateDictionary*> dicts;
-    EXPECT_EQ(2, peer.GetIncludeDictionaries("SECTION", &dicts));
+    ASSERT_EQ(2, peer.GetIncludeDictionaries("SECTION", &dicts));
 
     TemplateDictionaryPeer peer_section0(dicts[0]);
     EXPECT_STREQ("0", peer_section0.GetSectionValue("SECTION_VALUE"));
@@ -148,7 +157,7 @@ void Test_GetIncludeDictionaries() {
   }
 }
 
-void Test_GetIncludeAndSectionDictionaries() {
+TEST(TemplateTestUtilTest, GetIncludeAndSectionDictionaries) {
   TemplateDictionary dict("test_GetIncludeAndSectionDictionaries");
 
   {
@@ -164,13 +173,13 @@ void Test_GetIncludeAndSectionDictionaries() {
   {
     TemplateDictionaryPeer peer(&dict);
     vector<const TemplateDictionary*> include_dicts;
-    EXPECT_EQ(1, peer.GetIncludeDictionaries("SECTION", &include_dicts));
+    ASSERT_EQ(1, peer.GetIncludeDictionaries("SECTION", &include_dicts));
 
     TemplateDictionaryPeer include_peer(include_dicts[0]);
     EXPECT_STREQ("0", include_peer.GetSectionValue("SECTION_VALUE"));
 
     vector<const TemplateDictionary*> section_dicts;
-    EXPECT_EQ(1, peer.GetSectionDictionaries("SECTION", &section_dicts));
+    ASSERT_EQ(1, peer.GetSectionDictionaries("SECTION", &section_dicts));
 
     TemplateDictionaryPeer section_peer(section_dicts[0]);
     EXPECT_STREQ("1", section_peer.GetSectionValue("SECTION_VALUE"));
@@ -185,7 +194,7 @@ void Test_GetIncludeAndSectionDictionaries() {
   {
     TemplateDictionaryPeer peer(&dict);
     vector<const TemplateDictionary*> dicts;
-    EXPECT_EQ(2, peer.GetIncludeDictionaries("SECTION", &dicts));
+    ASSERT_EQ(2, peer.GetIncludeDictionaries("SECTION", &dicts));
 
     TemplateDictionaryPeer include_peer0(dicts[0]);
     EXPECT_STREQ("0", include_peer0.GetSectionValue("SECTION_VALUE"));
@@ -197,7 +206,7 @@ void Test_GetIncludeAndSectionDictionaries() {
     EXPECT_EQ(0, peer.GetIncludeDictionaries("ONE_MORE_SECTION", &dicts));
 
     vector<const TemplateDictionary*> section_dicts;
-    EXPECT_EQ(2, peer.GetSectionDictionaries("SECTION", &section_dicts));
+    ASSERT_EQ(2, peer.GetSectionDictionaries("SECTION", &section_dicts));
 
     TemplateDictionaryPeer section_peer0(section_dicts[0]);
     EXPECT_STREQ("1", section_peer0.GetSectionValue("SECTION_VALUE"));
@@ -210,7 +219,7 @@ void Test_GetIncludeAndSectionDictionaries() {
   }
 }
 
-void Test_TemplateTestUtilTest_GetFilename() {
+TEST(TemplateTestUtilTest, GetFilename) {
   TemplateDictionary parent("test_GetFilename");
   TemplateDictionary* child = parent.AddIncludeDictionary("INCLUDE_marker");
   child->SetFilename("included_filename");
@@ -234,7 +243,7 @@ StaticTemplateString GetTestTemplateString(UnsafeArena* arena) {
   return sts;
 }
 
-void Test_TemplateUtilTest_InitStaticTemplateStringForTest() {
+TEST(TemplateUtilTest, InitStaticTemplateStringForTest) {
   UnsafeArena arena(1024);
   StaticTemplateString kValue = GetTestTemplateString(&arena);
 
@@ -248,14 +257,6 @@ void Test_TemplateUtilTest_InitStaticTemplateStringForTest() {
 }  // namespace anonymous
 
 int main(int argc, char **argv) {
-  Test_GetSectionValue();
-  Test_IsHiddenSection();
-  Test_GetSectionDictionaries();
-  Test_GetIncludeDictionaries();
-  Test_GetIncludeAndSectionDictionaries();
-  Test_TemplateTestUtilTest_GetFilename();
-  Test_TemplateUtilTest_InitStaticTemplateStringForTest();
 
-  printf("PASS\n");
-  return 0;
+  return RUN_ALL_TESTS();
 }

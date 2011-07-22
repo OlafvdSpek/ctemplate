@@ -28,25 +28,27 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Frank H. Jernigan
 //
 // This class implements some template helper classes, that manage
 // template files and make it easier to monitor them.
 //
 // For information about how to use these classes and macros, and to
-// write the templates it takes as input, see doc/howto.html
+// write the templates it takes as input,
+// see the doc/ directory.
 
 #ifndef TEMPLATE_TEMPLATE_NAMELIST_H_
 #define TEMPLATE_TEMPLATE_NAMELIST_H_
 
 #include <time.h>    // for time_t
+#include @ac_cv_cxx_hash_set@
 #include <string>
 #include <vector>
-#include @ac_cv_cxx_hash_set@
-#include <ctemplate/template_enums.h>   // for Strip
-#include <ctemplate/template_string.h>  // for StringHash
+#include <ctemplate/template_enums.h>    // for Strip
+#include <ctemplate/template_string.h>   // for StringHash
 
 @ac_windows_dllexport_defines@
+
+@ac_google_start_namespace@
 
 // RegisterTemplateFilename
 //   Used to define a reference variable for the name of a template file. E.g:
@@ -63,9 +65,6 @@
 // header files, when and if the macro pre-processor supports that
 #define RegisterTemplateFilename(var, name)         \
   const char* const var = @ac_google_namespace@::TemplateNamelist::RegisterTemplate(name);
-
-
-@ac_google_start_namespace@
 
 // Class: TemplateNamelist
 //   Each time this class is instantiated, the name passed to
@@ -160,5 +159,6 @@ class @ac_windows_dllexport@ TemplateNamelist {
 };
 
 @ac_google_end_namespace@
+
 
 #endif  // TEMPLATE_TEMPLATE_NAMELIST_H_

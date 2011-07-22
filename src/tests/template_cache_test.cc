@@ -28,8 +28,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Shubhie Panicker
-// Author: Craig Silverstein
+// Author: csilvers@google.com (Craig Silverstein)
+//
 
 #include "config_for_unittests.h"
 #include <ctemplate/template_cache.h>
@@ -39,34 +39,32 @@
 #include <string.h>      // for strcmp()
 #include <sys/types.h>   // for mode_t
 #ifdef HAVE_UNISTD_H
-#include <unistd.h>      // for unlink()
-#endif
+# include <unistd.h>
+#endif      // for unlink()
 #include <ctemplate/template.h>  // for Template
 #include <ctemplate/template_dictionary.h>  // for TemplateDictionary
 #include <ctemplate/template_enums.h>  // for DO_NOT_STRIP, etc
 #include <ctemplate/template_pathops.h>  // for PathJoin(), kCWD
 #include <ctemplate/template_string.h>  // for TemplateString
 #include "tests/template_test_util.h"  // for AssertExpandIs(), etc
-
 using std::string;
+using GOOGLE_NAMESPACE::FLAGS_test_tmpdir;
+using GOOGLE_NAMESPACE::AssertExpandIs;
+using GOOGLE_NAMESPACE::CreateOrCleanTestDir;
+using GOOGLE_NAMESPACE::CreateOrCleanTestDirAndSetAsTmpdir;
+using GOOGLE_NAMESPACE::DO_NOT_STRIP;
+using GOOGLE_NAMESPACE::PathJoin;
+using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
+using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
+using GOOGLE_NAMESPACE::StaticTemplateString;
+using GOOGLE_NAMESPACE::StringToFile;
+using GOOGLE_NAMESPACE::StringToTemplateCache;
+using GOOGLE_NAMESPACE::StringToTemplateFile;
 using GOOGLE_NAMESPACE::Template;
 using GOOGLE_NAMESPACE::TemplateCache;
 using GOOGLE_NAMESPACE::TemplateCachePeer;
 using GOOGLE_NAMESPACE::TemplateDictionary;
-using GOOGLE_NAMESPACE::StaticTemplateString;
-using GOOGLE_NAMESPACE::DO_NOT_STRIP;
-using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
-using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
-using GOOGLE_NAMESPACE::FLAGS_test_tmpdir;
-using GOOGLE_NAMESPACE::PathJoin;
 using GOOGLE_NAMESPACE::kCWD;
-using GOOGLE_NAMESPACE::CreateOrCleanTestDir;
-using GOOGLE_NAMESPACE::CreateOrCleanTestDirAndSetAsTmpdir;
-using GOOGLE_NAMESPACE::StringToFile;
-using GOOGLE_NAMESPACE::StringToTemplateFile;
-using GOOGLE_NAMESPACE::AssertExpandIs;
-
-using GOOGLE_NAMESPACE::StringToTemplateCache;
 
 #define ASSERT(cond)  do {                                      \
   if (!(cond)) {                                                \
@@ -81,6 +79,8 @@ using GOOGLE_NAMESPACE::StringToTemplateCache;
 static const StaticTemplateString kKey = STS_INIT(kKey, "MY_KEY");
 static const StaticTemplateString kContent = STS_INIT(kContent, "content");
 
+// It would be nice to use the TEST framework, but it makes friendship
+// more difficult.  (TemplateCache befriends TemplateCacheUnittest.)
 class TemplateCacheUnittest {
  public:
   static void TestGetTemplate() {
@@ -1049,6 +1049,7 @@ class TemplateCacheUnittest {
 
 
 int main(int argc, char** argv) {
+
   CreateOrCleanTestDirAndSetAsTmpdir(FLAGS_test_tmpdir);
 
   TemplateCacheUnittest::TestGetTemplate();

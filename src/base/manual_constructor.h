@@ -26,9 +26,9 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 // ---
-// Author: Kenton Varda
+//
+// Author: kenton@google.com (Kenton Varda)
 //
 // ManualConstructor statically-allocates space in which to store some
 // object, but does not initialize it.  You can then call the constructor
@@ -44,73 +44,10 @@
 #ifndef UTIL_GTL_MANUAL_CONSTRUCTOR_H_
 #define UTIL_GTL_MANUAL_CONSTRUCTOR_H_
 
-#include "config.h"
+#include <config.h>
+#include "base/aligned_char_array.h"
 
 _START_GOOGLE_NAMESPACE_
-
-// ------- define ALIGNED_CHAR_ARRAY --------------------------------
-
-// Because MSVC and older GCCs require that the argument to their alignment
-// construct to be a literal constant integer, we use a template instantiated
-// at all the possible powers of two.
-#ifndef SWIG
-template<int alignment, int size> struct AlignType { };
-template<int size> struct AlignType<0, size> { typedef char result[size]; };
-#if defined(_MSC_VER)
-#define BASE_PORT_H_ALIGN_ATTRIBUTE(X) __declspec(align(X))
-#define BASE_PORT_H_ALIGN_OF(T) __alignof(T)
-#elif defined(HAVE___ATTRIBUTE__)
-#define BASE_PORT_H_ALIGN_ATTRIBUTE(X) __attribute__((aligned(X)))
-#define BASE_PORT_H_ALIGN_OF(T) __alignof__(T)
-#endif
-
-#if defined(BASE_PORT_H_ALIGN_ATTRIBUTE)
-
-#define BASE_PORT_H_ALIGNTYPE_TEMPLATE(X) \
-  template<int size> struct AlignType<X, size> { \
-    typedef BASE_PORT_H_ALIGN_ATTRIBUTE(X) char result[size]; \
-  }
-
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(1);
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(2);
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(4);
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(8);
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(16);
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(32);
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(64);
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(128);
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(256);
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(512);
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(1024);
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(2048);
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(4096);
-BASE_PORT_H_ALIGNTYPE_TEMPLATE(8192);
-// Any larger and MSVC++ will complain.
-
-#define ALIGNED_CHAR_ARRAY(T, Size) \
-  typename AlignType<BASE_PORT_H_ALIGN_OF(T), sizeof(T) * Size>::result
-
-#undef BASE_PORT_H_ALIGNTYPE_TEMPLATE
-#undef BASE_PORT_H_ALIGN_ATTRIBUTE
-
-#else  // defined(BASE_PORT_H_ALIGN_ATTRIBUTE)
-#define ALIGNED_CHAR_ARRAY you_must_define_ALIGNED_CHAR_ARRAY_for_your_compiler
-#endif // defined(BASE_PORT_H_ALIGN_ATTRIBUTE)
-
-#else  // !SWIG
-
-// SWIG can't represent alignment and doesn't care about alignment on data
-// members (it works fine without it).
-template<typename Size>
-struct AlignType { typedef char result[Size]; };
-#define ALIGNED_CHAR_ARRAY(T, Size) AlignType<Size * sizeof(T)>::result
-
-#endif // !SWIG
-
-#undef BASE_PORT_H_ALIGNTYPE_TEMPLATE
-#undef BASE_PORT_H_ALIGN_ATTRIBUTE
-
-// --------------------------------------------------------
 
 template <typename Type>
 class ManualConstructor {

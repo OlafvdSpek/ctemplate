@@ -1,4 +1,4 @@
-// Copyright (c) 2008, Google Inc.
+// Copyright (c) 2007, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -26,9 +26,8 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
 // ---
-// Author: Filipe Almeida
+// Author: falmeida@google.com (Filipe Almeida)
 //
 // Verify at different points during HTML processing that the parser is in the
 // correct state.
@@ -69,11 +68,8 @@
 // insert_text: Executes HtmlParser::InsertText() if the argument is true.
 
 #include "config_for_unittests.h"
-#include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
-#include <errno.h>
-#include <assert.h>
+#include <stdio.h>
 #include <string.h>
 #include <string>
 #include <utility>
@@ -81,88 +77,21 @@
 #include <map>
 #include "htmlparser/htmlparser_cpp.h"
 #include "ctemplate/template_pathops.h"
+#include "base/util.h"
 
-using std::string;
-using std::vector;
+#define FAIL()  EXPECT_TRUE(false)
+TEST_INIT  // Among other things, defines RUN_ALL_TESTS
+
 using std::map;
 using std::pair;
+using std::string;
+using std::vector;
 using GOOGLE_NAMESPACE::PathJoin;
-using HTMLPARSER_NAMESPACE::HtmlParser;
-using HTMLPARSER_NAMESPACE::JavascriptParser;
 
-// This default value is only used when the TEMPLATE_ROOTDIR envvar isn't set
-#ifndef DEFAULT_TEMPLATE_ROOTDIR
-# define DEFAULT_TEMPLATE_ROOTDIR  "."
-#endif
+namespace HTMLPARSER_NAMESPACE {
 
-#define CHECK(cond)  do {                                       \
-  if (!(cond)) {                                                \
-    printf("%s: %d: ASSERT FAILED: %s\n", __FILE__, __LINE__,   \
-           #cond);                                              \
-    assert(cond);                                               \
-    exit(1);                                                    \
-  }                                                             \
-} while (0)
-
-#define EXPECT_TRUE CHECK
-
-#define EXPECT_EQ(a, b)  do {                                             \
-  if ((a) != (b)) {                                                       \
-    printf("%s: %d: ASSERT FAILED: '%s' != '%s'\n", __FILE__, __LINE__,   \
-           #a, #b);                                                       \
-    assert((a) == (b));                                                   \
-    exit(1);                                                              \
-  }                                                                       \
-} while (0)
-
-#define PFATAL(s)  do { perror(s); exit(1); } while (0)
-
-
-static int strcount(const string& str, char c) {
-  int count = 0;
-  for (const char* p = strchr(str.c_str(), c); p; p = strchr(p+1, c))
-    count++;
-  return count;
-}
-
-static void LowerString(string* s) {
-  for (size_t i = 0; i < s->length(); ++i)
-    if ((*s)[i] >= 'A' && (*s)[i] <= 'Z')
-      (*s)[i] += 'a' - 'A';
-}
-
-static void StripWhiteSpace(string* s) {
-  const char* p = s->c_str(), *pend = s->c_str() + s->length();
-  while (p < pend && isspace(*p))
-    p++;
-  while (p < pend && isspace(pend[-1]))
-    pend--;
-  string retval(p, pend - p);   // maybe assigning directly to s is unsafe
-  std::swap(retval, *s);
-}
-
-  vector< pair< string, string > > pairs;
-static void SplitStringIntoKeyValuePairs(const string& in,
-                                         char after_key, char after_val,
-                                         vector< pair<string,string> >* pairs) {
-  pairs->clear();
-  const char* const pend = in.c_str() + in.length();
-  const char* key, *keyend;
-  const char* val, *valend;
-  for (const char* p = in.c_str(); p < pend; p = valend + 1) {
-    key = p;
-    keyend = (const char*)memchr(key, after_key, pend - key);
-    if (keyend == NULL)
-      break;
-    val = keyend + 1;
-    valend = (const char*)memchr(val, after_val, pend - val);
-    if (valend == NULL)
-      valend = pend;
-    pairs->push_back(pair<string,string>(string(key, keyend - key),
-                                         string(val, valend - val)));
-    p = valend + 1;
-  }
-}
+// Maximum file size limit.
+static const int kMaxFileSize = 1000000;
 
 static void ReadToString(const char* filename, string* s) {
   const int bufsize = 8092;
@@ -177,31 +106,11 @@ static void ReadToString(const char* filename, string* s) {
   fclose(fp);
 }
 
-
-namespace {
-
-class HtmlparserCppTest {
- public:
-  // Reads the filename of an annotated html file and validates the
-  // annotations against the html parser state.
-  void ValidateFile(string filename);
+class HtmlparserCppTest : public testing::Test {
+ protected:
 
   typedef map<string, HtmlParser *> ContextMap;
 
-  void SetUp() {
-    parser_.Reset();
-  }
-
-  void TearDown() {
-    // Delete all parser instances from the context map
-    for (ContextMap::iterator iter = contextMap.begin();
-        iter != contextMap.end(); ++iter) {
-      delete iter->second;
-    }
-    contextMap.clear();
-  }
-
- protected:
   // Structure that stores the mapping between an id and a name.
   struct IdNameMap {
     int id;
@@ -221,9 +130,6 @@ class HtmlparserCppTest {
 
   // Mapping between the enum and the string representation of the reset mode.
   static const struct IdNameMap kResetModeMap[];
-
-  // Maximum file size limit.
-  static const int kMaxFileSize;
 
   // String that marks the start of an annotation.
   static const char kDirectiveBegin[];
@@ -247,6 +153,10 @@ class HtmlparserCppTest {
   // Returns the enum_id of the correspondent name by consulting an array of
   // type IdNameMap.
   int NameToId(const struct IdNameMap *list, const string &name);
+
+  // Reads the filename of an annotated html file and validates the
+  // annotations against the html parser state.
+  void ValidateFile(string filename);
 
   // Validate an annotation string against the current parser state.
   void ProcessAnnotation(const string &dir);
@@ -295,14 +205,27 @@ class HtmlparserCppTest {
   // Validate the parser is_url_start value against the provided one.
   void ValidateIsUrlStart(const string &expected_is_url_start);
 
+  void SetUp() {
+    parser_.Reset();
+  }
+
+  void TearDown() {
+    // Delete all parser instances from the context map
+    for (ContextMap::iterator iter = contextMap.begin();
+        iter != contextMap.end(); ++iter) {
+      delete iter->second;
+    }
+    contextMap.clear();
+  }
+
   // Map containing the registers where the parser context is saved.
   ContextMap contextMap;
 
   // Parser instance
   HtmlParser parser_;
-};
 
-const int HtmlparserCppTest::kMaxFileSize = 1000000;
+  friend class Test_HtmlparserTest_TestFiles;
+};
 
 const char HtmlparserCppTest::kDirectiveBegin[] = "<?state";
 const char HtmlparserCppTest::kDirectiveEnd[] = "?>";
@@ -352,7 +275,12 @@ const struct HtmlparserCppTest::IdNameMap
 
 // Count the number of lines in a string.
 int HtmlparserCppTest::UpdateLines(const string &str, int line) {
-  return strcount(str, '\n') + line;
+  int linecount = line;
+  for (string::size_type i = 0; i < str.length(); ++i) {
+    if (str[i] == '\n')
+      ++linecount;
+  }
+  return linecount;
 }
 
 // Count the number of columns in a string.
@@ -375,11 +303,9 @@ int HtmlparserCppTest::UpdateColumns(const string &str, int column) {
 
 // Converts a string to a boolean.
 bool HtmlparserCppTest::StringToBool(const string &value) {
-  string lowercase(value);
-  LowerString(&lowercase);
-  if (lowercase == "true") {
+  if (strcasecmp(value.c_str(), "true") == 0) {
     return true;
-  } else if (lowercase == "false") {
+  } else if (strcasecmp(value.c_str(), "false") == 0) {
     return false;
   } else {
     CHECK("Unknown boolean value" == NULL);
@@ -421,26 +347,30 @@ void HtmlparserCppTest::ValidateState(const string &expected_state) {
   const char* parsed_state = IdToName(kStateMap, parser_.state());
   EXPECT_TRUE(parsed_state != NULL);
   EXPECT_TRUE(!expected_state.empty());
-  EXPECT_EQ(expected_state, string(parsed_state));
+  EXPECT_EQ(expected_state, string(parsed_state))
+      << "Unexpected state at line " << parser_.line_number();
 }
 
 // Validate the parser tag name against the provided tag name.
 void HtmlparserCppTest::ValidateTag(const string &expected_tag) {
   EXPECT_TRUE(parser_.tag() != NULL);
-  EXPECT_TRUE(expected_tag == parser_.tag());
+  EXPECT_TRUE(expected_tag == parser_.tag())
+      << "Unexpected attr tag name at line " << parser_.line_number();
 }
 
 // Validate the parser attribute name against the provided attribute name.
 void HtmlparserCppTest::ValidateAttribute(const string &expected_attr) {
   EXPECT_TRUE(parser_.attribute() != NULL);
-  EXPECT_EQ(expected_attr, parser_.attribute());
+  EXPECT_EQ(expected_attr, parser_.attribute())
+      << "Unexpected attr name value at line " << parser_.line_number();
 }
 
 // Validate the parser attribute value contents against the provided string.
 void HtmlparserCppTest::ValidateValue(const string &expected_value) {
   EXPECT_TRUE(parser_.value() != NULL);
   const string parsed_state(parser_.value());
-  EXPECT_EQ(expected_value, parsed_state);
+  EXPECT_EQ(expected_value, parsed_state)
+      << "Unexpected value at line " << parser_.line_number();
 }
 
 // Validate the parser attribute type against the provided attribute type.
@@ -450,7 +380,8 @@ void HtmlparserCppTest::ValidateAttributeType(
                                           parser_.AttributeType());
   EXPECT_TRUE(parsed_attr_type != NULL);
   EXPECT_TRUE(!expected_attr_type.empty());
-  EXPECT_EQ(expected_attr_type, string(parsed_attr_type));
+  EXPECT_EQ(expected_attr_type, string(parsed_attr_type))
+      << "Unexpected attr_type value at line " << parser_.line_number();
 }
 
 // Validate the parser attribute quoted state against the provided
@@ -458,13 +389,15 @@ void HtmlparserCppTest::ValidateAttributeType(
 void HtmlparserCppTest::ValidateAttributeQuoted(
     const string &expected_attr_quoted) {
   bool attr_quoted_bool = StringToBool(expected_attr_quoted);
-  EXPECT_EQ(attr_quoted_bool, parser_.IsAttributeQuoted());
+  EXPECT_EQ(attr_quoted_bool, parser_.IsAttributeQuoted())
+      << "Unexpected attr_quoted value at line " << parser_.line_number();
 }
 
 // Validates the parser in javascript state against the provided boolean.
 void HtmlparserCppTest::ValidateInJavascript(const string &expected_in_js) {
   bool in_js_bool = StringToBool(expected_in_js);
-  EXPECT_EQ(in_js_bool, parser_.InJavascript());
+  EXPECT_EQ(in_js_bool, parser_.InJavascript())
+      << "Unexpected in_js value at line " << parser_.line_number();
 }
 
 // Validate the current parser javascript quoted state against the provided
@@ -472,7 +405,8 @@ void HtmlparserCppTest::ValidateInJavascript(const string &expected_in_js) {
 void HtmlparserCppTest::ValidateJavascriptQuoted(
     const string &expected_js_quoted) {
   bool js_quoted_bool = StringToBool(expected_js_quoted);
-  EXPECT_EQ(js_quoted_bool, parser_.IsJavascriptQuoted());
+  EXPECT_EQ(js_quoted_bool, parser_.IsJavascriptQuoted())
+      << "Unexpected js_quoted value at line " << parser_.line_number();
 }
 
 // Validate the javascript parser state against the provided state.
@@ -481,54 +415,47 @@ void HtmlparserCppTest::ValidateJavascriptState(const string &expected_state) {
                                       parser_.javascript_state());
   EXPECT_TRUE(parsed_state != NULL);
   EXPECT_TRUE(!expected_state.empty());
-  EXPECT_EQ(expected_state, string(parsed_state));
-  //"Unexpected javascript state at line " << parser_.line_number();
+  EXPECT_EQ(expected_state, string(parsed_state))
+      << "Unexpected javascript state at line " << parser_.line_number();
 }
 
 // Validates the parser css state against the provided boolean.
 void HtmlparserCppTest::ValidateInCss(const string &expected_in_css) {
   bool in_css_bool = StringToBool(expected_in_css);
-  EXPECT_EQ(in_css_bool, parser_.InCss());
-}
-
-static bool safe_strto32(const char* str, int* value) {
-  char* endptr;
-  errno = 0;  // errno only gets set on errors
-  *value = strtol(str, &endptr, 10);
-  if (endptr != str) {
-    while (isspace(*endptr)) ++endptr;
-  }
-  return *str != 0 && *endptr == 0 && errno == 0;
+  EXPECT_EQ(in_css_bool, parser_.InCss())
+      << "Unexpected in_css value at line " << parser_.line_number();
 }
 
 // Validate the line count against the expected count.
 void HtmlparserCppTest::ValidateLine(const string &expected_line) {
   int line;
-  CHECK(safe_strto32(expected_line.c_str(), &line));
-  EXPECT_EQ(line, parser_.line_number());
+  CHECK(safe_strto32(expected_line, &line));
+  EXPECT_EQ(line, parser_.line_number())
+      << "Unexpected line count at line " << parser_.line_number();
 }
 
 // Validate the line count against the expected count.
 void HtmlparserCppTest::ValidateColumn(const string &expected_column) {
   int column;
-  CHECK(safe_strto32(expected_column.c_str(), &column));
-  EXPECT_EQ(column, parser_.column_number());
-  //"Unexpected column count at line " << parser_.line_number();
+  CHECK(safe_strto32(expected_column, &column));
+  EXPECT_EQ(column, parser_.column_number())
+      << "Unexpected column count at line " << parser_.line_number();
 }
 
 // Validate the current parser value index against the provided index.
 void HtmlparserCppTest::ValidateValueIndex(const string &expected_value_index) {
   int index;
-  CHECK(safe_strto32(expected_value_index.c_str(), &index));
-  EXPECT_EQ(index, parser_.ValueIndex());
+  CHECK(safe_strto32(expected_value_index, &index));
+  EXPECT_EQ(index, parser_.ValueIndex())
+      << "Unexpected value_index value at line " << parser_.line_number();
 }
 
 // Validate the parser is_url_start value against the provided one.
 void HtmlparserCppTest::ValidateIsUrlStart(
     const string &expected_is_url_start) {
   bool is_url_start_bool = StringToBool(expected_is_url_start);
-  EXPECT_EQ(is_url_start_bool, parser_.IsUrlStart());
-  // << "Unexpected is_url_start value at line " << parser_.line_number();
+  EXPECT_EQ(is_url_start_bool, parser_.IsUrlStart())
+      << "Unexpected is_url_start value at line " << parser_.line_number();
 }
 
 // Validate an annotation string against the current parser state.
@@ -537,7 +464,7 @@ void HtmlparserCppTest::ValidateIsUrlStart(
 // handler for each pair.
 void HtmlparserCppTest::ProcessAnnotation(const string &annotation) {
   vector< pair< string, string > > pairs;
-  SplitStringIntoKeyValuePairs(annotation, '=', ',', &pairs);
+  SplitStringIntoKeyValuePairs(annotation, "=", ",", &pairs);
 
   vector< pair< string, string > >::iterator iter;
 
@@ -595,7 +522,7 @@ void HtmlparserCppTest::ProcessAnnotation(const string &annotation) {
         parser_.InsertText();
       }
     } else {
-      CHECK(false); // "Unknown test directive: iter->first"
+      FAIL() << "Unknown test directive: " << iter->first;
     }
   }
 }
@@ -606,9 +533,19 @@ void HtmlparserCppTest::ProcessAnnotation(const string &annotation) {
 // blocks. It sends the html block to the parser and uses the annotation block
 // to validate the parser state.
 void HtmlparserCppTest::ValidateFile(string filename) {
-
+  // If TEMPLATE_ROOTDIR is set in the environment, it overrides the
+  // default of ".".  We use an env-var rather than argv because
+  // that's what automake supports most easily.
+  const char* template_rootdir = getenv("TEMPLATE_ROOTDIR");
+  if (template_rootdir == NULL)
+    template_rootdir = DEFAULT_TEMPLATE_ROOTDIR;   // probably "."
+  string dir = PathJoin(template_rootdir, "src");
+  dir = PathJoin(dir, "tests");
+  dir = PathJoin(dir, "htmlparser_testdata");
+  const string fullpath = PathJoin(dir, filename);
+  fprintf(stderr, "Validating %s", fullpath.c_str());
   string buffer;
-  ReadToString(filename.c_str(), &buffer);
+  ReadToString(fullpath.c_str(), &buffer);
 
   // Start of the current html block.
   size_t start_html = 0;
@@ -645,53 +582,50 @@ void HtmlparserCppTest::ValidateFile(string filename) {
   }
 }
 
-}  // namespace
+static vector<string> g_filenames;
+#define TEST_FILE(testname, filename)                           \
+  struct Register_##testname {                                  \
+    Register_##testname() { g_filenames.push_back(filename); }  \
+  };                                                            \
+  static Register_##testname g_register_##testname
 
-int main(int argc, char **argv) {
+TEST(HtmlparserTest, TestFiles) {
+  HtmlparserCppTest tester;
+  for (vector<string>::const_iterator it = g_filenames.begin();
+       it != g_filenames.end(); ++it) {
+    tester.SetUp();
+    tester.ValidateFile(*it);
+    tester.TearDown();
+  }
+}
+
+TEST_FILE(SimpleHtml, "simple.html");
+TEST_FILE(Comments, "comments.html");
+TEST_FILE(JavascriptBlock, "javascript_block.html");
+TEST_FILE(JavascriptAttribute, "javascript_attribute.html");
+TEST_FILE(JavascriptRegExp, "javascript_regexp.html");
+TEST_FILE(Tags, "tags.html");
+TEST_FILE(Context, "context.html");
+TEST_FILE(Reset, "reset.html");
+TEST_FILE(CData, "cdata.html");
+TEST_FILE(LineCount, "position.html");
+
+TEST(Htmlparser, Error) {
   HtmlParser html;
 
   EXPECT_EQ(html.GetErrorMessage(), (const char *)NULL);
   EXPECT_EQ(html.Parse("<a href='http://www.google.com' ''>\n"),
             HtmlParser::STATE_ERROR);
 
-  CHECK(!strcmp(html.GetErrorMessage(),
-                "Unexpected character '\\'' in state 'tag_space'"));
+  EXPECT_STREQ(html.GetErrorMessage(),
+               "Unexpected character '\\'' in state 'tag_space'");
   html.Reset();
   EXPECT_EQ(html.GetErrorMessage(), (const char *)NULL);
+}
 
-  HtmlparserCppTest tester;
+}  // namespace security_streamhtmlparser
 
-  // If TEMPLATE_ROOTDIR is set in the environment, it overrides the
-  // default of ".".  We use an env-var rather than argv because
-  // that's what automake supports most easily.
-  const char* template_rootdir = getenv("TEMPLATE_ROOTDIR");
-  if (template_rootdir == NULL)
-    template_rootdir = DEFAULT_TEMPLATE_ROOTDIR;   // probably "."
-  string dir = PathJoin(template_rootdir, "src");
-  dir = PathJoin(dir, "tests");
-  dir = PathJoin(dir, "htmlparser_testdata");
+int main(int argc, char **argv) {
 
-  // TODO(csilvers): use readdir (and windows equivalent) instead.
-  const char* file_list[] = { "simple.html",
-                              "comments.html",
-                              "javascript_block.html",
-                              "javascript_attribute.html",
-                              "javascript_regexp.html",
-                              "tags.html",
-                              "context.html",
-                              "reset.html",
-                              "cdata.html",
-			      "position.html",
-			       };
-
-  for (const char** pfile = file_list;
-       pfile < file_list + sizeof(file_list)/sizeof(*file_list);
-       ++pfile) {
-    tester.SetUp();
-    tester.ValidateFile(PathJoin(dir, *pfile));
-    tester.TearDown();
-  }
-
-  printf("DONE.\n");
-  return 0;
+  return RUN_ALL_TESTS();
 }

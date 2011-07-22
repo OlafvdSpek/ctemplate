@@ -28,7 +28,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Craig Silverstein
+// Author: csilvers@google.com (Craig Silverstein)
 //
 // In addition to a TemplateDictionary, there is also a PerExpandData
 // dictionary.  This dictionary holds information that applies to one
@@ -45,8 +45,8 @@
 #include <stdlib.h>   // for NULL
 #include <string.h>   // for strcmp
 #include <sys/types.h>
-#include <ctemplate/template_string.h>   // for StringHash
 #include <hash_map>
+#include <ctemplate/template_string.h>   // for StringHash
 
 // NOTE: if you are statically linking the template library into your binary
 // (rather than using the template .dll), set '/D CTEMPLATE_DLL_DECL='

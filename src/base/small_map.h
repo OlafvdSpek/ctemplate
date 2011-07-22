@@ -26,9 +26,9 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 // ---
-// Author: Kenton Varda
+//
+// Author: kenton@google.com (Kenton Varda)
 //
 // small_map is a drop-in replacement for map or hash_map.  It uses a fixed
 // array to store a certain number of elements, then reverts to using a
@@ -52,8 +52,11 @@
 #include <assert.h>
 #include <utility>   // for make_pair()
 #include "base/manual_constructor.h"
-
 _START_GOOGLE_NAMESPACE_
+
+template <bool> struct CompileAssert { };
+#define COMPILE_ASSERT(expr, msg) \
+  typedef CompileAssert<(bool(expr))> msg[bool(expr) ? 1 : -1]
 
 // An STL-like associative container which starts out backed by a simple
 // array but switches to some other container type if it grows beyond a
@@ -100,6 +103,12 @@ template <typename NormalMap,
           typename EqualKey = typename NormalMap::key_equal,
           typename MapInit = small_map_default_init<NormalMap> >
 class small_map {
+  // We cannot rely on the compiler to reject array of size 0.  In
+  // particular, gcc 2.95.3 does it but later versions allow 0-length
+  // arrays.  Therefore, we explicitly reject non-positive kArraySize
+  // here.
+  COMPILE_ASSERT(kArraySize > 0, default_initial_size_should_be_positive);
+
  public:
   typedef typename NormalMap::key_type key_type;
   typedef typename NormalMap::mapped_type data_type;
@@ -153,6 +162,19 @@ class small_map {
     inline iterator operator++(int) {
       iterator result(*this);
       ++(*this);
+      return result;
+    }
+    inline iterator& operator--() {
+      if (array_iter_ != NULL) {
+        --array_iter_;
+      } else {
+        --hash_iter_;
+      }
+      return *this;
+    }
+    inline iterator operator--(int) {
+      iterator result(*this);
+      --(*this);
       return result;
     }
     inline value_type* operator->() const {
@@ -210,11 +232,6 @@ class small_map {
     inline const_iterator(const iterator& other)
       : array_iter_(other.array_iter_), hash_iter_(other.hash_iter_) {}
 
-    inline const_iterator operator++(int) {
-      const_iterator result(*this);
-      ++(*this);
-      return result;
-    }
     inline const_iterator& operator++() {
       if (array_iter_ != NULL) {
         ++array_iter_;
@@ -222,6 +239,25 @@ class small_map {
         ++hash_iter_;
       }
       return *this;
+    }
+    inline const_iterator operator++(int) {
+      const_iterator result(*this);
+      ++(*this);
+      return result;
+    }
+
+    inline const_iterator& operator--() {
+      if (array_iter_ != NULL) {
+        --array_iter_;
+      } else {
+        --hash_iter_;
+      }
+      return *this;
+    }
+    inline const_iterator operator--(int) {
+      const_iterator result(*this);
+      --(*this);
+      return result;
     }
 
     inline const value_type* operator->() const {

@@ -1,4 +1,4 @@
-// Copyright (c) 2006, Google Inc.
+// Copyright (c) 2005, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -28,40 +28,36 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Craig Silverstein
+// Author: csilvers@google.com (Craig Silverstein)
+//
+// This code is written to not use the google testing framework
+// as much as possible, to make it easier to opensource.
 
 #include "config_for_unittests.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <vector>
+#include "base/arena.h"
 #include <ctemplate/template_dictionary.h>
 #include <ctemplate/template_modifiers.h>
 #include <ctemplate/per_expand_data.h>
-#include "base/arena.h"
 #include "tests/template_test_util.h"
+#include "base/util.h"
+TEST_INIT               // defines RUN_ALL_TESTS
 
 using std::string;
 using std::vector;
-
-// This works in both debug mode and NDEBUG mode.
-#define ASSERT(cond)  do {                                      \
-  if (!(cond)) {                                                \
-    printf("%s: %d: ASSERT FAILED: %s\n", __FILE__, __LINE__,   \
-           #cond);                                              \
-    assert(cond);                                               \
-    exit(1);                                                    \
-  }                                                             \
-} while (0)
-
-#define ASSERT_STREQ(a, b)  do {                                          \
-  if (strcmp((a), (b))) {                                                 \
-    printf("%s: %d: ASSERT FAILED: '%s' != '%s'\n", __FILE__, __LINE__,   \
-           (a), (b));                                                     \
-    assert(!strcmp((a), (b)));                                            \
-    exit(1);                                                              \
-  }                                                                       \
-} while (0)
+using GOOGLE_NAMESPACE::UnsafeArena;
+using GOOGLE_NAMESPACE::DO_NOT_STRIP;
+using GOOGLE_NAMESPACE::ExpandEmitter;
+using GOOGLE_NAMESPACE::PerExpandData;
+using GOOGLE_NAMESPACE::StaticTemplateString;
+using GOOGLE_NAMESPACE::StringToTemplateCache;
+using GOOGLE_NAMESPACE::TemplateDictionary;
+using GOOGLE_NAMESPACE::TemplateDictionaryInterface;
+using GOOGLE_NAMESPACE::TemplateDictionaryPeer;
+using GOOGLE_NAMESPACE::TemplateString;
 
 #define ASSERT_STRSTR(text, substr)  do {                       \
   if (!strstr((text), (substr))) {                              \
@@ -73,10 +69,8 @@ using std::vector;
 } while (0)
 
 
-_START_GOOGLE_NAMESPACE_
-
 // test escape-functor that replaces all input with "foo"
-class FooEscaper : public TemplateModifier {
+class FooEscaper : public GOOGLE_NAMESPACE::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData*,
@@ -87,7 +81,7 @@ class FooEscaper : public TemplateModifier {
 };
 
 // test escape-functor that replaces all input with ""
-class NullEscaper : public TemplateModifier {
+class NullEscaper : public GOOGLE_NAMESPACE::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData*,
@@ -97,29 +91,31 @@ class NullEscaper : public TemplateModifier {
 };
 
 // first does javascript-escaping, then html-escaping
-class DoubleEscaper : public TemplateModifier {
+class DoubleEscaper : public GOOGLE_NAMESPACE::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData* data,
               ExpandEmitter* outbuf, const string& arg) const {
     assert(arg.empty());    // we don't take an argument
-    string tmp = javascript_escape(in, inlen);
-    html_escape.Modify(tmp.data(), tmp.size(), data, outbuf, "");
+    string tmp = GOOGLE_NAMESPACE::javascript_escape(in, inlen);
+    GOOGLE_NAMESPACE::html_escape.Modify(tmp.data(), tmp.size(), data, outbuf, "");
   }
 };
+
+namespace {
 
 static const TemplateDictionary* GetSectionDict(
     const TemplateDictionary* d, const char* name, int i) {
   TemplateDictionaryPeer peer(d);
   vector<const TemplateDictionary*> dicts;
-  ASSERT(peer.GetSectionDictionaries(name, &dicts) >= i);
+  EXPECT_GE(peer.GetSectionDictionaries(name, &dicts), i);
   return dicts[i];
 }
 static const TemplateDictionary* GetIncludeDict(
     const TemplateDictionary* d, const char* name, int i) {
   TemplateDictionaryPeer peer(d);
   vector<const TemplateDictionary*> dicts;
-  ASSERT(peer.GetIncludeDictionaries(name, &dicts) >= i);
+  EXPECT_GE(peer.GetIncludeDictionaries(name, &dicts), i);
   return dicts[i];
 }
 
@@ -127,7 +123,7 @@ static void SetUp() {
   TemplateDictionary::SetGlobalValue("GLOBAL", "top");
 }
 
-static void TestSetValueAndTemplateStringAndArena() {
+TEST(TemplateDictionary, SetValueAndTemplateStringAndArena) {
   // Try both with the arena, and without.
   UnsafeArena arena(100);
   // We run the test with arena twice to double-check we don't ever delete it
@@ -141,8 +137,8 @@ static void TestSetValueAndTemplateStringAndArena() {
 
     TemplateDictionaryPeer peer(&dict);
     // verify what happened
-    ASSERT(peer.ValueIs("FOO", "foo"));
-    ASSERT(peer.ValueIs("FOO2", "foo2"));
+    EXPECT_TRUE(peer.ValueIs("FOO", "foo"));
+    EXPECT_TRUE(peer.ValueIs("FOO2", "foo2"));
     string dump;
     dict.DumpToString(&dump);
     char expected[256];
@@ -157,11 +153,11 @@ static void TestSetValueAndTemplateStringAndArena() {
               "   FOO: >foo<\n"
               "   FOO2: >foo2<\n"
               "}\n"), i);
-    ASSERT_STREQ(dump.c_str(), expected);
+    EXPECT_STREQ(dump.c_str(), expected);
   }
 }
 
-static void TestSetValueWithoutCopy() {
+TEST(TemplateDictionary, SetValueWithoutCopy) {
   UnsafeArena arena(100);
   TemplateDictionary dict("Test arena", &arena);
 
@@ -171,50 +167,17 @@ static void TestSetValueWithoutCopy() {
   const void* const ptr = arena.Alloc(0);
   dict.SetValueWithoutCopy("key", value);
   // We shouldn't have copied the value string.
-  ASSERT(ptr == arena.Alloc(0));
+  EXPECT_EQ(ptr, arena.Alloc(0));
 
   TemplateDictionaryPeer peer(&dict);
-  ASSERT(peer.ValueIs("key", "value"));
+  EXPECT_TRUE(peer.ValueIs("key", "value"));
   // If our content changes, so does what's in the dictionary -- but
   // only the contents of the buffer, not its length!
   snprintf(value, sizeof(value), "%s", "not_value");
-  ASSERT(peer.ValueIs("key", "not_v"));   // sizeof("not_v") == sizeof("value")
+  EXPECT_TRUE(peer.ValueIs("key", "not_v"));   // sizeof("not_v") == sizeof("value")
 }
 
-static void TestSetValueWithNUL() {
-  TemplateDictionary dict("test_SetValueWithNUL", NULL);
-  TemplateDictionaryPeer peer(&dict);
-
-  // Test copying char*s, strings, and explicit TemplateStrings
-  dict.SetValue(string("FOO\0BAR", 7), string("QUX\0QUUX", 8));
-  dict.SetGlobalValue(string("GOO\0GAR", 7), string("GUX\0GUUX", 8));
-
-  // FOO should not match FOO\0BAR
-  ASSERT(peer.ValueIs("FOO", ""));
-  ASSERT(peer.ValueIs("GOO", ""));
-
-  ASSERT(peer.ValueIs(string("FOO\0BAR", 7), string("QUX\0QUUX", 8)));
-  ASSERT(peer.ValueIs(string("GOO\0GAR", 7), string("GUX\0GUUX", 8)));
-
-  string dump;
-  dict.DumpToString(&dump);
-  // We can't use ASSERT_STREQ here because of the embedded NULs.
-  // They also require I count the length of the string by hand. :-(
-  string expected(("global dictionary {\n"
-                   "   BI_NEWLINE: >\n"
-                   "<\n"
-                   "   BI_SPACE: > <\n"
-                   "   GLOBAL: >top<\n"
-                   "   GOO\0GAR: >GUX\0GUUX<\n"
-                   "};\n"
-                   "dictionary 'test_SetValueWithNUL' {\n"
-                   "   FOO\0BAR: >QUX\0QUUX<\n"
-                   "}\n"),
-                  160);
-  ASSERT(dump == expected);
-}
-
-static void TestSetIntValue() {
+TEST(TemplateDictionary, SetIntValue) {
   TemplateDictionary dict("test_SetIntValue", NULL);
   TemplateDictionaryPeer peer(&dict);
 
@@ -222,22 +185,23 @@ static void TestSetIntValue() {
   // - is an illegal varname in templates, but perfectly fine in dicts
   dict.SetIntValue("-INT", -5);
 
-  ASSERT(peer.ValueIs("INT", "5"));
-  ASSERT(peer.ValueIs("-INT", "-5"));
+  EXPECT_TRUE(peer.ValueIs("INT", "5"));
+  EXPECT_TRUE(peer.ValueIs("-INT", "-5"));
   string dump;
   dict.DumpToString(&dump);
   ASSERT_STRSTR(dump.c_str(), "\n   INT: >5<\n");
   ASSERT_STRSTR(dump.c_str(), "\n   -INT: >-5<\n");
+
 }
 
-static void TestSetFormattedValue() {
+TEST(TemplateDictionary, SetFormattedValue) {
   TemplateDictionary dict("test_SetFormattedValue", NULL);
   TemplateDictionaryPeer peer(&dict);
 
   dict.SetFormattedValue(TemplateString("PRINTF", sizeof("PRINTF")-1),
                          "%s test %04d", "template test", 1);
 
-  ASSERT(peer.ValueIs("PRINTF", "template test test 0001"));
+  EXPECT_TRUE(peer.ValueIs("PRINTF", "template test test 0001"));
   string dump;
   dict.DumpToString(&dump);
   ASSERT_STRSTR(dump.c_str(), "\n   PRINTF: >template test test 0001<\n");
@@ -249,33 +213,33 @@ static void TestSetFormattedValue() {
   for (int i = 0; i < 4443; ++i)
     expected.append("0");
   expected.append("2");
-  ASSERT(peer.ValueIs("PRINTF", expected));
+  EXPECT_TRUE(peer.ValueIs("PRINTF", expected));
   string dump2;
   dict.DumpToString(&dump2);
   expected = string("\n   PRINTF: >") + expected + string("<\n");
   ASSERT_STRSTR(dump2.c_str(), expected.c_str());
 }
 
-static void TestSetEscapedValue() {
+TEST(TemplateDictionary, SetEscapedValue) {
   TemplateDictionary dict("test_SetEscapedValue", NULL);
   TemplateDictionaryPeer peer(&dict);
 
   dict.SetEscapedValue("hardest HTML",
                        "<A HREF='foo'\nid=\"bar\t\t&&\vbaz\">",
-                       html_escape);
+                       GOOGLE_NAMESPACE::html_escape);
   dict.SetEscapedValue("hardest JS",
                        ("f = 'foo';\r\n\tprint \"\\&foo = \b\", \"foo\""),
-                       javascript_escape);
+                       GOOGLE_NAMESPACE::javascript_escape);
   dict.SetEscapedValue("query escape 0", "",
-                       url_query_escape);
+                       GOOGLE_NAMESPACE::url_query_escape);
 
-  ASSERT(peer.ValueIs("hardest HTML",
-                      "&lt;A HREF=&#39;foo&#39; id=&quot;bar  &amp;&amp; "
-                      "baz&quot;&gt;"));
-  ASSERT(peer.ValueIs("hardest JS",
-                      "f \\x3d \\x27foo\\x27;\\r\\n\\tprint \\x22\\\\\\x26foo "
-                      "\\x3d \\b\\x22, \\x22foo\\x22"));
-  ASSERT(peer.ValueIs("query escape 0", ""));
+  EXPECT_TRUE(peer.ValueIs("hardest HTML",
+                           "&lt;A HREF=&#39;foo&#39; id=&quot;bar  &amp;&amp; "
+                           "baz&quot;&gt;"));
+  EXPECT_TRUE(peer.ValueIs("hardest JS",
+                           "f \\x3d \\x27foo\\x27;\\r\\n\\tprint \\x22\\\\\\x26"
+                           "foo \\x3d \\b\\x22, \\x22foo\\x22"));
+  EXPECT_TRUE(peer.ValueIs("query escape 0", ""));
 
   // Test using hand-made modifiers.
   FooEscaper foo_escaper;
@@ -292,42 +256,42 @@ static void TestSetEscapedValue() {
                        "print \"<A HREF='foo'>\";\r\n\\1;",
                        double_escaper);
 
-  ASSERT(peer.ValueIs("easy foo", "foo"));
-  ASSERT(peer.ValueIs("harder foo", "foo"));
-  ASSERT(peer.ValueIs("easy double", "doo"));
-  ASSERT(peer.ValueIs("harder double",
-                      "\\x3cA HREF\\x3d\\x27foo\\x27\\x3e\\n"));
-  ASSERT(peer.ValueIs("hardest double",
-                      "print \\x22\\x3cA HREF\\x3d\\x27foo\\x27\\x3e\\x22;"
-                      "\\r\\n\\\\1;"));
+  EXPECT_TRUE(peer.ValueIs("easy foo", "foo"));
+  EXPECT_TRUE(peer.ValueIs("harder foo", "foo"));
+  EXPECT_TRUE(peer.ValueIs("easy double", "doo"));
+  EXPECT_TRUE(peer.ValueIs("harder double",
+                           "\\x3cA HREF\\x3d\\x27foo\\x27\\x3e\\n"));
+  EXPECT_TRUE(peer.ValueIs("hardest double",
+                           "print \\x22\\x3cA HREF\\x3d\\x27foo\\x27\\x3e\\x22;"
+                           "\\r\\n\\\\1;"));
 }
 
-static void TestSetEscapedFormattedValue() {
+TEST(TemplateDictionary, SetEscapedFormattedValue) {
   TemplateDictionary dict("test_SetEscapedFormattedValue", NULL);
   TemplateDictionaryPeer peer(&dict);
 
-  dict.SetEscapedFormattedValue("HTML", html_escape,
+  dict.SetEscapedFormattedValue("HTML", GOOGLE_NAMESPACE::html_escape,
                                 "This is <%s> #%.4f", "a & b", 1.0/3);
-  dict.SetEscapedFormattedValue("PRE", pre_escape,
+  dict.SetEscapedFormattedValue("PRE", GOOGLE_NAMESPACE::pre_escape,
                                 "if %s x = %.4f;", "(a < 1 && b > 2)\n\t", 1.0/3);
-  dict.SetEscapedFormattedValue("URL", url_query_escape,
+  dict.SetEscapedFormattedValue("URL", GOOGLE_NAMESPACE::url_query_escape,
                                 "pageviews-%s", "r?egex");
-  dict.SetEscapedFormattedValue("XML", xml_escape,
+  dict.SetEscapedFormattedValue("XML", GOOGLE_NAMESPACE::xml_escape,
                                 "This&is%s -- ok?", "just&");
 
-  ASSERT(peer.ValueIs("HTML",
-                      "This is &lt;a &amp; b&gt; #0.3333"));
-  ASSERT(peer.ValueIs("PRE",
-                      "if (a &lt; 1 &amp;&amp; b &gt; 2)\n\t x = 0.3333;"));
-  ASSERT(peer.ValueIs("URL", "pageviews-r%3Fegex"));
+  EXPECT_TRUE(peer.ValueIs("HTML",
+                           "This is &lt;a &amp; b&gt; #0.3333"));
+  EXPECT_TRUE(peer.ValueIs("PRE",
+                           "if (a &lt; 1 &amp;&amp; b &gt; 2)\n\t x = 0.3333;"));
+  EXPECT_TRUE(peer.ValueIs("URL", "pageviews-r%3Fegex"));
 
-  ASSERT(peer.ValueIs("XML", "This&amp;isjust&amp; -- ok?"));
+  EXPECT_TRUE(peer.ValueIs("XML", "This&amp;isjust&amp; -- ok?"));
 }
 
 static const StaticTemplateString kSectName =
     STS_INIT(kSectName, "test_SetAddSectionDictionary");
 
-static void TestAddSectionDictionary() {
+TEST(TemplateDictionary, AddSectionDictionary) {
   // For fun, we'll make this constructor take a static template string.
   TemplateDictionary dict(kSectName, NULL);
   TemplateDictionaryPeer peer(&dict);
@@ -335,7 +299,9 @@ static void TestAddSectionDictionary() {
   dict.SetValue("TOPLEVEL2", "foo2");
 
   TemplateDictionary* subdict_1a = dict.AddSectionDictionary("section1");
-  TemplateDictionary* subdict_1b = dict.AddSectionDictionary("section1");
+  // This is the same dict, but name is specified a different way.
+  TemplateDictionary* subdict_1b = dict.AddSectionDictionary(
+      TemplateString("section1__ignored__", strlen("section1")));
   TemplateDictionaryPeer subdict_1a_peer(subdict_1a);
   TemplateDictionaryPeer subdict_1b_peer(subdict_1b);
   subdict_1a->SetValue("SUBLEVEL", "subfoo");
@@ -350,71 +316,71 @@ static void TestAddSectionDictionary() {
 
   // Verify that all variables that should be look-up-able are, and that
   // we have proper precedence.
-  ASSERT(peer.ValueIs("GLOBAL", "top"));
-  ASSERT(peer.ValueIs("TOPLEVEL", "foo"));
-  ASSERT(peer.ValueIs("TOPLEVEL2", "foo2"));
-  ASSERT(peer.ValueIs("SUBLEVEL", ""));
+  EXPECT_TRUE(peer.ValueIs("GLOBAL", "top"));
+  EXPECT_TRUE(peer.ValueIs("TOPLEVEL", "foo"));
+  EXPECT_TRUE(peer.ValueIs("TOPLEVEL2", "foo2"));
+  EXPECT_TRUE(peer.ValueIs("SUBLEVEL", ""));
 
-  ASSERT(subdict_1a_peer.ValueIs("GLOBAL", "top"));
-  ASSERT(subdict_1a_peer.ValueIs("TOPLEVEL", "foo"));
-  ASSERT(subdict_1a_peer.ValueIs("TOPLEVEL2", "foo2"));
-  ASSERT(subdict_1a_peer.ValueIs("SUBLEVEL", "subfoo"));
+  EXPECT_TRUE(subdict_1a_peer.ValueIs("GLOBAL", "top"));
+  EXPECT_TRUE(subdict_1a_peer.ValueIs("TOPLEVEL", "foo"));
+  EXPECT_TRUE(subdict_1a_peer.ValueIs("TOPLEVEL2", "foo2"));
+  EXPECT_TRUE(subdict_1a_peer.ValueIs("SUBLEVEL", "subfoo"));
 
-  ASSERT(subdict_1b_peer.ValueIs("GLOBAL", "top"));
-  ASSERT(subdict_1b_peer.ValueIs("TOPLEVEL", "foo"));
-  ASSERT(subdict_1b_peer.ValueIs("TOPLEVEL2", "foo2"));
-  ASSERT(subdict_1b_peer.ValueIs("SUBLEVEL", "subbar"));
+  EXPECT_TRUE(subdict_1b_peer.ValueIs("GLOBAL", "top"));
+  EXPECT_TRUE(subdict_1b_peer.ValueIs("TOPLEVEL", "foo"));
+  EXPECT_TRUE(subdict_1b_peer.ValueIs("TOPLEVEL2", "foo2"));
+  EXPECT_TRUE(subdict_1b_peer.ValueIs("SUBLEVEL", "subbar"));
 
-  ASSERT(subdict_2_peer.ValueIs("GLOBAL", "top"));
-  ASSERT(subdict_2_peer.ValueIs("TOPLEVEL", "bar"));
-  ASSERT(subdict_2_peer.ValueIs("TOPLEVEL2", "foo2"));
-  ASSERT(subdict_2_peer.ValueIs("SUBLEVEL", ""));
+  EXPECT_TRUE(subdict_2_peer.ValueIs("GLOBAL", "top"));
+  EXPECT_TRUE(subdict_2_peer.ValueIs("TOPLEVEL", "bar"));
+  EXPECT_TRUE(subdict_2_peer.ValueIs("TOPLEVEL2", "foo2"));
+  EXPECT_TRUE(subdict_2_peer.ValueIs("SUBLEVEL", ""));
 
-  ASSERT(subdict_2_1_peer.ValueIs("GLOBAL", "21"));
-  ASSERT(subdict_2_1_peer.ValueIs("TOPLEVEL", "bar"));
-  ASSERT(subdict_2_1_peer.ValueIs("TOPLEVEL2", "foo2"));
-  ASSERT(subdict_2_1_peer.ValueIs("SUBLEVEL", ""));
+  EXPECT_TRUE(subdict_2_1_peer.ValueIs("GLOBAL", "21"));
+  EXPECT_TRUE(subdict_2_1_peer.ValueIs("TOPLEVEL", "bar"));
+  EXPECT_TRUE(subdict_2_1_peer.ValueIs("TOPLEVEL2", "foo2"));
+  EXPECT_TRUE(subdict_2_1_peer.ValueIs("SUBLEVEL", ""));
 
   // Verify that everyone knows about its sub-dictionaries, and also
   // that these go 'up the chain' on lookup failure
-  ASSERT(!peer.IsHiddenSection("section1"));
-  ASSERT(!peer.IsHiddenSection("section2"));
-  ASSERT(peer.IsHiddenSection("section3"));
-  ASSERT(peer.IsHiddenSection("sub"));
-  ASSERT(!subdict_1a_peer.IsHiddenSection("section1"));
-  ASSERT(subdict_1a_peer.IsHiddenSection("sub"));
-  ASSERT(!subdict_2_peer.IsHiddenSection("sub"));
-  ASSERT(!subdict_2_1_peer.IsHiddenSection("sub"));
+  EXPECT_FALSE(peer.IsHiddenSection("section1"));
+  EXPECT_FALSE(peer.IsHiddenSection("section2"));
+  EXPECT_TRUE(peer.IsHiddenSection("section3"));
+  EXPECT_TRUE(peer.IsHiddenSection("sub"));
+  EXPECT_FALSE(subdict_1a_peer.IsHiddenSection("section1"));
+  EXPECT_TRUE(subdict_1a_peer.IsHiddenSection("sub"));
+  EXPECT_FALSE(subdict_2_peer.IsHiddenSection("sub"));
+  EXPECT_FALSE(subdict_2_1_peer.IsHiddenSection("sub"));
 
   // We should get the dictionary-lengths right as well
   vector<const TemplateDictionary*> dummy;
-  ASSERT(peer.GetSectionDictionaries("section1", &dummy) == 2);
-  ASSERT(peer.GetSectionDictionaries("section2", &dummy) == 1);
-  ASSERT(subdict_2_peer.GetSectionDictionaries("sub", &dummy) == 1);
+  EXPECT_EQ(2, peer.GetSectionDictionaries("section1", &dummy));
+  EXPECT_EQ(1, peer.GetSectionDictionaries("section2", &dummy));
+  EXPECT_EQ(1, subdict_2_peer.GetSectionDictionaries("sub", &dummy));
   // Test some of the values
-  ASSERT(TemplateDictionaryPeer(GetSectionDict(&dict, "section1", 0))
-         .ValueIs("SUBLEVEL", "subfoo"));
-  ASSERT(TemplateDictionaryPeer(GetSectionDict(&dict, "section1", 1))
-         .ValueIs("SUBLEVEL", "subbar"));
-  ASSERT(TemplateDictionaryPeer(GetSectionDict(&dict, "section2", 0))
-         .ValueIs("TOPLEVEL", "bar"));
-  ASSERT(TemplateDictionaryPeer(
-           GetSectionDict(GetSectionDict(&dict, "section2", 0), "sub", 0))
-         .ValueIs("TOPLEVEL", "bar"));
-  ASSERT(TemplateDictionaryPeer(
-             GetSectionDict(GetSectionDict(&dict, "section2", 0), "sub", 0))
-         .ValueIs("GLOBAL", "21"));
+  EXPECT_TRUE(TemplateDictionaryPeer(GetSectionDict(&dict, "section1", 0))
+              .ValueIs("SUBLEVEL", "subfoo"));
+  EXPECT_TRUE(TemplateDictionaryPeer(GetSectionDict(&dict, "section1", 1))
+              .ValueIs("SUBLEVEL", "subbar"));
+  EXPECT_TRUE(TemplateDictionaryPeer(GetSectionDict(&dict, "section2", 0))
+              .ValueIs("TOPLEVEL", "bar"));
+  EXPECT_TRUE(TemplateDictionaryPeer(
+      GetSectionDict(GetSectionDict(&dict, "section2", 0), "sub", 0))
+              .ValueIs("TOPLEVEL", "bar"));
+  EXPECT_TRUE(TemplateDictionaryPeer(
+      GetSectionDict(GetSectionDict(&dict, "section2", 0), "sub", 0))
+              .ValueIs("GLOBAL", "21"));
 
   // Make sure we're making descriptive names
-  ASSERT_STREQ(dict.name().c_str(),
+  EXPECT_STREQ(dict.name().c_str(),
                "test_SetAddSectionDictionary");
-  ASSERT_STREQ(subdict_1a->name().c_str(),
+  EXPECT_STREQ(subdict_1a->name().c_str(),
                "test_SetAddSectionDictionary/section1#1");
-  ASSERT_STREQ(subdict_1b->name().c_str(),
+  EXPECT_STREQ(subdict_1b->name().c_str(),
                "test_SetAddSectionDictionary/section1#2");
-  ASSERT_STREQ(subdict_2->name().c_str(),
+  EXPECT_STREQ(subdict_2->name().c_str(),
                "test_SetAddSectionDictionary/section2#1");
-  ASSERT_STREQ(subdict_2_1->name().c_str(),
+  EXPECT_STREQ(subdict_2_1->name().c_str(),
                "test_SetAddSectionDictionary/section2#1/sub#1");
 
   // Finally, we can test the whole kit and kaboodle
@@ -447,10 +413,10 @@ static void TestAddSectionDictionary() {
      "         }\n"
      "     }\n"
      "}\n");
-  ASSERT_STREQ(dump.c_str(), expected);
+  EXPECT_STREQ(dump.c_str(), expected);
 }
 
-static void TestShowSection() {
+TEST(TemplateDictionary, ShowSection) {
   TemplateDictionary dict("test_SetShowSection", NULL);
   // Let's say what filename dict is associated with
   dict.SetFilename("bigmamainclude!.tpl");
@@ -466,7 +432,7 @@ static void TestShowSection() {
   subdict->SetValue("TOPLEVEL", "bar");
   dict.ShowSection("section3");
 
-  ASSERT(subdict_peer.ValueIs("TOPLEVEL", "bar"));
+  EXPECT_TRUE(subdict_peer.ValueIs("TOPLEVEL", "bar"));
 
   // Since ShowSection() doesn't return a sub-dict, the only way to
   // probe what the dicts look like is via Dump()
@@ -493,10 +459,10 @@ static void TestShowSection() {
      "       TOPLEVEL: >bar<\n"
      "     }\n"
      "}\n");
-  ASSERT_STREQ(dump.c_str(), expected);
+  EXPECT_STREQ(dump.c_str(), expected);
 }
 
-static void TestSetValueAndShowSection() {
+TEST(TemplateDictionary, SetValueAndShowSection) {
   TemplateDictionary dict("test_SetValueAndShowSection");
   TemplateDictionaryPeer peer(&dict);
   dict.SetValue("TOPLEVEL", "foo");
@@ -506,7 +472,7 @@ static void TestSetValueAndShowSection() {
   dict.SetValueAndShowSection("NOTINSEC2", NULL, "SEC3");
 
   dict.SetEscapedValueAndShowSection("EINSEC", "a & b",
-                                     html_escape,
+                                     GOOGLE_NAMESPACE::html_escape,
                                      "SEC4");
   dict.SetEscapedValueAndShowSection("EINSEC2", "a beautiful poem",
                                      FooEscaper(),
@@ -515,12 +481,12 @@ static void TestSetValueAndShowSection() {
                                      NullEscaper(),
                                      "SEC6");
 
-  ASSERT(!peer.IsHiddenSection("SEC1"));
-  ASSERT(peer.IsHiddenSection("SEC2"));
-  ASSERT(peer.IsHiddenSection("SEC3"));
-  ASSERT(!peer.IsHiddenSection("SEC4"));
-  ASSERT(!peer.IsHiddenSection("SEC5"));
-  ASSERT(peer.IsHiddenSection("SEC6"));
+  EXPECT_FALSE(peer.IsHiddenSection("SEC1"));
+  EXPECT_TRUE(peer.IsHiddenSection("SEC2"));
+  EXPECT_TRUE(peer.IsHiddenSection("SEC3"));
+  EXPECT_FALSE(peer.IsHiddenSection("SEC4"));
+  EXPECT_FALSE(peer.IsHiddenSection("SEC5"));
+  EXPECT_TRUE(peer.IsHiddenSection("SEC6"));
 
   // Again, we don't get subdicts, so we have to dump to check values
   string dump;
@@ -547,10 +513,10 @@ static void TestSetValueAndShowSection() {
      "       EINSEC2: >foo<\n"
      "     }\n"
      "}\n");
-  ASSERT_STREQ(dump.c_str(), expected);
+  EXPECT_STREQ(dump.c_str(), expected);
 }
 
-static void TestSetTemplateGlobalValue() {
+TEST(TemplateDictionary, SetTemplateGlobalValue) {
   // The functionality involving it passing across the included dictionaries
   // is also tested in TestAddIncludeDictionary
   TemplateDictionary dict("test_SetTemplateGlobalValue", NULL);
@@ -567,10 +533,10 @@ static void TestSetTemplateGlobalValue() {
   // Setting a template value after sub dictionaries are created should
   // affect the sub dictionaries as well.
   dict.SetTemplateGlobalValue("TEMPLATEVAL", "templateval");
-  ASSERT(peer.ValueIs("TEMPLATEVAL", "templateval"));
-  ASSERT(subdict_peer.ValueIs("TEMPLATEVAL", "templateval"));
-  ASSERT(subsubdict_peer.ValueIs("TEMPLATEVAL", "templateval"));
-  ASSERT(includedict_peer.ValueIs("TEMPLATEVAL", "templateval"));
+  EXPECT_TRUE(peer.ValueIs("TEMPLATEVAL", "templateval"));
+  EXPECT_TRUE(subdict_peer.ValueIs("TEMPLATEVAL", "templateval"));
+  EXPECT_TRUE(subsubdict_peer.ValueIs("TEMPLATEVAL", "templateval"));
+  EXPECT_TRUE(includedict_peer.ValueIs("TEMPLATEVAL", "templateval"));
 
   // sub dictionaries after you set the template value should also
   // get the template value
@@ -579,56 +545,56 @@ static void TestSetTemplateGlobalValue() {
   TemplateDictionaryPeer subdict2_peer(subdict2);
   TemplateDictionaryPeer includedict2_peer(includedict2);
 
-  ASSERT(subdict2_peer.ValueIs("TEMPLATEVAL", "templateval"));
-  ASSERT(includedict2_peer.ValueIs("TEMPLATEVAL", "templateval"));
+  EXPECT_TRUE(subdict2_peer.ValueIs("TEMPLATEVAL", "templateval"));
+  EXPECT_TRUE(includedict2_peer.ValueIs("TEMPLATEVAL", "templateval"));
 
   // setting a template value on a sub dictionary should affect all the other
   // sub dictionaries and the parent as well
   subdict->SetTemplateGlobalValue("TEMPLATEVAL2", "templateval2");
-  ASSERT(peer.ValueIs("TEMPLATEVAL2", "templateval2"));
-  ASSERT(subdict_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
-  ASSERT(subsubdict_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
-  ASSERT(includedict_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
-  ASSERT(subdict2_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
-  ASSERT(includedict2_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  EXPECT_TRUE(peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  EXPECT_TRUE(subdict_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  EXPECT_TRUE(subsubdict_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  EXPECT_TRUE(includedict_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  EXPECT_TRUE(subdict2_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  EXPECT_TRUE(includedict2_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
 
   includedict->SetTemplateGlobalValue("TEMPLATEVAL3", "templateval3");
-  ASSERT(peer.ValueIs("TEMPLATEVAL3", "templateval3"));
-  ASSERT(subdict_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
-  ASSERT(subsubdict_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
-  ASSERT(includedict_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
-  ASSERT(subdict2_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
-  ASSERT(includedict2_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
+  EXPECT_TRUE(peer.ValueIs("TEMPLATEVAL3", "templateval3"));
+  EXPECT_TRUE(subdict_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
+  EXPECT_TRUE(subsubdict_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
+  EXPECT_TRUE(includedict_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
+  EXPECT_TRUE(subdict2_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
+  EXPECT_TRUE(includedict2_peer.ValueIs("TEMPLATEVAL3", "templateval3"));
 
   // you should be able to override a template value with a regular value
   // and the overwritten regular value should pass on to its children
   subdict->SetValue("TEMPLATEVAL2", "subdictval");
   includedict->SetValue("TEMPLATEVAL2", "includedictval");
-  ASSERT(peer.ValueIs("TEMPLATEVAL2", "templateval2"));
-  ASSERT(subdict_peer.ValueIs("TEMPLATEVAL2", "subdictval"));
-  ASSERT(subsubdict_peer.ValueIs("TEMPLATEVAL2", "subdictval"));
-  ASSERT(includedict_peer.ValueIs("TEMPLATEVAL2", "includedictval"));
-  ASSERT(subdict2_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
-  ASSERT(includedict2_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  EXPECT_TRUE(peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  EXPECT_TRUE(subdict_peer.ValueIs("TEMPLATEVAL2", "subdictval"));
+  EXPECT_TRUE(subsubdict_peer.ValueIs("TEMPLATEVAL2", "subdictval"));
+  EXPECT_TRUE(includedict_peer.ValueIs("TEMPLATEVAL2", "includedictval"));
+  EXPECT_TRUE(subdict2_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
+  EXPECT_TRUE(includedict2_peer.ValueIs("TEMPLATEVAL2", "templateval2"));
 
   // A section shown template-globally will be shown in all its children.
   dict.ShowTemplateGlobalSection("ShownTemplateGlobalSection");
-  ASSERT(!peer.IsHiddenSection("ShownTemplateGlobalSection"));
+  EXPECT_FALSE(peer.IsHiddenSection("ShownTemplateGlobalSection"));
 
-  ASSERT(!subdict2_peer.IsHiddenSection("ShownTemplateGlobalSection"));
-  ASSERT(!subsubdict_peer.IsHiddenSection("ShownTemplateGlobalSection"));
+  EXPECT_FALSE(subdict2_peer.IsHiddenSection("ShownTemplateGlobalSection"));
+  EXPECT_FALSE(subsubdict_peer.IsHiddenSection("ShownTemplateGlobalSection"));
 
   // Showing a template-global section in a child will show it in all templates
   // in the tree
   subdict->ShowTemplateGlobalSection("ShownFromAChild");
-  ASSERT(!peer.IsHiddenSection("ShownFromAChild"));
-  ASSERT(!subsubdict_peer.IsHiddenSection("ShownFromAChild"));
+  EXPECT_FALSE(peer.IsHiddenSection("ShownFromAChild"));
+  EXPECT_FALSE(subsubdict_peer.IsHiddenSection("ShownFromAChild"));
 
   // Asking for a section that doesn't exist shouldn't cause infinite recursion
   peer.IsHiddenSection("NAVBAR_SECTION");
 }
 
-static void TestSetTemplateGlobalValueWithoutCopy() {
+TEST(TemplateDictionary, SetTemplateGlobalValueWithoutCopy) {
   UnsafeArena arena(100);
   TemplateDictionary dict("Test arena", &arena);
   TemplateDictionaryPeer peer(&dict);
@@ -639,16 +605,16 @@ static void TestSetTemplateGlobalValueWithoutCopy() {
   const void* const ptr = arena.Alloc(0);
   dict.SetTemplateGlobalValueWithoutCopy("key", value);
   // We shouldn't have copied the value string.
-  ASSERT(ptr == arena.Alloc(0));
+  EXPECT_EQ(ptr, arena.Alloc(0));
 
-  ASSERT(peer.ValueIs("key", "value"));
+  EXPECT_TRUE(peer.ValueIs("key", "value"));
   // If our content changes, so does what's in the dictionary -- but
   // only the contents of the buffer, not its length!
   snprintf(value, sizeof(value), "%s", "not_value");
-  ASSERT(peer.ValueIs("key", "not_v"));   // sizeof("not_v") == sizeof("value")
+  EXPECT_TRUE(peer.ValueIs("key", "not_v"));   // "not_v" size == value" size
 }
 
-static void TestAddIncludeDictionary() {
+TEST(TemplateDictionary, AddIncludeDictionary) {
   TemplateDictionary dict("test_SetAddIncludeDictionary", NULL);
   TemplateDictionaryPeer peer(&dict);
   dict.SetValue("TOPLEVEL", "foo");
@@ -658,7 +624,9 @@ static void TestAddIncludeDictionary() {
   TemplateDictionary* subdict_1a = dict.AddIncludeDictionary("include1");
   TemplateDictionaryPeer subdict_1a_peer(subdict_1a);
   subdict_1a->SetFilename("incfile1a");
-  TemplateDictionary* subdict_1b = dict.AddIncludeDictionary("include1");
+  // This is the same dict, but name is specified a different way.
+  TemplateDictionary* subdict_1b = dict.AddIncludeDictionary(
+      TemplateString("include1__ignored__", strlen("include1")));
   TemplateDictionaryPeer subdict_1b_peer(subdict_1b);
   // Let's try not calling SetFilename on this one.
   subdict_1a->SetValue("SUBLEVEL", "subfoo");
@@ -678,86 +646,86 @@ static void TestAddIncludeDictionary() {
   // Verify that all variables that should be look-up-able are, and that
   // we have proper precedence.  Unlike with sections, includes lookups
   // do not go 'up the chain'.
-  ASSERT(peer.ValueIs("GLOBAL", "top"));
-  ASSERT(peer.ValueIs("TOPLEVEL", "foo"));
-  ASSERT(peer.ValueIs("TOPLEVEL2", "foo2"));
-  ASSERT(peer.ValueIs("TEMPLATELEVEL", "foo3"));
-  ASSERT(peer.ValueIs("SUBLEVEL", ""));
+  EXPECT_TRUE(peer.ValueIs("GLOBAL", "top"));
+  EXPECT_TRUE(peer.ValueIs("TOPLEVEL", "foo"));
+  EXPECT_TRUE(peer.ValueIs("TOPLEVEL2", "foo2"));
+  EXPECT_TRUE(peer.ValueIs("TEMPLATELEVEL", "foo3"));
+  EXPECT_TRUE(peer.ValueIs("SUBLEVEL", ""));
 
-  ASSERT(subdict_1a_peer.ValueIs("GLOBAL", "top"));
-  ASSERT(subdict_1a_peer.ValueIs("TOPLEVEL", ""));
-  ASSERT(subdict_1a_peer.ValueIs("TOPLEVEL2", ""));
-  ASSERT(subdict_1a_peer.ValueIs("TEMPLATELEVEL", "foo3"));
-  ASSERT(subdict_1a_peer.ValueIs("SUBLEVEL", "subfoo"));
+  EXPECT_TRUE(subdict_1a_peer.ValueIs("GLOBAL", "top"));
+  EXPECT_TRUE(subdict_1a_peer.ValueIs("TOPLEVEL", ""));
+  EXPECT_TRUE(subdict_1a_peer.ValueIs("TOPLEVEL2", ""));
+  EXPECT_TRUE(subdict_1a_peer.ValueIs("TEMPLATELEVEL", "foo3"));
+  EXPECT_TRUE(subdict_1a_peer.ValueIs("SUBLEVEL", "subfoo"));
 
-  ASSERT(subdict_1b_peer.ValueIs("GLOBAL", "top"));
-  ASSERT(subdict_1b_peer.ValueIs("TOPLEVEL", ""));
-  ASSERT(subdict_1b_peer.ValueIs("TOPLEVEL2", ""));
-  ASSERT(subdict_1b_peer.ValueIs("SUBLEVEL", "subbar"));
+  EXPECT_TRUE(subdict_1b_peer.ValueIs("GLOBAL", "top"));
+  EXPECT_TRUE(subdict_1b_peer.ValueIs("TOPLEVEL", ""));
+  EXPECT_TRUE(subdict_1b_peer.ValueIs("TOPLEVEL2", ""));
+  EXPECT_TRUE(subdict_1b_peer.ValueIs("SUBLEVEL", "subbar"));
 
-  ASSERT(subdict_2_peer.ValueIs("GLOBAL", "top"));
-  ASSERT(subdict_2_peer.ValueIs("TOPLEVEL", "bar"));
-  ASSERT(subdict_2_peer.ValueIs("TOPLEVEL2", ""));
-  ASSERT(subdict_2_peer.ValueIs("TEMPLATELEVEL", "subfoo3"));
-  ASSERT(subdict_2_peer.ValueIs("SUBLEVEL", ""));
+  EXPECT_TRUE(subdict_2_peer.ValueIs("GLOBAL", "top"));
+  EXPECT_TRUE(subdict_2_peer.ValueIs("TOPLEVEL", "bar"));
+  EXPECT_TRUE(subdict_2_peer.ValueIs("TOPLEVEL2", ""));
+  EXPECT_TRUE(subdict_2_peer.ValueIs("TEMPLATELEVEL", "subfoo3"));
+  EXPECT_TRUE(subdict_2_peer.ValueIs("SUBLEVEL", ""));
 
-  ASSERT(subdict_2_1_peer.ValueIs("GLOBAL", "21"));
-  ASSERT(subdict_2_1_peer.ValueIs("TOPLEVEL", ""));
-  ASSERT(subdict_2_1_peer.ValueIs("TOPLEVEL2", ""));
-  ASSERT(subdict_2_1_peer.ValueIs("SUBLEVEL", ""));
+  EXPECT_TRUE(subdict_2_1_peer.ValueIs("GLOBAL", "21"));
+  EXPECT_TRUE(subdict_2_1_peer.ValueIs("TOPLEVEL", ""));
+  EXPECT_TRUE(subdict_2_1_peer.ValueIs("TOPLEVEL2", ""));
+  EXPECT_TRUE(subdict_2_1_peer.ValueIs("SUBLEVEL", ""));
 
   // Verify that everyone knows about its sub-dictionaries, but that
   // these do not try to go 'up the chain' on lookup failure
-  ASSERT(!peer.IsHiddenTemplate("include1"));
-  ASSERT(!peer.IsHiddenTemplate("include2"));
-  ASSERT(peer.IsHiddenTemplate("include3"));
-  ASSERT(peer.IsHiddenTemplate("sub"));
-  ASSERT(subdict_1a_peer.IsHiddenTemplate("include1"));
-  ASSERT(subdict_1a_peer.IsHiddenTemplate("sub"));
-  ASSERT(!subdict_2_peer.IsHiddenTemplate("sub"));
-  ASSERT(subdict_2_1_peer.IsHiddenTemplate("sub"));
+  EXPECT_FALSE(peer.IsHiddenTemplate("include1"));
+  EXPECT_FALSE(peer.IsHiddenTemplate("include2"));
+  EXPECT_TRUE(peer.IsHiddenTemplate("include3"));
+  EXPECT_TRUE(peer.IsHiddenTemplate("sub"));
+  EXPECT_TRUE(subdict_1a_peer.IsHiddenTemplate("include1"));
+  EXPECT_TRUE(subdict_1a_peer.IsHiddenTemplate("sub"));
+  EXPECT_FALSE(subdict_2_peer.IsHiddenTemplate("sub"));
+  EXPECT_TRUE(subdict_2_1_peer.IsHiddenTemplate("sub"));
 
   // We should get the dictionary-lengths right as well
   vector<const TemplateDictionary*> dummy;
-  ASSERT(peer.GetIncludeDictionaries("include1", &dummy) == 2);
-  ASSERT(peer.GetIncludeDictionaries("include2", &dummy) == 1);
-  ASSERT(subdict_2_peer.GetIncludeDictionaries("sub", &dummy) == 1);
+  EXPECT_EQ(2, peer.GetIncludeDictionaries("include1", &dummy));
+  EXPECT_EQ(1, peer.GetIncludeDictionaries("include2", &dummy));
+  EXPECT_EQ(1, subdict_2_peer.GetIncludeDictionaries("sub", &dummy));
 
   // We can also test the include-files are right
-  ASSERT(peer.GetIncludeDictionaries("include1", &dummy) == 2);
-  ASSERT(peer.GetIncludeDictionaries("include2", &dummy) == 1);
-  ASSERT(subdict_2_peer.GetIncludeDictionaries("sub", &dummy) == 1);
+  EXPECT_EQ(2, peer.GetIncludeDictionaries("include1", &dummy));
+  EXPECT_EQ(1, peer.GetIncludeDictionaries("include2", &dummy));
+  EXPECT_EQ(1, subdict_2_peer.GetIncludeDictionaries("sub", &dummy));
   // Test some of the values
-  ASSERT(TemplateDictionaryPeer(GetIncludeDict(&dict, "include1", 0))
-         .ValueIs("SUBLEVEL", "subfoo"));
-  ASSERT(TemplateDictionaryPeer(GetIncludeDict(&dict, "include1", 1))
-         .ValueIs("SUBLEVEL", "subbar"));
-  ASSERT(TemplateDictionaryPeer(GetIncludeDict(&dict, "include2", 0))
-         .ValueIs("TOPLEVEL", "bar"));
-  ASSERT(TemplateDictionaryPeer(
-           GetIncludeDict(GetIncludeDict(&dict, "include2", 0), "sub", 0))
-         .ValueIs("TOPLEVEL", ""));
-  ASSERT(TemplateDictionaryPeer(
-             GetIncludeDict(GetIncludeDict(&dict, "include2", 0), "sub", 0))
-         .ValueIs("GLOBAL", "21"));
+  EXPECT_TRUE(TemplateDictionaryPeer(GetIncludeDict(&dict, "include1", 0))
+              .ValueIs("SUBLEVEL", "subfoo"));
+  EXPECT_TRUE(TemplateDictionaryPeer(GetIncludeDict(&dict, "include1", 1))
+              .ValueIs("SUBLEVEL", "subbar"));
+  EXPECT_TRUE(TemplateDictionaryPeer(GetIncludeDict(&dict, "include2", 0))
+              .ValueIs("TOPLEVEL", "bar"));
+  EXPECT_TRUE(TemplateDictionaryPeer(
+      GetIncludeDict(GetIncludeDict(&dict, "include2", 0), "sub", 0))
+              .ValueIs("TOPLEVEL", ""));
+  EXPECT_TRUE(TemplateDictionaryPeer(
+      GetIncludeDict(GetIncludeDict(&dict, "include2", 0), "sub", 0))
+              .ValueIs("GLOBAL", "21"));
   // We can test the include-names as well
-  ASSERT_STREQ(peer.GetIncludeTemplateName("include1", 0), "incfile1a");
-  ASSERT_STREQ(peer.GetIncludeTemplateName("include1", 1), "");
-  ASSERT_STREQ(peer.GetIncludeTemplateName("include2", 0), "foo/bar");
-  ASSERT_STREQ(TemplateDictionaryPeer(GetIncludeDict(&dict, "include2", 0))
+  EXPECT_STREQ(peer.GetIncludeTemplateName("include1", 0), "incfile1a");
+  EXPECT_STREQ(peer.GetIncludeTemplateName("include1", 1), "");
+  EXPECT_STREQ(peer.GetIncludeTemplateName("include2", 0), "foo/bar");
+  EXPECT_STREQ(TemplateDictionaryPeer(GetIncludeDict(&dict, "include2", 0))
                .GetIncludeTemplateName("sub", 0),
                "baz");
 
   // Make sure we're making descriptive names
-  ASSERT_STREQ(dict.name().c_str(),
+  EXPECT_STREQ(dict.name().c_str(),
                "test_SetAddIncludeDictionary");
-  ASSERT_STREQ(subdict_1a->name().c_str(),
+  EXPECT_STREQ(subdict_1a->name().c_str(),
                "test_SetAddIncludeDictionary/include1#1");
-  ASSERT_STREQ(subdict_1b->name().c_str(),
+  EXPECT_STREQ(subdict_1b->name().c_str(),
                "test_SetAddIncludeDictionary/include1#2");
-  ASSERT_STREQ(subdict_2->name().c_str(),
+  EXPECT_STREQ(subdict_2->name().c_str(),
                "test_SetAddIncludeDictionary/include2#1");
-  ASSERT_STREQ(subdict_2_1->name().c_str(),
+  EXPECT_STREQ(subdict_2_1->name().c_str(),
                "test_SetAddIncludeDictionary/include2#1/sub#1");
 
   // Finally, we can test the whole kit and kaboodle
@@ -818,7 +786,7 @@ static void TestAddIncludeDictionary() {
      "         }\n"
      "     }\n"
      "}\n");
-  ASSERT_STREQ(dump.c_str(), expected);
+  EXPECT_STREQ(dump.c_str(), expected);
 }
 
 static void TestMakeCopy(bool use_local_arena) {
@@ -858,8 +826,8 @@ static void TestMakeCopy(bool use_local_arena) {
   // Make a copy
   TemplateDictionary* dict_copy = dict->MakeCopy("testdict", NULL);
   // Make sure it doesn't work to copy a sub-dictionary
-  ASSERT(subdict_1a->MakeCopy("copy of subdict") == NULL);
-  ASSERT(subdict_2a->MakeCopy("copy of subdict") == NULL);
+  EXPECT_TRUE(subdict_1a->MakeCopy("copy of subdict") == NULL);
+  EXPECT_TRUE(subdict_2a->MakeCopy("copy of subdict") == NULL);
 
   // Delete the original dict, to make sure the copy really is independent
   delete dict;
@@ -868,17 +836,25 @@ static void TestMakeCopy(bool use_local_arena) {
   dict_copy->DumpToString(&copy);
   delete dict_copy;
 
-  ASSERT_STREQ(orig.c_str(), copy.c_str());
+  EXPECT_STREQ(orig.c_str(), copy.c_str());
 }
 
-static void TestSetModifierData() {
+TEST(MakeCopy, UseLocalArena) {
+  TestMakeCopy(true);
+}
+
+TEST(MakeCopy, DoNotUseLocalArena) {
+  TestMakeCopy(false);
+}
+
+TEST(TemplateDictionary, SetModifierData) {
   PerExpandData per_expand_data;
   const void* data = "test";
   per_expand_data.InsertForModifiers("a", data);
-  ASSERT(data == per_expand_data.LookupForModifiers("a"));
+  EXPECT_EQ(data, per_expand_data.LookupForModifiers("a"));
 }
 
-static void TestIterator() {
+TEST(TemplateDictionary, Iterator) {
   // Build up a nice community of TemplateDictionaries.
   TemplateDictionary farm("Farm");
   TemplateDictionaryPeer farm_peer(&farm);
@@ -903,93 +879,145 @@ static void TestIterator() {
   // Check that the iterators expose all of the dictionaries.
   TemplateDictionaryPeer::Iterator* barns =
       farm_peer.CreateTemplateIterator("BARN");
-  ASSERT(barns->HasNext());
-  ASSERT(&barns->Next() == grey_barn);
-  ASSERT(!barns->HasNext());
+  EXPECT_TRUE(barns->HasNext());
+  EXPECT_EQ(&barns->Next(), grey_barn);
+  EXPECT_FALSE(barns->HasNext());
   delete barns;
 
   TemplateDictionaryPeer::Iterator* ponds =
       farm_peer.CreateTemplateIterator("POND");
-  ASSERT(ponds->HasNext());
-  ASSERT(&ponds->Next() == duck_pond);
-  ASSERT(ponds->HasNext());
-  ASSERT(&ponds->Next() == cattle_pond);
-  ASSERT(ponds->HasNext());
-  ASSERT(&ponds->Next() == irrigation_pond);
-  ASSERT(!ponds->HasNext());
+  EXPECT_TRUE(ponds->HasNext());
+  EXPECT_EQ(&ponds->Next(), duck_pond);
+  EXPECT_TRUE(ponds->HasNext());
+  EXPECT_EQ(&ponds->Next(), cattle_pond);
+  EXPECT_TRUE(ponds->HasNext());
+  EXPECT_EQ(&ponds->Next(), irrigation_pond);
+  EXPECT_FALSE(ponds->HasNext());
   delete ponds;
 
   TemplateDictionaryPeer::Iterator* flowers =
       farm_peer.CreateSectionIterator("FLOWERS");
-  ASSERT(flowers->HasNext());
-  ASSERT(&flowers->Next() == lillies);
-  ASSERT(flowers->HasNext());
-  ASSERT(&flowers->Next() == lilacs);
-  ASSERT(flowers->HasNext());
-  ASSERT(&flowers->Next() == daisies);
-  ASSERT(!flowers->HasNext());
+  EXPECT_TRUE(flowers->HasNext());
+  EXPECT_EQ(&flowers->Next(), lillies);
+  EXPECT_TRUE(flowers->HasNext());
+  EXPECT_EQ(&flowers->Next(), lilacs);
+  EXPECT_TRUE(flowers->HasNext());
+  EXPECT_EQ(&flowers->Next(), daisies);
+  EXPECT_FALSE(flowers->HasNext());
   delete flowers;
 
   TemplateDictionaryPeer::Iterator* crop =
       farm_peer.CreateSectionIterator("WHEAT");
-  ASSERT(crop->HasNext());
-  ASSERT(&crop->Next() == wheat);
-  ASSERT(!crop->HasNext());
+  EXPECT_TRUE(crop->HasNext());
+  EXPECT_EQ(&crop->Next(), wheat);
+  EXPECT_FALSE(crop->HasNext());
   delete crop;
 
   TemplateDictionaryPeer::Iterator* corn_crop =
       farm_peer.CreateSectionIterator("CORN");
-  ASSERT(corn_crop->HasNext());
-  ASSERT(&corn_crop->Next());  // ShowSection doesn't give us the dict back
-  ASSERT(!corn_crop->HasNext());
+  EXPECT_TRUE(corn_crop->HasNext());
+  EXPECT_TRUE(&corn_crop->Next());  // ShowSection doesn't give us the dict back
+  EXPECT_FALSE(corn_crop->HasNext());
   delete corn_crop;
 }
 
-static void TestIsHiddenSectionDefault() {
+TEST(TemplateDictionary, IsHiddenSectionDefault) {
   TemplateDictionary dict("dict");
   TemplateDictionaryPeer peer(&dict);
-  ASSERT(peer.IsHiddenSection("UNDEFINED"));
-  ASSERT(!peer.IsUnhiddenSection("UNDEFINED"));
+  EXPECT_TRUE(peer.IsHiddenSection("UNDEFINED"));
+  EXPECT_FALSE(peer.IsUnhiddenSection("UNDEFINED"));
   dict.ShowSection("VISIBLE");
-  ASSERT(!peer.IsHiddenSection("VISIBLE"));
-  ASSERT(peer.IsUnhiddenSection("VISIBLE"));
+  EXPECT_FALSE(peer.IsHiddenSection("VISIBLE"));
+  EXPECT_TRUE(peer.IsUnhiddenSection("VISIBLE"));
 }
 
-int Main() {
-  SetUp();
+// This has to run last, since its SetGlobalValue modifies the global
+// state, which can affect other tests (especially given the embedded
+// NUL!)  So we don't use the normal TEST() here, and call it manually
+// in main().
 
-  TestSetValueAndTemplateStringAndArena();
-  TestSetValueWithoutCopy();
-  TestSetIntValue();
-  TestSetFormattedValue();
-  TestSetEscapedValue();
-  TestSetEscapedFormattedValue();
+void TestSetValueWithNUL() {
+  TemplateDictionary dict("test_SetValueWithNUL", NULL);
+  TemplateDictionaryPeer peer(&dict);
 
-  TestAddSectionDictionary();
-  TestShowSection();
-  TestSetValueAndShowSection();
-  TestSetTemplateGlobalValue();
-  TestSetTemplateGlobalValueWithoutCopy();
-  TestAddIncludeDictionary();
-  TestIsHiddenSectionDefault();
+  // Test copying char*s, strings, and explicit TemplateStrings
+  dict.SetValue(string("FOO\0BAR", 7), string("QUX\0QUUX", 8));
+  dict.SetGlobalValue(string("GOO\0GAR", 7), string("GUX\0GUUX", 8));
 
-  TestIterator();
+  // FOO should not match FOO\0BAR
+  EXPECT_TRUE(peer.ValueIs("FOO", ""));
+  EXPECT_TRUE(peer.ValueIs("GOO", ""));
 
-  TestMakeCopy(true);    // use our own arena
-  TestMakeCopy(false);   // use fake arena
+  EXPECT_TRUE(peer.ValueIs(string("FOO\0BAR", 7), string("QUX\0QUUX", 8)));
+  EXPECT_TRUE(peer.ValueIs(string("GOO\0GAR", 7), string("GUX\0GUUX", 8)));
 
-  TestSetModifierData();
-
-  // We do this test last, because the NULs it inserts mess up all
-  // the c-string-based tests that use strstr() and the like.
-  TestSetValueWithNUL();
-
-  printf("DONE.\n");
-  return 0;
+  string dump;
+  dict.DumpToString(&dump);
+  // We can't use EXPECT_STREQ here because of the embedded NULs.
+  // They also require I count the length of the string by hand. :-(
+  string expected(("global dictionary {\n"
+                   "   BI_NEWLINE: >\n"
+                   "<\n"
+                   "   BI_SPACE: > <\n"
+                   "   GLOBAL: >top<\n"
+                   "   GOO\0GAR: >GUX\0GUUX<\n"
+                   "};\n"
+                   "dictionary 'test_SetValueWithNUL' {\n"
+                   "   FOO\0BAR: >QUX\0QUUX<\n"
+                   "}\n"),
+                  160);
+  EXPECT_EQ(dump, expected);
 }
 
-_END_GOOGLE_NAMESPACE_
+TEST(TemplateDictionary, TestShowTemplateGlobalSection) {
+  StringToTemplateCache("test.tpl", "{{#sect}}OK{{/sect}}", DO_NOT_STRIP);
+
+  TemplateDictionary dict("mydict");
+  dict.ShowTemplateGlobalSection("sect");
+
+  string out;
+  ExpandTemplate("test.tpl", DO_NOT_STRIP, &dict, &out);
+}
+
+TEST(TemplateDictionary, TestShowTemplateGlobalSection_Child) {
+  // The TemplateDictionary::template_global_dict_ behaves differently for child
+  // dictionaries than for the root parent dictionary.
+  StringToTemplateCache("test2.tpl",
+                        "{{#foo}}{{#sect}}OK{{/sect}}{{/foo}}",
+                        DO_NOT_STRIP);
+
+  TemplateDictionary dict("mydict");
+  dict.ShowTemplateGlobalSection("sect");
+
+  dict.AddSectionDictionary("foo");
+
+  string out;
+  ExpandTemplate("test2.tpl", DO_NOT_STRIP, &dict, &out);
+}
+
+TEST(TemplateDictionary, TestShowTemplateGlobalSection_SectionDoesntExist) {
+  StringToTemplateCache("test3.tpl",
+                        "{{#bad}}bad{{/bad}}",
+                        DO_NOT_STRIP);
+
+  TemplateDictionary dict("mydict");
+
+  string out;
+  ExpandTemplate("test3.tpl", DO_NOT_STRIP, &dict, &out);
+}
+
+
+}  // unnamed namespace
+
 
 int main(int argc, char** argv) {
-  return GOOGLE_NAMESPACE::Main();
+
+  SetUp();
+
+  const int retval = RUN_ALL_TESTS();
+
+  // This has to run last, so we run it manually
+  TestSetValueWithNUL();
+
+  return retval;
 }

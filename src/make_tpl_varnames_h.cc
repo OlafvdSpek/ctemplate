@@ -28,18 +28,18 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Frank H. Jernigan
 //
 // A utility for checking syntax and generating headers to
 // use with Google Templates.
 //
 // For example:
 //
-// > ./make_tpl_varnames_h some_template_file.tpl
+// > <path_to>/make_tpl_varnames_h some_template_file.tpl
 //
-// This creates the header file some_template_file.tpl.varnames.h
-// in ./. If there are any syntax errors they are
-// reported to stderr  (in which case, no header file is created)
+// This creates the header file some_template_file.tpl.varnames.h.  If
+// there are any syntax errors they are reported to stderr (in which
+// case, no header file is created).
+//
 //
 // Exit code is the number of templates we were unable to parse.
 //
@@ -51,32 +51,29 @@
 // TODO(jad): Prevent -f and -o from being used together.
 //            Previously -o would be silently ignored.
 
-#include "config.h"
 // This is for windows.  Even though we #include config.h, just like
 // the files used to compile the dll, we are actually a *client* of
 // the dll, so we don't get to decl anything.
+#include <config.h>
 #undef CTEMPLATE_DLL_DECL
-
-#include <stdlib.h>
-#include <stdio.h>
 #include <ctype.h>    // for toupper(), isalnum()
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
+#include <errno.h>
+#ifdef HAVE_GETOPT_H
+# include <getopt.h>
 #endif
 #include <stdarg.h>
-#ifdef HAVE_GETOPT_H
-#include <getopt.h>
-#endif
-#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
+#endif
 #include <string>
 #include <set>
 #include <vector>
+
 #include <ctemplate/template_pathops.h>
 #include <ctemplate/template.h>
-
-
 using std::set;
 using std::string;
 using std::vector;
@@ -136,9 +133,10 @@ static void Usage(const char* argv0, FILE* outfile) {
 
 static void Version(FILE* outfile) {
   fprintf(outfile,
-          "make_tpl_varnames_h (part of " PACKAGE_STRING ")\n"
-          "\n"
-          "Copyright 1998-2005 Google Inc.\n"
+          "make_tpl_varnames_h "
+          " (part of " PACKAGE_STRING ")"
+          "\n\n"
+          "Copyright 1998 Google Inc.\n"
           "\n"
           "This is BSD licensed software; see the source for copying conditions\n"
           "and license information.\n"
@@ -247,25 +245,25 @@ static vector<string> SplitIntoLines(const string &input) {
 //   ex2.tpl: <a href="{{URL}}">{{USER}}</a>
 //
 // The header entries for ex1.tpl are:
-// #include <ctemplate/template_string.h>
-// static const ::ctemplate::StaticTemplateString ke_USER =
+// #include "template/template_string.h"
+// static const ::GOOGLE_NAMESPACE::StaticTemplateString ke_USER =
 //   STS_INIT_WITH_HASH(ke_USER, "USER", 3254611514008215315LLU);
 //
 // The header entries for ex2.tpl are:
-// #include <ctemplate/template_string.h>
-// static const ::ctemplate::StaticTemplateString ke_URL =
+// #include "template/template_string.h"
+// static const ::GOOGLE_NAMESPACE::StaticTemplateString ke_URL =
 //   STS_INIT_WITH_HASH(ke_URL, "URL", 1026025273225241985LLU);
-// static const ::ctemplate::StaticTemplateString ke_USER =
+// static const ::GOOGLE_NAMESPACE::StaticTemplateString ke_USER =
 //   STS_INIT_WITH_HASH(ke_USER, "USER", 3254611514008215315LLU);
 //
 // Simply concatenating both header entries will result in
 // duplicate #include directives and duplicate definitions of
 // the ke_USER variable. This function instead outputs:
 //
-// #include <ctemplate/template_string.h>
-// static const ::ctemplate::StaticTemplateString ke_USER =
+// #include "template/template_string.h"
+// static const ::GOOGLE_NAMESPACE::StaticTemplateString ke_USER =
 //   STS_INIT_WITH_HASH(ke_USER, "USER", 3254611514008215315LLU);
-// static const ::ctemplate::StaticTemplateString ke_URL =
+// static const ::GOOGLE_NAMESPACE::StaticTemplateString ke_URL =
 //   STS_INIT_WITH_HASH(ke_URL, "URL", 1026025273225241985LLU);
 //
 static string TextWithDuplicateLinesRemoved(const string& header_entries) {
@@ -306,6 +304,7 @@ static bool WriteToDisk(bool log_info, const string& output_file,
 int main(int argc, char **argv) {
   string FLAG_template_dir(GOOGLE_NAMESPACE::kCWD);   // "./"
   string FLAG_header_dir(GOOGLE_NAMESPACE::kCWD);
+  GOOGLE_NAMESPACE::NormalizeDirectory(&FLAG_header_dir);   // adds trailing slash
   string FLAG_outputfile_suffix(".varnames.h");
   string FLAG_outputfile("");
   bool FLAG_header = true;
@@ -329,9 +328,8 @@ int main(int argc, char **argv) {
   int option_index;
 # define GETOPT(argc, argv)  getopt_long(argc, argv, "t:o:s:f:ndqhV", \
                                          longopts, &option_index)
-#elif defined(HAVE_GETOPT)
+#elif defined(HAVE_GETOPT_H)
 # define GETOPT(argc, argv)  getopt(argc, argv, "t:o:s:f:ndqhV")
-
 #else    // TODO(csilvers): implement something reasonable for windows
 # define GETOPT(argc, argv)  -1
   int optind = 1;    // first non-opt argument
@@ -362,6 +360,7 @@ int main(int argc, char **argv) {
   }
 
   Template::SetTemplateRootDirectory(FLAG_template_dir);
+
 
   // Initialize the TemplateRecord array. It holds one element per
   // template given on the command-line.

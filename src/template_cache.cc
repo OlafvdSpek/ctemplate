@@ -28,29 +28,28 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Shubhie Panicker
-// Author: Craig Silverstein
 
-#include "config.h"
-
+#include <config.h>
 #include "base/mutex.h"  // This must go first so we get _XOPEN_SOURCE
 #include <ctemplate/template_cache.h>
 #include <assert.h>      // for assert()
-#include <errno.h>       // for errno
-#include <stdlib.h>      // for strerror()
+#include <errno.h>
 #include <stddef.h>      // for size_t
+#include <stdlib.h>      // for strerror()
 #include <sys/stat.h>
 #ifdef HAVE_UNISTD_H
-#include <unistd.h>      // for getcwd()
-#endif
-#include HASH_MAP_H      // defined in config.h
-#include <iostream>      // for cerr
+# include <unistd.h>
+#endif      // for getcwd()
+#include HASH_MAP_H      // for hash_map<>::iterator, hash_map<>, etc
 #include <utility>       // for pair<>, make_pair()
 #include <vector>        // for vector<>::size_type, vector<>, etc
+#include "base/thread_annotations.h"  // for GUARDED_BY
 #include <ctemplate/template.h>  // for Template, TemplateState
 #include <ctemplate/template_enums.h>  // for Strip, DO_NOT_STRIP
 #include <ctemplate/template_pathops.h>  // for PathJoin(), IsAbspath(), etc
 #include <ctemplate/template_string.h>  // for StringHash
+#include "base/fileutil.h"
+#include <iostream>      // for cerr
 
 #ifndef PATH_MAX
 #ifdef MAXPATHLEN
@@ -59,8 +58,6 @@
 #define PATH_MAX        4096         // seems conservative for max filename len!
 #endif
 #endif
-
-_START_GOOGLE_NAMESPACE_
 
 using std::endl;
 using std::string;
@@ -79,6 +76,8 @@ static int kVerbosity = 0;   // you can change this by hand to get vlogs
 #define LOG(level)   std::cerr << #level ": "
 #define PLOG(level)   std::cerr << #level ": [" << strerror(errno) << "] "
 #define VLOG(level)  if (kVerbosity >= level)  std::cerr << "V" #level ": "
+
+_START_GOOGLE_NAMESPACE_
 
 // ----------------------------------------------------------------------
 // TemplateCache::RefcountedTemplate
@@ -124,7 +123,7 @@ class TemplateCache::RefcountedTemplate {
  private:
   ~RefcountedTemplate() { delete ptr_; }
   const Template* const ptr_;
-  int refcount_  /*GUARDED_BY(mutex_)*/;
+  int refcount_  GUARDED_BY(mutex_);
   mutable Mutex mutex_;
 };
 
@@ -226,14 +225,14 @@ TemplateCache::~TemplateCache() {
 
 bool HasTemplateChangedOnDisk(const char* resolved_filename,
                               time_t mtime,
-                              struct stat* statbuf) {
-  if (stat(resolved_filename, statbuf) != 0) {
+                              FileStat* statbuf) {
+  if (!File::Stat(resolved_filename, statbuf)) {
     LOG(WARNING) << "Unable to stat file " << resolved_filename << endl;
     // If we can't Stat the file then the file may have been deleted,
     // so reload the template.
     return true;
   }
-  if (statbuf->st_mtime == mtime && mtime > 0) {
+  if (statbuf->mtime == mtime && mtime > 0) {
     // No need to reload yet.
     return false;
   }
@@ -302,7 +301,7 @@ TemplateCache::RefcountedTemplate* TemplateCache::GetTemplateLocked(
   }
   if (it->second.should_reload) {
     // check if the template has changed on disk:
-    struct stat statbuf;
+    FileStat statbuf;
     if (it->second.template_type == CachedTemplate::FILE_BASED &&
         HasTemplateChangedOnDisk(
             it->second.refcounted_tpl->tpl()->template_file(),
@@ -547,11 +546,11 @@ string TemplateCache::template_root_directory() const {
 // true. Otherwise, the function returns false.
 bool TemplateCache::ResolveTemplateFilename(const string& unresolved,
                                             string* resolved,
-                                            struct stat* statbuf) const {
+                                            FileStat* statbuf) const {
   ReaderMutexLock ml(search_path_mutex_);
   if (search_path_.empty() || IsAbspath(unresolved)) {
     *resolved = unresolved;
-    if (stat(resolved->c_str(), statbuf) == 0) {
+    if (File::Stat(*resolved, statbuf)) {
       VLOG(1) << "Resolved " << unresolved << " to " << *resolved << endl;
       return true;
     }
@@ -560,7 +559,7 @@ bool TemplateCache::ResolveTemplateFilename(const string& unresolved,
          path != search_path_.end();
          ++path) {
       *resolved = PathJoin(*path, unresolved);
-      if (stat(resolved->c_str(), statbuf) == 0) {
+      if (File::Stat(*resolved, statbuf)) {
         VLOG(1) << "Resolved " << unresolved << " to " << *resolved << endl;
         return true;
       }
@@ -574,7 +573,7 @@ bool TemplateCache::ResolveTemplateFilename(const string& unresolved,
 string TemplateCache::FindTemplateFilename(const string& unresolved)
     const {
   string resolved;
-  struct stat statbuf;
+  FileStat statbuf;
   if (!ResolveTemplateFilename(unresolved, &resolved, &statbuf))
     resolved.clear();
   return resolved;
@@ -771,14 +770,14 @@ bool TemplateCache::TemplateIsCached(const TemplateCacheKey template_cache_key)
 
 bool TemplateCache::IsValidTemplateFilename(const string& filename,
                                             string* resolved_filename,
-                                            struct stat* statbuf) const {
+                                            FileStat* statbuf) const {
   if (!ResolveTemplateFilename(filename,
                                resolved_filename,
                                statbuf)) {
     LOG(WARNING) << "Unable to locate file " << filename << endl;
     return false;
   }
-  if (S_ISDIR(statbuf->st_mode)) {
+  if (statbuf->IsDirectory()) {
     LOG(WARNING) << *resolved_filename
                  << "is a directory and thus not readable" << endl;
     return false;
@@ -786,4 +785,4 @@ bool TemplateCache::IsValidTemplateFilename(const string& filename,
   return true;
 }
 
-}  // namespace ctemplate
+_END_GOOGLE_NAMESPACE_

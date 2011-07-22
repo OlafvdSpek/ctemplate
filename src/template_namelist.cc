@@ -28,29 +28,33 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Author: Frank H. Jernigan
 
-#include "config.h"
-#include <assert.h>
+#include <config.h>
 #include <stdlib.h>
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>              // for access()
-#endif
-#include <time.h>                // for time_t
 #include <sys/stat.h>            // for stat()
+#include <time.h>                // for time_t
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
+#endif
+#include <algorithm>             // for binary_search
+#include HASH_SET_H              // that's NameListType
 #include <string>
 #include <vector>                // that's MissingListType, SyntaxListType
-#include <iostream>              // for cerr
-#include <algorithm>             // for binary_search
-#include HASH_SET_H              // (defined in config.h)  to get hash<>
 #include <ctemplate/template_namelist.h>
 #include <ctemplate/template_pathops.h>
-#include <ctemplate/template.h>     // for Strip, GetTemplate(), etc.
+#include <ctemplate/template.h>   // for Strip, GetTemplate(), etc.
+#include <assert.h>
+#include <iostream>              // for cerr
+#include "base/fileutil.h"
 
-_START_GOOGLE_NAMESPACE_
-
+using std::max;
+using std::pair;
 using std::string;
 using std::vector;
+
+#define LOG(level)  std::cerr << #level << ": "
+
+_START_GOOGLE_NAMESPACE_
 
 TemplateNamelist::NameListType *TemplateNamelist::namelist_ = NULL;
 TemplateNamelist::MissingListType *TemplateNamelist::missing_list_ = NULL;
@@ -61,7 +65,7 @@ const char* TemplateNamelist::RegisterTemplate(const char* name) {
   if (!namelist_) {
     namelist_ = new NameListType;
   }
-  std::pair<NameListType::iterator, bool> insert_result = namelist_->insert(name);
+  pair<NameListType::iterator, bool> insert_result = namelist_->insert(name);
   // return a pointer to the entry corresponding to name;
   return insert_result.first->c_str();
 }
@@ -100,11 +104,11 @@ const TemplateNamelist::MissingListType& TemplateNamelist::GetMissingList(
          iter != the_list.end();
          ++iter) {
       const string path = Template::FindTemplateFilename(*iter);
-      if (path.empty() || access(path.c_str(), R_OK) != 0) {
+      if (path.empty() || !File::Readable(path.c_str())) {
         missing_list_->push_back(*iter);
-        std::cerr << "ERROR: Template file missing: " << *iter
-                  << " at path: " << (path.empty() ? "(empty path)" : path)
-                  << std::endl;
+        LOG(ERROR) << "Template file missing: " << *iter
+                   << " at path: " << (path.empty() ? "(empty path)" : path)
+                   << "\n";
       }
     }
   }
@@ -146,7 +150,7 @@ const TemplateNamelist::SyntaxListType& TemplateNamelist::GetBadSyntaxList(
           // If it's not in the missing list, then we're here because
           // it caused an error during parsing
           bad_syntax_list_->push_back(*iter);
-          std::cerr << "ERROR loading template: " << (*iter) << std::endl;
+          LOG(ERROR) << "Error loading template: " << (*iter) << "\n";
         }
       }
     }
@@ -167,7 +171,7 @@ time_t TemplateNamelist::GetLastmodTime() {
     struct stat statbuf;
     if (path.empty() || stat(path.c_str(), &statbuf) != 0)
       continue;  // ignore files we can't find
-    retval = retval > statbuf.st_mtime ? retval : statbuf.st_mtime;
+    retval = max(retval, statbuf.st_mtime);
   }
   return retval;
 }

@@ -1,10 +1,10 @@
-// Copyright (c) 2007, Google Inc.
+// Copyright (c) 2011, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -14,7 +14,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -28,37 +28,69 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// All Rights Reserved.
+// Author: csilvers@google.com (Craig Silverstein)
 //
-// Author: Craig Silverstein
-//
-// This file is needed for windows -- unittests are not part of the
-// ctemplate dll, but still want to include config.h just like the
-// dll does, so they can use internal tools and APIs for testing.
-//
-// The problem is that config.h declares CTEMPLATE_DLL_DECL to be
-// for exporting symbols, but the unittest needs to *import* symbols
-// (since it's not the dll).
-//
-// The solution is to have this file, which is just like config.h but
-// sets CTEMPLATE_DLL_DECL to do a dllimport instead of a dllexport.
-//
-// The reason we need this extra CTEMPLATE_DLL_DECL_FOR_UNITTESTS
-// variable is in case people want to set CTEMPLATE_DLL_DECL explicitly
-// to something other than __declspec(dllexport).  In that case, they
-// may want to use something other than __declspec(dllimport) for the
-// unittest case.  For that, we allow folks to define both
-// CTEMPLATE_DLL_DECL and CTEMPLATE_DLL_DECL_FOR_UNITTESTS explicitly.
-//
-// NOTE: This file is equivalent to config.h on non-windows systems,
-// which never defined CTEMPLATE_DLL_DECL_FOR_UNITTESTS and always
-// define CTEMPLATE_DLL_DECL to the empty string.
+// A tiny wrapper around struct stat and FILE*.
 
-#include "config.h"
+#ifndef TEMPLATE_OPENSOURCE_FILEUTIL_H_
+#define TEMPLATE_OPENSOURCE_FILEUTIL_H_
 
-#undef CTEMPLATE_DLL_DECL
-#ifdef CTEMPLATE_DLL_DECL_FOR_UNITTESTS
-# define CTEMPLATE_DLL_DECL  CTEMPLATE_DLL_DECL_FOR_UNITTESTS
-#else
-# define CTEMPLATE_DLL_DECL  // if DLL_DECL_FOR_UNITTESTS isn't defined, use ""
+#include <config.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <time.h>
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
 #endif
+#include <string>
+
+_START_GOOGLE_NAMESPACE_
+
+class FileStat {
+ public:
+  time_t mtime;
+  off_t length;
+  bool IsDirectory() { return S_ISDIR(internal_statbuf.st_mode); }
+
+ private:
+  friend class File;
+  struct stat internal_statbuf;
+};
+
+class File {
+ public:
+  static bool Stat(const std::string& filename, FileStat* statbuf) {
+    if (stat(filename.c_str(), &statbuf->internal_statbuf) != 0)
+      return false;
+    statbuf->mtime = statbuf->internal_statbuf.st_mtime;
+    statbuf->length = statbuf->internal_statbuf.st_size;
+    return true;
+  }
+
+  static bool Readable(const char* filename) {
+    return access(filename, R_OK) == 0;
+  }
+
+  static File* Open(const char* filename, const char* mode) {
+    FILE* fp = fopen(filename, mode);
+    if (!fp)  return NULL;
+    return new File(fp);
+  }
+
+  size_t Read(char* buf, size_t size) {
+    return fread(buf, 1, size, fp_);
+  }
+
+  void Close() {
+    fclose(fp_);
+    delete this;   // naughty naughty!
+  }
+
+ private:
+  explicit File(FILE* fp) : fp_(fp) { }
+  FILE* fp_;
+};
+
+_END_GOOGLE_NAMESPACE_
+
+#endif  // TEMPLATE_OPENSOURCE_FILEUTIL_H_
