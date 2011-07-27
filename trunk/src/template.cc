@@ -2645,7 +2645,7 @@ bool Template::ReloadIfChangedLocked()
     return false;   // file's timestamp hasn't changed, so no need to reload
   }
 
-  File* fp = File::Open(resolved_filename_.c_str(), "rb");
+  File* fp = File::Open(resolved_filename_.c_str(), "r");
   if (fp == NULL) {
     LOG(ERROR) << "Can't find file " << resolved_filename_
                << "; skipping" << endl;
