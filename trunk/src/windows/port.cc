@@ -31,7 +31,7 @@
  * Author: Craig Silverstein
  */
 
-#include "windows/config.h"
+#include <config.h>
 #ifndef _WIN32
 # error You should only be including windows/port.cc in a windows environment!
 #endif
