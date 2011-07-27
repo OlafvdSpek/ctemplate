@@ -72,7 +72,17 @@ class File {
   }
 
   static File* Open(const char* filename, const char* mode) {
-    FILE* fp = fopen(filename, mode);
+    char binary_mode[3];
+    const char* mode_to_use = mode;
+    if ((mode[0] == 'r' || mode[0] == 'w') && mode[1] == '\0') {
+      // We add a 'b' to make sure we do the right thing even on
+      // Windows.  On unix, this will be a noop.
+      binary_mode[0] = mode[0];
+      binary_mode[1] = 'b';
+      binary_mode[2] = '\0';
+      mode_to_use = binary_mode;
+    }
+    FILE* fp = fopen(filename, mode_to_use);
     if (!fp)  return NULL;
     return new File(fp);
   }
