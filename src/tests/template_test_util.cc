@@ -66,6 +66,8 @@
 #include <ctemplate/template_enums.h>  // for Strip
 #include <ctemplate/template_namelist.h>  // for TemplateNamelist, etc
 #include <ctemplate/template_pathops.h>  // for PathJoin()
+#include "base/util.h"   // for down_cast()
+
 using std::string;
 using std::vector;
 
