@@ -55,7 +55,6 @@
 #include <string>
 #include <vector>
 
-#include "base/arena-inl.h"   // for ArenaAllocator
 #include <ctemplate/template_dictionary_interface.h>
 #include <ctemplate/template_modifiers.h>
 #include <ctemplate/template_string.h>
@@ -68,6 +67,7 @@
 #endif
 
 namespace ctemplate {
+template <class T, class C> class ArenaAllocator;
 class UnsafeArena;
 template<typename A, int B, typename C, typename D> class small_map;
 template<typename NormalMap> class small_map_default_init;  // in small_map.h
