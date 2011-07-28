@@ -158,16 +158,12 @@
 #include <assert.h>
 #include <stdlib.h>      // for abort()
 
-#define MUTEX_NAMESPACE ctemplate_mutex_namespace
-
 _START_GOOGLE_NAMESPACE_
+
 namespace base {
 // This is used for the single-arg constructor
 enum LinkerInitialized { LINKER_INITIALIZED };
 }
-_END_GOOGLE_NAMESPACE_
-
-namespace MUTEX_NAMESPACE {
 
 class Mutex {
  public:
@@ -178,7 +174,7 @@ class Mutex {
   // It inhibits work being done by the destructor, which makes it
   // safer for code that tries to acqiure this mutex in their global
   // destructor.
-  inline Mutex(GOOGLE_NAMESPACE::base::LinkerInitialized);
+  inline Mutex(base::LinkerInitialized);
 
   // Destructor
   inline ~Mutex();
@@ -233,7 +229,7 @@ class Mutex {
 // assert.
 
 Mutex::Mutex() : mutex_(0) { }
-Mutex::Mutex(GOOGLE_NAMESPACE::base::LinkerInitialized) : mutex_(0) { }
+Mutex::Mutex(base::LinkerInitialized) : mutex_(0) { }
 Mutex::~Mutex()            { assert(mutex_ == 0); }
 void Mutex::Lock()         { assert(--mutex_ == -1); }
 void Mutex::Unlock()       { assert(mutex_++ == -1); }
@@ -258,7 +254,7 @@ Mutex::Mutex() : destroy_(true) {
   InitializeCriticalSection(&mutex_);
   SetIsSafe();
 }
-Mutex::Mutex(GOOGLE_NAMESPACE::base::LinkerInitialized) : destroy_(false) {
+Mutex::Mutex(base::LinkerInitialized) : destroy_(false) {
   InitializeCriticalSection(&mutex_);
   SetIsSafe();
 }
@@ -308,7 +304,7 @@ Mutex::Mutex() : destroy_(true) {
   SetIsSafe();
   if (is_safe_ && pthread_rwlock_init(&mutex_, NULL) != 0) abort();
 }
-Mutex::Mutex(GOOGLE_NAMESPACE::base::LinkerInitialized) : destroy_(false) {
+Mutex::Mutex(base::LinkerInitialized) : destroy_(false) {
   SetIsSafe();
   if (is_safe_ && pthread_rwlock_init(&mutex_, NULL) != 0) abort();
 }
@@ -340,7 +336,7 @@ Mutex::Mutex() : destroy_(true) {
   SetIsSafe();
   if (is_safe_ && pthread_mutex_init(&mutex_, NULL) != 0) abort();
 }
-Mutex::Mutex(GOOGLE_NAMESPACE::base::LinkerInitialized) : destroy_(false) {
+Mutex::Mutex(base::LinkerInitialized) : destroy_(false) {
   SetIsSafe();
   if (is_safe_ && pthread_mutex_init(&mutex_, NULL) != 0) abort();
 }
@@ -407,10 +403,6 @@ class WriterMutexLock {
 #define ReaderMutexLock(x) COMPILE_ASSERT(0, rmutex_lock_decl_missing_var_name)
 #define WriterMutexLock(x) COMPILE_ASSERT(0, wmutex_lock_decl_missing_var_name)
 
-}  // namespace MUTEX_NAMESPACE
-
-using namespace MUTEX_NAMESPACE;
-
-#undef MUTEX_NAMESPACE
+_END_GOOGLE_NAMESPACE_
 
 #endif  /* #define GOOGLE_MUTEX_H__ */
