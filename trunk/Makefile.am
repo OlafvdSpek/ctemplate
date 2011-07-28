@@ -234,6 +234,15 @@ compile_nothreads_test_SOURCES = $(compile_test_SOURCES)
 compile_nothreads_test_CXXFLAGS = -DNO_THREADS $(AM_CXXFLAGS)
 compile_nothreads_test_LDADD = libctemplate_nothreads_debug.la
 
+# With compile_test, we are making sure that the code compiles without
+# needing config.h/etc.  The best test is to make sure we can compile
+# with just the installed header files.  The best way to do this is at
+# installcheck time.  When this rule is run (via 'make distcheck'),
+# 'includedir' is the installed include-dir.
+installcheck-local:
+	$(CXX) -I $(includedir) -c $(top_srcdir)/src/tests/compile_test.cc \
+	       -o installcheck_compile_test.o
+
 TESTS += template_test_util_test template_test_util_nothreads_test
 WINDOWS_PROJECTS += vsprojects/template_test_util_test/template_test_util_test.vcproj
 template_test_util_test_SOURCES = src/tests/config_for_unittests.h \
@@ -371,6 +380,7 @@ TESTDATA += \
    src/tests/htmlparser_testdata/cdata.html \
    src/tests/htmlparser_testdata/comments.html \
    src/tests/htmlparser_testdata/context.html \
+   src/tests/htmlparser_testdata/google.html \
    src/tests/htmlparser_testdata/javascript_attribute.html \
    src/tests/htmlparser_testdata/javascript_block.html \
    src/tests/htmlparser_testdata/javascript_regexp.html \
@@ -479,7 +489,7 @@ libtool: $(LIBTOOL_DEPS)
 # NOTE: BUILT_SOURCES should come after the .config files, so they
 # come later (and thus end up with a later timestamp) when we tar/untar.
 EXTRA_DIST = packages/rpm.sh packages/rpm/rpm.spec packages/deb.sh packages/deb \
-	$(SCRIPTS) $(TESTDATA) libtool \
+	$(SCRIPTS) $(TESTDATA) libtool autogen.sh \
 	src/htmlparser/generate_fsm.py src/htmlparser/fsm_config.py \
 	src/tests/statemachine_test_fsm.config \
 	src/htmlparser/htmlparser_fsm.config \
