@@ -1,3 +1,9 @@
+Fri Jul 29 12:19:50 2011  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 1.0rc2 release
+	* BUGFIX: removed #includes of non-installed headers from installed ones
+	* BUGFIX: Make compile-test test against an install
+
 Fri Jul 22 15:31:05 2011  Google Inc. <opensource@google.com>
 
 	* ctemplate: version 1.0rc1 release
