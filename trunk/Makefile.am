@@ -11,6 +11,14 @@ if GCC
 AM_CXXFLAGS = -Wall -Wwrite-strings -Woverloaded-virtual -Wno-sign-compare
 endif
 
+# mingw does weird directory munging on /tmp, which causes some of our
+# tests to fail, so use a different tmpdir there.
+if MINGW
+TMPDIR = ./
+else
+TMPDIR = /tmp
+endif
+
 ctemplateincludedir = $(includedir)/ctemplate
 ## The .h files you want to install (that is, .h files that people
 ## who install this package can include in their own applications.)
@@ -426,14 +434,14 @@ noinst_SCRIPTS += src/tests/make_tpl_varnames_h_unittest.sh
 make_tpl_varnames_h_unittest_sh: src/tests/make_tpl_varnames_h_unittest.sh \
                                  make_tpl_varnames_h
 	sh $(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
-	   $(top_builddir)/make_tpl_varnames_h /tmp/$@_dir
+	   $(top_builddir)/make_tpl_varnames_h $(TMPDIR)/$@_dir
 
 check_SCRIPTS += diff_tpl_auto_escape_unittest_sh
 noinst_SCRIPTS += src/tests/diff_tpl_auto_escape_unittest.sh
 diff_tpl_auto_escape_unittest_sh: src/tests/diff_tpl_auto_escape_unittest.sh \
                                   diff_tpl_auto_escape
 	sh $(top_srcdir)/src/tests/diff_tpl_auto_escape_unittest.sh \
-	   $(top_builddir)/diff_tpl_auto_escape /tmp/$@_dir
+	   $(top_builddir)/diff_tpl_auto_escape $(TMPDIR)/$@_dir
 
 ## ^^^^ END OF RULES TO MAKE THE LIBRARIES, BINARIES, AND UNITTESTS
 

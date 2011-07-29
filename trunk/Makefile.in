@@ -777,6 +777,11 @@ AM_CPPFLAGS = -I$(top_srcdir)/src
 
 # These are good warnings to turn on by default
 @GCC_TRUE@AM_CXXFLAGS = -Wall -Wwrite-strings -Woverloaded-virtual -Wno-sign-compare
+@MINGW_FALSE@TMPDIR = /tmp
+
+# mingw does weird directory munging on /tmp, which causes some of our
+# tests to fail, so use a different tmpdir there.
+@MINGW_TRUE@TMPDIR = ./
 ctemplateincludedir = $(includedir)/ctemplate
 nodist_ctemplateinclude_HEADERS = \
 	src/ctemplate/template.h \
@@ -2730,11 +2735,11 @@ generate_fsm_test_sh: src/tests/generate_fsm_test.sh \
 make_tpl_varnames_h_unittest_sh: src/tests/make_tpl_varnames_h_unittest.sh \
                                  make_tpl_varnames_h
 	sh $(top_srcdir)/src/tests/make_tpl_varnames_h_unittest.sh \
-	   $(top_builddir)/make_tpl_varnames_h /tmp/$@_dir
+	   $(top_builddir)/make_tpl_varnames_h $(TMPDIR)/$@_dir
 diff_tpl_auto_escape_unittest_sh: src/tests/diff_tpl_auto_escape_unittest.sh \
                                   diff_tpl_auto_escape
 	sh $(top_srcdir)/src/tests/diff_tpl_auto_escape_unittest.sh \
-	   $(top_builddir)/diff_tpl_auto_escape /tmp/$@_dir
+	   $(top_builddir)/diff_tpl_auto_escape $(TMPDIR)/$@_dir
 
 rpm: dist-gzip packages/rpm.sh packages/rpm/rpm.spec
 	@cd packages && ./rpm.sh ${PACKAGE} ${VERSION}
