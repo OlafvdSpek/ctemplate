@@ -45,6 +45,7 @@
 namespace ctemplate {
 class FileStat;
 }
+class Mutex;
 class TemplateCacheUnittest;
 
 // NOTE: if you are statically linking the template library into your binary
@@ -365,8 +366,8 @@ class CTEMPLATE_DLL_DECL TemplateCache {
   // (which they will probably get at via a call to ClearCache()).
   TemplateCallMap* get_template_calls_;
 
-  mutable class Mutex* mutex_;
-  mutable class Mutex* search_path_mutex_;
+  Mutex* const mutex_;
+  Mutex* const search_path_mutex_;
 
   // Can't invoke copy constructor or assignment operator
   TemplateCache(const TemplateCache&);
