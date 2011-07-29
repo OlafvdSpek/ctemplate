@@ -1,4 +1,18 @@
-== 22 July 2011 ==
+== 29 July 2011 ==
+
+I've just released ctemplate 1.0rc2.  This fixes a serious bug where I
+had added #includes in installed header files, that tried to include
+non-installed header files.  This means it was impossible to use
+installed ctemplate; it only worked if you were using it from the
+tarball directory.
+
+I also fixed the unittest that was supposed to catch this, but didn't
+(it was also building in the tarball directory).
+
+If no further problems are found in the next week or so, I will
+release ctemplate 1.0.
+
+=== 22 July 2011 ===
 
 I've just released ctemplate 1.0rc1.  If no problems are found in the
 next week or two, I will release ctemplate 1.0.
