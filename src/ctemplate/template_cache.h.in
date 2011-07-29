@@ -45,6 +45,7 @@
 @ac_google_start_namespace@
 class FileStat;
 @ac_google_end_namespace@
+class Mutex;
 class TemplateCacheUnittest;
 
 @ac_windows_dllexport_defines@
@@ -355,8 +356,8 @@ class @ac_windows_dllexport@ TemplateCache {
   // (which they will probably get at via a call to ClearCache()).
   TemplateCallMap* get_template_calls_;
 
-  mutable class Mutex* mutex_;
-  mutable class Mutex* search_path_mutex_;
+  Mutex* const mutex_;
+  Mutex* const search_path_mutex_;
 
   // Can't invoke copy constructor or assignment operator
   TemplateCache(const TemplateCache&);
