@@ -1,4 +1,11 @@
-== 29 July 2011 ==
+== 26 August 2011 ==
+
+I've just released ctemplate 1.0!  (I've decided 4 weeks is well
+within the definition of "the next week or so"...)
+
+A bit anti-climactic: there are no changes from ctemplate 1.0rc2.
+
+=== 29 July 2011 ===
 
 I've just released ctemplate 1.0rc2.  This fixes a serious bug where I
 had added #includes in installed header files, that tried to include
