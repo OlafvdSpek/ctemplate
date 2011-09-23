@@ -103,6 +103,11 @@ inline To down_cast(From* f) {                   // so we only accept pointers
 #define EXPECT_FALSE(cond)    CHECK(!(cond))
 #define EXPECT_STREQ(a, b)    CHECK(strcmp(a, b) == 0)
 #define ASSERT_TRUE(cond)     EXPECT_TRUE(cond)
+// LOG(FATAL) is an alias for CHECK(FALSE).  We define FATAL, but no
+// other value that is reasonable inside LOG(), so the compile will
+// fail if someone tries to use LOG(DEBUG) or the like.
+#define LOG(x)                INTERNAL_DO_LOG_ ## x
+#define INTERNAL_DO_LOG_FATAL CHECK(false)
 
 // These are used only in debug mode.
 #ifdef NDEBUG
