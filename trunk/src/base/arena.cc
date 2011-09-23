@@ -64,7 +64,7 @@ using std::vector;
 
 // TODO(csilvers): add in a portable implementation of aligned_malloc
 static void* aligned_malloc(size_t size, size_t alignment) {
-  CHECK(false) << "page_aligned_ not currently supported\n";
+  LOG(FATAL) << "page_aligned_ not currently supported\n";
 }
 
 // The value here doesn't matter until page_aligned_ is supported.
