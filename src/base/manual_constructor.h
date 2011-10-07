@@ -45,9 +45,81 @@
 #define UTIL_GTL_MANUAL_CONSTRUCTOR_H_
 
 #include <config.h>
-#include "base/aligned_char_array.h"
-
 _START_GOOGLE_NAMESPACE_
+
+namespace util {
+namespace gtl {
+namespace internal {
+
+//
+// Provides a char array with the exact same alignment as another type. The
+// first parameter must be a complete type, the second parameter is how many
+// of that type to provide space for.
+//
+//   UTIL_GTL_ALIGNED_CHAR_ARRAY(struct stat, 16) storage_;
+//
+// Because MSVC and older GCCs require that the argument to their alignment
+// construct to be a literal constant integer, we use a template instantiated
+// at all the possible powers of two.
+#ifndef SWIG
+template<int alignment, int size> struct AlignType { };
+template<int size> struct AlignType<0, size> { typedef char result[size]; };
+#if defined(COMPILER_MSVC)
+#define UTIL_GTL_ALIGN_ATTRIBUTE(X) __declspec(align(X))
+#define UTIL_GTL_ALIGN_OF(T) __alignof(T)
+#elif defined(COMPILER_GCC3) || defined(COMPILER_ICC)
+#define UTIL_GTL_ALIGN_ATTRIBUTE(X) __attribute__((aligned(X)))
+#define UTIL_GTL_ALIGN_OF(T) __alignof__(T)
+#endif
+
+#if defined(UTIL_GTL_ALIGN_ATTRIBUTE)
+
+#define UTIL_GTL_ALIGNTYPE_TEMPLATE(X) \
+  template<int size> struct AlignType<X, size> { \
+    typedef UTIL_GTL_ALIGN_ATTRIBUTE(X) char result[size]; \
+  }
+
+UTIL_GTL_ALIGNTYPE_TEMPLATE(1);
+UTIL_GTL_ALIGNTYPE_TEMPLATE(2);
+UTIL_GTL_ALIGNTYPE_TEMPLATE(4);
+UTIL_GTL_ALIGNTYPE_TEMPLATE(8);
+UTIL_GTL_ALIGNTYPE_TEMPLATE(16);
+UTIL_GTL_ALIGNTYPE_TEMPLATE(32);
+UTIL_GTL_ALIGNTYPE_TEMPLATE(64);
+UTIL_GTL_ALIGNTYPE_TEMPLATE(128);
+UTIL_GTL_ALIGNTYPE_TEMPLATE(256);
+UTIL_GTL_ALIGNTYPE_TEMPLATE(512);
+UTIL_GTL_ALIGNTYPE_TEMPLATE(1024);
+UTIL_GTL_ALIGNTYPE_TEMPLATE(2048);
+UTIL_GTL_ALIGNTYPE_TEMPLATE(4096);
+UTIL_GTL_ALIGNTYPE_TEMPLATE(8192);
+// Any larger and MSVC++ will complain.
+
+#define UTIL_GTL_ALIGNED_CHAR_ARRAY(T, Size) \
+  typename util::gtl::internal::AlignType<UTIL_GTL_ALIGN_OF(T), \
+                                          sizeof(T) * Size>::result
+
+#undef UTIL_GTL_ALIGNTYPE_TEMPLATE
+#undef UTIL_GTL_ALIGN_ATTRIBUTE
+
+#else  // defined(UTIL_GTL_ALIGN_ATTRIBUTE)
+#error "You must define UTIL_GTL_ALIGNED_CHAR_ARRAY for your compiler."
+#endif  // defined(UTIL_GTL_ALIGN_ATTRIBUTE)
+
+#else  // !SWIG
+
+// SWIG can't represent alignment and doesn't care about alignment on data
+// members (it works fine without it).
+template<typename Size>
+struct AlignType { typedef char result[Size]; };
+#define UTIL_GTL_ALIGNED_CHAR_ARRAY(T, Size) \
+    util::gtl::internal::AlignType<Size * sizeof(T)>::result
+
+#endif  // !SWIG
+
+}  // namespace internal
+}  // namespace gtl
+}  // namespace util
 
 template <typename Type>
 class ManualConstructor {
@@ -152,8 +224,11 @@ class ManualConstructor {
   }
 
  private:
-  ALIGNED_CHAR_ARRAY(Type, 1) space_;
+  UTIL_GTL_ALIGNED_CHAR_ARRAY(Type, 1) space_;
 };
+
+#undef UTIL_GTL_ALIGNED_CHAR_ARRAY
+#undef UTIL_GTL_ALIGN_OF
 
 _END_GOOGLE_NAMESPACE_
 
