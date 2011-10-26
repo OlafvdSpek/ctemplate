@@ -72,6 +72,13 @@ typedef unsigned __int64 uint64;
 #elif defined(BSWAP_32)             // Solaris 10
   // Solaris defines BSWSAP_32 as a macro in sys/byteorder.h (already #included)
 # define BSWAP32(x)  BSWAP_32(x)
+#elif !defined(BSWAP32)
+# define BSWAP32(x)  ((((x) & 0x000000ff) << 24) |      \
+                      (((x) & 0x0000ff00) << 8)  |      \
+                      (((x) & 0x00ff0000) >> 8)  |      \
+                      (((x) & 0xff000000) >> 24));
+#else
+# define CTEMPLATE_BSWAP32_ALREADY_DEFINED
 #endif
 
 #if defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
@@ -79,9 +86,6 @@ typedef unsigned __int64 uint64;
 # define UNALIGNED_LOAD32(_p) (*reinterpret_cast<const uint32 *>(_p))
 #elif defined(__ppc__) || defined(__ppc64__)
   // We know they allow unaligned memory access and are big-endian
-# ifndef BSWAP32  // Could just define this in C, but might as well do it fast
-#   error Need_to_define_BSWAP32_for_your_architecture
-# endif
 # define UNALIGNED_LOAD32(_p) BSWAP32(*reinterpret_cast<const uint32 *>(_p))
 #elif (BYTE_ORDER == 1234) || (_BYTE_ORDER == 1234) || defined(_LITTLE_ENDIAN)
   // Use memcpy to align the memory properly
@@ -91,9 +95,6 @@ typedef unsigned __int64 uint64;
     return t;
   }
 #elif (BYTE_ORDER == 4321) || (_BYTE_ORDER == 4321) || defined(_BIG_ENDIAN)
-# ifndef BSWAP32  // Could just define this in C, but might as well do it fast
-#   error Need_to_define_BSWAP32_for_your_architecture
-# endif
   inline uint32 UNALIGNED_LOAD32(const void *p) {
     uint32 t;
     memcpy(&t, p, sizeof(t));
@@ -102,6 +103,12 @@ typedef unsigned __int64 uint64;
 #else
   // Means we can't find find endian.h on this machine:
 # error Need to define UNALIGNED_LOAD32 for this architecture
+#endif
+
+#ifndef CTEMPLATE_BSWAP32_ALREADY_DEFINED
+# undef BSWAP32                             // don't leak outside this file
+#else
+# undef CTEMPLATE_BSWAP32_ALREADY_DEFINED   // just cleaning up
 #endif
 
 #endif  // CTEMPLATE_MACROS_H_
