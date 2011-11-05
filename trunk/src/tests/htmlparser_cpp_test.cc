@@ -308,7 +308,7 @@ bool HtmlparserCppTest::StringToBool(const string &value) {
   } else if (strcasecmp(value.c_str(), "false") == 0) {
     return false;
   } else {
-    CHECK("Unknown boolean value" == NULL);
+    LOG(FATAL) << "Unknown boolean value";
   }
 }
 
@@ -323,8 +323,7 @@ const char *HtmlparserCppTest::IdToName(const struct IdNameMap *list,
     }
     list++;
   }
-  CHECK("Unknown id" != NULL);
-  return NULL;  // Unreachable.
+  LOG(FATAL) << "Unknown id";
 }
 
 // Returns the enum_id of the correspondent name by consulting an array of
@@ -338,8 +337,7 @@ int HtmlparserCppTest::NameToId(const struct IdNameMap *list,
     }
     list++;
   }
-  CHECK("Unknown name" != NULL);
-  return -1;  // Unreachable.
+  LOG(FATAL) << "Unknown name";
 }
 
 // Validate the parser state against the provided state.
