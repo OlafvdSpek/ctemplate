@@ -300,13 +300,17 @@ TemplateCache::RefcountedTemplate* TemplateCache::GetTemplateLocked(
     assert(it != parsed_template_cache_->end());
   }
   if (it->second.should_reload) {
-    // check if the template has changed on disk:
+    // check if the template has changed on disk or if a new template with the
+    // same name has been added earlier in the search path:
+    const string resolved = FindTemplateFilename(
+        it->second.refcounted_tpl->tpl()->original_filename());
     FileStat statbuf;
     if (it->second.template_type == CachedTemplate::FILE_BASED &&
-        HasTemplateChangedOnDisk(
-            it->second.refcounted_tpl->tpl()->template_file(),
-            it->second.refcounted_tpl->tpl()->mtime(),
-            &statbuf)) {
+        (resolved != it->second.refcounted_tpl->tpl()->template_file() ||
+         HasTemplateChangedOnDisk(
+             it->second.refcounted_tpl->tpl()->template_file(),
+             it->second.refcounted_tpl->tpl()->mtime(),
+             &statbuf))) {
       // Create a new template, insert it into the cache under
       // template_cache_key, and DecRef() the old one to indicate
       // the cache no longer has a reference to it.
@@ -658,19 +662,12 @@ void TemplateCache::DoneWithGetTemplatePtrs() {
 //    LAZY_RELOAD just sets the reload bit in the cache so that the next
 //    GetTemplate will reload and parse the template, if it changed.
 
-//    NOTE: ReloadAllIfChanged can have surprising behavior if the
-//    same file exists in several places on the template search path.
-//    Suppose the search path is "dira:dirb", and a template is
+//    NOTE: Suppose the search path is "dira:dirb", and a template is
 //    created with name "foo", which resolves to "dirb/foo" because
-//    dira/foo does not exist.  Then suppose dira/foo is created and,
-//    dirb/foo is updated, and then ReloadAllIfChanged() is called.
-//    Then ReloadAllIfChanged() will replace the contents of the
-//    template with dira/foo, *not* dirb/foo.  On the other hand, if
-//    dira/foo is added but dirb/foo is *not* updated,
-//    ReloadAllIfChanged() will be a noop, and the template contents
-//    will stay at dirb/foo.  The possible lesson to draw from this is
-//    to not have the same template filename in different places on
-//    the search path.
+//    dira/foo does not exist.  Then suppose dira/foo is created and then
+//    ReloadAllIfChanged() is called. Then ReloadAllIfChanged() will replace
+//    the contents of the template with dira/foo, *not* dirb/foo, even if
+//    dirb/foo hasn't changed.
 // ----------------------------------------------------------------------
 
 void TemplateCache::ReloadAllIfChanged(ReloadType reload_type) {
