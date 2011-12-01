@@ -520,21 +520,14 @@ class TemplateCacheUnittest {
     StringToFile("b/template_foo", path_b_foo);
     ASSERT_STREQ(path_b_foo.c_str(),
                  cache1.FindTemplateFilename("template_foo").c_str());
-    const Template* b_foo = cache1.GetTemplate("template_foo", DO_NOT_STRIP);
+    // Add b/foo to the template cache.
+    cache1.GetTemplate("template_foo", DO_NOT_STRIP);
 
     // Add a/foo
     const string path_a_foo = PathJoin(pathA, "template_foo");
     StringToFile("a/template_foo", path_a_foo);
     ASSERT_STREQ(path_a_foo.c_str(),
                  cache1.FindTemplateFilename("template_foo").c_str());
-
-    // Since we didn't touch b/foo, on reload it doesn't get overridden by a/foo
-    cache1.ReloadAllIfChanged(TemplateCache::IMMEDIATE_RELOAD);
-    // Ensure that foo contains b/foo
-    ASSERT(b_foo = cache1.GetTemplate("template_foo", DO_NOT_STRIP));
-
-    // Now update (or touch) b/foo
-    StringToFile("{updated b/template_foo}", path_b_foo);
 
     // Now, on reload we pick up foo from the earlier search path: a/foo
     cache1.ReloadAllIfChanged(TemplateCache::IMMEDIATE_RELOAD);
@@ -548,7 +541,7 @@ class TemplateCacheUnittest {
     cache1.ReloadAllIfChanged(TemplateCache::IMMEDIATE_RELOAD);
     foo_post_reload = cache_peer.GetTemplate("template_foo",
                                              STRIP_WHITESPACE);
-    AssertExpandIs(foo_post_reload, &dict, "{updated b/template_foo}",
+    AssertExpandIs(foo_post_reload, &dict, "b/template_foo",
                    true);
   }
 
@@ -572,21 +565,14 @@ class TemplateCacheUnittest {
     StringToFile("b/template_foo", path_b_foo);
     ASSERT_STREQ(path_b_foo.c_str(),
                  cache1.FindTemplateFilename("template_foo").c_str());
-    const Template* b_foo = cache1.GetTemplate("template_foo", DO_NOT_STRIP);
+    // Add b/foo to the template cache.
+    cache1.GetTemplate("template_foo", DO_NOT_STRIP);
 
     // Add a/foo
     const string path_a_foo = PathJoin(pathA, "template_foo");
     StringToFile("a/template_foo", path_a_foo);
     ASSERT_STREQ(path_a_foo.c_str(),
                  cache1.FindTemplateFilename("template_foo").c_str());
-
-    // Since we didn't touch b/foo, on reload it doesn't get overridden by a/foo
-    cache1.ReloadAllIfChanged(TemplateCache::LAZY_RELOAD);
-    // Ensure that foo contains b/foo
-    ASSERT(b_foo = cache1.GetTemplate("template_foo", DO_NOT_STRIP));
-
-    // Now update (or touch) b/foo
-    StringToFile("{updated b/template_foo}", path_b_foo);
 
     // Now, on reload we pick up foo from the earlier search path: a/foo
     cache1.ReloadAllIfChanged(TemplateCache::LAZY_RELOAD);
@@ -600,7 +586,7 @@ class TemplateCacheUnittest {
     cache1.ReloadAllIfChanged(TemplateCache::LAZY_RELOAD);
     foo_post_reload = cache_peer.GetTemplate("template_foo",
                                              STRIP_WHITESPACE);
-    AssertExpandIs(foo_post_reload, &dict, "{updated b/template_foo}",
+    AssertExpandIs(foo_post_reload, &dict, "b/template_foo",
                    true);
   }
 
