@@ -49,7 +49,7 @@ details see, the links below.
    int main(int argc, char** argv) {
       ctemplate::TemplateDictionary dict("example");
       dict.SetValue("NAME", "John Smith");
-      int winnings = random() % 100000;
+      int winnings = rand() % 100000;
       dict.SetIntValue("VALUE", winnings);
       dict.SetFormattedValue("TAXED_VALUE", "%.2f", winnings * 0.83);
       // For now, assume everyone lives in CA.
@@ -58,7 +58,7 @@ details see, the links below.
         dict.ShowSection("IN_CA");
       }
       std::string output;
-      ctemplate::Expand("example.tpl", ctemplate::DO_NOT_STRIP, &dict, &output);
+      ctemplate::ExpandTemplate("example.tpl", ctemplate::DO_NOT_STRIP, &dict, &output);
       std::cout &lt;&lt; output;
       return 0;
    }
