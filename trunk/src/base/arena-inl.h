@@ -106,6 +106,9 @@ template <class T, class C> class ArenaAllocator {
   void construct(pointer p, const T & val) {
     new(reinterpret_cast<void*>(p)) T(val);
   }
+  void construct(pointer p) {
+    new(reinterpret_cast<void*>(p)) T();
+  }
   void destroy(pointer p) { p->~T(); }
 
   C* arena(void) const { return arena_; }
