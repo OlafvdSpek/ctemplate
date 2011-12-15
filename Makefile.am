@@ -120,7 +120,6 @@ CTEMPLATE_SYMBOLS = '(ctemplate|template_modifiers|BaseArena|UnsafeArena|[^A-Za-
 lib_LTLIBRARIES += libctemplate.la
 WINDOWS_PROJECTS += vsprojects/libctemplate/libctemplate.vcproj
 libctemplate_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
-	src/base/aligned_char_array.h \
 	src/base/arena-inl.h \
 	src/base/arena.cc \
 	src/base/arena.h \
