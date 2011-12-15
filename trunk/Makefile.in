@@ -127,21 +127,21 @@ am__libctemplate_la_SOURCES_DIST = src/ctemplate/template.h \
 	src/ctemplate/template_annotator.h \
 	src/ctemplate/template_emitter.h \
 	src/ctemplate/template_namelist.h \
-	src/ctemplate/per_expand_data.h src/base/aligned_char_array.h \
-	src/base/arena-inl.h src/base/arena.cc src/base/arena.h \
-	src/base/fileutil.h src/base/macros.h \
-	src/base/manual_constructor.h src/base/mutex.h \
-	src/base/small_map.h src/base/thread_annotations.h \
-	src/base/util.h src/indented_writer.h src/per_expand_data.cc \
-	src/template.cc src/template_annotator.cc \
-	src/template_cache.cc src/template_dictionary.cc \
-	src/template_modifiers.cc src/template_modifiers_internal.h \
-	src/template_namelist.cc src/template_pathops.cc \
-	src/template_string.cc src/htmlparser/htmlparser.cc \
-	src/htmlparser/htmlparser.h src/htmlparser/htmlparser_cpp.h \
-	src/htmlparser/jsparser.cc src/htmlparser/jsparser.h \
-	src/htmlparser/statemachine.cc src/htmlparser/statemachine.h \
-	src/windows/port.h src/windows/port.cc
+	src/ctemplate/per_expand_data.h src/base/arena-inl.h \
+	src/base/arena.cc src/base/arena.h src/base/fileutil.h \
+	src/base/macros.h src/base/manual_constructor.h \
+	src/base/mutex.h src/base/small_map.h \
+	src/base/thread_annotations.h src/base/util.h \
+	src/indented_writer.h src/per_expand_data.cc src/template.cc \
+	src/template_annotator.cc src/template_cache.cc \
+	src/template_dictionary.cc src/template_modifiers.cc \
+	src/template_modifiers_internal.h src/template_namelist.cc \
+	src/template_pathops.cc src/template_string.cc \
+	src/htmlparser/htmlparser.cc src/htmlparser/htmlparser.h \
+	src/htmlparser/htmlparser_cpp.h src/htmlparser/jsparser.cc \
+	src/htmlparser/jsparser.h src/htmlparser/statemachine.cc \
+	src/htmlparser/statemachine.h src/windows/port.h \
+	src/windows/port.cc
 am__objects_1 =
 @MINGW_TRUE@am__objects_2 = libctemplate_la-port.lo
 am_libctemplate_la_OBJECTS = $(am__objects_1) libctemplate_la-arena.lo \
@@ -171,21 +171,21 @@ am__libctemplate_debug_la_SOURCES_DIST = src/ctemplate/template.h \
 	src/ctemplate/template_annotator.h \
 	src/ctemplate/template_emitter.h \
 	src/ctemplate/template_namelist.h \
-	src/ctemplate/per_expand_data.h src/base/aligned_char_array.h \
-	src/base/arena-inl.h src/base/arena.cc src/base/arena.h \
-	src/base/fileutil.h src/base/macros.h \
-	src/base/manual_constructor.h src/base/mutex.h \
-	src/base/small_map.h src/base/thread_annotations.h \
-	src/base/util.h src/indented_writer.h src/per_expand_data.cc \
-	src/template.cc src/template_annotator.cc \
-	src/template_cache.cc src/template_dictionary.cc \
-	src/template_modifiers.cc src/template_modifiers_internal.h \
-	src/template_namelist.cc src/template_pathops.cc \
-	src/template_string.cc src/htmlparser/htmlparser.cc \
-	src/htmlparser/htmlparser.h src/htmlparser/htmlparser_cpp.h \
-	src/htmlparser/jsparser.cc src/htmlparser/jsparser.h \
-	src/htmlparser/statemachine.cc src/htmlparser/statemachine.h \
-	src/windows/port.h src/windows/port.cc
+	src/ctemplate/per_expand_data.h src/base/arena-inl.h \
+	src/base/arena.cc src/base/arena.h src/base/fileutil.h \
+	src/base/macros.h src/base/manual_constructor.h \
+	src/base/mutex.h src/base/small_map.h \
+	src/base/thread_annotations.h src/base/util.h \
+	src/indented_writer.h src/per_expand_data.cc src/template.cc \
+	src/template_annotator.cc src/template_cache.cc \
+	src/template_dictionary.cc src/template_modifiers.cc \
+	src/template_modifiers_internal.h src/template_namelist.cc \
+	src/template_pathops.cc src/template_string.cc \
+	src/htmlparser/htmlparser.cc src/htmlparser/htmlparser.h \
+	src/htmlparser/htmlparser_cpp.h src/htmlparser/jsparser.cc \
+	src/htmlparser/jsparser.h src/htmlparser/statemachine.cc \
+	src/htmlparser/statemachine.h src/windows/port.h \
+	src/windows/port.cc
 @MINGW_TRUE@am__objects_3 = libctemplate_debug_la-port.lo
 am__objects_4 = $(am__objects_1) libctemplate_debug_la-arena.lo \
 	libctemplate_debug_la-per_expand_data.lo \
@@ -217,21 +217,21 @@ am__libctemplate_nothreads_la_SOURCES_DIST = src/ctemplate/template.h \
 	src/ctemplate/template_annotator.h \
 	src/ctemplate/template_emitter.h \
 	src/ctemplate/template_namelist.h \
-	src/ctemplate/per_expand_data.h src/base/aligned_char_array.h \
-	src/base/arena-inl.h src/base/arena.cc src/base/arena.h \
-	src/base/fileutil.h src/base/macros.h \
-	src/base/manual_constructor.h src/base/mutex.h \
-	src/base/small_map.h src/base/thread_annotations.h \
-	src/base/util.h src/indented_writer.h src/per_expand_data.cc \
-	src/template.cc src/template_annotator.cc \
-	src/template_cache.cc src/template_dictionary.cc \
-	src/template_modifiers.cc src/template_modifiers_internal.h \
-	src/template_namelist.cc src/template_pathops.cc \
-	src/template_string.cc src/htmlparser/htmlparser.cc \
-	src/htmlparser/htmlparser.h src/htmlparser/htmlparser_cpp.h \
-	src/htmlparser/jsparser.cc src/htmlparser/jsparser.h \
-	src/htmlparser/statemachine.cc src/htmlparser/statemachine.h \
-	src/windows/port.h src/windows/port.cc
+	src/ctemplate/per_expand_data.h src/base/arena-inl.h \
+	src/base/arena.cc src/base/arena.h src/base/fileutil.h \
+	src/base/macros.h src/base/manual_constructor.h \
+	src/base/mutex.h src/base/small_map.h \
+	src/base/thread_annotations.h src/base/util.h \
+	src/indented_writer.h src/per_expand_data.cc src/template.cc \
+	src/template_annotator.cc src/template_cache.cc \
+	src/template_dictionary.cc src/template_modifiers.cc \
+	src/template_modifiers_internal.h src/template_namelist.cc \
+	src/template_pathops.cc src/template_string.cc \
+	src/htmlparser/htmlparser.cc src/htmlparser/htmlparser.h \
+	src/htmlparser/htmlparser_cpp.h src/htmlparser/jsparser.cc \
+	src/htmlparser/jsparser.h src/htmlparser/statemachine.cc \
+	src/htmlparser/statemachine.h src/windows/port.h \
+	src/windows/port.cc
 @MINGW_TRUE@am__objects_5 = libctemplate_nothreads_la-port.lo
 am__objects_6 = $(am__objects_1) libctemplate_nothreads_la-arena.lo \
 	libctemplate_nothreads_la-per_expand_data.lo \
@@ -264,21 +264,21 @@ am__libctemplate_nothreads_debug_la_SOURCES_DIST =  \
 	src/ctemplate/template_annotator.h \
 	src/ctemplate/template_emitter.h \
 	src/ctemplate/template_namelist.h \
-	src/ctemplate/per_expand_data.h src/base/aligned_char_array.h \
-	src/base/arena-inl.h src/base/arena.cc src/base/arena.h \
-	src/base/fileutil.h src/base/macros.h \
-	src/base/manual_constructor.h src/base/mutex.h \
-	src/base/small_map.h src/base/thread_annotations.h \
-	src/base/util.h src/indented_writer.h src/per_expand_data.cc \
-	src/template.cc src/template_annotator.cc \
-	src/template_cache.cc src/template_dictionary.cc \
-	src/template_modifiers.cc src/template_modifiers_internal.h \
-	src/template_namelist.cc src/template_pathops.cc \
-	src/template_string.cc src/htmlparser/htmlparser.cc \
-	src/htmlparser/htmlparser.h src/htmlparser/htmlparser_cpp.h \
-	src/htmlparser/jsparser.cc src/htmlparser/jsparser.h \
-	src/htmlparser/statemachine.cc src/htmlparser/statemachine.h \
-	src/windows/port.h src/windows/port.cc
+	src/ctemplate/per_expand_data.h src/base/arena-inl.h \
+	src/base/arena.cc src/base/arena.h src/base/fileutil.h \
+	src/base/macros.h src/base/manual_constructor.h \
+	src/base/mutex.h src/base/small_map.h \
+	src/base/thread_annotations.h src/base/util.h \
+	src/indented_writer.h src/per_expand_data.cc src/template.cc \
+	src/template_annotator.cc src/template_cache.cc \
+	src/template_dictionary.cc src/template_modifiers.cc \
+	src/template_modifiers_internal.h src/template_namelist.cc \
+	src/template_pathops.cc src/template_string.cc \
+	src/htmlparser/htmlparser.cc src/htmlparser/htmlparser.h \
+	src/htmlparser/htmlparser_cpp.h src/htmlparser/jsparser.cc \
+	src/htmlparser/jsparser.h src/htmlparser/statemachine.cc \
+	src/htmlparser/statemachine.h src/windows/port.h \
+	src/windows/port.cc
 @MINGW_TRUE@am__objects_7 = libctemplate_nothreads_debug_la-port.lo
 am__objects_8 = $(am__objects_1) \
 	libctemplate_nothreads_debug_la-arena.lo \
@@ -925,20 +925,20 @@ BUILT_SOURCES = src/htmlparser/htmlparser_fsm.h \
 # exported, but they're needed -- at least -- for some unittests.
 CTEMPLATE_SYMBOLS = '(ctemplate|template_modifiers|BaseArena|UnsafeArena|[^A-Za-z]Template[^A-Za-z]|TemplateDictionary|TemplateNamelist|TemplateFromString|TemplateString|TemplateState|[^A-Za-z]Strip[^A-Za-z])'
 libctemplate_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
-	src/base/aligned_char_array.h src/base/arena-inl.h \
-	src/base/arena.cc src/base/arena.h src/base/fileutil.h \
-	src/base/macros.h src/base/manual_constructor.h \
-	src/base/mutex.h src/base/small_map.h \
-	src/base/thread_annotations.h src/base/util.h \
-	src/indented_writer.h src/per_expand_data.cc src/template.cc \
-	src/template_annotator.cc src/template_cache.cc \
-	src/template_dictionary.cc src/template_modifiers.cc \
-	src/template_modifiers_internal.h src/template_namelist.cc \
-	src/template_pathops.cc src/template_string.cc \
-	src/htmlparser/htmlparser.cc src/htmlparser/htmlparser.h \
-	src/htmlparser/htmlparser_cpp.h src/htmlparser/jsparser.cc \
-	src/htmlparser/jsparser.h src/htmlparser/statemachine.cc \
-	src/htmlparser/statemachine.h $(am__append_1)
+	src/base/arena-inl.h src/base/arena.cc src/base/arena.h \
+	src/base/fileutil.h src/base/macros.h \
+	src/base/manual_constructor.h src/base/mutex.h \
+	src/base/small_map.h src/base/thread_annotations.h \
+	src/base/util.h src/indented_writer.h src/per_expand_data.cc \
+	src/template.cc src/template_annotator.cc \
+	src/template_cache.cc src/template_dictionary.cc \
+	src/template_modifiers.cc src/template_modifiers_internal.h \
+	src/template_namelist.cc src/template_pathops.cc \
+	src/template_string.cc src/htmlparser/htmlparser.cc \
+	src/htmlparser/htmlparser.h src/htmlparser/htmlparser_cpp.h \
+	src/htmlparser/jsparser.cc src/htmlparser/jsparser.h \
+	src/htmlparser/statemachine.cc src/htmlparser/statemachine.h \
+	$(am__append_1)
 libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG $(AM_CXXFLAGS)
 # -version-info gets passed to libtool
 libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) \
