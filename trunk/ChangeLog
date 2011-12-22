@@ -1,3 +1,10 @@
+Thu Dec 22 14:03:27 2011  Google Inc. <opensource@google.com>
+
+	* ctemplate: version 1.1 release
+	* Make reloads always prefer files earlier on the search patch (ssas)
+	* PORTING: Add a default BSWAP32, needed for AIX (csilvers)
+	* Die at configure-time when g++ isn't installed
+
 Fri Aug 26 13:10:46 2011  Google Inc. <opensource@google.com>
 
 	* ctemplate: version 1.0 release

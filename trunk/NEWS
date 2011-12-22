@@ -1,4 +1,19 @@
-== 26 August 2011 ==
+== 22 December 2011 ==
+
+I've just released ctemplate 1.1.  The only functionality change is
+obscure: when a reload is done (via, say, `ReloadAllIfChanged`), and a
+new file has been created since the last reload that both a) has the
+same filename as a template file that had been loaded in the past, and
+b) is earlier on the template search-path than the previously loaded
+file, *and* c) the previously loaded file hasn't changed since the
+last reload, then at reload-time we now load the new file into the
+template, replacing the old file.  Before we would only load the new
+file if the old file had changed on disk, and would otherwise leave
+the template alone.  Even more minor changes are in the
+[http://google-ctemplate.googlecode.com/svn/tags/ctemplate-1.1/ChangeLog ChangeLog].
+
+
+=== 26 August 2011 ===
 
 I've just released ctemplate 1.0!  (I've decided 4 weeks is well
 within the definition of "the next week or so"...)

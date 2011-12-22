@@ -164,7 +164,7 @@
 #undef PACKAGE_NAME
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING  "ctemplate 1.0rc2"
+#define PACKAGE_STRING  "ctemplate 1.1"
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME

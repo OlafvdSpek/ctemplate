@@ -4,10 +4,10 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ(2.57)
 
-AC_INIT(ctemplate, 1.0, opensource@google.com)
+AC_INIT(ctemplate, 1.1, opensource@google.com)
 # Update this value for every release!  (A:B:C will map to foo.so.(A-C).C.B)
 # http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
-SO_VERSION=1:2:1
+SO_VERSION=1:3:1
 
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
