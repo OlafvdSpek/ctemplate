@@ -1,7 +1,7 @@
 Source: ctemplate
 Section: libdevel
 Priority: optional
-Maintainer: Google Inc. <google-ctemplate@googlegroups.com>
+Maintainer: Google Inc. and others <google-ctemplate@googlegroups.com>
 Build-Depends: debhelper (>= 4.0.0)
 Standards-Version: 3.6.1
 

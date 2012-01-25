@@ -81,7 +81,7 @@ template class __declspec(dllexport) std::vector<std::string>;\n\
     eval "$varname='$value'"
   done
 
-  # Process all the .in files in the "google" subdirectory
+  # Process all the .in files in the "ctemplate" subdirectory
   mkdir -p "$1/windows/ctemplate"
   for file in "$1"/ctemplate/*.in; do
      echo "Processing $file"

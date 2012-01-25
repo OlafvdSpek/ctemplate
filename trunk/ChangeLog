@@ -1,3 +1,11 @@
+Tue Jan 24 16:00:51 2012  Google Inc. <google-ctemplate@googlegroups.com>
+
+	* ctemplate: version 2.0 release
+	* Changed the 'official' ctemplate email in setup.py/etc
+	* Rewrote docs to refer to Ctemplate, not Google Template
+	* Renamed google-ctemplate.sln to ctemplate.sln
+	* Changed copyright text to reflect Google's relinquished ownership
+
 Thu Dec 22 14:03:27 2011  Google Inc. <opensource@google.com>
 
 	* ctemplate: version 1.1 release

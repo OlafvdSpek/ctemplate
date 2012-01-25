@@ -1,6 +1,6 @@
 This project has been ported to Windows.  A working solution file
 exists in this directory:
-    google-ctemplate.sln
+    ctemplate.sln
 
 You can load this solution file into either VC++ 7.1 (Visual Studio
 2003) or VC++ 8.0 (Visual Studio 2005) -- in the latter case, it will
@@ -36,8 +36,8 @@ followed by Template::GetTemplate().
 I have little experience with Windows programming, so there may be
 better ways to set this up than I've done!  If you run across any
 problems, please post to the google-ctemplate Google Group, or report
-them on the google-ctemplate Google Code site:
+them on the ctemplate Google Code site:
    http://groups.google.com/group/google-ctemplate
-   http://code.google.com/p/google-ctemplate/issues/list
+   http://code.google.com/p/ctemplate/issues/list
 
 -- craig
