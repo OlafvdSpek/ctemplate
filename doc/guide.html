@@ -2,7 +2,7 @@
 
 <html>
 <head>
-<title>How To Use the Google Template System</title>
+<title>How To Use the Ctemplate (formerly Google Template) System</title>
 
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <link href="designstyle.css" type="text/css" rel="stylesheet">
@@ -24,7 +24,7 @@
 
 <body>
 
-<h1>How To Use the Google Template System</h1>
+<h1>How To Use the Ctemplate (formerly Google Template) System</h1>
 <small>(as of
 <script type=text/javascript>
   var lm = new Date(document.lastModified);
@@ -57,7 +57,7 @@ be to everybody's tastes.  However, while this design limits the power
 of the template <i>language</i>, it does not limit the power or
 flexibility of the template <i>system</i>.  This system supports
 arbitrarily complex text formatting.  Many Google applications,
-including the "main" Google web search, use this system exclusively
+including the "main" Google web search, use this system
 for formatting output.</p>
 
 <p>Finally, this system is designed with an eye towards efficiency.
@@ -67,7 +67,7 @@ both memory use and memory fragmentation.</p>
 
 <h2> Overview </h2>
 
-<p>There are two main parts to the Google Template System:</p>
+<p>There are two main parts to the Ctemplate System:</p>
 
 <ul>
   <li> Templates
@@ -107,7 +107,7 @@ as <code>11/20/2005</code>, are <b>dictionary values</b>.</p>
 
 <p>A few points are clear even from this simple example:</p>
 <ol>
-  <li> Dictionary keys and values are strings; the Google template
+  <li> Dictionary keys and values are strings; the Ctemplate
        system is not typed. </li>
   <li> Dictionary values come already formatted.  It was up to the
        application code to decide how to format the value for
@@ -210,7 +210,7 @@ a single template to produce formatted output.</p>
 
 <h3>Expanding a Template</h3>
 
-<p>A program using Google Templates typically reads in templates at
+<p>A program using Ctemplate typically reads in templates at
 load time.  During the course of program execution, the program will
 repeatedly perform the following two steps: first, instantiate a data
 dictionary, and second, apply the dictionary to the template to
@@ -891,7 +891,7 @@ tests:</p>
 
 <h2> <A NAME="security">Security Considerations</A> </h2>
 
-<p>Like all web applications, programs that use the Google Template
+<p>Like all web applications, programs that use the Ctemplate
 System to create HTML documents can be vulnerable to
 Cross-Site-Scripting (XSS) attacks unless data inserted into a
 template is appropriately sanitized and/or escaped.  Which specific

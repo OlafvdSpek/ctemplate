@@ -70,7 +70,7 @@ noinst_LTLIBRARIES =
 bin_PROGRAMS =
 bin_SCRIPTS =
 ## The location of the windows project file for each binary we make
-WINDOWS_PROJECTS = google-ctemplate.sln
+WINDOWS_PROJECTS = ctemplate.sln
 
 
 ## unittests you want to run when people type 'make check'.

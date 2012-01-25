@@ -2,7 +2,7 @@
 
 <html>
 <head>
-<title>Google Template System Reference Guide</title>
+<title>Ctemplate System Reference Guide</title>
 
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <link href="designstyle.css" type="text/css" rel="stylesheet">
@@ -24,7 +24,7 @@
 
 <body>
 
-<h1>Google Template System Reference Guide</h1>
+<h1>Ctemplate System Reference Guide</h1>
 <small>(as of
 <script type=text/javascript>
   var lm = new Date(document.lastModified);
@@ -74,7 +74,7 @@ option is set, which puts template code in namespace
 <h3> The Template Language </h3>
 
 <p>Templates are strings that contain special formatting code called
-<em>template markers</em>.  In the Google Template System, template
+<em>template markers</em>.  In the Ctemplate System, template
 strings are usually read from a file.</p>
 
 <p>Anything found in a template of the form {{...}} is
@@ -1454,7 +1454,7 @@ implementation, for emitting to a string.</p>
      <code>StaticTemplateString</code> Classes</A> </h2>
 
 <p><code>TemplateString</code> is a string-like implementation.
-Google Template uses <code>TemplateString</code> almost exclusively,
+Ctemplate uses <code>TemplateString</code> almost exclusively,
 internally.  Many of the public API methods, such as
 <code>TemplateDictionary::SetValue()</code>, also take
 <code>TemplateString</code> as input.  <code>TemplateString</code>
@@ -1469,7 +1469,7 @@ length, you can save a bit of work by explicitly constructing a
 
 <p>Some compile-time tools work with <code>TemplateString</code> to
 offload computation from runtime to compile-time.  This is possible
-because the Google Template code often stores a hash of a string
+because the Ctemplate code often stores a hash of a string
 rather than a string directly.  For static, immutable strings,
 <code>TemplateString</code> can store a pre-computed hash value.  This
 functionality is used by <A

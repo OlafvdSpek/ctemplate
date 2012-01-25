@@ -836,7 +836,7 @@ noinst_LTLIBRARIES = libctemplate_debug.la \
 	libctemplate_nothreads_debug.la libctemplate_testing.la \
 	libctemplate_testing_nothreads.la
 bin_SCRIPTS = src/template-converter
-WINDOWS_PROJECTS = google-ctemplate.sln \
+WINDOWS_PROJECTS = ctemplate.sln \
 	vsprojects/libctemplate/libctemplate.vcproj \
 	vsprojects/make_tpl_varname_h/make_tpl_varname_h.vcproj \
 	vsprojects/diff_tpl_auto_escape/diff_tpl_auto_escape.vcproj \

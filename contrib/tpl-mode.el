@@ -25,7 +25,7 @@
   (require 'font-lock))
 
 (defgroup tpl-mode nil
-  "Major mode for editing Google CTemplate files"
+  "Major mode for editing CTemplate files"
   :group 'languages)
 
 (defvar tpl-mode-version "1.0"
@@ -242,7 +242,7 @@
 (put 'tpl-mode 'font-lock-defaults '(tpl-font-lock-keywords nil t))
 
 (defun tpl-mode ()
-  "Major mode for editing Google CTemplate file."
+  "Major mode for editing CTemplate file."
   (interactive)
   (kill-all-local-variables)
   (use-local-map tpl-mode-map)

@@ -7,10 +7,10 @@ Summary: Simple but powerful template language for C++
 Version: %VERSION
 Release: %rel
 Group: Development/Libraries
-URL: http://code.google.com/p/google-ctemplate
+URL: http://code.google.com/p/ctemplate
 License: BSD
-Vendor: Google
-Packager: Google Inc. <google-ctemplate@googlegroups.com>
+Vendor: Google Inc. and others
+Packager: Google Inc. and others <google-ctemplate@googlegroups.com>
 Source: http://%{NAME}.googlecode.com/files/%{NAME}-%{VERSION}.tar.gz
 Distribution: Redhat 7 and above.
 Buildroot: %{_tmppath}/%{name}-root
