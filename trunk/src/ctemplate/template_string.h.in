@@ -188,19 +188,19 @@ class @ac_windows_dllexport@ TemplateString {
   }
 
   const char* begin() const {
-  	return ptr_;
+    return ptr_;
   }
 
   const char* end() const {
-  	return ptr_ + length_;
+    return ptr_ + length_;
   }
 
   const char* data() const {
-  	return ptr_;
+    return ptr_;
   }
 
   size_t size() const {
-  	return length_;
+    return length_;
   }
 
   inline bool empty() const {
@@ -218,8 +218,6 @@ class @ac_windows_dllexport@ TemplateString {
   friend class TemplateCache;                    // for GetGlobalId
   friend class StaticTemplateStringInitializer;  // for AddToGlo...
   friend struct TemplateStringHasher;            // for GetGlobalId
-  friend class ::TemplateStringTest;
-  friend class ::StaticTemplateStringTest;       // for GetGlobalId
   friend TemplateId GlobalIdForTest(const char* ptr, int len);
   friend TemplateId GlobalIdForSTS_INIT(const TemplateString& s);
 
