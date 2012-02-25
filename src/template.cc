@@ -1034,11 +1034,11 @@ bool VariableTemplateNode::Expand(ExpandEmitter *output_buffer,
   const TemplateString value = dictionary->GetValue(variable_);
 
   if (AnyMightModify(token_.modvals, per_expand_data)) {
-    EmitModifiedString(token_.modvals, value.ptr_, value.length_,
+    EmitModifiedString(token_.modvals, value.data(), value.size(),
                        per_expand_data, output_buffer);
   } else {
     // No need to modify value, so just emit it.
-    output_buffer->Emit(value.ptr_, value.length_);
+    output_buffer->Emit(value.data(), value.size());
   }
 
   if (per_expand_data->annotate()) {
