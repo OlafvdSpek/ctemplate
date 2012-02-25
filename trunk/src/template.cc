@@ -2141,9 +2141,9 @@ Template* Template::StringToTemplate(const TemplateString& content,
   // But we have to do the "loading" and parsing ourselves:
 
   // BuildTree deletes the buffer when done, so we need a copy for it.
-  char* buffer = new char[content.length_];
-  size_t content_len = content.length_;
-  memcpy(buffer, content.ptr_, content_len);
+  char* buffer = new char[content.size()];
+  size_t content_len = content.size();
+  memcpy(buffer, content.data(), content_len);
   tpl->StripBuffer(&buffer, &content_len);
   if ( tpl->BuildTree(buffer, buffer + content_len) ) {
     assert(tpl->state() == TS_READY);
@@ -2171,7 +2171,7 @@ Template* Template::StringToTemplate(const TemplateString& content,
 Template::Template(const TemplateString& filename, Strip strip,
                    TemplateCache* owner)
     // TODO(csilvers): replace ToString() with an is_immutable() check
-    : original_filename_(filename.ToString()), resolved_filename_(),
+    : original_filename_(filename.data(), filename.size()), resolved_filename_(),
       filename_mtime_(0), strip_(strip), state_(TS_EMPTY),
       template_cache_(owner), template_text_(NULL), template_text_len_(0),
       tree_(NULL), parse_state_(),

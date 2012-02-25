@@ -187,6 +187,22 @@ class @ac_windows_dllexport@ TemplateString {
         is_immutable_(true), id_(s.do_not_use_directly_.id_) {
   }
 
+  const char* begin() const {
+  	return ptr_;
+  }
+
+  const char* end() const {
+  	return ptr_ + length_;
+  }
+
+  const char* data() const {
+  	return ptr_;
+  }
+
+  size_t size() const {
+  	return length_;
+  }
+
   inline bool empty() const {
     return length_ == 0;
   };
@@ -198,7 +214,6 @@ class @ac_windows_dllexport@ TemplateString {
   // Only TemplateDictionaries and template expansion code can read these.
   friend class TemplateDictionary;
   friend class TemplateDictionaryPeer;           // TDP::GetSectionValue()
-  friend class Template;                         // for StringToTemplate()
   friend class VariableTemplateNode;             // VTN::Expand()
   friend class TemplateCache;                    // for GetGlobalId
   friend class StaticTemplateStringInitializer;  // for AddToGlo...
