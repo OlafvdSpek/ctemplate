@@ -242,7 +242,7 @@ const char* TemplateDictionaryPeer::GetSectionValue(
     const TemplateString& variable)
     const {
   // Luckily, TemplateDictionary stores all values with a trailing NUL.
-  return dict_->GetValue(variable).ptr_;
+  return dict_->GetValue(variable).data();
 }
 
 bool TemplateDictionaryPeer::ValueIs(const TemplateString& variable,

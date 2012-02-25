@@ -207,13 +207,18 @@ class @ac_windows_dllexport@ TemplateString {
     return length_ == 0;
   };
 
+  inline bool is_immutable() const {
+    return is_immutable_;
+  }
+
   // STL requires this to be public for hash_map, though I'd rather not.
-  inline bool operator==(const TemplateString& x) const;
+  inline bool operator==(const TemplateString& x) const {
+    return GetGlobalId() == x.GetGlobalId();
+  }
 
  private:
   // Only TemplateDictionaries and template expansion code can read these.
   friend class TemplateDictionary;
-  friend class TemplateDictionaryPeer;           // TDP::GetSectionValue()
   friend class VariableTemplateNode;             // VTN::Expand()
   friend class TemplateCache;                    // for GetGlobalId
   friend class StaticTemplateStringInitializer;  // for AddToGlo...
@@ -223,10 +228,6 @@ class @ac_windows_dllexport@ TemplateString {
 
   TemplateString(const char* s, size_t slen, bool is_immutable, TemplateId id)
       : ptr_(s), length_(slen), is_immutable_(is_immutable), id_(id) {
-  }
-
-  inline bool is_immutable() const {
-    return is_immutable_;
   }
 
   // This returns true if s is in the .text segment of the binary.
@@ -330,11 +331,6 @@ inline bool StaticTemplateString::operator==(
            memcmp(do_not_use_directly_.ptr_, x.do_not_use_directly_.ptr_,
                   do_not_use_directly_.length_) == 0));
 }
-
-inline bool TemplateString::operator==(const TemplateString& x) const {
-  return (GetGlobalId() == x.GetGlobalId());
-}
-
 
 // We set up as much of StaticTemplateString as we can at
 // static-initialization time (using brace-initialization), but some

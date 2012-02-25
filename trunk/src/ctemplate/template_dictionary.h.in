@@ -84,7 +84,7 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
   static UnsafeArena* const NO_ARENA;
 
   std::string name() const {
-    return std::string(name_.ptr_, name_.length_);
+    return std::string(name_.data(), name_.size());
   }
 
   // Returns a recursive copy of this dictionary.  This dictionary
@@ -294,10 +294,10 @@ void SetIntValue(const TemplateString variable, long value);
   // trailing-NUL check in the TemplateString version of Memdup.
   TemplateString Memdup(const char* s, size_t slen);
   TemplateString Memdup(const TemplateString& s) {
-    if (s.is_immutable() && s.ptr_[s.length_] == '\0') {
+    if (s.is_immutable() && s.data()[s.size()] == '\0') {
       return s;
     }
-    return Memdup(s.ptr_, s.length_);
+    return Memdup(s.data(), s.size());
   }
 
   // Used for recursive MakeCopy calls.
@@ -338,10 +338,10 @@ void SetIntValue(const TemplateString variable, long value);
   // of TemplateString, but we are
   static std::string PrintableTemplateString(
       const TemplateString& ts) {
-    return std::string(ts.ptr_, ts.length_);
+    return std::string(ts.data(), ts.size());
   }
   static bool InvalidTemplateString(const TemplateString& ts) {
-    return ts.ptr_ == NULL;
+    return ts.data() == NULL;
   }
   // Compilers differ about whether nested classes inherit our friendship.
   // The only thing DictionaryPrinter needs is IdToString, so just re-export.
