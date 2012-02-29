@@ -102,7 +102,7 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
   // either a char* or a C++ string, or a TemplateString(s, slen).
 
   void SetValue(const TemplateString variable, const TemplateString value);
-void SetIntValue(const TemplateString variable, long value);
+  void SetIntValue(const TemplateString variable, long value);
   void SetFormattedValue(const TemplateString variable, const char* format, ...)
 #if @ac_google_attribute@
       __attribute__((__format__ (__printf__, 3, 4)))
