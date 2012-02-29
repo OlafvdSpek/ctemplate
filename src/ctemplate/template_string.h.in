@@ -157,11 +157,6 @@ struct @ac_windows_dllexport@ StaticTemplateString {
     return do_not_use_directly_.length_ == 0;
   }
 
-  // Use sparingly. Converting to a string loses information about the
-  // id of the template string, making operations require extra hash
-  // computations.
-  inline std::string ToString() const;
-
   // Allows comparisons of StaticTemplateString objects as if they were
   // strings.  This is useful for STL.
   inline bool operator==(const StaticTemplateString& x) const;
@@ -316,11 +311,6 @@ inline bool StaticTemplateString::Hasher::operator()(
   assert(IsTemplateIdInitialized(id_a));
   assert(IsTemplateIdInitialized(id_b));
   return TemplateIdHasher()(id_a, id_b);
-}
-
-inline std::string StaticTemplateString::ToString() const {
-  return std::string(do_not_use_directly_.ptr_,
-                                     do_not_use_directly_.length_);
 }
 
 inline bool StaticTemplateString::operator==(
