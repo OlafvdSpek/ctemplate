@@ -194,6 +194,7 @@ AC_CONFIG_FILES([Makefile \
                  src/ctemplate/template_dictionary.h \
                  src/ctemplate/template_pathops.h \
                  src/ctemplate/template_namelist.h \
+                 src/ctemplate/find_ptr.h \
                  src/ctemplate/per_expand_data.h \
                  src/ctemplate/template_dictionary_interface.h \
                  ])
