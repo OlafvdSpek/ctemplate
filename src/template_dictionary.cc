@@ -48,6 +48,7 @@
 #include "base/arena-inl.h"
 #include "base/thread_annotations.h"
 #include "indented_writer.h"
+#include <ctemplate/find_ptr.h>
 #include <ctemplate/template_dictionary.h>
 #include <ctemplate/template_modifiers.h>
 #include "base/small_map.h"
@@ -560,18 +561,14 @@ void TemplateDictionary::SetTemplateGlobalValueWithoutCopy(
 
 TemplateDictionary* TemplateDictionary::AddSectionDictionary(
     const TemplateString section_name) {
-  DictVector* dicts = NULL;
   LazilyCreateDict(&section_dict_);
-  const SectionDict::iterator it = section_dict_->find(
-      section_name.GetGlobalId());
-  if (it == section_dict_->end()) {
+  DictVector* dicts = find_ptr2(*section_dict_, section_name.GetGlobalId());
+  if (!dicts) {
     dicts = CreateDictVector();
     // Since most lists will remain under 8 or 16 entries but will frequently
     // be more than four, this prevents copying from 1->2->4->8.
     dicts->reserve(8);
     HashInsert(section_dict_, section_name, dicts);
-  } else {
-    dicts = it->second;
   }
   assert(dicts != NULL);
   const string newname(CreateSubdictName(name_, section_name,
@@ -585,7 +582,7 @@ TemplateDictionary* TemplateDictionary::AddSectionDictionary(
 
 void TemplateDictionary::ShowSection(const TemplateString section_name) {
   LazilyCreateDict(&section_dict_);
-  if (section_dict_->find(section_name.GetGlobalId()) == section_dict_->end()) {
+  if (!section_dict_->count(section_name.GetGlobalId())) {
     TemplateDictionary* empty_dict = CreateTemplateSubdict(
         "empty dictionary", arena_, this, template_global_dict_owner_);
     DictVector* sub_dict = CreateDictVector();
@@ -640,15 +637,11 @@ void TemplateDictionary::SetEscapedValueAndShowSection(
 
 TemplateDictionary* TemplateDictionary::AddIncludeDictionary(
     const TemplateString include_name) {
-  DictVector* dicts = NULL;
   LazilyCreateDict(&include_dict_);
-  const IncludeDict::iterator it = include_dict_->find(
-      include_name.GetGlobalId());
-  if (it == include_dict_->end()) {
+  DictVector* dicts = find_ptr2(*include_dict_, include_name.GetGlobalId());
+  if (!dicts) {
     dicts = CreateDictVector();
     HashInsert(include_dict_, include_name, dicts);
-  } else {
-    dicts = it->second;
   }
   assert(dicts != NULL);
   const string newname(CreateSubdictName(name_, include_name,
@@ -915,10 +908,8 @@ TemplateString TemplateDictionary::GetValue(
     const TemplateString& variable) const LOCKS_EXCLUDED(g_static_mutex) {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->variable_dict_) {
-      VariableDict::const_iterator it
-          = d->variable_dict_->find(variable.GetGlobalId());
-      if (it != d->variable_dict_->end())
-        return it->second;
+      if (const TemplateString* it = find_ptr(*d->variable_dict_, variable.GetGlobalId()))
+        return *it;
     }
   }
 
@@ -929,18 +920,15 @@ TemplateString TemplateDictionary::GetValue(
     const VariableDict* template_global_vars =
         template_global_dict_owner_->template_global_dict_->variable_dict_;
 
-    VariableDict::const_iterator it =
-        template_global_vars->find(variable.GetGlobalId());
-    if (it != template_global_vars->end())
-      return it->second;
+    if (const TemplateString* it = find_ptr(*template_global_vars, variable.GetGlobalId()))
+      return *it;
   }
 
   // No match in dict tree or template-global dict.  Last chance: global dict.
   {
     ReaderMutexLock ml(&g_static_mutex);
-    GlobalDict::const_iterator it = global_dict_->find(variable.GetGlobalId());
-    if (it != global_dict_->end())
-      return it->second;
+    if (const TemplateString* it = find_ptr(*global_dict_, variable.GetGlobalId()))
+      return *it;
     return *empty_string_;
   }
 }
@@ -948,7 +936,7 @@ TemplateString TemplateDictionary::GetValue(
 bool TemplateDictionary::IsHiddenSection(const TemplateString& name) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->section_dict_ &&
-        d->section_dict_->find(name.GetGlobalId()) != d->section_dict_->end())
+        d->section_dict_->count(name.GetGlobalId()))
       return false;
   }
   assert(template_global_dict_owner_ != NULL);
@@ -956,7 +944,7 @@ bool TemplateDictionary::IsHiddenSection(const TemplateString& name) const {
       template_global_dict_owner_->template_global_dict_->section_dict_) {
     SectionDict* sections =
         template_global_dict_owner_->template_global_dict_->section_dict_;
-    if (sections->find(name.GetGlobalId()) != sections->end()) {
+    if (sections->count(name.GetGlobalId())) {
       return false;
     }
   }
@@ -966,7 +954,7 @@ bool TemplateDictionary::IsHiddenSection(const TemplateString& name) const {
 bool TemplateDictionary::IsHiddenTemplate(const TemplateString& name) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->include_dict_ &&
-        d->include_dict_->find(name.GetGlobalId()) != d->include_dict_->end())
+        d->include_dict_->count(name.GetGlobalId()))
       return false;
   }
   return true;
@@ -976,10 +964,8 @@ const char *TemplateDictionary::GetIncludeTemplateName(
     const TemplateString& variable, int dictnum) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->include_dict_) {
-      IncludeDict::const_iterator it = d->include_dict_->find(
-          variable.GetGlobalId());
-      if (it != d->include_dict_->end()) {
-        TemplateDictionary* dict = (*it->second)[dictnum];
+      if (DictVector* it = find_ptr2(*d->include_dict_, variable.GetGlobalId())) {
+        TemplateDictionary* dict = (*it)[dictnum];
         return dict->filename_ ? dict->filename_ : "";   // map NULL to ""
       }
     }
@@ -1019,11 +1005,9 @@ TemplateDictionary::CreateTemplateIterator(
     const TemplateString& section_name) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->include_dict_) {
-      IncludeDict::const_iterator it = d->include_dict_->find(
-          section_name.GetGlobalId());
-      if (it != d->include_dict_->end()) {
+      if (DictVector* it = find_ptr2(*d->include_dict_, section_name.GetGlobalId())) {
         // Found it!  Return it as an Iterator
-        return MakeIterator(*it->second);
+        return MakeIterator(*it);
       }
     }
   }
@@ -1036,11 +1020,9 @@ TemplateDictionary::CreateSectionIterator(
     const TemplateString& section_name) const {
   for (const TemplateDictionary* d = this; d; d = d->parent_dict_) {
     if (d->section_dict_) {
-      SectionDict::const_iterator it = d->section_dict_->find(
-          section_name.GetGlobalId());
-      if (it != d->section_dict_->end()) {
+      if (const DictVector* it = find_ptr2(*d->section_dict_, section_name.GetGlobalId())) {
         // Found it!  Return it as an Iterator
-        return MakeIterator(*it->second);
+        return MakeIterator(*it);
       }
     }
   }
@@ -1049,11 +1031,8 @@ TemplateDictionary::CreateSectionIterator(
   const TemplateDictionary* template_global_dict =
       template_global_dict_owner_->template_global_dict_;
   if (template_global_dict && template_global_dict->section_dict_) {
-    SectionDict::const_iterator it =
-        template_global_dict->section_dict_->find(
-            section_name.GetGlobalId());
-    if (it != template_global_dict->section_dict_->end()) {
-      return MakeIterator(*it->second);
+    if (const DictVector* it = find_ptr2(*template_global_dict->section_dict_, section_name.GetGlobalId())) {
+      return MakeIterator(*it);
     }
   }
   assert("Call IsHiddenSection before GetDictionaries" && 0);
