@@ -37,6 +37,7 @@ nodist_ctemplateinclude_HEADERS = \
 	src/ctemplate/template_annotator.h \
 	src/ctemplate/template_emitter.h \
 	src/ctemplate/template_namelist.h \
+	src/ctemplate/find_ptr.h \
 	src/ctemplate/per_expand_data.h
 noinst_HEADERS = \
 	src/ctemplate/template.h.in \
@@ -50,6 +51,7 @@ noinst_HEADERS = \
 	src/ctemplate/template_annotator.h.in \
 	src/ctemplate/template_emitter.h.in \
 	src/ctemplate/template_namelist.h.in \
+	src/ctemplate/find_ptr.h.in \
 	src/ctemplate/per_expand_data.h.in
 
 docdir = $(prefix)/share/doc/$(PACKAGE)-$(VERSION)
