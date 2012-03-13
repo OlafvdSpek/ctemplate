@@ -226,7 +226,7 @@ class @ac_windows_dllexport@ TemplateString {
 
   // This returns true if s is in the .text segment of the binary.
   // (Note this only checks .text of the main executable, not of
-// shared libraries.  So it may not be all that useful.)
+  // shared libraries.  So it may not be all that useful.)
   // This requires the gnu linker (and probably elf), to define
   // _start and data_start.
   static bool InTextSegment(const char* s) {

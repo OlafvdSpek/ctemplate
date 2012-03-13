@@ -59,8 +59,6 @@ using std::map;
 using std::pair;
 using std::make_pair;
 
-typedef long int64;   // used with SetIntValue
-
 _START_GOOGLE_NAMESPACE_
 
 // Guards the initialization of the global dictionary.
@@ -438,7 +436,7 @@ void TemplateDictionary::SetValueWithoutCopy(const TemplateString variable,
 }
 
 void TemplateDictionary::SetIntValue(const TemplateString variable,
-                                     int64 value) {
+                                     long value) {
   char buffer[64];   // big enough for any int
   int valuelen = snprintf(buffer, sizeof(buffer), "%ld", value);
   LazilyCreateDict(&variable_dict_);
@@ -447,9 +445,9 @@ void TemplateDictionary::SetIntValue(const TemplateString variable,
 
 void TemplateDictionary::SetFormattedValue(const TemplateString variable,
                                            const char* format, ...) {
-  char *scratch, *buffer;
+  char* buffer;
 
-  scratch = arena_->Alloc(1024);  // StringAppendV requires >=1024 bytes
+  char* scratch = arena_->Alloc(1024);  // StringAppendV requires >=1024 bytes
   va_list ap;
   va_start(ap, format);
   const int buflen = StringAppendV(scratch, &buffer, format, ap);
@@ -471,16 +469,15 @@ void TemplateDictionary::SetFormattedValue(const TemplateString variable,
 void TemplateDictionary::SetEscapedValue(TemplateString variable,
                                          TemplateString value,
                                          const TemplateModifier& escfn) {
-  string escaped_string(escfn(value.ptr_, value.length_));
-  SetValue(variable, escaped_string);
+  SetValue(variable, string(escfn(value.data(), value.size())));
 }
 
 void TemplateDictionary::SetEscapedFormattedValue(TemplateString variable,
                                                   const TemplateModifier& escfn,
                                                   const char* format, ...) {
-  char *scratch, *buffer;
+  char* buffer;
 
-  scratch = arena_->Alloc(1024);  // StringAppendV requires >=1024 bytes
+  char* scratch = arena_->Alloc(1024);  // StringAppendV requires >=1024 bytes
   va_list ap;
   va_start(ap, format);
   const int buflen = StringAppendV(scratch, &buffer, format, ap);
