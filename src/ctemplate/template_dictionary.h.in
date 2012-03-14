@@ -55,6 +55,7 @@
 #include <string>
 #include <vector>
 
+#include <ctemplate/str_ref.h>
 #include <ctemplate/template_dictionary_interface.h>
 #include <ctemplate/template_modifiers.h>
 #include <ctemplate/template_string.h>
@@ -108,6 +109,30 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
       __attribute__((__format__ (__printf__, 3, 4)))
 #endif
      ;  // starts at 3 because of implicit 1st arg 'this'
+
+  class SetProxy {
+  public:
+    SetProxy(TemplateDictionary& dict, const TemplateString& variable) :
+      dict_(dict),
+      variable_(variable) {
+    }
+
+    void operator=(str_ref value) {
+      dict_.SetValue(variable_, TemplateString(value.data(), value.size()));
+    }
+
+    void operator=(long value) {
+      dict_.SetIntValue(variable_, value);
+    }
+
+  private:
+    TemplateDictionary& dict_;
+    const TemplateString& variable_;
+  };
+
+  SetProxy operator[](const TemplateString& variable) {
+    return SetProxy(*this, variable);
+  }
 
   // We also let you set values in the 'global' dictionary which is
   // referenced when all other dictionaries fail.  Note this is a

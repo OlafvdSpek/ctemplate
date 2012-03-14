@@ -66,6 +66,7 @@ DIST_COMMON = README $(am__configure_deps) $(dist_doc_DATA) \
 	$(top_srcdir)/configure $(top_srcdir)/src/config.h.in \
 	$(top_srcdir)/src/ctemplate/find_ptr.h.in \
 	$(top_srcdir)/src/ctemplate/per_expand_data.h.in \
+	$(top_srcdir)/src/ctemplate/str_ref.h.in \
 	$(top_srcdir)/src/ctemplate/template.h.in \
 	$(top_srcdir)/src/ctemplate/template_annotator.h.in \
 	$(top_srcdir)/src/ctemplate/template_cache.h.in \
@@ -105,7 +106,7 @@ CONFIG_CLEAN_FILES = src/ctemplate/template_string.h \
 	src/ctemplate/template_dictionary.h \
 	src/ctemplate/template_pathops.h \
 	src/ctemplate/template_namelist.h src/ctemplate/find_ptr.h \
-	src/ctemplate/per_expand_data.h \
+	src/ctemplate/per_expand_data.h src/ctemplate/str_ref.h \
 	src/ctemplate/template_dictionary_interface.h
 CONFIG_CLEAN_VPATH_FILES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
@@ -145,21 +146,21 @@ am__libctemplate_la_SOURCES_DIST = src/ctemplate/template.h \
 	src/ctemplate/template_annotator.h \
 	src/ctemplate/template_emitter.h \
 	src/ctemplate/template_namelist.h \
-	src/ctemplate/per_expand_data.h src/base/arena-inl.h \
-	src/base/arena.cc src/base/arena.h src/base/fileutil.h \
-	src/base/macros.h src/base/manual_constructor.h \
-	src/base/mutex.h src/base/small_map.h \
-	src/base/thread_annotations.h src/base/util.h \
-	src/indented_writer.h src/per_expand_data.cc src/template.cc \
-	src/template_annotator.cc src/template_cache.cc \
-	src/template_dictionary.cc src/template_modifiers.cc \
-	src/template_modifiers_internal.h src/template_namelist.cc \
-	src/template_pathops.cc src/template_string.cc \
-	src/htmlparser/htmlparser.cc src/htmlparser/htmlparser.h \
-	src/htmlparser/htmlparser_cpp.h src/htmlparser/jsparser.cc \
-	src/htmlparser/jsparser.h src/htmlparser/statemachine.cc \
-	src/htmlparser/statemachine.h src/windows/port.h \
-	src/windows/port.cc
+	src/ctemplate/per_expand_data.h src/ctemplate/str_ref.h \
+	src/base/arena-inl.h src/base/arena.cc src/base/arena.h \
+	src/base/fileutil.h src/base/macros.h \
+	src/base/manual_constructor.h src/base/mutex.h \
+	src/base/small_map.h src/base/thread_annotations.h \
+	src/base/util.h src/indented_writer.h src/per_expand_data.cc \
+	src/template.cc src/template_annotator.cc \
+	src/template_cache.cc src/template_dictionary.cc \
+	src/template_modifiers.cc src/template_modifiers_internal.h \
+	src/template_namelist.cc src/template_pathops.cc \
+	src/template_string.cc src/htmlparser/htmlparser.cc \
+	src/htmlparser/htmlparser.h src/htmlparser/htmlparser_cpp.h \
+	src/htmlparser/jsparser.cc src/htmlparser/jsparser.h \
+	src/htmlparser/statemachine.cc src/htmlparser/statemachine.h \
+	src/windows/port.h src/windows/port.cc
 am__objects_1 =
 @MINGW_TRUE@am__objects_2 = libctemplate_la-port.lo
 am_libctemplate_la_OBJECTS = $(am__objects_1) libctemplate_la-arena.lo \
@@ -192,21 +193,21 @@ am__libctemplate_debug_la_SOURCES_DIST = src/ctemplate/template.h \
 	src/ctemplate/template_annotator.h \
 	src/ctemplate/template_emitter.h \
 	src/ctemplate/template_namelist.h \
-	src/ctemplate/per_expand_data.h src/base/arena-inl.h \
-	src/base/arena.cc src/base/arena.h src/base/fileutil.h \
-	src/base/macros.h src/base/manual_constructor.h \
-	src/base/mutex.h src/base/small_map.h \
-	src/base/thread_annotations.h src/base/util.h \
-	src/indented_writer.h src/per_expand_data.cc src/template.cc \
-	src/template_annotator.cc src/template_cache.cc \
-	src/template_dictionary.cc src/template_modifiers.cc \
-	src/template_modifiers_internal.h src/template_namelist.cc \
-	src/template_pathops.cc src/template_string.cc \
-	src/htmlparser/htmlparser.cc src/htmlparser/htmlparser.h \
-	src/htmlparser/htmlparser_cpp.h src/htmlparser/jsparser.cc \
-	src/htmlparser/jsparser.h src/htmlparser/statemachine.cc \
-	src/htmlparser/statemachine.h src/windows/port.h \
-	src/windows/port.cc
+	src/ctemplate/per_expand_data.h src/ctemplate/str_ref.h \
+	src/base/arena-inl.h src/base/arena.cc src/base/arena.h \
+	src/base/fileutil.h src/base/macros.h \
+	src/base/manual_constructor.h src/base/mutex.h \
+	src/base/small_map.h src/base/thread_annotations.h \
+	src/base/util.h src/indented_writer.h src/per_expand_data.cc \
+	src/template.cc src/template_annotator.cc \
+	src/template_cache.cc src/template_dictionary.cc \
+	src/template_modifiers.cc src/template_modifiers_internal.h \
+	src/template_namelist.cc src/template_pathops.cc \
+	src/template_string.cc src/htmlparser/htmlparser.cc \
+	src/htmlparser/htmlparser.h src/htmlparser/htmlparser_cpp.h \
+	src/htmlparser/jsparser.cc src/htmlparser/jsparser.h \
+	src/htmlparser/statemachine.cc src/htmlparser/statemachine.h \
+	src/windows/port.h src/windows/port.cc
 @MINGW_TRUE@am__objects_3 = libctemplate_debug_la-port.lo
 am__objects_4 = $(am__objects_1) libctemplate_debug_la-arena.lo \
 	libctemplate_debug_la-per_expand_data.lo \
@@ -238,21 +239,21 @@ am__libctemplate_nothreads_la_SOURCES_DIST = src/ctemplate/template.h \
 	src/ctemplate/template_annotator.h \
 	src/ctemplate/template_emitter.h \
 	src/ctemplate/template_namelist.h \
-	src/ctemplate/per_expand_data.h src/base/arena-inl.h \
-	src/base/arena.cc src/base/arena.h src/base/fileutil.h \
-	src/base/macros.h src/base/manual_constructor.h \
-	src/base/mutex.h src/base/small_map.h \
-	src/base/thread_annotations.h src/base/util.h \
-	src/indented_writer.h src/per_expand_data.cc src/template.cc \
-	src/template_annotator.cc src/template_cache.cc \
-	src/template_dictionary.cc src/template_modifiers.cc \
-	src/template_modifiers_internal.h src/template_namelist.cc \
-	src/template_pathops.cc src/template_string.cc \
-	src/htmlparser/htmlparser.cc src/htmlparser/htmlparser.h \
-	src/htmlparser/htmlparser_cpp.h src/htmlparser/jsparser.cc \
-	src/htmlparser/jsparser.h src/htmlparser/statemachine.cc \
-	src/htmlparser/statemachine.h src/windows/port.h \
-	src/windows/port.cc
+	src/ctemplate/per_expand_data.h src/ctemplate/str_ref.h \
+	src/base/arena-inl.h src/base/arena.cc src/base/arena.h \
+	src/base/fileutil.h src/base/macros.h \
+	src/base/manual_constructor.h src/base/mutex.h \
+	src/base/small_map.h src/base/thread_annotations.h \
+	src/base/util.h src/indented_writer.h src/per_expand_data.cc \
+	src/template.cc src/template_annotator.cc \
+	src/template_cache.cc src/template_dictionary.cc \
+	src/template_modifiers.cc src/template_modifiers_internal.h \
+	src/template_namelist.cc src/template_pathops.cc \
+	src/template_string.cc src/htmlparser/htmlparser.cc \
+	src/htmlparser/htmlparser.h src/htmlparser/htmlparser_cpp.h \
+	src/htmlparser/jsparser.cc src/htmlparser/jsparser.h \
+	src/htmlparser/statemachine.cc src/htmlparser/statemachine.h \
+	src/windows/port.h src/windows/port.cc
 @MINGW_TRUE@am__objects_5 = libctemplate_nothreads_la-port.lo
 am__objects_6 = $(am__objects_1) libctemplate_nothreads_la-arena.lo \
 	libctemplate_nothreads_la-per_expand_data.lo \
@@ -285,21 +286,21 @@ am__libctemplate_nothreads_debug_la_SOURCES_DIST =  \
 	src/ctemplate/template_annotator.h \
 	src/ctemplate/template_emitter.h \
 	src/ctemplate/template_namelist.h \
-	src/ctemplate/per_expand_data.h src/base/arena-inl.h \
-	src/base/arena.cc src/base/arena.h src/base/fileutil.h \
-	src/base/macros.h src/base/manual_constructor.h \
-	src/base/mutex.h src/base/small_map.h \
-	src/base/thread_annotations.h src/base/util.h \
-	src/indented_writer.h src/per_expand_data.cc src/template.cc \
-	src/template_annotator.cc src/template_cache.cc \
-	src/template_dictionary.cc src/template_modifiers.cc \
-	src/template_modifiers_internal.h src/template_namelist.cc \
-	src/template_pathops.cc src/template_string.cc \
-	src/htmlparser/htmlparser.cc src/htmlparser/htmlparser.h \
-	src/htmlparser/htmlparser_cpp.h src/htmlparser/jsparser.cc \
-	src/htmlparser/jsparser.h src/htmlparser/statemachine.cc \
-	src/htmlparser/statemachine.h src/windows/port.h \
-	src/windows/port.cc
+	src/ctemplate/per_expand_data.h src/ctemplate/str_ref.h \
+	src/base/arena-inl.h src/base/arena.cc src/base/arena.h \
+	src/base/fileutil.h src/base/macros.h \
+	src/base/manual_constructor.h src/base/mutex.h \
+	src/base/small_map.h src/base/thread_annotations.h \
+	src/base/util.h src/indented_writer.h src/per_expand_data.cc \
+	src/template.cc src/template_annotator.cc \
+	src/template_cache.cc src/template_dictionary.cc \
+	src/template_modifiers.cc src/template_modifiers_internal.h \
+	src/template_namelist.cc src/template_pathops.cc \
+	src/template_string.cc src/htmlparser/htmlparser.cc \
+	src/htmlparser/htmlparser.h src/htmlparser/htmlparser_cpp.h \
+	src/htmlparser/jsparser.cc src/htmlparser/jsparser.h \
+	src/htmlparser/statemachine.cc src/htmlparser/statemachine.h \
+	src/windows/port.h src/windows/port.cc
 @MINGW_TRUE@am__objects_7 = libctemplate_nothreads_debug_la-port.lo
 am__objects_8 = $(am__objects_1) \
 	libctemplate_nothreads_debug_la-arena.lo \
@@ -837,7 +838,8 @@ nodist_ctemplateinclude_HEADERS = \
 	src/ctemplate/template_annotator.h \
 	src/ctemplate/template_emitter.h \
 	src/ctemplate/template_namelist.h \
-	src/ctemplate/per_expand_data.h
+	src/ctemplate/per_expand_data.h \
+	src/ctemplate/str_ref.h
 
 noinst_HEADERS = \
 	src/ctemplate/template.h.in \
@@ -851,7 +853,8 @@ noinst_HEADERS = \
 	src/ctemplate/template_annotator.h.in \
 	src/ctemplate/template_emitter.h.in \
 	src/ctemplate/template_namelist.h.in \
-	src/ctemplate/per_expand_data.h.in
+	src/ctemplate/per_expand_data.h.in \
+	src/ctemplate/str_ref.h.in
 
 dist_doc_DATA = AUTHORS COPYING ChangeLog INSTALL NEWS README README_windows.txt \
 	doc/designstyle.css doc/index.html \
@@ -1238,6 +1241,8 @@ src/ctemplate/template_namelist.h: $(top_builddir)/config.status $(top_srcdir)/s
 src/ctemplate/find_ptr.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/find_ptr.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 src/ctemplate/per_expand_data.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/per_expand_data.h.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+src/ctemplate/str_ref.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/str_ref.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 src/ctemplate/template_dictionary_interface.h: $(top_builddir)/config.status $(top_srcdir)/src/ctemplate/template_dictionary_interface.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
