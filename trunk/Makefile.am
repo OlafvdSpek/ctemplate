@@ -37,7 +37,8 @@ nodist_ctemplateinclude_HEADERS = \
 	src/ctemplate/template_annotator.h \
 	src/ctemplate/template_emitter.h \
 	src/ctemplate/template_namelist.h \
-	src/ctemplate/per_expand_data.h
+	src/ctemplate/per_expand_data.h \
+	src/ctemplate/str_ref.h
 noinst_HEADERS = \
 	src/ctemplate/template.h.in \
 	src/ctemplate/template_cache.h.in \
@@ -50,7 +51,8 @@ noinst_HEADERS = \
 	src/ctemplate/template_annotator.h.in \
 	src/ctemplate/template_emitter.h.in \
 	src/ctemplate/template_namelist.h.in \
-	src/ctemplate/per_expand_data.h.in
+	src/ctemplate/per_expand_data.h.in \
+	src/ctemplate/str_ref.h.in
 
 docdir = $(prefix)/share/doc/$(PACKAGE)-$(VERSION)
 ## This is for HTML and other documentation you want to install.

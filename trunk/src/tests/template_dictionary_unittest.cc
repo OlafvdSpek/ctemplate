@@ -134,6 +134,11 @@ TEST(TemplateDictionary, SetValueAndTemplateStringAndArena) {
     // Test copying char*s, strings, and explicit TemplateStrings
     dict.SetValue("FOO", "foo");
     dict.SetValue(string("FOO2"), TemplateString("foo2andmore", 4));
+		dict["FOO3"] = "foo3";
+		dict[string("FOO4")] = TemplateString("foo4andmore", 4);
+		dict["FOO5"] = string("Olaf");
+		dict["FOO6"] = 6;
+		dict["FOO7"] = long(7);
 
     TemplateDictionaryPeer peer(&dict);
     // verify what happened
@@ -152,6 +157,11 @@ TEST(TemplateDictionary, SetValueAndTemplateStringAndArena) {
               "dictionary 'test_arena%d' {\n"
               "   FOO: >foo<\n"
               "   FOO2: >foo2<\n"
+              "   FOO3: >foo3<\n"
+              "   FOO4: >foo4<\n"
+              "   FOO5: >Olaf<\n"
+              "   FOO6: >6<\n"
+              "   FOO7: >7<\n"
               "}\n"), i);
     EXPECT_STREQ(dump.c_str(), expected);
   }

@@ -16271,7 +16271,7 @@ _ACEOF
 
 
 # Write generated configuration file, and also .h files
-ac_config_files="$ac_config_files Makefile src/ctemplate/template_string.h src/ctemplate/template_enums.h src/ctemplate/template.h src/ctemplate/template_cache.h src/ctemplate/template_modifiers.h src/ctemplate/template_emitter.h src/ctemplate/template_annotator.h src/ctemplate/template_dictionary.h src/ctemplate/template_pathops.h src/ctemplate/template_namelist.h src/ctemplate/find_ptr.h src/ctemplate/per_expand_data.h src/ctemplate/template_dictionary_interface.h"
+ac_config_files="$ac_config_files Makefile src/ctemplate/template_string.h src/ctemplate/template_enums.h src/ctemplate/template.h src/ctemplate/template_cache.h src/ctemplate/template_modifiers.h src/ctemplate/template_emitter.h src/ctemplate/template_annotator.h src/ctemplate/template_dictionary.h src/ctemplate/template_pathops.h src/ctemplate/template_namelist.h src/ctemplate/find_ptr.h src/ctemplate/per_expand_data.h src/ctemplate/str_ref.h src/ctemplate/template_dictionary_interface.h"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -17373,6 +17373,7 @@ do
     "src/ctemplate/template_namelist.h") CONFIG_FILES="$CONFIG_FILES src/ctemplate/template_namelist.h" ;;
     "src/ctemplate/find_ptr.h") CONFIG_FILES="$CONFIG_FILES src/ctemplate/find_ptr.h" ;;
     "src/ctemplate/per_expand_data.h") CONFIG_FILES="$CONFIG_FILES src/ctemplate/per_expand_data.h" ;;
+    "src/ctemplate/str_ref.h") CONFIG_FILES="$CONFIG_FILES src/ctemplate/str_ref.h" ;;
     "src/ctemplate/template_dictionary_interface.h") CONFIG_FILES="$CONFIG_FILES src/ctemplate/template_dictionary_interface.h" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5 ;;
