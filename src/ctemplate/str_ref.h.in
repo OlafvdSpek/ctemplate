@@ -51,7 +51,7 @@ public:
   template <class U>
   str_ref_basic(const U& c)
   {
-    assign(&*c.begin(), &*c.end());
+    assign(&*c.begin(), c.end() - c.begin() + &*c.begin());
   }
 
   str_ref_basic(const void* b, const void* e)
