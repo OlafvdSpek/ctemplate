@@ -56,7 +56,10 @@ public:
   template <class U>
   str_ref_basic(const U& c)
   {
-    assign(&*c.begin(), c.end() - c.begin() + &*c.begin());
+    if (c.end() != c.begin())
+      assign(&*c.begin(), c.end() - c.begin() + &*c.begin());
+    else
+      clear();
   }
 
   str_ref_basic(const void* b, const void* e)
@@ -71,7 +74,10 @@ public:
 
   str_ref_basic(const char* b)
   {
-    assign(b, strlen(b));
+    if (b)
+      assign(b, strlen(b));
+    else
+      clear();
   }
 
   void clear()
