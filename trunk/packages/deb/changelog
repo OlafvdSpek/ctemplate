@@ -1,3 +1,9 @@
+ctemplate (2.1-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Olaf van der Spek <olafvdspek@gmail.com>  Thu, 22 Mar 2012 00:29:09 +0100
+
 ctemplate (2.0-1) unstable; urgency=low
 
   * New upstream release.

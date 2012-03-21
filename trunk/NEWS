@@ -1,3 +1,7 @@
+== 22 March 2012 ==
+
+2.1 has been released. operator[] has been added to TemplateDictionary.
+
 == 24 January 2012 ==
 
 I've just released ctemplate 2.0.  It has no functional changes from
