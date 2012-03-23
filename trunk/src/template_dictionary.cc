@@ -554,7 +554,7 @@ void TemplateDictionary::SetTemplateGlobalValueWithoutCopy(
     const TemplateString& dict_name, const TemplateString& sub_name,
     size_t index, const char* suffix) {
   char index_str[64];
-  snprintf(index_str, sizeof(index_str), "%"PRIuS, index);
+  snprintf(index_str, sizeof(index_str), "%" PRIuS, index);
   return (PrintableTemplateString(dict_name) + "/" +
           PrintableTemplateString(sub_name) + "#" + index_str + suffix);
 }
@@ -861,7 +861,7 @@ class TemplateDictionary::DictionaryPrinter {
 
   string GetDictNum(size_t index, size_t size) const {
     char buf[64];   // big enough for two ints
-    snprintf(buf, sizeof(buf), "%"PRIuS" of %"PRIuS, index, size);
+    snprintf(buf, sizeof(buf), "%" PRIuS" of %" PRIuS, index, size);
     return buf;
   }
 
