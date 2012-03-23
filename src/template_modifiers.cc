@@ -93,8 +93,8 @@ using HTMLPARSER_NAMESPACE::HtmlParser;
 // Check whether the string of length len is identical to the literal.
 // The ""s ensure literal is actually a string literal
 #define STR_IS(str, len, literal) \
-  ((len) == sizeof(""literal"")-1 && \
-   memcmp(str, literal, sizeof(""literal"")-1) == 0)
+  ((len) == sizeof("" literal "") - 1 && \
+   memcmp(str, literal, sizeof("" literal "") - 1) == 0)
 
 TemplateModifier::~TemplateModifier() {}
 
