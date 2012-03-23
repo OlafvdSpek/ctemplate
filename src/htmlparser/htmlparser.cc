@@ -991,12 +991,9 @@ int htmlparser_value_index(htmlparser_ctx *ctx)
  */
 int htmlparser_is_url_start(htmlparser_ctx *ctx)
 {
-  const char *tag;
-  const char *attr;
-
   if (htmlparser_attr_type(ctx) == HTMLPARSER_ATTR_URI) {
-    tag = htmlparser_tag(ctx);
-    attr = htmlparser_attr(ctx);
+    const char* tag = htmlparser_tag(ctx);
+    /*const char* attr =*/ htmlparser_attr(ctx);
 
     if ((tag && strcmp(tag, "meta") == 0 &&
          meta_redirect_type(htmlparser_value(ctx)) ==
@@ -1012,11 +1009,6 @@ int htmlparser_is_url_start(htmlparser_ctx *ctx)
  */
 int htmlparser_attr_type(htmlparser_ctx *ctx)
 {
-    const char *tag;
-    const char *attr;
-    const char *value;
-    enum meta_redirect_type_enum redirect_type;
-
     if (!htmlparser_in_attr(ctx))
         return HTMLPARSER_ATTR_NONE;
 
@@ -1029,15 +1021,15 @@ int htmlparser_attr_type(htmlparser_ctx *ctx)
     if (is_style_attribute(ctx->attr))
         return HTMLPARSER_ATTR_STYLE;
 
-    tag = htmlparser_tag(ctx);
-    attr = htmlparser_attr(ctx);
+    const char* tag = htmlparser_tag(ctx);
+    const char* attr = htmlparser_attr(ctx);
 
     /* Special logic to handle meta redirect type tags. */
     if (tag && strcmp(tag, "meta") == 0 &&
         attr && strcmp(attr, "content") == 0) {
 
-      value = htmlparser_value(ctx);
-      redirect_type = meta_redirect_type(value);
+      const char* value = htmlparser_value(ctx);
+      meta_redirect_type_enum redirect_type = meta_redirect_type(value);
 
       if (redirect_type == META_REDIRECT_TYPE_URL ||
           redirect_type == META_REDIRECT_TYPE_URL_START)
