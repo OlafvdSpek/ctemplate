@@ -1,3 +1,7 @@
+== 18 April 2012 ==
+
+Ctemplate 2.2 has been released. Several issues reported by G++ 4.7 have been fixed.
+
 == 22 March 2012 ==
 
 2.1 has been released. operator[] has been added to TemplateDictionary.
