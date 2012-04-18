@@ -1,3 +1,7 @@
+Wed Apr 18 23:36:08 2012  Olaf van der Spek <olafvdspek@gmail.com>
+
+        * ctemplate: version 2.2 release
+        * Fixed several issues reported by G++ 4.7
 
 Thu Mar 22 00:29:09 2012  Olaf van der Spek <olafvdspek@gmail.com>
 	
