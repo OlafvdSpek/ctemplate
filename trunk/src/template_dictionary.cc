@@ -861,7 +861,7 @@ class TemplateDictionary::DictionaryPrinter {
 
   string GetDictNum(size_t index, size_t size) const {
     char buf[64];   // big enough for two ints
-    snprintf(buf, sizeof(buf), "%" PRIuS" of %" PRIuS, index, size);
+    snprintf(buf, sizeof(buf), "%" PRIuS " of %" PRIuS, index, size);
     return buf;
   }
 
