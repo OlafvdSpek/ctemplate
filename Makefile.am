@@ -154,6 +154,7 @@ libctemplate_la_CXXFLAGS = $(PTHREAD_CFLAGS) -DNDEBUG $(AM_CXXFLAGS)
 # -version-info gets passed to libtool
 libctemplate_la_LDFLAGS = $(PTHREAD_CFLAGS) \
                           -export-symbols-regex $(CTEMPLATE_SYMBOLS) \
+                          -no-undefined \
                           -version-info @SO_VERSION@
 libctemplate_la_LIBADD = $(PTHREAD_LIBS)
 
@@ -169,6 +170,7 @@ libctemplate_nothreads_la_SOURCES = $(libctemplate_la_SOURCES)
 libctemplate_nothreads_la_DEPENDENCIES = $(libctemplate_la_DEPENDENCIES)
 libctemplate_nothreads_la_CXXFLAGS = -DNDEBUG -DNO_THREADS $(AM_CXXFLAGS)
 libctemplate_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_SYMBOLS) \
+                                    -no-undefined \
                                     -version-info @SO_VERSION@
 
 # For our tests, we want versions of these libraries that include asserts.
@@ -201,11 +203,13 @@ libctemplate_testing_la_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 CTEMPLATE_TESTING_SYMBOLS = 'TemporaryRegisterTemplate|TemplateDictionaryPeer'
 libctemplate_testing_la_LDFLAGS = $(PTHREAD_CFLAGS) \
                                   -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS) \
+                                  -no-undefined \
                                   -version-info @SO_VERSION@
 libctemplate_testing_la_LIBADD = $(PTHREAD_LIBS)
 libctemplate_testing_nothreads_la_SOURCES = $(libctemplate_testing_la_SOURCES)
 libctemplate_testing_nothreads_la_CXXFLAGS = $(AM_CXXFLAGS) -DNO_THREADS
 libctemplate_testing_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TESTING_SYMBOLS) \
+                                            -no-undefined \
                                             -version-info @SO_VERSION@
 
 # This library depends on libctemplate, but it can use either libctemplate
