@@ -319,9 +319,6 @@ class @ac_windows_dllexport@ Template {
   static bool StringToTemplateCache(const TemplateString& key,
                                     const char* content, Strip);
 
-  // INSTEAD, use ReloadAllIfChanged.
-  bool ReloadIfChanged();
-
  protected:
   friend class SectionTemplateNode;  // for access to set_state(), ParseState
   friend class TemplateTemplateNode; // for recursive call to Expand()

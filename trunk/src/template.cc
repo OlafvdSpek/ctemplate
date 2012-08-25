@@ -2691,14 +2691,6 @@ bool Template::ReloadIfChangedLocked()
   }
 }
 
-bool Template::ReloadIfChanged() LOCKS_EXCLUDED(g_template_mutex) {
-  // ReloadIfChanged() is protected by g_template_mutex so when it's
-  // called from different threads, they don't stomp on tree_ and
-  // state_.  (This is the only write-locker on g_template_mutex.)
-  WriterMutexLock ml(&g_template_mutex);
-  return ReloadIfChangedLocked();
-}
-
 // ----------------------------------------------------------------------
 // Template::ExpandLocked()
 // Template::ExpandWithDataAndCache()
