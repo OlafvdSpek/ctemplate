@@ -231,10 +231,6 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
       __attribute__((__format__ (__printf__, 4, 5)))
 #endif
      ;  // starts at 4 because of implicit 1st arg 'this'
-  void SetEscapedValueAndShowSection(const TemplateString variable,
-                                     const TemplateString value,
-                                     const TemplateModifier& escfn,
-                                     const TemplateString section_name);
 
 
  private:

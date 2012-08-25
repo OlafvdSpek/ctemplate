@@ -481,22 +481,9 @@ TEST(TemplateDictionary, SetValueAndShowSection) {
   dict.SetValueAndShowSection("NOTINSEC", "", "SEC2");
   dict.SetValueAndShowSection("NOTINSEC2", NULL, "SEC3");
 
-  dict.SetEscapedValueAndShowSection("EINSEC", "a & b",
-                                     GOOGLE_NAMESPACE::html_escape,
-                                     "SEC4");
-  dict.SetEscapedValueAndShowSection("EINSEC2", "a beautiful poem",
-                                     FooEscaper(),
-                                     "SEC5");
-  dict.SetEscapedValueAndShowSection("NOTEINSEC", "a long string",
-                                     NullEscaper(),
-                                     "SEC6");
-
   EXPECT_FALSE(peer.IsHiddenSection("SEC1"));
   EXPECT_TRUE(peer.IsHiddenSection("SEC2"));
   EXPECT_TRUE(peer.IsHiddenSection("SEC3"));
-  EXPECT_FALSE(peer.IsHiddenSection("SEC4"));
-  EXPECT_FALSE(peer.IsHiddenSection("SEC5"));
-  EXPECT_TRUE(peer.IsHiddenSection("SEC6"));
 
   // Again, we don't get subdicts, so we have to dump to check values
   string dump;
@@ -513,14 +500,6 @@ TEST(TemplateDictionary, SetValueAndShowSection) {
      "   section SEC1 (dict 1 of 1) -->\n"
      "     dictionary 'test_SetValueAndShowSection/SEC1#1' {\n"
      "       INSEC: >bar<\n"
-     "     }\n"
-     "   section SEC4 (dict 1 of 1) -->\n"
-     "     dictionary 'test_SetValueAndShowSection/SEC4#1' {\n"
-     "       EINSEC: >a &amp; b<\n"
-     "     }\n"
-     "   section SEC5 (dict 1 of 1) -->\n"
-     "     dictionary 'test_SetValueAndShowSection/SEC5#1' {\n"
-     "       EINSEC2: >foo<\n"
      "     }\n"
      "}\n");
   EXPECT_STREQ(dump.c_str(), expected);

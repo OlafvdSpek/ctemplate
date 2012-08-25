@@ -616,16 +616,6 @@ void TemplateDictionary::SetValueAndShowSection(const TemplateString variable,
   sub_dict->SetValue(variable, value);
 }
 
-void TemplateDictionary::SetEscapedValueAndShowSection(
-    const TemplateString variable, const TemplateString value,
-    const TemplateModifier& escfn, const TemplateString section_name) {
-  string escaped_string(escfn(value.ptr_, value.length_));
-  if (escaped_string.empty())    // no value: the do-nothing case
-    return;
-  TemplateDictionary* sub_dict = AddSectionDictionary(section_name);
-  sub_dict->SetValue(variable, escaped_string);
-}
-
 // ----------------------------------------------------------------------
 // TemplateDictionary::AddIncludeDictionary()
 //    This is much like AddSectionDictionary().  One major difference

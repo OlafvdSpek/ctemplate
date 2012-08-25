@@ -306,9 +306,9 @@ static TemplateDictionary* MakeDict1() {
   dict->SetEscapedValue("GOTO_MESSAGE", "print \"Go home\"",
                         GOOGLE_NAMESPACE::javascript_escape);
 
-  dict->SetEscapedValueAndShowSection("UPDATE", "monday & tuesday",
-                                      GOOGLE_NAMESPACE::html_escape,
-                                      "UPDATE_SECTION");
+  dict->SetEscapedValue("UPDATE", "monday & tuesday",
+                                      GOOGLE_NAMESPACE::html_escape);
+  dict->ShowSection("UPDATE_SECTION");
 
   dict->SetValue("ALIGNMENT", "\"right\"");   // all results sections see this
   for (int i = 0; i < 3; ++i) {   // we'll do three results
