@@ -198,9 +198,7 @@ static string Boilerplate(const string& progname,
 // (space, horizontal tab, vertical tab, form feed, carriage return).
 static bool LineIsAllWhitespace(const string& input) {
   static const string kWhitespace(" \f\t\v\r");
-  if (input.find_first_not_of(kWhitespace) == string::npos)
-    return true;
-  return false;
+  return input.find_first_not_of(kWhitespace) == string::npos;
 }
 
 // Splits the input string into lines using the newline (\n)
@@ -214,12 +212,11 @@ static bool LineIsAllWhitespace(const string& input) {
 static vector<string> SplitIntoLines(const string &input) {
   vector<string> lines;
 
-  string::size_type begin_index, end_index;
+  string::size_type begin_index = 0;
   string::size_type input_len = input.length();
-  begin_index = 0;
 
   while (1) {
-    end_index = input.find_first_of('\n', begin_index);
+    string::size_type end_index = input.find_first_of('\n', begin_index);
     if (end_index == string::npos) {
         lines.push_back(input.substr(begin_index));
       break;
@@ -274,7 +271,7 @@ static string TextWithDuplicateLinesRemoved(const string& header_entries) {
   for (int i = 0; i < lines_len; ++i) {
     const string& line = lines[i];
     if (LineIsAllWhitespace(line) ||    // Blank lines always go in
-        lines_seen.find(line) == lines_seen.end()) {  // So do new lines
+        !lines_seen.count(line)) {  // So do new lines
       output.append(line);
       output.append("\n");
       lines_seen.insert(line);
