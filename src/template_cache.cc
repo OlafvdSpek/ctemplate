@@ -44,6 +44,7 @@
 #include <utility>       // for pair<>, make_pair()
 #include <vector>        // for vector<>::size_type, vector<>, etc
 #include "base/thread_annotations.h"  // for GUARDED_BY
+#include <ctemplate/find_ptr.h>
 #include <ctemplate/template.h>  // for Template, TemplateState
 #include <ctemplate/template_enums.h>  // for Strip, DO_NOT_STRIP
 #include <ctemplate/template_pathops.h>  // for PathJoin(), IsAbspath(), etc
@@ -282,8 +283,8 @@ TemplateCache::RefcountedTemplate* TemplateCache::GetTemplateLocked(
     Strip strip,
     const TemplateCacheKey& template_cache_key) {
   // NOTE: A write-lock must be held on mutex_ when this method is called.
-  TemplateMap::iterator it = parsed_template_cache_->find(template_cache_key);
-  if (it == parsed_template_cache_->end()) {
+  CachedTemplate* it = find_ptr(*parsed_template_cache_, template_cache_key);
+  if (!it) {
     // If the cache is frozen and the template doesn't already exist in cache,
     // do not load the template, return NULL.
     if (is_frozen_) {
@@ -294,22 +295,21 @@ TemplateCache::RefcountedTemplate* TemplateCache::GetTemplateLocked(
     // If validation succeeds then pass in resolved filename, mtime &
     // file length (from statbuf) to the constructor.
     const Template* tpl = new Template(filename, strip, this);
-    it = parsed_template_cache_->insert(
-        make_pair(template_cache_key,
-                  CachedTemplate(tpl, CachedTemplate::FILE_BASED))).first;
-    assert(it != parsed_template_cache_->end());
+    it = &(*parsed_template_cache_)[template_cache_key];
+    *it = CachedTemplate(tpl, CachedTemplate::FILE_BASED);
+    assert(it);
   }
-  if (it->second.should_reload) {
+  if (it->should_reload) {
     // check if the template has changed on disk or if a new template with the
     // same name has been added earlier in the search path:
     const string resolved = FindTemplateFilename(
-        it->second.refcounted_tpl->tpl()->original_filename());
+        it->refcounted_tpl->tpl()->original_filename());
     FileStat statbuf;
-    if (it->second.template_type == CachedTemplate::FILE_BASED &&
-        (resolved != it->second.refcounted_tpl->tpl()->template_file() ||
+    if (it->template_type == CachedTemplate::FILE_BASED &&
+        (resolved != it->refcounted_tpl->tpl()->template_file() ||
          HasTemplateChangedOnDisk(
-             it->second.refcounted_tpl->tpl()->template_file(),
-             it->second.refcounted_tpl->tpl()->mtime(),
+             it->refcounted_tpl->tpl()->template_file(),
+             it->refcounted_tpl->tpl()->mtime(),
              &statbuf))) {
       // Create a new template, insert it into the cache under
       // template_cache_key, and DecRef() the old one to indicate
@@ -317,36 +317,30 @@ TemplateCache::RefcountedTemplate* TemplateCache::GetTemplateLocked(
       const Template* tpl = new Template(filename, strip, this);
       // DecRef after creating the new template since DecRef may free up
       // the storage for filename,
-      it->second.refcounted_tpl->DecRef();
-      it->second = CachedTemplate(tpl, CachedTemplate::FILE_BASED);
+      it->refcounted_tpl->DecRef();
+      *it = CachedTemplate(tpl, CachedTemplate::FILE_BASED);
     }
-    it->second.should_reload = false;
+    it->should_reload = false;
   }
 
   // If the state is TS_ERROR, we leave the state as is, but return
   // NULL.  We won't try to load the template file again until the
   // reload status is set to true by another call to ReloadAllIfChanged.
-  if (it->second.refcounted_tpl->tpl()->state() != TS_READY) {
-    return NULL;
-  } else {
-    return it->second.refcounted_tpl;
-  }
+  return it->refcounted_tpl->tpl()->state() == TS_READY ? it->refcounted_tpl : NULL;
 }
 
 bool TemplateCache::StringToTemplateCache(const TemplateString& key,
                                           const TemplateString& content,
                                           Strip strip) {
-  TemplateCacheKey template_cache_key = TemplateCacheKey(key.GetGlobalId(),
-                                                         strip);
+  TemplateCacheKey template_cache_key = TemplateCacheKey(key.GetGlobalId(), strip);
   {
     ReaderMutexLock ml(mutex_);
     if (is_frozen_) {
       return false;
     }
     // If the key is already in the parsed-cache, we just return false.
-    TemplateMap::iterator it = parsed_template_cache_->find(template_cache_key);
-    if (it != parsed_template_cache_->end() &&
-        it->second.refcounted_tpl->tpl()->state() != TS_ERROR) {
+    CachedTemplate* it = find_ptr(*parsed_template_cache_, template_cache_key);
+    if (it && it->refcounted_tpl->tpl()->state() != TS_ERROR) {
       return false;
     }
   }
@@ -361,11 +355,11 @@ bool TemplateCache::StringToTemplateCache(const TemplateString& key,
 
   WriterMutexLock ml(mutex_);
   // Double-check it wasn't just inserted.
-  TemplateMap::iterator it = parsed_template_cache_->find(template_cache_key);
-  if (it != parsed_template_cache_->end()) {
-    if (it->second.refcounted_tpl->tpl()->state() == TS_ERROR) {
+  CachedTemplate* it = find_ptr(*parsed_template_cache_, template_cache_key);
+  if (it) {
+    if (it->refcounted_tpl->tpl()->state() == TS_ERROR) {
       // replace the old entry with the new one
-      it->second.refcounted_tpl->DecRef();
+      it->refcounted_tpl->DecRef();
     } else {
       delete tpl;
       return false;
