@@ -1455,10 +1455,10 @@ TEST(Template, TemplateNamelist) {
 
   TemplateNamelist::NameListType names = TemplateNamelist::GetList();
   ASSERT(names.size() == 4);
-  ASSERT(names.find(NONEXISTENT_FN) != names.end());
-  ASSERT(names.find(INVALID1_FN) != names.end());
-  ASSERT(names.find(INVALID2_FN) != names.end());
-  ASSERT(names.find(VALID1_FN) != names.end());
+  ASSERT(names.count(NONEXISTENT_FN));
+  ASSERT(names.count(INVALID1_FN));
+  ASSERT(names.count(INVALID2_FN));
+  ASSERT(names.count(VALID1_FN));
 
   // Before creating the files INVALID1_FN, etc., all should be missing.
   for (int i = 0; i < 3; ++i) {   // should be consistent all 3 times

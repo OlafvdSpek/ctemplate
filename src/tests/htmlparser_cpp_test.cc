@@ -500,12 +500,12 @@ void HtmlparserCppTest::ProcessAnnotation(const string &annotation) {
     } else if (iter->first.compare("is_url_start") == 0) {
       ValidateIsUrlStart(iter->second);
     } else if (iter->first.compare("save_context") == 0) {
-      if (contextMap.find(iter->second) == contextMap.end()) {
+      if (!contextMap.count(iter->second)) {
         contextMap[iter->second] = new HtmlParser();
       }
       contextMap[iter->second]->CopyFrom(&parser_);
     } else if (iter->first.compare("load_context") == 0) {
-      CHECK(contextMap.find(iter->second) != contextMap.end());
+      CHECK(contextMap.count(iter->second));
       parser_.CopyFrom(contextMap[iter->second]);
     } else if (iter->first.compare("reset") == 0) {
       if (StringToBool(iter->second)) {
