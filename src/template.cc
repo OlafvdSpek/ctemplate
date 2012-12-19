@@ -655,7 +655,7 @@ static void WriteOneHeaderEntry(
   }
 
   // print out the variable, but only if we haven't seen it before.
-  if (vars_seen.find(variable) == vars_seen.end()) {
+  if (!vars_seen.count(variable)) {
     if (variable == kMainSectionName || variable.find("BI_") == 0) {
       // We don't want to write entries for __MAIN__ or the built-ins
     } else {
@@ -665,7 +665,7 @@ static void WriteOneHeaderEntry(
                 << AS_STR(GOOGLE_NAMESPACE) << "::StaticTemplateString "
                 << prefix << variable << " = STS_INIT_WITH_HASH("
                 << prefix << variable << ", \"" << variable << "\", "
-                << id << "LLU);\n";
+                << id << "ULL);\n";
       outstring->append(outstream.str());
     }
     vars_seen[variable] = true;

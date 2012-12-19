@@ -83,9 +83,9 @@ expected_ok1=`cat <<EOF | grep -v '^EOF$'
 #define %%%OUTPUT_NAME%%%
 
 #include <ctemplate/template_string.h>
-static const ::ctemplate::StaticTemplateString ko_QCHAR = STS_INIT_WITH_HASH(ko_QCHAR, "QCHAR", 13739615363438531061LLU);
-static const ::ctemplate::StaticTemplateString ko_HREF = STS_INIT_WITH_HASH(ko_HREF, "HREF", 4441707909033668369LLU);
-static const ::ctemplate::StaticTemplateString ko_PARAMS = STS_INIT_WITH_HASH(ko_PARAMS, "PARAMS", 10755877064288701757LLU);
+static const ::ctemplate::StaticTemplateString ko_QCHAR = STS_INIT_WITH_HASH(ko_QCHAR, "QCHAR", 13739615363438531061ULL);
+static const ::ctemplate::StaticTemplateString ko_HREF = STS_INIT_WITH_HASH(ko_HREF, "HREF", 4441707909033668369ULL);
+static const ::ctemplate::StaticTemplateString ko_PARAMS = STS_INIT_WITH_HASH(ko_PARAMS, "PARAMS", 10755877064288701757ULL);
 
 #endif  // %%%OUTPUT_NAME%%%
 EOF`
@@ -95,8 +95,8 @@ expected_ok2=`cat <<EOF | grep -v '^EOF$'
 #define %%%OUTPUT_NAME%%%
 
 #include <ctemplate/template_string.h>
-static const ::ctemplate::StaticTemplateString ko_ATTRIBUTES = STS_INIT_WITH_HASH(ko_ATTRIBUTES, "ATTRIBUTES", 11813232524653503831LLU);
-static const ::ctemplate::StaticTemplateString ko_ATTRIBUTE = STS_INIT_WITH_HASH(ko_ATTRIBUTE, "ATTRIBUTE", 14959290143384361001LLU);
+static const ::ctemplate::StaticTemplateString ko_ATTRIBUTES = STS_INIT_WITH_HASH(ko_ATTRIBUTES, "ATTRIBUTES", 11813232524653503831ULL);
+static const ::ctemplate::StaticTemplateString ko_ATTRIBUTE = STS_INIT_WITH_HASH(ko_ATTRIBUTE, "ATTRIBUTE", 14959290143384361001ULL);
 
 #endif  // %%%OUTPUT_NAME%%%
 EOF`
@@ -106,7 +106,7 @@ expected_ok3=`cat <<EOF | grep -v '^EOF$'
 #define %%%OUTPUT_NAME%%%
 
 #include <ctemplate/template_string.h>
-static const ::ctemplate::StaticTemplateString ko_TITLE = STS_INIT_WITH_HASH(ko_TITLE, "TITLE", 8931122033088041025LLU);
+static const ::ctemplate::StaticTemplateString ko_TITLE = STS_INIT_WITH_HASH(ko_TITLE, "TITLE", 8931122033088041025ULL);
 
 #endif  // %%%OUTPUT_NAME%%%
 EOF`
@@ -116,8 +116,8 @@ expected_ok4=`cat <<EOF | grep -v '^EOF$'
 #define %%%OUTPUT_NAME%%%
 
 #include <ctemplate/template_string.h>
-static const ::ctemplate::StaticTemplateString ko_HREF = STS_INIT_WITH_HASH(ko_HREF, "HREF", 4441707909033668369LLU);
-static const ::ctemplate::StaticTemplateString ko_PARAMS = STS_INIT_WITH_HASH(ko_PARAMS, "PARAMS", 10755877064288701757LLU);
+static const ::ctemplate::StaticTemplateString ko_HREF = STS_INIT_WITH_HASH(ko_HREF, "HREF", 4441707909033668369ULL);
+static const ::ctemplate::StaticTemplateString ko_PARAMS = STS_INIT_WITH_HASH(ko_PARAMS, "PARAMS", 10755877064288701757ULL);
 
 #endif  // %%%OUTPUT_NAME%%%
 EOF`
@@ -135,11 +135,11 @@ expected_ok1and2=`cat <<EOF | grep -v '^EOF$'
 #define %%%OUTPUT_NAME%%%
 
 #include <ctemplate/template_string.h>
-static const ::ctemplate::StaticTemplateString ko_QCHAR = STS_INIT_WITH_HASH(ko_QCHAR, "QCHAR", 13739615363438531061LLU);
-static const ::ctemplate::StaticTemplateString ko_HREF = STS_INIT_WITH_HASH(ko_HREF, "HREF", 4441707909033668369LLU);
-static const ::ctemplate::StaticTemplateString ko_PARAMS = STS_INIT_WITH_HASH(ko_PARAMS, "PARAMS", 10755877064288701757LLU);
-static const ::ctemplate::StaticTemplateString ko_ATTRIBUTES = STS_INIT_WITH_HASH(ko_ATTRIBUTES, "ATTRIBUTES", 11813232524653503831LLU);
-static const ::ctemplate::StaticTemplateString ko_ATTRIBUTE = STS_INIT_WITH_HASH(ko_ATTRIBUTE, "ATTRIBUTE", 14959290143384361001LLU);
+static const ::ctemplate::StaticTemplateString ko_QCHAR = STS_INIT_WITH_HASH(ko_QCHAR, "QCHAR", 13739615363438531061ULL);
+static const ::ctemplate::StaticTemplateString ko_HREF = STS_INIT_WITH_HASH(ko_HREF, "HREF", 4441707909033668369ULL);
+static const ::ctemplate::StaticTemplateString ko_PARAMS = STS_INIT_WITH_HASH(ko_PARAMS, "PARAMS", 10755877064288701757ULL);
+static const ::ctemplate::StaticTemplateString ko_ATTRIBUTES = STS_INIT_WITH_HASH(ko_ATTRIBUTES, "ATTRIBUTES", 11813232524653503831ULL);
+static const ::ctemplate::StaticTemplateString ko_ATTRIBUTE = STS_INIT_WITH_HASH(ko_ATTRIBUTE, "ATTRIBUTE", 14959290143384361001ULL);
 
 #endif  // %%%OUTPUT_NAME%%%
 EOF`
