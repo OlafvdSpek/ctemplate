@@ -1,3 +1,8 @@
+== 19 March 2014 ==
+
+Ctemplate 2.3 has been released. Fixed some more C++11 issues. 
+Removed deprecated Template::SetEscapedValueAndShowSection() and Template::ReloadIfChanged().
+
 == 18 April 2012 ==
 
 Ctemplate 2.2 has been released. Several issues reported by G++ 4.7 have been fixed.

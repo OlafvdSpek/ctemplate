@@ -1,3 +1,10 @@
+Wed Mar 19 20:02:51 2014  Olaf van der Spek <olafvdspek@gmail.com>
+
+	* ctemplate: version 2.3 release
+	* Fixed some more C++11 issues. 
+	* Removed deprecated Template::SetEscapedValueAndShowSection() 
+	*   and Template::ReloadIfChanged().
+
 Wed Apr 18 23:36:08 2012  Olaf van der Spek <olafvdspek@gmail.com>
 
         * ctemplate: version 2.2 release
