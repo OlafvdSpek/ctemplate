@@ -41,7 +41,6 @@
 enum Strip { DO_NOT_STRIP, STRIP_BLANK_LINES, STRIP_WHITESPACE,
              NUM_STRIPS };   // sentinel value
 
-@ac_google_end_namespace@
-
+}
 
 #endif  // TEMPLATE_TEMPLATE_ENUMS_H_

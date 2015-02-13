@@ -138,7 +138,6 @@ class @ac_windows_dllexport@ TemplateDictionaryInterface {
   void operator=(const TemplateDictionaryInterface&);
 };
 
-@ac_google_end_namespace@
-
+}
 
 #endif  // TEMPLATE_TEMPLATE_DICTIONARY_INTERFACE_H_

@@ -65,7 +65,6 @@ class @ac_windows_dllexport@ StringEmitter : public ExpandEmitter {
   virtual void Emit(const char* s, size_t slen) { outbuf_->append(s, slen); }
 };
 
-@ac_google_end_namespace@
-
+}
 
 #endif  // TEMPLATE_TEMPLATE_EMITTER_H_

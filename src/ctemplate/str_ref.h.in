@@ -124,6 +124,6 @@ private:
 typedef str_ref_basic<const unsigned char*> data_ref;
 typedef str_ref_basic<const char*> str_ref;
 
-@ac_google_end_namespace@
+}
 
 #endif // TEMPLATE_STR_REF_H_
