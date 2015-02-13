@@ -63,7 +63,7 @@ class HtmlParser;
 
 @ac_windows_dllexport_defines@
 
-@ac_google_start_namespace@
+namespace ctemplate {
 
 // These free functions form the "simple" template API, and support
 // the most common operations (expanding a template from a file, and

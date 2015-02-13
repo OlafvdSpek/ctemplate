@@ -69,7 +69,7 @@ template<typename A, int B, typename C, typename D> class small_map;
 template<typename NormalMap> class small_map_default_init;  // in small_map.h
 }
 
-@ac_google_start_namespace@
+namespace ctemplate {
 
 
 class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInterface {

@@ -48,7 +48,7 @@
 
 @ac_windows_dllexport_defines@
 
-@ac_google_start_namespace@
+namespace ctemplate {
 
 // RegisterTemplateFilename
 //   Used to define a reference variable for the name of a template file. E.g:
