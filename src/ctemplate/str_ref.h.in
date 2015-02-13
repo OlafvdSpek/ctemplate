@@ -37,7 +37,7 @@
 
 @ac_windows_dllexport_defines@
 
-@ac_google_start_namespace@
+namespace ctemplate {
 
 template <class T>
 class str_ref_basic

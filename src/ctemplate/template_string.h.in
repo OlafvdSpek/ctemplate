@@ -57,7 +57,7 @@ extern char data_start[] __attribute__((weak));               // start of .data
 
 @ac_windows_dllexport_defines@
 
-@ac_google_start_namespace@
+namespace ctemplate {
 
 // Most methods of TemplateDictionary take a TemplateString rather than a
 // C++ string.  This is for efficiency: it can avoid extra string copies.

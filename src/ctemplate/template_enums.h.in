@@ -35,7 +35,7 @@
 #ifndef TEMPLATE_TEMPLATE_ENUMS_H_
 #define TEMPLATE_TEMPLATE_ENUMS_H_
 
-@ac_google_start_namespace@
+namespace ctemplate {
 
 // Enums for GetTemplate flag values
 enum Strip { DO_NOT_STRIP, STRIP_BLANK_LINES, STRIP_WHITESPACE,

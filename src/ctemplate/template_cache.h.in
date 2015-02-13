@@ -50,7 +50,7 @@ class TemplateCacheUnittest;
 
 @ac_windows_dllexport_defines@
 
-@ac_google_start_namespace@
+namespace ctemplate {
 
 class PerExpandData;
 class Template;

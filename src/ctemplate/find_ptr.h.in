@@ -35,7 +35,7 @@
 
 @ac_windows_dllexport_defines@
 
-@ac_google_start_namespace@
+namespace ctemplate {
 
 template <class T, class U>
 typename T::value_type::second_type* find_ptr(T& c, U v)
