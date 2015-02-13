@@ -131,7 +131,6 @@ class @ac_windows_dllexport@ TextTemplateAnnotator : public TemplateAnnotator {
   void operator=(const TextTemplateAnnotator&);
 };
 
-@ac_google_end_namespace@
-
+}
 
 #endif  // TEMPLATE_TEMPLATE_ANNOTATOR_H_

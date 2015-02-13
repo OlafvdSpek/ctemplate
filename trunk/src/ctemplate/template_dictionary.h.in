@@ -449,7 +449,6 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
   void operator=(const TemplateDictionary&);
 };
 
-@ac_google_end_namespace@
-
+}
 
 #endif  // TEMPLATE_TEMPLATE_DICTIONARY_H_

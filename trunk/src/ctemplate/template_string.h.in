@@ -352,7 +352,6 @@ class @ac_windows_dllexport@ StaticTemplateStringInitializer {
 const StaticTemplateString kStsEmpty =
     STS_INIT_WITH_HASH(kStsEmpty, "", 1457976849674613049ULL);
 
-@ac_google_end_namespace@
-
+}
 
 #endif  // TEMPLATE_TEMPLATE_STRING_H_

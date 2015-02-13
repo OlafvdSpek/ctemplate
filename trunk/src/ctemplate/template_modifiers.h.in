@@ -343,10 +343,8 @@ bool AddModifier(const char* long_name, const TemplateModifier* modifier);
 //   is used in a different context (say Javascript) where this
 //   escaping may be inadequate.
 extern @ac_windows_dllexport@
-bool AddXssSafeModifier(const char* long_name,
-                        const TemplateModifier* modifier);
+bool AddXssSafeModifier(const char* long_name, const TemplateModifier* modifier);
 
-@ac_google_end_namespace@
-
+}
 
 #endif  // TEMPLATE_TEMPLATE_MODIFIERS_H_

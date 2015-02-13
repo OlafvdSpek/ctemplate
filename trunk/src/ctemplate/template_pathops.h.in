@@ -68,6 +68,6 @@ std::string Basename(const std::string& path);          // everything after last
 extern @ac_windows_dllexport@
 bool ContainsFullWord(const std::string& text, const std::string& word);
 
-@ac_google_end_namespace@
+}
 
 #endif  // TEMPLATE_TEMPLATE_PATHOPS_H_

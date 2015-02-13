@@ -144,6 +144,6 @@ class @ac_windows_dllexport@ PerExpandData {
   void operator=(const PerExpandData&);   // disallow evil operator=
 };
 
-@ac_google_end_namespace@
+}
 
 #endif  // TEMPLATE_PER_EXPAND_DATA_H_

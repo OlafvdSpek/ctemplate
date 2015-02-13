@@ -44,7 +44,7 @@
 #include <ctemplate/per_expand_data.h>
 @ac_google_start_namespace@
 class FileStat;
-@ac_google_end_namespace@
+}
 class Mutex;
 class TemplateCacheUnittest;
 
@@ -363,6 +363,6 @@ class @ac_windows_dllexport@ TemplateCache {
   void operator=(const TemplateCache &);
 };
 
-@ac_google_end_namespace@
+}
 
 #endif  // TEMPLATE_TEMPLATE_CACHE_H_

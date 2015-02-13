@@ -158,7 +158,6 @@ class @ac_windows_dllexport@ TemplateNamelist {
   void operator=(const TemplateNamelist&);
 };
 
-@ac_google_end_namespace@
-
+}
 
 #endif  // TEMPLATE_TEMPLATE_NAMELIST_H_

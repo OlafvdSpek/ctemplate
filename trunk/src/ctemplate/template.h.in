@@ -54,7 +54,7 @@
 @ac_google_start_namespace@
 class TemplateDictionaryInterface;
 class PerExpandData;
-@ac_google_end_namespace@
+}
 #endif
 
 namespace @ac_htmlparser_namespace@ {
@@ -478,7 +478,6 @@ class @ac_windows_dllexport@ Template {
   void operator=(const Template &);
 };
 
-@ac_google_end_namespace@
-
+}
 
 #endif // CTEMPLATE_TEMPLATE_H_

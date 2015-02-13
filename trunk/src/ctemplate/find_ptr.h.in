@@ -65,6 +65,6 @@ const typename T::value_type::second_type find_ptr2(const T& c, U v)
   return i == c.end() ? NULL : i->second;
 }
 
-@ac_google_end_namespace@
+}
 
 #endif // TEMPLATE_FIND_PTR_H_
