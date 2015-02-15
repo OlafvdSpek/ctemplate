@@ -158,7 +158,7 @@
 #include <assert.h>
 #include <stdlib.h>      // for abort()
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 namespace base {
 // This is used for the single-arg constructor

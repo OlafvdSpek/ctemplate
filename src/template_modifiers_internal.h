@@ -65,12 +65,11 @@
 using std::string;
 using std::vector;
 
-
 namespace HTMLPARSER_NAMESPACE {
 class HtmlParser;
 }
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 class TemplateModifier;
 

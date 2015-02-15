@@ -52,7 +52,8 @@
 #include <assert.h>
 #include <utility>   // for make_pair()
 #include "base/manual_constructor.h"
-_START_GOOGLE_NAMESPACE_
+
+namespace ctemplate {
 
 template <bool> struct CompileAssert { };
 #define COMPILE_ASSERT(expr, msg) \

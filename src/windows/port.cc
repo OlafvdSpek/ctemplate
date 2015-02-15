@@ -68,7 +68,7 @@ int snprintf(char *str, size_t size, const char *format, ...) {
 using std::string;
 using std::vector;
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 // defined (for unix) in template_test_utils.cc
 string TmpFile(const char* basename) {

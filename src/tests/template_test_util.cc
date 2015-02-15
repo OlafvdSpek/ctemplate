@@ -82,7 +82,7 @@ using std::vector;
   }                                                             \
 } while (0)
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 // Deletes all files named *template* in dir, and sets up dir as the
 // place where StringToTemplate writes.

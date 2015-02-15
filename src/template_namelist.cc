@@ -54,7 +54,7 @@ using std::vector;
 
 #define LOG(level)  std::cerr << #level << ": "
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 TemplateNamelist::NameListType *TemplateNamelist::namelist_ = NULL;
 TemplateNamelist::MissingListType *TemplateNamelist::missing_list_ = NULL;

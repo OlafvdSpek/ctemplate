@@ -70,7 +70,7 @@ static void* aligned_malloc(size_t size, size_t alignment) {
 // The value here doesn't matter until page_aligned_ is supported.
 static const int kPageSize = 8192;   // should be getpagesize()
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 // We used to only keep track of how much space has been allocated in
 // debug mode. Now we track this for optimized builds, as well. If you

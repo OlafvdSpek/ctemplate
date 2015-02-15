@@ -52,7 +52,7 @@
 #include <ctemplate/template_namelist.h>
 #include <ctemplate/template_string.h>  // for TemplateString, TemplateId
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 using std::string;
 

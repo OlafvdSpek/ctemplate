@@ -49,7 +49,7 @@
   (emitter)->Emit(value);                               \
   (emitter)->Emit("}}", 2);
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 using std::string;
 

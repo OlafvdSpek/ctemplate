@@ -60,7 +60,7 @@ using std::map;
 using std::pair;
 using std::make_pair;
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 // Guards the initialization of the global dictionary.
 static GoogleOnceType g_once = GOOGLE_ONCE_INIT;

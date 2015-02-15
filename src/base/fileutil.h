@@ -44,7 +44,7 @@
 #endif
 #include <string>
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 class FileStat {
  public:
