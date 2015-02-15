@@ -1029,4 +1029,4 @@ TemplateDictionary::CreateSectionIterator(
   abort();
 }
 
-_END_GOOGLE_NAMESPACE_
+}

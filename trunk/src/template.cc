@@ -2774,4 +2774,4 @@ bool Template::ExpandWithDataAndCache(
   return ExpandLocked(expand_emitter, dict, per_expand_data, cache);
 }
 
-_END_GOOGLE_NAMESPACE_
+}

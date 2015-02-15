@@ -99,7 +99,7 @@ void CreateOrCleanTestDir(const string& dirname) {
   }
 }
 
-_END_GOOGLE_NAMESPACE_
+}
 
 void GetNamelist(const char* testdata_dir, vector<string>* namelist) {
   string glob(GOOGLE_NAMESPACE::PathJoin(testdata_dir,

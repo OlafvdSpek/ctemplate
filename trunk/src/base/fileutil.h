@@ -101,6 +101,6 @@ class File {
   FILE* fp_;
 };
 
-_END_GOOGLE_NAMESPACE_
+}
 
 #endif  // TEMPLATE_OPENSOURCE_FILEUTIL_H_

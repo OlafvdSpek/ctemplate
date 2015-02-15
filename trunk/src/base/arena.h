@@ -693,6 +693,6 @@ class CTEMPLATE_DLL_DECL SafeArena : public BaseArena {
   DISALLOW_COPY_AND_ASSIGN(SafeArena);
 };
 
-_END_GOOGLE_NAMESPACE_
+}
 
 #endif  // BASE_ARENA_H_

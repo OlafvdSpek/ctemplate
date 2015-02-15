@@ -1414,4 +1414,4 @@ vector<const ModifierAndValue*> GetDefaultModifierForJson() {
   return GetModifierForJson(NULL, NULL);
 }
 
-_END_GOOGLE_NAMESPACE_
+}

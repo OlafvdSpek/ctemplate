@@ -231,6 +231,6 @@ class ManualConstructor {
 #undef UTIL_GTL_ALIGNED_CHAR_ARRAY
 #undef UTIL_GTL_ALIGN_OF
 
-_END_GOOGLE_NAMESPACE_
+}
 
 #endif  // UTIL_GTL_MANUAL_CONSTRUCTOR_H_

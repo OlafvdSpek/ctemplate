@@ -306,4 +306,4 @@ const char* TemplateDictionaryPeer::GetFilename() const {
   return dict_->filename_;
 }
 
-_END_GOOGLE_NAMESPACE_
+}

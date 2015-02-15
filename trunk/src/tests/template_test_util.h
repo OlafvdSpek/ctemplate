@@ -278,7 +278,6 @@ class TemplateCachePeer {
   void operator=(const TemplateCachePeer&);
 };
 
-_END_GOOGLE_NAMESPACE_
-
+}
 
 #endif  // TEMPLATE_TEMPLATE_TEST_UTIL_H_

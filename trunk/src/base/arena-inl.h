@@ -138,7 +138,7 @@ template<class T, class C> const int ArenaAllocator<T, C>::kAlignment =
 
 
 // 'new' must be in the global namespace.
-_END_GOOGLE_NAMESPACE_
+}
 using GOOGLE_NAMESPACE::UnsafeArena;
 
 
@@ -347,6 +347,6 @@ class ArrayGladiator : public Gladiator {
 
 #endif  // ********** example
 
-_END_GOOGLE_NAMESPACE_
+}
 
 #endif  // BASE_ARENA_INL_H_

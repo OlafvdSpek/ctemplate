@@ -191,4 +191,4 @@ bool TemplateNamelist::IsAllSyntaxOkay(Strip strip) {
   return bad_syntax_list.empty();
 }
 
-_END_GOOGLE_NAMESPACE_
+}

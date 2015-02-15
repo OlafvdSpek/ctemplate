@@ -563,6 +563,6 @@ inline bool small_map<NormalMap, kArraySize, EqualKey,
   return other != *this;
 }
 
-_END_GOOGLE_NAMESPACE_
+}
 
 #endif  // UTIL_GTL_SMALL_MAP_H_
