@@ -33,6 +33,7 @@
 
 #include <config.h>
 #include "base/mutex.h"   // This has to come first to get _XOPEN_SOURCE
+#include <ctemplate/find_ptr.h>
 #include <ctemplate/template_string.h>
 #include HASH_SET_H
 #include "base/arena.h"
@@ -173,9 +174,9 @@ void TemplateString::AddToGlobalIdToNameMap() LOCKS_EXCLUDED(mutex) {
     // Check to see if it's already here.
     ReaderMutexLock reader_lock(&mutex);
     if (template_string_set) {
-      TemplateStringSet::const_iterator iter =
-          template_string_set->find(*this);
-      if (iter != template_string_set->end()) {
+      const TemplateString* iter =
+          find_ptr0(*template_string_set, *this);
+      if (iter) {
         DCHECK_EQ(TemplateString(ptr_, length_),
                   TemplateString(iter->ptr_, iter->length_))
             << "TemplateId collision!";
@@ -193,7 +194,7 @@ void TemplateString::AddToGlobalIdToNameMap() LOCKS_EXCLUDED(mutex) {
     arena = new UnsafeArena(1024);  // 1024 was picked out of a hat.
   }
 
-  if (template_string_set->find(*this) != template_string_set->end()) {
+  if (template_string_set->count(*this)) {
     return;
   }
   // If we are immutable, we can store ourselves directly in the map.
@@ -225,14 +226,9 @@ TemplateString TemplateString::IdToString(TemplateId id) LOCKS_EXCLUDED(mutex) {
   // TemplateString.  This may seem weird, but it lets us use a
   // hash_set instead of a hash_map.
   TemplateString id_as_template_string(NULL, 0, false, id);
-  TemplateStringSet::const_iterator iter =
-      template_string_set->find(id_as_template_string);
-  if (iter == template_string_set->end()) {
-    return TemplateString(kStsEmpty);
-  }
-  return *iter;
+  const TemplateString* iter = find_ptr0(*template_string_set, id_as_template_string);
+  return iter ? *iter : TemplateString(kStsEmpty);
 }
-
 
 StaticTemplateStringInitializer::StaticTemplateStringInitializer(
     const StaticTemplateString* sts) {
