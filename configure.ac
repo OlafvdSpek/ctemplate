@@ -16,7 +16,7 @@ SO_VERSION=3:0:0
 AC_CONFIG_SRCDIR(README)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CANONICAL_HOST
-AM_INIT_AUTOMAKE([dist-zip])
+AM_INIT_AUTOMAKE([subdir-objects dist-zip])
 AM_CONFIG_HEADER(src/config.h)
 
 # Checks for programs.
