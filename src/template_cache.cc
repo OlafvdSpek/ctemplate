@@ -769,4 +769,4 @@ bool TemplateCache::IsValidTemplateFilename(const string& filename,
   return true;
 }
 
-_END_GOOGLE_NAMESPACE_
+}

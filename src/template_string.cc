@@ -253,4 +253,4 @@ StaticTemplateStringInitializer::StaticTemplateStringInitializer(
   ts_copy_of_sts.AddToGlobalIdToNameMap();
 }
 
-_END_GOOGLE_NAMESPACE_
+}

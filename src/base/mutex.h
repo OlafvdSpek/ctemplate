@@ -403,6 +403,6 @@ class WriterMutexLock {
 #define ReaderMutexLock(x) COMPILE_ASSERT(0, rmutex_lock_decl_missing_var_name)
 #define WriterMutexLock(x) COMPILE_ASSERT(0, wmutex_lock_decl_missing_var_name)
 
-_END_GOOGLE_NAMESPACE_
+}
 
 #endif  /* #define GOOGLE_MUTEX_H__ */

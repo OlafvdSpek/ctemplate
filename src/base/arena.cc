@@ -502,4 +502,4 @@ char* SafeArena::Realloc(char* s, size_t oldsize, size_t newsize) {
   return newstr;
 }
 
-_END_GOOGLE_NAMESPACE_
+}

@@ -242,6 +242,6 @@ std::vector<const ModifierAndValue*> GetDefaultModifierForXml();
 extern CTEMPLATE_DLL_DECL
 std::vector<const ModifierAndValue*> GetDefaultModifierForJson();
 
-_END_GOOGLE_NAMESPACE_
+}
 
 #endif  // TEMPLATE_TEMPLATE_MODIFIERS_INTERNAL_H_

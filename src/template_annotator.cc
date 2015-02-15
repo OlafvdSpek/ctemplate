@@ -105,4 +105,4 @@ void TextTemplateAnnotator::EmitFileIsMissing(ExpandEmitter* emitter,
   EMIT_MISSING_ANNOTATION(emitter,"MISSING_FILE", value);
 }
 
-_END_GOOGLE_NAMESPACE_
+}

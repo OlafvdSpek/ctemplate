@@ -75,4 +75,4 @@ const void* PerExpandData::LookupForModifiers(const char* key) const {
   return map_ ? find_ptr2(*map_, key) : NULL;
 }
 
-_END_GOOGLE_NAMESPACE_
+}
