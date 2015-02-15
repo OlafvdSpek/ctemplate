@@ -84,7 +84,7 @@ bool HasInsecureProtocol(const char* in, int inlen) {
 
 namespace ctemplate {
 
-using HTMLPARSER_NAMESPACE::HtmlParser;
+using ctemplate_htmlparser::HtmlParser;
 
 // A most-efficient way to append a string literal to the var named 'out'.
 // The ""s ensure literal is actually a string literal

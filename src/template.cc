@@ -116,7 +116,7 @@ using HASH_NAMESPACE::hash_map;
 
 namespace ctemplate {
 
-using HTMLPARSER_NAMESPACE::HtmlParser;
+using ctemplate_htmlparser::HtmlParser;
 
 TemplateId GlobalIdForSTS_INIT(const TemplateString& s) {
   return s.GetGlobalId();   // normally this method is private

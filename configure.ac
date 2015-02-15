@@ -179,7 +179,7 @@ AC_SUBST(ac_windows_dllexport)
 # This will (should) never change, but we put it here so if we do need
 # to change it, to avoid naming conflicts or something, it's easy to
 # do in one place.
-ac_htmlparser_namespace=google_ctemplate_streamhtmlparser
+ac_htmlparser_namespace=ctemplate_htmlparser
 AC_SUBST(ac_htmlparser_namespace)
 AC_DEFINE_UNQUOTED(HTMLPARSER_NAMESPACE, $ac_htmlparser_namespace,
                    [The namespace to put the htmlparser code.])

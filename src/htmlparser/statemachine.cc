@@ -48,7 +48,7 @@
 #endif
 
 #ifdef __cplusplus
-namespace HTMLPARSER_NAMESPACE {
+namespace ctemplate_htmlparser {
 #endif
 
 #define MAX_CHAR_8BIT 256
