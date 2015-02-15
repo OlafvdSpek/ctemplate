@@ -419,18 +419,17 @@ bool TemplateCache::ExpandNoLoad(
     ExpandEmitter *expand_emitter) const {
   TemplateCacheKey template_cache_key(filename.GetGlobalId(), strip);
   CachedTemplate cached_tpl;
-  TemplateMap::iterator it;
   {
     ReaderMutexLock ml(mutex_);
     if (!is_frozen_) {
       LOG(DFATAL) << ": ExpandNoLoad() only works on frozen caches.";
       return false;
     }
-    it = parsed_template_cache_->find(template_cache_key);
-    if (it == parsed_template_cache_->end()) {
+    CachedTemplate* it = find_ptr(*parsed_template_cache_, template_cache_key);
+    if (!it) {
       return false;
     }
-    cached_tpl = it->second;
+    cached_tpl = *it;
     cached_tpl.refcounted_tpl->IncRef();
   }
   const bool result = cached_tpl.refcounted_tpl->tpl()->ExpandWithDataAndCache(
@@ -732,13 +731,8 @@ TemplateCache* TemplateCache::Clone() const {
 
 int TemplateCache::Refcount(const TemplateCacheKey template_cache_key) const {
   ReaderMutexLock ml(mutex_);
-  TemplateMap::const_iterator it =
-      parsed_template_cache_->find(template_cache_key);
-  if (it != parsed_template_cache_->end()) {
-    return it->second.refcounted_tpl->refcount();
-  } else {
-    return 0;
-  }
+  CachedTemplate* it = find_ptr(*parsed_template_cache_, template_cache_key);
+  return it ? it->refcounted_tpl->refcount() : 0;
 }
 
 // ----------------------------------------------------------------------
@@ -750,8 +744,7 @@ int TemplateCache::Refcount(const TemplateCacheKey template_cache_key) const {
 bool TemplateCache::TemplateIsCached(const TemplateCacheKey template_cache_key)
     const {
   ReaderMutexLock ml(mutex_);
-  return (parsed_template_cache_->find(template_cache_key) !=
-          parsed_template_cache_->end());
+  return parsed_template_cache_->count(template_cache_key);
 }
 
 // ----------------------------------------------------------------------
