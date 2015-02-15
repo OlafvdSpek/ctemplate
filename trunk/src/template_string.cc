@@ -50,7 +50,7 @@ using HASH_NAMESPACE::unordered_set;
 using HASH_NAMESPACE::hash_set;
 #endif
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 // Based on public domain MurmurHashUnaligned2, by Austin Appleby.
 // http://murmurhash.googlepages.com/

@@ -82,7 +82,7 @@ bool HasInsecureProtocol(const char* in, int inlen) {
 }
 }  // namespace URL
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 using HTMLPARSER_NAMESPACE::HtmlParser;
 

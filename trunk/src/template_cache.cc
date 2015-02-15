@@ -78,7 +78,7 @@ static int kVerbosity = 0;   // you can change this by hand to get vlogs
 #define PLOG(level)   std::cerr << #level ": [" << strerror(errno) << "] "
 #define VLOG(level)  if (kVerbosity >= level)  std::cerr << "V" #level ": "
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 // ----------------------------------------------------------------------
 // TemplateCache::RefcountedTemplate

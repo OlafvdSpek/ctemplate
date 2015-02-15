@@ -114,7 +114,7 @@ using HASH_NAMESPACE::unordered_map;
 using HASH_NAMESPACE::hash_map;
 #endif
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 using HTMLPARSER_NAMESPACE::HtmlParser;
 

@@ -66,9 +66,8 @@
 #include <stddef.h>
 #include <new>
 #include <memory>
-_START_GOOGLE_NAMESPACE_
 
-
+namespace ctemplate {
 
 // T is the type we want to allocate, and C is the type of the arena.
 // ArenaAllocator has the thread-safety characteristics of C.
@@ -161,7 +160,7 @@ inline void* operator new[](size_t size,
   return arena->Alloc(size);
 }
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 // Ordinarily in C++, one allocates all instances of a class from an
 // arena.  If that's what you want to do, you don't need Gladiator.

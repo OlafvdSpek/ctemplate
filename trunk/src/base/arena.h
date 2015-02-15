@@ -279,7 +279,7 @@
 #include "base/macros.h"  // for uint32
 #include "base/util.h"    // for CHECK, etc
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 // Annoying stuff for windows -- make sure clients (in this case
 // unittests) can import the class definitions and variables.

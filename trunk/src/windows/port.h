@@ -122,7 +122,7 @@ extern int CTEMPLATE_DLL_DECL safe_vsnprintf(char *str, size_t size,
 #include <string>
 #include <vector>
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 extern CTEMPLATE_DLL_DECL std::string TmpFile(const char* basename);
 void CTEMPLATE_DLL_DECL CreateOrCleanTestDir(const std::string& dirname);
 }

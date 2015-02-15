@@ -38,7 +38,7 @@
 #include <ctemplate/per_expand_data.h>
 #include <ctemplate/template_annotator.h>
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 using std::string;
 

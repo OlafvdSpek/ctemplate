@@ -45,7 +45,8 @@
 #define UTIL_GTL_MANUAL_CONSTRUCTOR_H_
 
 #include <config.h>
-_START_GOOGLE_NAMESPACE_
+
+namespace ctemplate {
 
 namespace util {
 namespace gtl {

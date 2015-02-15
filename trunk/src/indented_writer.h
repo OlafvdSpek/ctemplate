@@ -36,7 +36,7 @@
 #include <config.h>
 #include <string>
 
-_START_GOOGLE_NAMESPACE_
+namespace ctemplate {
 
 using std::string;
 
