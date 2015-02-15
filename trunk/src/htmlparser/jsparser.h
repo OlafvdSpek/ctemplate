@@ -38,7 +38,7 @@
 #include "htmlparser/statemachine.h"
 
 #ifdef __cplusplus
-namespace HTMLPARSER_NAMESPACE {
+namespace ctemplate_htmlparser {
 #endif /* __cplusplus */
 
 /* Size of the ring buffer used to lookup the last token in the javascript

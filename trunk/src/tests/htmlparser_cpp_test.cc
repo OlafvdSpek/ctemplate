@@ -88,7 +88,7 @@ using std::string;
 using std::vector;
 using GOOGLE_NAMESPACE::PathJoin;
 
-namespace HTMLPARSER_NAMESPACE {
+namespace ctemplate_htmlparser {
 
 // Maximum file size limit.
 static const int kMaxFileSize = 1000000;

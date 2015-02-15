@@ -65,7 +65,7 @@
 using std::string;
 using std::vector;
 
-namespace HTMLPARSER_NAMESPACE {
+namespace ctemplate_htmlparser {
 class HtmlParser;
 }
 
@@ -181,7 +181,7 @@ string PrettyPrintOneModifier(const ModifierAndValue& modval);
 // to change.
 extern CTEMPLATE_DLL_DECL
 vector<const ModifierAndValue*> GetModifierForHtmlJs(
-    HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, string* error_msg);
+    ctemplate_htmlparser::HtmlParser* htmlparser, string* error_msg);
 
 // Returns the appropriate escaping directives to escape content
 // in a CSS context.
@@ -191,7 +191,7 @@ vector<const ModifierAndValue*> GetModifierForHtmlJs(
 // that take URLs, which require a different escaping function (non-existent).
 extern CTEMPLATE_DLL_DECL
 vector<const ModifierAndValue*> GetModifierForCss(
-    HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, string* error_msg);
+    ctemplate_htmlparser::HtmlParser* htmlparser, string* error_msg);
 
 // Returns the appropriate escaping directives to escape content
 // in an XML context.
@@ -199,7 +199,7 @@ vector<const ModifierAndValue*> GetModifierForCss(
 // parser nor can it fail. This may change once the parser can parse XML.
 extern CTEMPLATE_DLL_DECL
 vector<const ModifierAndValue*> GetModifierForXml(
-    HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, string* error_msg);
+    ctemplate_htmlparser::HtmlParser* htmlparser, string* error_msg);
 
 // Returns the appropriate escaping directives to escape content
 // in a JSON context.
@@ -208,7 +208,7 @@ vector<const ModifierAndValue*> GetModifierForXml(
 // and distinguish different contexts within JSON.
 extern CTEMPLATE_DLL_DECL
 vector<const ModifierAndValue*> GetModifierForJson(
-    HTMLPARSER_NAMESPACE::HtmlParser* htmlparser, string* error_msg);
+    ctemplate_htmlparser::HtmlParser* htmlparser, string* error_msg);
 
 // Return the default escaping directives to escape content for the given
 // context. These methods are useful when the caller does not have

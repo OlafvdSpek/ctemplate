@@ -40,7 +40,7 @@
 #include "htmlparser/jsparser.h"
 #include "base/util.h"
 
-namespace HTMLPARSER_NAMESPACE {
+namespace ctemplate_htmlparser {
 
 class JavascriptParser {
   public:

@@ -57,7 +57,7 @@ class PerExpandData;
 }
 #endif
 
-namespace @ac_htmlparser_namespace@ {
+namespace ctemplate_htmlparser {
 class HtmlParser;
 }
 
@@ -431,7 +431,7 @@ class @ac_windows_dllexport@ Template {
   TemplateContext initial_context_;
   // Non-null if the template was initialized in an Auto-Escape mode that
   // requires a parser (currently TC_HTML, TC_CSS and TC_JS).
-  @ac_htmlparser_namespace@::HtmlParser *htmlparser_;
+  ctemplate_htmlparser::HtmlParser *htmlparser_;
 
   // A sorted list of trusted variable names, declared here because a unittest
   // needs to verify that it is appropriately sorted (an unsorted array would

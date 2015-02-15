@@ -49,7 +49,7 @@
 #endif
 
 #ifdef __cplusplus
-namespace HTMLPARSER_NAMESPACE {
+namespace ctemplate_htmlparser {
 #endif /* __cplusplus */
 
 /* Generated state machine definition. */

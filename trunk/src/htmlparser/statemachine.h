@@ -36,7 +36,7 @@
 
 #include <config.h>
 #ifdef __cplusplus
-namespace HTMLPARSER_NAMESPACE {
+namespace ctemplate_htmlparser {
 #endif
 
 /* TODO(falmeida): I'm not sure about these limits, but since right now we only
