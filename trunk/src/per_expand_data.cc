@@ -34,6 +34,7 @@
 // introduce new include dependencies.
 
 #include <config.h>
+#include <ctemplate/find_ptr.h>
 #include <ctemplate/per_expand_data.h>
 #include <ctemplate/template_annotator.h>
 
@@ -71,10 +72,7 @@ void PerExpandData::InsertForModifiers(const char* key, const void* value) {
   // Retrieve data specific to this Expand call. Returns NULL if key
   // is not found.  This should only be used by template modifiers.
 const void* PerExpandData::LookupForModifiers(const char* key) const {
-  if (!map_)
-    return NULL;
-  const DataMap::const_iterator it = map_->find(key);
-  return it == map_->end() ? NULL : it->second;
+  return map_ ? find_ptr2(*map_, key) : NULL;
 }
 
 _END_GOOGLE_NAMESPACE_
