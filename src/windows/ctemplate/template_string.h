@@ -342,7 +342,7 @@ class CTEMPLATE_DLL_DECL StaticTemplateStringInitializer {
 
 // Don't use this.  This is used only in auto-generated .varnames.h files.
 #define STS_INIT_WITH_HASH(name, str, hash_compare)                                   \
-  { { str, sizeof(""str"")-1, hash_compare } };                                       \
+  { { str, sizeof("" str "")-1, hash_compare } };                                       \
   namespace ctemplate_sts_init {                                              \
   static const ctemplate::StaticTemplateStringInitializer name##_init(&name); \
   }
@@ -358,6 +358,5 @@ const StaticTemplateString kStsEmpty =
     STS_INIT_WITH_HASH(kStsEmpty, "", 1457976849674613049ULL);
 
 }
-
 
 #endif  // TEMPLATE_TEMPLATE_STRING_H_

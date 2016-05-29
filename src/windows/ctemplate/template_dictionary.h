@@ -236,10 +236,6 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
       __attribute__((__format__ (__printf__, 4, 5)))
 #endif
      ;  // starts at 4 because of implicit 1st arg 'this'
-  void SetEscapedValueAndShowSection(const TemplateString variable,
-                                     const TemplateString value,
-                                     const TemplateModifier& escfn,
-                                     const TemplateString section_name);
 
 
  private:
@@ -459,6 +455,5 @@ class CTEMPLATE_DLL_DECL TemplateDictionary : public TemplateDictionaryInterface
 };
 
 }
-
 
 #endif  // TEMPLATE_TEMPLATE_DICTIONARY_H_

@@ -138,5 +138,4 @@ class CTEMPLATE_DLL_DECL TextTemplateAnnotator : public TemplateAnnotator {
 
 }
 
-
 #endif  // TEMPLATE_TEMPLATE_ANNOTATOR_H_

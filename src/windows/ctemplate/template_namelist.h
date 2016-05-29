@@ -165,5 +165,4 @@ class CTEMPLATE_DLL_DECL TemplateNamelist {
 
 }
 
-
 #endif  // TEMPLATE_TEMPLATE_NAMELIST_H_

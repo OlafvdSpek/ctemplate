@@ -72,5 +72,4 @@ class CTEMPLATE_DLL_DECL StringEmitter : public ExpandEmitter {
 
 }
 
-
 #endif  // TEMPLATE_TEMPLATE_EMITTER_H_
