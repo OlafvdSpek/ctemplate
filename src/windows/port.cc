@@ -42,7 +42,7 @@
 #include "port.h"
 
 // These call the windows _vsnprintf, but always NUL-terminate.
-#if !defined(__MINGW32__) && !defined(__MINGW64__)  /* mingw already defines */
+#if !defined(__MINGW32__) && !defined(__MINGW64__) && (!defined(_MSC_VER) || _MSC_VER < 1900)  /* mingw already defines */
 int safe_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
   if (size == 0)        // not even room for a \0?
     return -1;          // not what C99 says to do, but what windows does
