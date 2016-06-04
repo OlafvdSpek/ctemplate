@@ -45,7 +45,7 @@
 #include <stdlib.h>   // for NULL
 #include <string.h>   // for strcmp
 #include <sys/types.h>
-#include <hash_map>
+#include <unordered_map>
 #include <ctemplate/template_string.h>   // for StringHash
 
 // NOTE: if you are statically linking the template library into your binary
@@ -131,12 +131,12 @@ class CTEMPLATE_DLL_DECL PerExpandData {
 
  private:
 #ifdef _MSC_VER
-  typedef stdext::hash_map<const char*, const void*, StringHash> DataMap;
+  typedef std::unordered_map<const char*, const void*, StringHash> DataMap;
 #else
   struct DataEq {
     bool operator()(const char* s1, const char* s2) const;
   };
-  typedef stdext::hash_map<const char*, const void*, StringHash, DataEq>
+  typedef std::unordered_map<const char*, const void*, StringHash, DataEq>
     DataMap;
 #endif
 

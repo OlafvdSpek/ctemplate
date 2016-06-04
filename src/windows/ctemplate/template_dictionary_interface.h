@@ -145,5 +145,4 @@ class CTEMPLATE_DLL_DECL TemplateDictionaryInterface {
 
 }
 
-
 #endif  // TEMPLATE_TEMPLATE_DICTIONARY_INTERFACE_H_

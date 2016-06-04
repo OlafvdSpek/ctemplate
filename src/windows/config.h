@@ -19,13 +19,13 @@
 #define GOOGLE_NAMESPACE  ctemplate
 
 /* the location of <unordered_map> or <hash_map> */
-#define HASH_MAP_H  <hash_map>
+#define HASH_MAP_H  <unordered_map>
 
 /* the namespace of hash_map/hash_set */
-#define HASH_NAMESPACE  stdext
+#define HASH_NAMESPACE  std
 
 /* the location of <unordered_set> or <hash_set> */
-#define HASH_SET_H  <hash_set>
+#define HASH_SET_H  <unordered_set>
 
 /* Define to 1 if you have the <byteswap.h> header file. */
 #undef HAVE_BYTESWAP_H
