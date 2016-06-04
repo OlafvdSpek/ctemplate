@@ -120,7 +120,7 @@ BUILT_SOURCES = src/htmlparser/htmlparser_fsm.h \
 CTEMPLATE_SYMBOLS = '(ctemplate|template_modifiers|BaseArena|UnsafeArena|[^A-Za-z]Template[^A-Za-z]|TemplateDictionary|TemplateNamelist|TemplateFromString|TemplateString|TemplateState|[^A-Za-z]Strip[^A-Za-z])'
 
 lib_LTLIBRARIES += libctemplate.la
-WINDOWS_PROJECTS += vsprojects/libctemplate/libctemplate.vcproj
+WINDOWS_PROJECTS += vsprojects/libctemplate/libctemplate.vcxproj
 libctemplate_la_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/base/arena-inl.h \
 	src/base/arena.cc \
@@ -221,13 +221,13 @@ libctemplate_testing_nothreads_la_LDFLAGS = -export-symbols-regex $(CTEMPLATE_TE
 
 # Helper apps
 bin_PROGRAMS += make_tpl_varnames_h
-WINDOWS_PROJECTS += vsprojects/make_tpl_varname_h/make_tpl_varname_h.vcproj
+WINDOWS_PROJECTS += vsprojects/make_tpl_varname_h/make_tpl_varname_h.vcxproj
 make_tpl_varnames_h_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/make_tpl_varnames_h.cc
 make_tpl_varnames_h_LDADD = libctemplate_nothreads.la
 
 bin_PROGRAMS += diff_tpl_auto_escape
-WINDOWS_PROJECTS += vsprojects/diff_tpl_auto_escape/diff_tpl_auto_escape.vcproj
+WINDOWS_PROJECTS += vsprojects/diff_tpl_auto_escape/diff_tpl_auto_escape.vcxproj
 diff_tpl_auto_escape_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
 	src/diff_tpl_auto_escape.cc
 diff_tpl_auto_escape_LDADD = libctemplate_nothreads.la
@@ -237,7 +237,7 @@ bin_SCRIPTS += src/template-converter
 # For each of the tests, we test with and without threads
 
 TESTS += compile_test compile_nothreads_test
-WINDOWS_PROJECTS += vsprojects/compile_test/compile_test.vcproj
+WINDOWS_PROJECTS += vsprojects/compile_test/compile_test.vcxproj
 compile_test_SOURCES = $(nodist_ctemplateinclude_HEADERS) \
                        src/tests/compile_test.cc
 compile_test_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
@@ -257,7 +257,7 @@ installcheck-local:
 	       -o installcheck_compile_test.o
 
 TESTS += template_test_util_test template_test_util_nothreads_test
-WINDOWS_PROJECTS += vsprojects/template_test_util_test/template_test_util_test.vcproj
+WINDOWS_PROJECTS += vsprojects/template_test_util_test/template_test_util_test.vcxproj
 template_test_util_test_SOURCES = src/tests/config_for_unittests.h \
                                    src/template_dictionary.cc \
                                    src/tests/template_test_util_test.cc
@@ -271,7 +271,7 @@ template_test_util_nothreads_test_LDADD = libctemplate_testing_nothreads.la \
                                           libctemplate_nothreads_debug.la
 
 TESTS += template_dictionary_unittest template_dictionary_nothreads_unittest
-WINDOWS_PROJECTS += vsprojects/template_dictionary_unittest/template_dictionary_unittest.vcproj
+WINDOWS_PROJECTS += vsprojects/template_dictionary_unittest/template_dictionary_unittest.vcxproj
 template_dictionary_unittest_SOURCES = src/tests/config_for_unittests.h \
                                        src/base/arena.h \
                                        src/tests/template_dictionary_unittest.cc
@@ -285,7 +285,7 @@ template_dictionary_nothreads_unittest_LDADD = libctemplate_testing_nothreads.la
                                                libctemplate_nothreads_debug.la
 
 TESTS += template_modifiers_unittest template_modifiers_nothreads_unittest
-WINDOWS_PROJECTS += vsprojects/template_modifiers_unittest/template_modifiers_unittest.vcproj
+WINDOWS_PROJECTS += vsprojects/template_modifiers_unittest/template_modifiers_unittest.vcxproj
 template_modifiers_unittest_SOURCES = src/tests/config_for_unittests.h \
                                       src/tests/template_modifiers_unittest.cc
 template_modifiers_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
@@ -298,7 +298,7 @@ template_modifiers_nothreads_unittest_LDADD = libctemplate_testing_nothreads.la 
                                               libctemplate_nothreads_debug.la
 
 TESTS += template_setglobals_unittest template_setglobals_nothreads_unittest
-WINDOWS_PROJECTS += vsprojects/template_setglobals_unittest/template_setglobals_unittest.vcproj
+WINDOWS_PROJECTS += vsprojects/template_setglobals_unittest/template_setglobals_unittest.vcxproj
 template_setglobals_unittest_SOURCES = src/tests/config_for_unittests.h \
                                        src/tests/template_setglobals_unittest.cc
 template_setglobals_unittest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
@@ -311,7 +311,7 @@ template_setglobals_nothreads_unittest_LDADD = libctemplate_testing_nothreads.la
                                                libctemplate_nothreads_debug.la
 
 TESTS += template_cache_test template_cache_nothreads_test
-WINDOWS_PROJECTS += vsprojects/template_cache_test/template_cache_test.vcproj
+WINDOWS_PROJECTS += vsprojects/template_cache_test/template_cache_test.vcxproj
 template_cache_test_SOURCES = src/tests/config_for_unittests.h \
                               src/template_modifiers_internal.h \
                               src/tests/template_cache_test.cc
@@ -325,8 +325,8 @@ template_cache_nothreads_test_LDADD = libctemplate_testing_nothreads.la \
                                       libctemplate_nothreads_debug.la
 
 TESTS += template_unittest template_nothreads_unittest
-WINDOWS_PROJECTS += vsprojects/template_unittest/template_unittest.vcproj
-WINDOWS_PROJECTS += vsprojects/template_unittest_static/template_unittest_static.vcproj
+WINDOWS_PROJECTS += vsprojects/template_unittest/template_unittest.vcxproj
+WINDOWS_PROJECTS += vsprojects/template_unittest_static/template_unittest_static.vcxproj
 template_unittest_SOURCES = src/tests/config_for_unittests.h \
                             src/template_modifiers_internal.h \
                             src/tests/template_unittest.cc
@@ -340,7 +340,7 @@ template_nothreads_unittest_LDADD = libctemplate_testing_nothreads.la \
                                     libctemplate_nothreads_debug.la
 
 TESTS += template_regtest template_nothreads_regtest
-WINDOWS_PROJECTS += vsprojects/template_regtest/template_regtest.vcproj
+WINDOWS_PROJECTS += vsprojects/template_regtest/template_regtest.vcxproj
 template_regtest_SOURCES = src/tests/template_regtest.cc
 template_regtest_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 template_regtest_LDFLAGS = $(PTHREAD_CFLAGS)
@@ -381,7 +381,7 @@ TESTDATA += \
    src/tests/template_unittest_test_valid1_dict01.out
 
 TESTS += htmlparser_test htmlparser_nothreads_test
-WINDOWS_PROJECTS += vsprojects/htmlparser_test/htmlparser_test.vcproj
+WINDOWS_PROJECTS += vsprojects/htmlparser_test/htmlparser_test.vcxproj
 htmlparser_test_SOURCES = src/tests/htmlparser_cpp_test.cc
 htmlparser_test_CXXFLAGS = $(PTHREAD_CFLAGS) $(AM_CXXFLAGS)
 htmlparser_test_LDFLAGS = $(PTHREAD_CFLAGS)
@@ -411,13 +411,13 @@ BUILT_SOURCES += statemachine.c
 CLEANFILES = statemachine.c
 
 TESTS += statemachine_test
-WINDOWS_PROJECTS += vsprojects/statemachine_test/statemachine_test.vcproj
+WINDOWS_PROJECTS += vsprojects/statemachine_test/statemachine_test.vcxproj
 statemachine_test_SOURCES = src/tests/statemachine_test.c \
                             statemachine.c
 statemachine_test_CFLAGS = -I$(top_srcdir)/src/htmlparser
 
 TESTS += generate_fsm_c_test
-WINDOWS_PROJECTS += vsprojects/generate_fsm_c_test/generate_fsm_c_test.vcproj
+WINDOWS_PROJECTS += vsprojects/generate_fsm_c_test/generate_fsm_c_test.vcxproj
 generate_fsm_c_test_SOURCES = src/tests/generate_fsm_c_test.c
 generate_fsm_c_test_DEPENDENCIES = src/tests/htmlparser_testdata/sample_fsm.c
 
@@ -488,7 +488,7 @@ lib${PACKAGE}.pc: Makefile packages/rpm/rpm.spec
 lib${PACKAGE}_nothreads.pc: lib${PACKAGE}.pc
 	grep -v Libs.private lib${PACKAGE}.pc | sed s/-l$(PACKAGE)/-l$(PACKAGE)_nothreads/ > "$@"
 
-# Windows wants write permission to .vcproj files and maybe even sln files.
+# Windows wants write permission to .vcxproj files and maybe even sln files.
 dist-hook:
 	test -e "$(distdir)/vsprojects" \
 	   && chmod -R u+w $(distdir)/*.sln $(distdir)/vsprojects/
