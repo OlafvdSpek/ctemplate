@@ -124,7 +124,7 @@
 #undef HAVE_UNISTD_H
 
 /* define if the compiler supports unordered_{map,set} */
-#undef HAVE_UNORDERED_MAP
+#define HAVE_UNORDERED_MAP 1
 
 /* Define to 1 if you have the <utime.h> header file. */
 #undef HAVE_UTIME_H
