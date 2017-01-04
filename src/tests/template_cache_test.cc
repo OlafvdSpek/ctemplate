@@ -48,23 +48,23 @@
 #include <ctemplate/template_string.h>  // for TemplateString
 #include "tests/template_test_util.h"  // for AssertExpandIs(), etc
 using std::string;
-using GOOGLE_NAMESPACE::FLAGS_test_tmpdir;
-using GOOGLE_NAMESPACE::AssertExpandIs;
-using GOOGLE_NAMESPACE::CreateOrCleanTestDir;
-using GOOGLE_NAMESPACE::CreateOrCleanTestDirAndSetAsTmpdir;
-using GOOGLE_NAMESPACE::DO_NOT_STRIP;
-using GOOGLE_NAMESPACE::PathJoin;
-using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
-using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
-using GOOGLE_NAMESPACE::StaticTemplateString;
-using GOOGLE_NAMESPACE::StringToFile;
-using GOOGLE_NAMESPACE::StringToTemplateCache;
-using GOOGLE_NAMESPACE::StringToTemplateFile;
-using GOOGLE_NAMESPACE::Template;
-using GOOGLE_NAMESPACE::TemplateCache;
-using GOOGLE_NAMESPACE::TemplateCachePeer;
-using GOOGLE_NAMESPACE::TemplateDictionary;
-using GOOGLE_NAMESPACE::kCWD;
+using ctemplate::FLAGS_test_tmpdir;
+using ctemplate::AssertExpandIs;
+using ctemplate::CreateOrCleanTestDir;
+using ctemplate::CreateOrCleanTestDirAndSetAsTmpdir;
+using ctemplate::DO_NOT_STRIP;
+using ctemplate::PathJoin;
+using ctemplate::STRIP_BLANK_LINES;
+using ctemplate::STRIP_WHITESPACE;
+using ctemplate::StaticTemplateString;
+using ctemplate::StringToFile;
+using ctemplate::StringToTemplateCache;
+using ctemplate::StringToTemplateFile;
+using ctemplate::Template;
+using ctemplate::TemplateCache;
+using ctemplate::TemplateCachePeer;
+using ctemplate::TemplateDictionary;
+using ctemplate::kCWD;
 
 #define ASSERT(cond)  do {                                      \
   if (!(cond)) {                                                \

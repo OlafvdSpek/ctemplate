@@ -454,17 +454,17 @@ static bool FilenameValidForContext(const string& filename,
                                     TemplateContext context) {
   string stripped_filename = Basename(filename);
 
-  if (GOOGLE_NAMESPACE::ContainsFullWord(stripped_filename, "css") ||
-      GOOGLE_NAMESPACE::ContainsFullWord(stripped_filename, "stylesheet") ||
-      GOOGLE_NAMESPACE::ContainsFullWord(stripped_filename, "style")) {
+  if (ctemplate::ContainsFullWord(stripped_filename, "css") ||
+      ctemplate::ContainsFullWord(stripped_filename, "stylesheet") ||
+      ctemplate::ContainsFullWord(stripped_filename, "style")) {
     if (context != TC_CSS) {
       LOG(WARNING) << "Template filename " << filename
                    << " indicates CSS but given TemplateContext"
                    << " was not TC_CSS." << endl;
       return false;
     }
-  } else if (GOOGLE_NAMESPACE::ContainsFullWord(stripped_filename, "js") ||
-             GOOGLE_NAMESPACE::ContainsFullWord(stripped_filename, "javascript")) {
+  } else if (ctemplate::ContainsFullWord(stripped_filename, "js") ||
+             ctemplate::ContainsFullWord(stripped_filename, "javascript")) {
     if (context != TC_JS) {
       LOG(WARNING) << "Template filename " << filename
                    << " indicates javascript but given TemplateContext"
@@ -662,7 +662,7 @@ static void WriteOneHeaderEntry(
       const TemplateId id = GlobalIdForSTS_INIT(TemplateString(variable));
       std::ostringstream outstream;
       outstream << "static const "
-                << AS_STR(GOOGLE_NAMESPACE) << "::StaticTemplateString "
+                << "::ctemplate::StaticTemplateString "
                 << prefix << variable << " = STS_INIT_WITH_HASH("
                 << prefix << variable << ", \"" << variable << "\", "
                 << id << "ULL);\n";
@@ -2381,7 +2381,7 @@ bool Template::StringToTemplateCache(const TemplateString& key,
   // We say the insert succeeded only if it succeded for all strip values.
   bool retval = true;
   for (int i = 0; i < static_cast<int>(NUM_STRIPS); ++i) {
-    if (!GOOGLE_NAMESPACE::StringToTemplateCache(key, content, static_cast<Strip>(i)))
+    if (!ctemplate::StringToTemplateCache(key, content, static_cast<Strip>(i)))
       retval = false;
   }
   return retval;

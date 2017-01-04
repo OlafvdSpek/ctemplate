@@ -138,7 +138,7 @@ template<class T, class C> const int ArenaAllocator<T, C>::kAlignment =
 
 // 'new' must be in the global namespace.
 }
-using GOOGLE_NAMESPACE::UnsafeArena;
+using ctemplate::UnsafeArena;
 
 
 // Operators for allocation on the arena

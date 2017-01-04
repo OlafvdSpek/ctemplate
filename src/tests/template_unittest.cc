@@ -62,42 +62,42 @@ TEST_INIT   // defines RUN_ALL_TESTS()
 
 using std::vector;
 using std::string;
-using GOOGLE_NAMESPACE::FLAGS_test_tmpdir;
+using ctemplate::FLAGS_test_tmpdir;
 
-using GOOGLE_NAMESPACE::AssertExpandIs;
-using GOOGLE_NAMESPACE::AssertExpandWithDataIs;
-using GOOGLE_NAMESPACE::CreateOrCleanTestDir;
-using GOOGLE_NAMESPACE::CreateOrCleanTestDirAndSetAsTmpdir;
-using GOOGLE_NAMESPACE::DO_NOT_STRIP;
-using GOOGLE_NAMESPACE::ExpandEmitter;
-using GOOGLE_NAMESPACE::IsAbspath;
-using GOOGLE_NAMESPACE::Now;
-using GOOGLE_NAMESPACE::PathJoin;
-using GOOGLE_NAMESPACE::PerExpandData;
-using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
-using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
-using GOOGLE_NAMESPACE::StaticTemplateString;
-using GOOGLE_NAMESPACE::StringToFile;
-using GOOGLE_NAMESPACE::StringToTemplate;
-using GOOGLE_NAMESPACE::StringToTemplateFile;
-using GOOGLE_NAMESPACE::Strip;
-using GOOGLE_NAMESPACE::TC_CSS;
-using GOOGLE_NAMESPACE::TC_HTML;
-using GOOGLE_NAMESPACE::TC_JS;
-using GOOGLE_NAMESPACE::TC_JSON;
-using GOOGLE_NAMESPACE::TC_MANUAL;
-using GOOGLE_NAMESPACE::TC_UNUSED;
-using GOOGLE_NAMESPACE::TC_XML;
-using GOOGLE_NAMESPACE::Template;
-using GOOGLE_NAMESPACE::TemplateContext;
-using GOOGLE_NAMESPACE::TemplateDictionary;
-using GOOGLE_NAMESPACE::TemplateNamelist;
-using GOOGLE_NAMESPACE::TemplateString;
-using GOOGLE_NAMESPACE::kRootdir;
+using ctemplate::AssertExpandIs;
+using ctemplate::AssertExpandWithDataIs;
+using ctemplate::CreateOrCleanTestDir;
+using ctemplate::CreateOrCleanTestDirAndSetAsTmpdir;
+using ctemplate::DO_NOT_STRIP;
+using ctemplate::ExpandEmitter;
+using ctemplate::IsAbspath;
+using ctemplate::Now;
+using ctemplate::PathJoin;
+using ctemplate::PerExpandData;
+using ctemplate::STRIP_BLANK_LINES;
+using ctemplate::STRIP_WHITESPACE;
+using ctemplate::StaticTemplateString;
+using ctemplate::StringToFile;
+using ctemplate::StringToTemplate;
+using ctemplate::StringToTemplateFile;
+using ctemplate::Strip;
+using ctemplate::TC_CSS;
+using ctemplate::TC_HTML;
+using ctemplate::TC_JS;
+using ctemplate::TC_JSON;
+using ctemplate::TC_MANUAL;
+using ctemplate::TC_UNUSED;
+using ctemplate::TC_XML;
+using ctemplate::Template;
+using ctemplate::TemplateContext;
+using ctemplate::TemplateDictionary;
+using ctemplate::TemplateNamelist;
+using ctemplate::TemplateString;
+using ctemplate::kRootdir;
 
-using GOOGLE_NAMESPACE::ExpandTemplate;
-using GOOGLE_NAMESPACE::ExpandWithData;
-using GOOGLE_NAMESPACE::StringToTemplateCache;
+using ctemplate::ExpandTemplate;
+using ctemplate::ExpandWithData;
+using ctemplate::StringToTemplateCache;
 
 static const StaticTemplateString kHello = STS_INIT(kHello, "Hello");
 static const StaticTemplateString kWorld = STS_INIT(kWorld, "World");
@@ -270,7 +270,7 @@ static void AssertCorrectEscaping(TemplateContext template_type,
   ASSERT_STREQ_VERBOSE(expected_out, outstring, text);
 }
 
-class DynamicModifier : public GOOGLE_NAMESPACE::TemplateModifier {
+class DynamicModifier : public ctemplate::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData* per_expand_data,
@@ -283,7 +283,7 @@ class DynamicModifier : public GOOGLE_NAMESPACE::TemplateModifier {
   }
 };
 
-class EmphasizeTemplateModifier : public GOOGLE_NAMESPACE::TemplateModifier {
+class EmphasizeTemplateModifier : public ctemplate::TemplateModifier {
  public:
   EmphasizeTemplateModifier(const string& match)
       : match_(match) {
@@ -310,47 +310,47 @@ class EmphasizeTemplateModifier : public GOOGLE_NAMESPACE::TemplateModifier {
 // TextTemplateAnnotator but just to test our ability to customize
 // annotation, and with stateful one, it prefixes each text annotation
 // with an event (call) count.
-class CustomTestAnnotator : public GOOGLE_NAMESPACE::TextTemplateAnnotator {
+class CustomTestAnnotator : public ctemplate::TextTemplateAnnotator {
  public:
   CustomTestAnnotator() : event_count_(0) { }
   void Reset() { event_count_ = 0; }
 
   virtual void EmitOpenInclude(ExpandEmitter* emitter, const string& value) {
     EmitTestPrefix(emitter);
-    GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitOpenInclude(emitter, value);
+    ctemplate::TextTemplateAnnotator::EmitOpenInclude(emitter, value);
   }
   virtual void EmitCloseInclude(ExpandEmitter* emitter) {
     EmitTestPrefix(emitter);
-    GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitCloseInclude(emitter);
+    ctemplate::TextTemplateAnnotator::EmitCloseInclude(emitter);
   }
   virtual void EmitOpenFile(ExpandEmitter* emitter, const string& value) {
     EmitTestPrefix(emitter);
-    GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitOpenFile(emitter, value);
+    ctemplate::TextTemplateAnnotator::EmitOpenFile(emitter, value);
   }
   virtual void EmitCloseFile(ExpandEmitter* emitter) {
     EmitTestPrefix(emitter);
-    GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitCloseFile(emitter);
+    ctemplate::TextTemplateAnnotator::EmitCloseFile(emitter);
   }
   virtual void EmitOpenSection(ExpandEmitter* emitter, const string& value) {
     EmitTestPrefix(emitter);
-    GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitOpenSection(emitter, value);
+    ctemplate::TextTemplateAnnotator::EmitOpenSection(emitter, value);
   }
   virtual void EmitCloseSection(ExpandEmitter* emitter) {
     EmitTestPrefix(emitter);
-    GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitCloseSection(emitter);
+    ctemplate::TextTemplateAnnotator::EmitCloseSection(emitter);
   }
   virtual void EmitOpenVariable(ExpandEmitter* emitter, const string& value) {
     EmitTestPrefix(emitter);
-    GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitOpenVariable(emitter, value);
+    ctemplate::TextTemplateAnnotator::EmitOpenVariable(emitter, value);
   }
   virtual void EmitCloseVariable(ExpandEmitter* emitter) {
     EmitTestPrefix(emitter);
-    GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitCloseVariable(emitter);
+    ctemplate::TextTemplateAnnotator::EmitCloseVariable(emitter);
   }
   virtual void EmitFileIsMissing(ExpandEmitter* emitter,
                                     const string& value) {
     EmitTestPrefix(emitter);
-    GOOGLE_NAMESPACE::TextTemplateAnnotator::EmitFileIsMissing(emitter, value);
+    ctemplate::TextTemplateAnnotator::EmitFileIsMissing(emitter, value);
   }
 
  private:
@@ -701,12 +701,12 @@ TEST(Template, VariableWithModifiers) {
   AssertExpandIs(tpl, &dict, "hi yo_yo # <b>foo & bar</b> lo", true);
 
   // Test with custom modifiers [regular or XssSafe should not matter].
-  ASSERT(GOOGLE_NAMESPACE::AddModifier("x-test",
-                                &GOOGLE_NAMESPACE::html_escape));
-  ASSERT(GOOGLE_NAMESPACE::AddModifier("x-test-arg=",
-                                &GOOGLE_NAMESPACE::html_escape));
-  ASSERT(GOOGLE_NAMESPACE::AddXssSafeModifier("x-test-arg=snippet",
-                                       &GOOGLE_NAMESPACE::snippet_escape));
+  ASSERT(ctemplate::AddModifier("x-test",
+                                &ctemplate::html_escape));
+  ASSERT(ctemplate::AddModifier("x-test-arg=",
+                                &ctemplate::html_escape));
+  ASSERT(ctemplate::AddXssSafeModifier("x-test-arg=snippet",
+                                       &ctemplate::snippet_escape));
 
   tpl = StringToTemplate("hi {{VAR:x-test}} lo", STRIP_WHITESPACE);
   AssertExpandIs(tpl, &dict, "hi yo&amp;yo lo", true);
@@ -718,7 +718,7 @@ TEST(Template, VariableWithModifiers) {
 
   // Test with a modifier taking per-expand data
   DynamicModifier dynamic_modifier;
-  ASSERT(GOOGLE_NAMESPACE::AddModifier("x-dynamic", &dynamic_modifier));
+  ASSERT(ctemplate::AddModifier("x-dynamic", &dynamic_modifier));
   PerExpandData per_expand_data;
   tpl = StringToTemplate("hi {{VAR:x-dynamic}} lo", STRIP_WHITESPACE);
   AssertExpandWithDataIs(tpl, &dict, &per_expand_data, "hi  lo", true);
@@ -1753,8 +1753,8 @@ TEST(Template, CorrectModifiersForAutoEscape) {
   AssertCorrectModifiers(TC_JSON, text, "USER:h:j\n");
 
   // 2i: Variables with XssSafe Custom modifiers are untouched.
-  ASSERT(GOOGLE_NAMESPACE::AddXssSafeModifier("x-test-cm",
-                                       &GOOGLE_NAMESPACE::html_escape));
+  ASSERT(ctemplate::AddXssSafeModifier("x-test-cm",
+                                       &ctemplate::html_escape));
   text = "Hello {{USER:x-test-cm}}";              // Missing :h
   AssertCorrectModifiers(TC_HTML, text, "USER:x-test-cm\n");
   text = "Hello {{USER:x-test-cm:j}}";            // Extra :j

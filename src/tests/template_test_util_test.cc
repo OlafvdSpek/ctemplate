@@ -44,12 +44,12 @@ TEST_INIT   // defines RUN_ALL_TESTS()
 
 using std::vector;
 using std::string;
-using GOOGLE_NAMESPACE::UnsafeArena;
+using ctemplate::UnsafeArena;
 
-using GOOGLE_NAMESPACE::TemplateDictionary;
-using GOOGLE_NAMESPACE::TemplateDictionaryPeer;
-using GOOGLE_NAMESPACE::TemplateString;
-using GOOGLE_NAMESPACE::StaticTemplateString;
+using ctemplate::TemplateDictionary;
+using ctemplate::TemplateDictionaryPeer;
+using ctemplate::TemplateString;
+using ctemplate::StaticTemplateString;
 
 namespace {
 

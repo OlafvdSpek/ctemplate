@@ -64,7 +64,7 @@ namespace ctemplate {
 // TODO (we wish): Make this macro produce the #include for the auto-generated
 // header files, when and if the macro pre-processor supports that
 #define RegisterTemplateFilename(var, name)         \
-  const char* const var = @ac_google_namespace@::TemplateNamelist::RegisterTemplate(name);
+  const char* const var = ctemplate::TemplateNamelist::RegisterTemplate(name);
 
 // Class: TemplateNamelist
 //   Each time this class is instantiated, the name passed to

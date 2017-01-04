@@ -82,12 +82,12 @@
 #include <ctemplate/template_pathops.h>
 using std::string;
 using std::vector;
-using GOOGLE_NAMESPACE::Template;
-using GOOGLE_NAMESPACE::TemplateContext;
-using GOOGLE_NAMESPACE::Strip;
-using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
-using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
-using GOOGLE_NAMESPACE::DO_NOT_STRIP;
+using ctemplate::Template;
+using ctemplate::TemplateContext;
+using ctemplate::Strip;
+using ctemplate::STRIP_WHITESPACE;
+using ctemplate::STRIP_BLANK_LINES;
+using ctemplate::DO_NOT_STRIP;
 
 enum {LOG_VERBOSE, LOG_INFO, LOG_WARNING, LOG_ERROR, LOG_FATAL};
 
@@ -102,7 +102,7 @@ struct VariableAndMod {
 };
 typedef vector<VariableAndMod> VariableAndMods;
 
-static string FLAG_template_dir(GOOGLE_NAMESPACE::kCWD);   // "./"
+static string FLAG_template_dir(ctemplate::kCWD);   // "./"
 static string FLAG_strip = "";      // cmd-line arg -s
 static bool FLAG_verbose = false;   // cmd-line arg -v
 

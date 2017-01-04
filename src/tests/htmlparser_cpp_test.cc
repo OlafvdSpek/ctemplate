@@ -86,7 +86,7 @@ using std::map;
 using std::pair;
 using std::string;
 using std::vector;
-using GOOGLE_NAMESPACE::PathJoin;
+using ctemplate::PathJoin;
 
 namespace ctemplate_htmlparser {
 

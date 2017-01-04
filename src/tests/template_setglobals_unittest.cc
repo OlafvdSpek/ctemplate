@@ -38,15 +38,15 @@
 #include "base/util.h"
 TEST_INIT   // defines RUN_ALL_TESTS()
 
-using GOOGLE_NAMESPACE::Template;
-using GOOGLE_NAMESPACE::TemplateDictionary;
+using ctemplate::Template;
+using ctemplate::TemplateDictionary;
 
 TEST(SetGlobalValue, TemplateDictionary) {
   // Test to see that the global dictionary object gets created when you
   // first call the static function TemplateDictionary::SetGlobalValue().
   TemplateDictionary::SetGlobalValue("TEST_GLOBAL_VAR", "test_value");
   TemplateDictionary tpl("empty");
-  GOOGLE_NAMESPACE::TemplateDictionaryPeer peer(&tpl);
+  ctemplate::TemplateDictionaryPeer peer(&tpl);
   EXPECT_STREQ(peer.GetSectionValue("TEST_GLOBAL_VAR"),
                "test_value");
 

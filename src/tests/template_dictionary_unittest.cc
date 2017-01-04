@@ -48,16 +48,16 @@ TEST_INIT               // defines RUN_ALL_TESTS
 
 using std::string;
 using std::vector;
-using GOOGLE_NAMESPACE::UnsafeArena;
-using GOOGLE_NAMESPACE::DO_NOT_STRIP;
-using GOOGLE_NAMESPACE::ExpandEmitter;
-using GOOGLE_NAMESPACE::PerExpandData;
-using GOOGLE_NAMESPACE::StaticTemplateString;
-using GOOGLE_NAMESPACE::StringToTemplateCache;
-using GOOGLE_NAMESPACE::TemplateDictionary;
-using GOOGLE_NAMESPACE::TemplateDictionaryInterface;
-using GOOGLE_NAMESPACE::TemplateDictionaryPeer;
-using GOOGLE_NAMESPACE::TemplateString;
+using ctemplate::UnsafeArena;
+using ctemplate::DO_NOT_STRIP;
+using ctemplate::ExpandEmitter;
+using ctemplate::PerExpandData;
+using ctemplate::StaticTemplateString;
+using ctemplate::StringToTemplateCache;
+using ctemplate::TemplateDictionary;
+using ctemplate::TemplateDictionaryInterface;
+using ctemplate::TemplateDictionaryPeer;
+using ctemplate::TemplateString;
 
 #define ASSERT_STRSTR(text, substr)  do {                       \
   if (!strstr((text), (substr))) {                              \
@@ -70,7 +70,7 @@ using GOOGLE_NAMESPACE::TemplateString;
 
 
 // test escape-functor that replaces all input with "foo"
-class FooEscaper : public GOOGLE_NAMESPACE::TemplateModifier {
+class FooEscaper : public ctemplate::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData*,
@@ -81,7 +81,7 @@ class FooEscaper : public GOOGLE_NAMESPACE::TemplateModifier {
 };
 
 // test escape-functor that replaces all input with ""
-class NullEscaper : public GOOGLE_NAMESPACE::TemplateModifier {
+class NullEscaper : public ctemplate::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData*,
@@ -91,14 +91,14 @@ class NullEscaper : public GOOGLE_NAMESPACE::TemplateModifier {
 };
 
 // first does javascript-escaping, then html-escaping
-class DoubleEscaper : public GOOGLE_NAMESPACE::TemplateModifier {
+class DoubleEscaper : public ctemplate::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData* data,
               ExpandEmitter* outbuf, const string& arg) const {
     assert(arg.empty());    // we don't take an argument
-    string tmp = GOOGLE_NAMESPACE::javascript_escape(in, inlen);
-    GOOGLE_NAMESPACE::html_escape.Modify(tmp.data(), tmp.size(), data, outbuf, "");
+    string tmp = ctemplate::javascript_escape(in, inlen);
+    ctemplate::html_escape.Modify(tmp.data(), tmp.size(), data, outbuf, "");
   }
 };
 
@@ -236,12 +236,12 @@ TEST(TemplateDictionary, SetEscapedValue) {
 
   dict.SetEscapedValue("hardest HTML",
                        "<A HREF='foo'\nid=\"bar\t\t&&\vbaz\">",
-                       GOOGLE_NAMESPACE::html_escape);
+                       ctemplate::html_escape);
   dict.SetEscapedValue("hardest JS",
                        ("f = 'foo';\r\n\tprint \"\\&foo = \b\", \"foo\""),
-                       GOOGLE_NAMESPACE::javascript_escape);
+                       ctemplate::javascript_escape);
   dict.SetEscapedValue("query escape 0", "",
-                       GOOGLE_NAMESPACE::url_query_escape);
+                       ctemplate::url_query_escape);
 
   EXPECT_TRUE(peer.ValueIs("hardest HTML",
                            "&lt;A HREF=&#39;foo&#39; id=&quot;bar  &amp;&amp; "
@@ -280,13 +280,13 @@ TEST(TemplateDictionary, SetEscapedFormattedValue) {
   TemplateDictionary dict("test_SetEscapedFormattedValue", NULL);
   TemplateDictionaryPeer peer(&dict);
 
-  dict.SetEscapedFormattedValue("HTML", GOOGLE_NAMESPACE::html_escape,
+  dict.SetEscapedFormattedValue("HTML", ctemplate::html_escape,
                                 "This is <%s> #%.4f", "a & b", 1.0/3);
-  dict.SetEscapedFormattedValue("PRE", GOOGLE_NAMESPACE::pre_escape,
+  dict.SetEscapedFormattedValue("PRE", ctemplate::pre_escape,
                                 "if %s x = %.4f;", "(a < 1 && b > 2)\n\t", 1.0/3);
-  dict.SetEscapedFormattedValue("URL", GOOGLE_NAMESPACE::url_query_escape,
+  dict.SetEscapedFormattedValue("URL", ctemplate::url_query_escape,
                                 "pageviews-%s", "r?egex");
-  dict.SetEscapedFormattedValue("XML", GOOGLE_NAMESPACE::xml_escape,
+  dict.SetEscapedFormattedValue("XML", ctemplate::xml_escape,
                                 "This&is%s -- ok?", "just&");
 
   EXPECT_TRUE(peer.ValueIs("HTML",

@@ -77,7 +77,7 @@
 using std::set;
 using std::string;
 using std::vector;
-using GOOGLE_NAMESPACE::Template;
+using ctemplate::Template;
 
 enum {LOG_INFO, LOG_WARNING, LOG_ERROR, LOG_FATAL};
 
@@ -243,14 +243,14 @@ static vector<string> SplitIntoLines(const string &input) {
 //
 // The header entries for ex1.tpl are:
 // #include "template/template_string.h"
-// static const ::GOOGLE_NAMESPACE::StaticTemplateString ke_USER =
+// static const ::ctemplate::StaticTemplateString ke_USER =
 //   STS_INIT_WITH_HASH(ke_USER, "USER", 3254611514008215315LLU);
 //
 // The header entries for ex2.tpl are:
 // #include "template/template_string.h"
-// static const ::GOOGLE_NAMESPACE::StaticTemplateString ke_URL =
+// static const ::ctemplate::StaticTemplateString ke_URL =
 //   STS_INIT_WITH_HASH(ke_URL, "URL", 1026025273225241985LLU);
-// static const ::GOOGLE_NAMESPACE::StaticTemplateString ke_USER =
+// static const ::ctemplate::StaticTemplateString ke_USER =
 //   STS_INIT_WITH_HASH(ke_USER, "USER", 3254611514008215315LLU);
 //
 // Simply concatenating both header entries will result in
@@ -258,9 +258,9 @@ static vector<string> SplitIntoLines(const string &input) {
 // the ke_USER variable. This function instead outputs:
 //
 // #include "template/template_string.h"
-// static const ::GOOGLE_NAMESPACE::StaticTemplateString ke_USER =
+// static const ::ctemplate::StaticTemplateString ke_USER =
 //   STS_INIT_WITH_HASH(ke_USER, "USER", 3254611514008215315LLU);
-// static const ::GOOGLE_NAMESPACE::StaticTemplateString ke_URL =
+// static const ::ctemplate::StaticTemplateString ke_URL =
 //   STS_INIT_WITH_HASH(ke_URL, "URL", 1026025273225241985LLU);
 //
 static string TextWithDuplicateLinesRemoved(const string& header_entries) {
@@ -299,9 +299,9 @@ static bool WriteToDisk(bool log_info, const string& output_file,
 }
 
 int main(int argc, char **argv) {
-  string FLAG_template_dir(GOOGLE_NAMESPACE::kCWD);   // "./"
-  string FLAG_header_dir(GOOGLE_NAMESPACE::kCWD);
-  GOOGLE_NAMESPACE::NormalizeDirectory(&FLAG_header_dir);   // adds trailing slash
+  string FLAG_template_dir(ctemplate::kCWD);   // "./"
+  string FLAG_header_dir(ctemplate::kCWD);
+  ctemplate::NormalizeDirectory(&FLAG_header_dir);   // adds trailing slash
   string FLAG_outputfile_suffix(".varnames.h");
   string FLAG_outputfile("");
   bool FLAG_header = true;
@@ -378,7 +378,7 @@ int main(int argc, char **argv) {
     // The last two arguments in the following call do not matter
     // since they control how the template gets expanded and we never
     // expand the template after loading it here
-    Template * tpl = Template::GetTemplate(tplname, GOOGLE_NAMESPACE::DO_NOT_STRIP);
+    Template * tpl = Template::GetTemplate(tplname, ctemplate::DO_NOT_STRIP);
 
     // The call to GetTemplate (above) loads the template from disk
     // and attempts to parse it. If it cannot find the file or if it
@@ -443,9 +443,9 @@ int main(int argc, char **argv) {
            it = template_records.begin(); it != template_records.end(); ++it) {
         if ((*it)->error)
           continue;
-        string basename = GOOGLE_NAMESPACE::Basename((*it)->name);
+        string basename = ctemplate::Basename((*it)->name);
         string output_file =
-            GOOGLE_NAMESPACE::PathJoin(FLAG_header_dir,
+            ctemplate::PathJoin(FLAG_header_dir,
                                 basename + FLAG_outputfile_suffix);
         vector<string> template_filenames;   // Contains one template filename.
         template_filenames.push_back((*it)->name);

@@ -67,7 +67,7 @@ inline TemplateId GlobalIdForTest(const char* ptr, int len) {
 // Call this to create a StaticTemplateString for testing when the ptr is
 // not guaranteed to be allocated for the entire length of the test.
 #define STS_INIT_FOR_TEST(ptr, len, arena) \
-  { { arena->Memdup(ptr, len), len, GOOGLE_NAMESPACE::GlobalIdForTest(ptr, len) } };
+  { { arena->Memdup(ptr, len), len, ctemplate::GlobalIdForTest(ptr, len) } };
 
 extern const std::string FLAGS_test_tmpdir;
 
@@ -119,8 +119,8 @@ class TemporaryRegisterTemplate {
   explicit TemporaryRegisterTemplate(const char* name);
   ~TemporaryRegisterTemplate();
  private:
-  GOOGLE_NAMESPACE::TemplateNamelist::NameListType* old_namelist_;
-  GOOGLE_NAMESPACE::TemplateNamelist::NameListType namelist_;
+  ctemplate::TemplateNamelist::NameListType* old_namelist_;
+  ctemplate::TemplateNamelist::NameListType namelist_;
 
   // disallow copy constructor and assignment
   TemporaryRegisterTemplate(const TemporaryRegisterTemplate&);

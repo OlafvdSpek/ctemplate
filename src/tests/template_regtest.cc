@@ -74,14 +74,14 @@ using std::vector;
 using std::string;
 using std::sort;
 
-using GOOGLE_NAMESPACE::DO_NOT_STRIP;
-using GOOGLE_NAMESPACE::PerExpandData;
-using GOOGLE_NAMESPACE::STRIP_BLANK_LINES;
-using GOOGLE_NAMESPACE::STRIP_WHITESPACE;
-using GOOGLE_NAMESPACE::TC_HTML;
-using GOOGLE_NAMESPACE::TC_MANUAL;
-using GOOGLE_NAMESPACE::Template;
-using GOOGLE_NAMESPACE::TemplateDictionary;
+using ctemplate::DO_NOT_STRIP;
+using ctemplate::PerExpandData;
+using ctemplate::STRIP_BLANK_LINES;
+using ctemplate::STRIP_WHITESPACE;
+using ctemplate::TC_HTML;
+using ctemplate::TC_MANUAL;
+using ctemplate::Template;
+using ctemplate::TemplateDictionary;
 
 #define ASSERT(cond)  do {                                      \
   if (!(cond)) {                                                \
@@ -231,7 +231,7 @@ static TemplateDictionary* MakeDict1() {
   TemplateDictionary* fbt = dict->AddSectionDictionary("FOOTER_BAR_TEXT");
   fbt->SetValue("BODY", "Should never be shown");  // this is part of simple
   fbt->SetEscapedValue("HOME_LINK", "<b>Time to go home!</b>",
-                       GOOGLE_NAMESPACE::html_escape);
+                       ctemplate::html_escape);
   // Note: you should never have code like this in real life!  The <b>
   // and </b> should be part of the template proper.
   fbt->SetFormattedValue("ADVERTISE_LINK", "<b>Be advertiser #%d</b>", 2);
@@ -285,7 +285,7 @@ static TemplateDictionary* MakeDict1() {
   TemplateDictionary* inc2a = jfs2->AddIncludeDictionary("FAST_NEXT_JAVASCRIPT");
   inc2a->SetFilename("template_unittest_test_simple.in");
   inc2a->SetValue("HEAD", "include-head");
-  inc2a->SetEscapedFormattedValue("BODY", GOOGLE_NAMESPACE::html_escape,
+  inc2a->SetEscapedFormattedValue("BODY", ctemplate::html_escape,
                                   "<b>%s</b>: %.4f", "<A HREF=/>", 1.0/3);
   inc2a->SetValue("BI_NEWLINE", "");   // override the global default
   TemplateDictionary* inc2b = jfs2->AddIncludeDictionary("FAST_NEXT_JAVASCRIPT");
@@ -304,10 +304,10 @@ static TemplateDictionary* MakeDict1() {
   foo->SetValue("BI_NEWLINE", "not gonna matter");
 
   dict->SetEscapedValue("GOTO_MESSAGE", "print \"Go home\"",
-                        GOOGLE_NAMESPACE::javascript_escape);
+                        ctemplate::javascript_escape);
 
   dict->SetEscapedValue("UPDATE", "monday & tuesday",
-                                      GOOGLE_NAMESPACE::html_escape);
+                                      ctemplate::html_escape);
   dict->ShowSection("UPDATE_SECTION");
 
   dict->SetValue("ALIGNMENT", "\"right\"");   // all results sections see this
@@ -318,7 +318,7 @@ static TemplateDictionary* MakeDict1() {
     const char* res = "<&>\"result\" #%d'&'";
     result->SetFormattedValue("RESULT", res, i);
     result->SetEscapedFormattedValue("XML_RESULT",
-                                     GOOGLE_NAMESPACE::xml_escape,
+                                     ctemplate::xml_escape,
                                      res, i);
     result->SetIntValue("GOODNESS", i + 5);
   }
@@ -480,8 +480,8 @@ int main(int argc, char** argv) {
   const char* template_rootdir = getenv("TEMPLATE_ROOTDIR");
   if (template_rootdir == NULL)
     template_rootdir = DEFAULT_TEMPLATE_ROOTDIR;   // probably "."
-  string rootdir = GOOGLE_NAMESPACE::PathJoin(template_rootdir, "src");
-  rootdir = GOOGLE_NAMESPACE::PathJoin(rootdir, "tests");
+  string rootdir = ctemplate::PathJoin(template_rootdir, "src");
+  rootdir = ctemplate::PathJoin(rootdir, "tests");
   Template::SetTemplateRootDirectory(rootdir);
 
   vector<Testdata> testdata = ReadDataFiles(
