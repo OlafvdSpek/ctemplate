@@ -122,14 +122,7 @@ struct @ac_windows_dllexport@ StaticTemplateString {
 
   // These members shouldn't be accessed directly, except in the
   // internals of the template code.  They are public because that is
-  // the only way we can brace-initialize them.  NOTE: MSVC (at least
-  // up to 8.0) has a bug where it ignores 'mutable' when it's buried
-  // in an internal struct.  To fix that, we have to make this whole
-  // internal struct mutable.  We only do this on MSVC, so on other
-  // compilers we get the full constness we want.
-#ifdef _MSC_VER
-  mutable
-#endif
+  // the only way we can brace-initialize them.
   struct {
     const char* ptr_;
     size_t length_;
