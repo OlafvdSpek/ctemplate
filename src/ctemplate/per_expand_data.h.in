@@ -125,15 +125,10 @@ class @ac_windows_dllexport@ PerExpandData {
   }
 
  private:
-#ifdef _MSC_VER
-  typedef @ac_cv_cxx_hash_map_class@<const char*, const void*, StringHash> DataMap;
-#else
   struct DataEq {
     bool operator()(const char* s1, const char* s2) const;
   };
-  typedef @ac_cv_cxx_hash_map_class@<const char*, const void*, StringHash, DataEq>
-    DataMap;
-#endif
+  typedef @ac_cv_cxx_hash_map_class@<const char*, const void*, StringHash, DataEq> DataMap;
 
   const char* annotate_path_;
   TemplateAnnotator* annotator_;
