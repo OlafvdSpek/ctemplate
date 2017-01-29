@@ -11,10 +11,13 @@ if GCC
 AM_CXXFLAGS = -Wall -Wwrite-strings -Woverloaded-virtual -Wno-sign-compare
 endif
 
+dist_doc_DATA = AUTHORS ChangeLog NEWS README
+
 # mingw does weird directory munging on /tmp, which causes some of our
 # tests to fail, so use a different tmpdir there.
 if MINGW
 TMPDIR = ./
+dist_doc_DATA += README_windows.txt
 else
 TMPDIR = /tmp
 endif
@@ -54,12 +57,10 @@ noinst_HEADERS = \
 	src/ctemplate/per_expand_data.h.in \
 	src/ctemplate/str_ref.h.in
 
-docdir = $(prefix)/share/doc/$(PACKAGE)-$(VERSION)
 ## This is for HTML and other documentation you want to install.
 ## Add your documentation files (in doc/) in addition to these
 ## top-level boilerplate files.  Also add a TODO file if you have one.
-dist_doc_DATA = AUTHORS COPYING ChangeLog INSTALL NEWS README README_windows.txt \
-	doc/designstyle.css doc/index.html \
+dist_html_DATA = doc/designstyle.css doc/index.html \
 	doc/howto.html doc/guide.html doc/reference.html \
 	doc/tips.html doc/example.html doc/auto_escape.html \
 	doc/xss_resources.html
@@ -403,9 +404,8 @@ TESTDATA += \
    src/tests/htmlparser_testdata/tags.html
 
 # We want to compile statemachine.cc as a c file as well as a c++ file
-
-statemachine.c: src/htmlparser/statemachine.cc
-	$(LN_S) src/htmlparser/statemachine.cc $@
+statemachine.c: $(top_srcdir)/src/htmlparser/statemachine.cc
+	cp $< $@
 
 BUILT_SOURCES += statemachine.c
 CLEANFILES = statemachine.c
@@ -452,7 +452,7 @@ diff_tpl_auto_escape_unittest_sh: src/tests/diff_tpl_auto_escape_unittest.sh \
 
 ## This should always include $(TESTS), but may also include other
 ## binaries that you compile but don't want automatically installed.
-noinst_PROGRAMS = $(TESTS)
+check_PROGRAMS = $(TESTS)
 
 rpm: dist-gzip packages/rpm.sh packages/rpm/rpm.spec
 	@cd packages && ./rpm.sh ${PACKAGE} ${VERSION}

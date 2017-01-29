@@ -2,9 +2,9 @@
 ## In general, the safest way to proceed is to run ./autogen.sh
 
 # make sure we're interpreted by some minimal autoconf
-AC_PREREQ(2.57)
+AC_PREREQ([2.69])
 
-AC_INIT(ctemplate, 2.3, google-ctemplate@googlegroups.com)
+AC_INIT([ctemplate],[2.3],[google-ctemplate@googlegroups.com])
 AM_SILENT_RULES([yes])
 
 # Update this value for every release!  (A:B:C will map to foo.so.(A-C).C.B)
@@ -17,13 +17,14 @@ AC_CONFIG_SRCDIR(README)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CANONICAL_HOST
 AM_INIT_AUTOMAKE([subdir-objects dist-zip])
-AM_CONFIG_HEADER(src/config.h)
+AC_CONFIG_HEADERS([src/config.h])
 
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_CPP
+AM_PROG_AR
 AM_CONDITIONAL(GCC, test "$GCC" = yes)   # let the Makefile know if we're gcc
 
 # MinGW uses autoconf, but also needs the windows shim routines
@@ -35,22 +36,10 @@ AH_BOTTOM([
 #include "windows/port.h"
 #endif
 ])
-case $host_os in
-  *mingw*)
-    # Disabling fast install keeps libtool from creating wrapper scripts
-    # around the executables it builds.  Such scripts have caused failures on
-    # MinGW.  Using this option means an extra link step is executed during
-    # "make install".
-    AC_DISABLE_FAST_INSTALL
-    ;;
-   *)
-    AC_ENABLE_FAST_INSTALL
-    ;;
-esac
 AM_CONDITIONAL(MINGW, expr $host : '.*-mingw' >/dev/null 2>&1)
 
 # Uncomment this if you'll be exporting libraries (.so's)
-AC_PROG_LIBTOOL
+LT_INIT([disable-fast-install])
 AC_SUBST(LIBTOOL_DEPS)
 AC_SUBST(SO_VERSION)
 
@@ -91,7 +80,7 @@ AC_CHECK_HEADERS(sys/endian.h)            # FreeBSD
 AC_CHECK_HEADERS(sys/isa_defs.h)          # Solaris 10
 
 # A lot of the code in this directory depends on pthreads
-ACX_PTHREAD
+AX_PTHREAD
 
 # We'd like to use read/write locks in several places in the code.
 # See if our pthreads support extends to that.  Note: for linux, it
@@ -161,11 +150,18 @@ fi
 # variables weak, just in case, but for this check, we only want to
 # say "yes" if the linker supports the vars, *and* the compiler supports
 # attribute-weak.
-AC_TRY_LINK([], [ extern char _start[];
-                  extern char data_start[];
-                  extern char dummy[]  __attribute__((weak));
-                  return (_start && data_start && dummy); ],
-            [ ac_have_attribute_weak=1 ], [ ac_have_attribute_weak=0 ])
+AC_LINK_IFELSE([
+	AC_LANG_PROGRAM([], [[
+	extern char _start[];
+	extern char data_start[];
+	extern char dummy[]  __attribute__((weak));
+	return (_start && data_start && dummy);
+	]])
+], [
+	ac_have_attribute_weak=1
+], [
+	ac_have_attribute_weak=0
+])
 AC_SUBST(ac_have_attribute_weak)
 
 # In unix (that is, using this script), this dll-export stuff will always
