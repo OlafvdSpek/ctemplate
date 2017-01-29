@@ -14,7 +14,7 @@
 set -ex
 rm -rf autom4te.cache
 
-autoreconf -f -i -W all,no-obsolete
+autoreconf --force --install --warnings all,no-obsolete
 
 rm -rf autom4te.cache
 exit 0

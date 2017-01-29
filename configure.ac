@@ -2,9 +2,9 @@
 ## In general, the safest way to proceed is to run ./autogen.sh
 
 # make sure we're interpreted by some minimal autoconf
-AC_PREREQ(2.57)
+AC_PREREQ([2.69])
 
-AC_INIT(ctemplate, 2.3, google-ctemplate@googlegroups.com)
+AC_INIT([ctemplate],[2.3],[google-ctemplate@googlegroups.com])
 AM_SILENT_RULES([yes])
 
 # Update this value for every release!  (A:B:C will map to foo.so.(A-C).C.B)
