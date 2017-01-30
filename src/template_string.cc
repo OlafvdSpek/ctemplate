@@ -42,13 +42,7 @@
 #include "base/macros.h"
 #include "base/util.h"
 
-#ifdef HAVE_UNORDERED_MAP
 using HASH_NAMESPACE::unordered_set;
-// This is totally cheap, but minimizes the need for #ifdef's below...
-#define hash_set unordered_set
-#else
-using HASH_NAMESPACE::hash_set;
-#endif
 
 namespace ctemplate {
 
@@ -153,7 +147,7 @@ struct TemplateStringHasher {
 namespace {
 Mutex mutex(base::LINKER_INITIALIZED);
 
-typedef hash_set<TemplateString, TemplateStringHasher> TemplateStringSet;
+typedef unordered_set<TemplateString, TemplateStringHasher> TemplateStringSet;
 
 TemplateStringSet* template_string_set
 GUARDED_BY(mutex) PT_GUARDED_BY(mutex) = NULL;

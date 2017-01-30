@@ -106,13 +106,7 @@ using std::list;
 using std::vector;
 using std::pair;
 using std::binary_search;
-#ifdef HAVE_UNORDERED_MAP
 using HASH_NAMESPACE::unordered_map;
-// This is totally cheap, but minimizes the need for #ifdef's below...
-#define hash_map unordered_map
-#else
-using HASH_NAMESPACE::hash_map;
-#endif
 
 namespace ctemplate {
 
@@ -618,7 +612,7 @@ static void WriteOneHeaderEntry(
   MutexLock ml(&g_header_mutex);
 
   // we use hash_map instead of hash_set just to keep the stl size down
-  static hash_map<string, bool, StringHash> vars_seen
+  static unordered_map<string, bool, StringHash> vars_seen
       GUARDED_BY(g_header_mutex);
   static string current_file GUARDED_BY(g_header_mutex);
   static string prefix GUARDED_BY(g_header_mutex);
