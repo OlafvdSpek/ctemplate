@@ -39,7 +39,7 @@
 #include "base/arena.h"
 #include "base/thread_annotations.h"
 #include <assert.h>
-#include "base/macros.h"    // for uint32, uint64, UNALIGNED_LOAD32
+#include "base/macros.h"
 #include "base/util.h"
 
 #ifdef HAVE_UNORDERED_MAP
@@ -61,15 +61,15 @@ namespace ctemplate {
 //     64-bits,
 //   - uses a fixed seed.
 // This is not static because template_string_test accesses it directly.
-uint64 MurmurHash64(const char* ptr, size_t len) {
-  const uint32 kMultiplyVal = 0x5bd1e995;
+uint64_t MurmurHash64(const char* ptr, size_t len) {
+  const uint32_t kMultiplyVal = 0x5bd1e995;
   const int kShiftVal = 24;
-  const uint32 kHashSeed1 = 0xc86b14f7;
-  const uint32 kHashSeed2 = 0x650f5c4d;
+  const uint32_t kHashSeed1 = 0xc86b14f7;
+  const uint32_t kHashSeed2 = 0x650f5c4d;
 
-  uint32 h1 = kHashSeed1 ^ len, h2 = kHashSeed2;
+  uint32_t h1 = kHashSeed1 ^ len, h2 = kHashSeed2;
   while (len >= 8) {
-    uint32 k1 = UNALIGNED_LOAD32(ptr);
+    uint32_t k1 = UNALIGNED_LOAD32(ptr);
     k1 *= kMultiplyVal;
     k1 ^= k1 >> kShiftVal;
     k1 *= kMultiplyVal;
@@ -78,7 +78,7 @@ uint64 MurmurHash64(const char* ptr, size_t len) {
     h1 ^= k1;
     ptr += 4;
 
-    uint32 k2 = UNALIGNED_LOAD32(ptr);
+    uint32_t k2 = UNALIGNED_LOAD32(ptr);
     k2 *= kMultiplyVal;
     k2 ^= k2 >> kShiftVal;
     k2 *= kMultiplyVal;
@@ -91,7 +91,7 @@ uint64 MurmurHash64(const char* ptr, size_t len) {
   }
 
   if (len >= 4) {
-    uint32 k1 = UNALIGNED_LOAD32(ptr);
+    uint32_t k1 = UNALIGNED_LOAD32(ptr);
     k1 *= kMultiplyVal;
     k1 ^= k1 >> kShiftVal;
     k1 *= kMultiplyVal;
@@ -121,7 +121,7 @@ uint64 MurmurHash64(const char* ptr, size_t len) {
   h1 ^= h2 >> 17;
   h1 *= kMultiplyVal;
 
-  uint64 h = h1;
+  uint64_t h = h1;
   h = (h << 32) | h2;
   return h;
 }

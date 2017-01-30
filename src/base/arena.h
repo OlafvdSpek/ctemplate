@@ -276,7 +276,7 @@
 #include <string.h>
 #include <vector>
 #include "base/thread_annotations.h"
-#include "base/macros.h"  // for uint32
+#include "base/macros.h"
 #include "base/util.h"    // for CHECK, etc
 
 namespace ctemplate {
@@ -306,23 +306,23 @@ class CTEMPLATE_DLL_DECL BaseArena {
   // copy and assignment semantics.
   class Handle {
    public:
-    static const uint32 kInvalidValue = 0xFFFFFFFF;   // int32-max
+    static const uint32_t kInvalidValue = 0xFFFFFFFF;   // int32-max
 
     Handle() : handle_(kInvalidValue) { }
     // Default copy constructors are fine here.
     bool operator==(const Handle& h) const { return handle_ == h.handle_; }
     bool operator!=(const Handle& h) const { return handle_ != h.handle_; }
 
-    uint32 hash() const { return handle_; }
+    uint32_t hash() const { return handle_; }
     bool valid() const { return handle_ != kInvalidValue; }
 
    private:
     // Arena needs to be able to access the internal data.
     friend class BaseArena;
 
-    explicit Handle(uint32 handle) : handle_(handle) { }
+    explicit Handle(uint32_t handle) : handle_(handle) { }
 
-    uint32 handle_;
+    uint32_t handle_;
   };
 
   // they're "slow" only 'cause they're virtual (subclasses define "fast" ones)

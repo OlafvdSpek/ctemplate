@@ -4,9 +4,6 @@
 // Provides macros and typedefs based on config.h settings.
 // Provides the following macros:
 //    UNALIGNED_LOAD32   (may be an inline function on some architectures)
-// and the following typedefs:
-//    uint32
-//    uint64
 
 #ifndef CTEMPLATE_MACROS_H_
 #define CTEMPLATE_MACROS_H_
@@ -23,23 +20,6 @@
 # include <inttypes.h>
 #endif       // a third place for uint32_t or u_int32_t
 #endif
-
-#if defined(HAVE_U_INT32_T)
-typedef u_int32_t uint32;
-#elif defined(HAVE_UINT32_T)
-typedef uint32_t uint32;
-#elif defined(HAVE___INT32)
-typedef unsigned __int32 uint32;
-#endif
-
-#if defined(HAVE_U_INT64_T)
-typedef u_int64_t uint64;
-#elif defined(HAVE_UINT64_T)
-typedef uint64_t uint64;
-#elif defined(HAVE___INT64)
-typedef unsigned __int64 uint64;
-#endif
-
 
 // This is all to figure out endian-ness and byte-swapping on various systems
 #if defined(HAVE_ENDIAN_H)
@@ -83,20 +63,20 @@ typedef unsigned __int64 uint64;
 
 #if defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
   // We know they allow unaligned memory access and are little-endian
-# define UNALIGNED_LOAD32(_p) (*reinterpret_cast<const uint32 *>(_p))
+# define UNALIGNED_LOAD32(_p) (*reinterpret_cast<const uint32_t*>(_p))
 #elif defined(__ppc__) || defined(__ppc64__)
   // We know they allow unaligned memory access and are big-endian
-# define UNALIGNED_LOAD32(_p) BSWAP32(*reinterpret_cast<const uint32 *>(_p))
+# define UNALIGNED_LOAD32(_p) BSWAP32(*reinterpret_cast<const uint32_t*>(_p))
 #elif (BYTE_ORDER == 1234) || (_BYTE_ORDER == 1234) || defined(_LITTLE_ENDIAN)
   // Use memcpy to align the memory properly
-  inline uint32 UNALIGNED_LOAD32(const void *p) {
-    uint32 t;
+  inline uint32_t UNALIGNED_LOAD32(const void *p) {
+    uint32_t t;
     memcpy(&t, p, sizeof(t));
     return t;
   }
 #elif (BYTE_ORDER == 4321) || (_BYTE_ORDER == 4321) || defined(_BIG_ENDIAN)
-  inline uint32 UNALIGNED_LOAD32(const void *p) {
-    uint32 t;
+  inline uint32_t UNALIGNED_LOAD32(const void *p) {
+    uint32_t t;
     memcpy(&t, p, sizeof(t));
     return BSWAP32(t);
   }
