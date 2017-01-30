@@ -23,7 +23,7 @@ and
 Compiling
 ---------
 
-To compile test applications with these classes, run `./configure` followed by
+To compile test applications with these classes, run `./autogen.sh && ./configure` followed by
 `make` on unixoid platforms like Linux or MacOSX.
 
 To install these header files on your system, run `make install`.
