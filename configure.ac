@@ -58,15 +58,6 @@ AC_CHECK_FUNCS([getopt_long getopt])
 AC_CHECK_HEADERS([getopt.h])
 AC_CHECK_HEADERS([utime.h])           # used by unittests to mock file-times
 
-# These are the types I need.  We look for them in either stdint.h,
-# sys/types.h, or inttypes.h, all of which are part of the default-includes.
-AC_CHECK_TYPES([uint32_t])
-AC_CHECK_TYPES([u_int32_t])
-AC_CHECK_TYPES([__int32])
-AC_CHECK_TYPES([uint64_t])
-AC_CHECK_TYPES([u_int64_t])
-AC_CHECK_TYPES([__int64])
-
 AC_HEADER_DIRENT               # for template_unittest.cc, template_regtest.cc
 
 # We need to do byte-swapping efficiently to hash efficiently in

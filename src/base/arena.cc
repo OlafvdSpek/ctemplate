@@ -55,7 +55,6 @@
 #ifdef HAVE_UNISTD_H
 # include <unistd.h>
 #endif            // last place uintptr_t might be
-#include "base/macros.h"       // for uint64
 #include "base/mutex.h"
 #include "base/util.h"         // for DCHECK_*
 

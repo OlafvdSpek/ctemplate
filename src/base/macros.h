@@ -9,17 +9,7 @@
 #define CTEMPLATE_MACROS_H_
 
 #include <config.h>
-#ifdef HAVE_STDINT_H
-#include <stdint.h>         // the normal place uint32_t is defined
-#endif
-#ifdef HAVE_SYS_TYPES_H
-#include <sys/types.h>      // the normal place u_int32_t is defined
-#endif
-#ifdef HAVE_INTTYPES_H
-#ifdef HAVE_INTTYPES_H
-# include <inttypes.h>
-#endif       // a third place for uint32_t or u_int32_t
-#endif
+#include <cstdint>
 
 // This is all to figure out endian-ness and byte-swapping on various systems
 #if defined(HAVE_ENDIAN_H)

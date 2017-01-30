@@ -110,7 +110,7 @@ struct @ac_windows_dllexport@ StringHash {
 
 // ----------------------- THE CLASSES -------------------------------
 
-typedef @ac_cv_uint64@ TemplateId;
+typedef uint64_t TemplateId;
 
 const TemplateId kIllegalTemplateId = 0;
 

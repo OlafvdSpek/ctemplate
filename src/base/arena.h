@@ -273,10 +273,10 @@
 #include <config.h>
 #include "base/mutex.h"   // must go first to get _XOPEN_SOURCE
 #include <assert.h>
+#include <cstdint>
 #include <string.h>
 #include <vector>
 #include "base/thread_annotations.h"
-#include "base/macros.h"
 #include "base/util.h"    // for CHECK, etc
 
 namespace ctemplate {
