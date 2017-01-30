@@ -43,9 +43,6 @@ AC_SUBST(SO_VERSION)
 
 AX_C___ATTRIBUTE__
 
-# Check whether some low-level functions/files are available
-AC_HEADER_STDC
-
 # Defines PRIuS
 AC_COMPILER_CHARACTERISTICS
 
