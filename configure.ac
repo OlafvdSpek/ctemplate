@@ -22,8 +22,6 @@ AC_CONFIG_HEADERS([src/config.h])
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC
-AM_PROG_CC_C_O
-AC_PROG_CPP
 AM_PROG_AR
 AM_CONDITIONAL(GCC, test "$GCC" = yes)   # let the Makefile know if we're gcc
 
@@ -42,8 +40,6 @@ AM_CONDITIONAL(MINGW, expr $host : '.*-mingw' >/dev/null 2>&1)
 LT_INIT([disable-fast-install])
 AC_SUBST(LIBTOOL_DEPS)
 AC_SUBST(SO_VERSION)
-
-AC_PROG_LN_S
 
 AX_C___ATTRIBUTE__
 
@@ -82,11 +78,6 @@ AC_RWLOCK
 # 'volatile' in some places.  They differ from MSVC, and the API is
 # unclear, so it's best just to check.
 AC_INTERLOCKED_EXCHANGE_NONVOLATILE
-
-# Find out what namespace 'normal' STL code lives in, and also what namespace
-# the user wants our classes to be defined in
-AC_CXX_STL_NAMESPACE
-AC_DEFINE_GOOGLE_NAMESPACE(ctemplate)
 
 # Figures out where hash_map and hash_set live, and what namespace they use
 AC_CXX_STL_HASH

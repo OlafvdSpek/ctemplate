@@ -51,7 +51,7 @@
 #include <ctemplate/template_namelist.h>
 #include <ctemplate/per_expand_data.h>
 #else
-@ac_google_start_namespace@
+namespace ctemplate {
 class TemplateDictionaryInterface;
 class PerExpandData;
 }

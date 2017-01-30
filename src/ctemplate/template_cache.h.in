@@ -42,7 +42,7 @@
 #include <ctemplate/template_enums.h>  // for Strip
 #include <ctemplate/template_string.h>
 #include <ctemplate/per_expand_data.h>
-@ac_google_start_namespace@
+namespace ctemplate {
 class FileStat;
 }
 class Mutex;
