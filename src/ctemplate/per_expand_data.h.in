@@ -128,7 +128,7 @@ class @ac_windows_dllexport@ PerExpandData {
   struct DataEq {
     bool operator()(const char* s1, const char* s2) const;
   };
-  typedef @ac_cv_cxx_hash_map_class@<const char*, const void*, StringHash, DataEq> DataMap;
+  typedef @ac_cv_cxx_hash_namespace@::unordered_map<const char*, const void*, StringHash, DataEq> DataMap;
 
   const char* annotate_path_;
   TemplateAnnotator* annotator_;

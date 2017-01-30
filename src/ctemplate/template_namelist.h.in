@@ -82,7 +82,7 @@ class @ac_windows_dllexport@ TemplateNamelist {
   // thing you should do with them is call size() and/or iterate
   // between begin() and end(), and the only operations we promise
   // the iterators will support are operator* and operator++.
-  typedef @ac_cv_cxx_hash_set_class@<std::string, StringHash> NameListType;
+  typedef @ac_cv_cxx_hash_namespace@::unordered_set<std::string, StringHash> NameListType;
   typedef std::vector<std::string> MissingListType;
   typedef std::vector<std::string> SyntaxListType;
 

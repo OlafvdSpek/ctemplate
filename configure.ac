@@ -36,7 +36,6 @@ AH_BOTTOM([
 ])
 AM_CONDITIONAL(MINGW, expr $host : '.*-mingw' >/dev/null 2>&1)
 
-# Uncomment this if you'll be exporting libraries (.so's)
 LT_INIT([disable-fast-install])
 AC_SUBST(LIBTOOL_DEPS)
 AC_SUBST(SO_VERSION)
@@ -79,51 +78,17 @@ AC_INTERLOCKED_EXCHANGE_NONVOLATILE
 # Figures out where hash_map and hash_set live, and what namespace they use
 AC_CXX_STL_HASH
 
-# If we found tr1/unordered_map, prefer unordered_map/unordered_set to
-# hash_map/hash_set.
-if test "$ac_cv_cxx_have_unordered_map" = yes; then
-   ac_cv_cxx_hash_map_class="$ac_cv_cxx_hash_namespace::unordered_map"
-   ac_cv_cxx_hash_set_class="$ac_cv_cxx_hash_namespace::unordered_set"
-else
-   ac_cv_cxx_hash_map_class="$ac_cv_cxx_hash_namespace::hash_map"
-   ac_cv_cxx_hash_set_class="$ac_cv_cxx_hash_namespace::hash_set"
-fi
-
-AC_SUBST(ac_google_namespace)
-AC_SUBST(ac_google_start_namespace)
-AC_SUBST(ac_google_end_namespace)
+AC_SUBST(ac_cv_cxx_hash_namespace)
 AC_SUBST(ac_cv_cxx_hash_map)
 AC_SUBST(ac_cv_cxx_hash_set)
-AC_SUBST(ac_cv_cxx_hash_map_class)
-AC_SUBST(ac_cv_cxx_hash_set_class)
+
 if test "$ac_cv___attribute__" = "yes"; then
    AC_SUBST(ac_google_attribute, 1)
 else
    AC_SUBST(ac_google_attribute, 0)
 fi
-if test "$ac_cv_type_u_int64_t" = "yes"; then
-   AC_SUBST(ac_cv_uint64, u_int64_t)
-elif test "$ac_cv_type_uint64_t" = "yes"; then
-   AC_SUBST(ac_cv_uint64, uint64_t)
-elif test "$ac_cv_type___int64" = "yes"; then
-   AC_SUBST(ac_cv_uint64, unsigned __int64)
-else
-   AC_SUBST(ac_cv_uint64, unsigned long long)   # best we can do
-fi
-# These are used by template_string.h.in
-if test "$ac_cv_header_stdint_h" = "yes"; then
-   AC_SUBST(ac_cv_have_stdint_h, 1)
-else
-   AC_SUBST(ac_cv_have_stdint_h, 0)
-fi
-if test "$ac_cv_header_inttypes_h" = "yes"; then
-   AC_SUBST(ac_cv_have_inttypes_h, 1)
-else
-   AC_SUBST(ac_cv_have_inttypes_h, 0)
-fi
 
-
-# One some systems (eg gnu/linux), the linker defines _start and
+# On some systems (eg gnu/linux), the linker defines _start and
 # data_start to indicate the extent of the .text section.  We can use
 # this to know strings are immutable.  In the code, we make the
 # variables weak, just in case, but for this check, we only want to
@@ -150,14 +115,6 @@ ac_windows_dllexport_defines=
 ac_windows_dllexport=
 AC_SUBST(ac_windows_dllexport_defines)
 AC_SUBST(ac_windows_dllexport)
-
-# This will (should) never change, but we put it here so if we do need
-# to change it, to avoid naming conflicts or something, it's easy to
-# do in one place.
-ac_htmlparser_namespace=ctemplate_htmlparser
-AC_SUBST(ac_htmlparser_namespace)
-AC_DEFINE_UNQUOTED(HTMLPARSER_NAMESPACE, $ac_htmlparser_namespace,
-                   [The namespace to put the htmlparser code.])
 
 # Write generated configuration file, and also .h files
 AC_CONFIG_FILES([Makefile \

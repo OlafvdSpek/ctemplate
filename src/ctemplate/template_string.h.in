@@ -39,13 +39,7 @@
 #include <vector>
 
 #include <assert.h>
-#if @ac_cv_have_stdint_h@
-#include <stdint.h>       // one place @ac_cv_unit64@ might live
-#endif
-#if @ac_cv_have_inttypes_h@
-#include <inttypes.h>     // another place @ac_cv_unit64@ might live
-#endif
-#include <sys/types.h>    // final place @ac_cv_unit64@ might live
+#include <cstdint>
 
 class TemplateStringTest;          // needed for friendship declaration
 class StaticTemplateStringTest;
@@ -130,7 +124,7 @@ struct @ac_windows_dllexport@ StaticTemplateString {
   } do_not_use_directly_;
 
   // This class is a good hash functor to pass in as the third
-  // argument to @ac_cv_cxx_hash_map_class@<>, when creating a map whose keys are
+  // argument to unordered_map<>, when creating a map whose keys are
   // StaticTemplateString.  NOTE: This class isn't that safe to use,
   // because it requires that StaticTemplateStringInitializer has done
   // its job.  Unfortunately, even when you use the STS_INIT macro

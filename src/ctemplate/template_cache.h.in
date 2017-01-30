@@ -34,7 +34,7 @@
 #ifndef TEMPLATE_TEMPLATE_CACHE_H_
 #define TEMPLATE_TEMPLATE_CACHE_H_
 
-#include @ac_cv_cxx_hash_map@      // for @ac_cv_cxx_hash_map_class@<>
+#include @ac_cv_cxx_hash_map@
 #include <string>        // for string
 #include <utility>       // for pair
 #include <vector>        // for vector<>
@@ -278,9 +278,8 @@ class @ac_windows_dllexport@ TemplateCache {
  public:
   typedef std::pair<TemplateId, int> TemplateCacheKey;
  private:
-  typedef @ac_cv_cxx_hash_map_class@<TemplateCacheKey, CachedTemplate, TemplateCacheHash>
-    TemplateMap;
-  typedef @ac_cv_cxx_hash_map_class@<RefcountedTemplate*, int, RefTplPtrHash> TemplateCallMap;
+  typedef @ac_cv_cxx_hash_namespace@::unordered_map<TemplateCacheKey, CachedTemplate, TemplateCacheHash> TemplateMap;
+  typedef @ac_cv_cxx_hash_namespace@::unordered_map<RefcountedTemplate*, int, RefTplPtrHash> TemplateCallMap;
   // Where to search for files.
   typedef std::vector<std::string> TemplateSearchPath;
 
