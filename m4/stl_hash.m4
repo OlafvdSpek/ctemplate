@@ -9,7 +9,7 @@
 
 # This also checks if unordered map exists.
 AC_DEFUN([AC_CXX_STL_HASH],
-  [AC_REQUIRE([AC_CXX_NAMESPACES])
+  [
    AC_MSG_CHECKING(the location of hash_map) 
    AC_LANG_SAVE
    AC_LANG_CPLUSPLUS
