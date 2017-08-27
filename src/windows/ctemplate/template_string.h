@@ -39,13 +39,7 @@
 #include <vector>
 
 #include <assert.h>
-#if 0
-#include <stdint.h>       // one place @ac_cv_unit64@ might live
-#endif
-#if 0
-#include <inttypes.h>     // another place @ac_cv_unit64@ might live
-#endif
-#include <sys/types.h>    // final place @ac_cv_unit64@ might live
+#include <cstdint>
 
 class TemplateStringTest;          // needed for friendship declaration
 class StaticTemplateStringTest;
@@ -115,7 +109,7 @@ struct CTEMPLATE_DLL_DECL StringHash {
 
 // ----------------------- THE CLASSES -------------------------------
 
-typedef unsigned __int64 TemplateId;
+typedef uint64_t TemplateId;
 
 const TemplateId kIllegalTemplateId = 0;
 
@@ -127,14 +121,7 @@ struct CTEMPLATE_DLL_DECL StaticTemplateString {
 
   // These members shouldn't be accessed directly, except in the
   // internals of the template code.  They are public because that is
-  // the only way we can brace-initialize them.  NOTE: MSVC (at least
-  // up to 8.0) has a bug where it ignores 'mutable' when it's buried
-  // in an internal struct.  To fix that, we have to make this whole
-  // internal struct mutable.  We only do this on MSVC, so on other
-  // compilers we get the full constness we want.
-#ifdef _MSC_VER
-  mutable
-#endif
+  // the only way we can brace-initialize them.
   struct {
     const char* ptr_;
     size_t length_;
@@ -142,7 +129,7 @@ struct CTEMPLATE_DLL_DECL StaticTemplateString {
   } do_not_use_directly_;
 
   // This class is a good hash_compare functor to pass in as the third
-  // argument to std::unordered_map<>, when creating a map whose keys are
+  // argument to unordered_map<>, when creating a map whose keys are
   // StaticTemplateString.  NOTE: This class isn't that safe to use,
   // because it requires that StaticTemplateStringInitializer has done
   // its job.  Unfortunately, even when you use the STS_INIT macro

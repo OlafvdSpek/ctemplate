@@ -99,8 +99,7 @@ template class __declspec(dllexport) std::vector<std::string>;\n\
          -e "s!@ac_windows_dllexport_defines@!$MY_DLLDEF_DEFINES!g" \
          -e "s!@ac_cv_cxx_hash_map@!$HASH_MAP_H!g" \
          -e "s!@ac_cv_cxx_hash_set@!$HASH_SET_H!g" \
-         -e "s!@ac_cv_cxx_hash_map_class@!$HASH_NAMESPACE::unordered_map!g" \
-         -e "s!@ac_cv_cxx_hash_set_class@!$HASH_NAMESPACE::unordered_set!g" \
+         -e "s!@ac_cv_cxx_hash_namespace@!$HASH_NAMESPACE!g" \
          -e "s!@ac_google_attribute@!${HAVE___ATTRIBUTE__:-0}!g" \
          -e "s!@ac_google_end_namespace@!$_END_GOOGLE_NAMESPACE_!g" \
          -e "s!@ac_google_namespace@!$GOOGLE_NAMESPACE!g" \

@@ -130,15 +130,10 @@ class CTEMPLATE_DLL_DECL PerExpandData {
   }
 
  private:
-#ifdef _MSC_VER
-  typedef std::unordered_map<const char*, const void*, StringHash> DataMap;
-#else
   struct DataEq {
     bool operator()(const char* s1, const char* s2) const;
   };
-  typedef std::unordered_map<const char*, const void*, StringHash, DataEq>
-    DataMap;
-#endif
+  typedef std::unordered_map<const char*, const void*, StringHash, DataEq> DataMap;
 
   const char* annotate_path_;
   TemplateAnnotator* annotator_;
