@@ -210,7 +210,7 @@ class FSMConfig(object):
 
     self.sm['state'] = self.AddState
     self.sm['condition'] = self.AddCondition
-    execfile(filename, self.sm)
+    exec(open(filename).read(), self.sm)
     self.name = self.sm['name']
     if not self.name.isalnum():
       raise Exception("State machine name must consist of only alphanumeric"
