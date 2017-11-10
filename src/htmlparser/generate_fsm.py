@@ -244,6 +244,19 @@ class FSMGenerateC(FSMGenerateAbstract):
 
     return ''.join(out)
 
+  def _Repr(self, c):
+    """Simplified repr() to avoid problems in non-Unicode systems
+    if c == 9:
+      return "'\\t'"
+    elif c == 10:
+      return "'\\n'"
+    elif c == 13:
+      return "'\\r'"
+    elif c >= 0x20 and c < 0x7f:
+      return repr(chr(c))
+    else:
+      return "'\\x%02x'" % c
+
   def _CreateTransitionTable(self):
     """Print the state transition list.
 
@@ -282,8 +295,8 @@ class FSMGenerateC(FSMGenerateAbstract):
     for state in self._config.states:
       transition_row = []
       for c in range(0, 255):
-        transition_row.append('    /* %06s */ %s' % (repr(chr(c)),
-                                                     state_table[state][c]))
+        transition_row.append('    /* %06s */ %s' % (self._Repr(c),
+                                                    state_table[state][c]))
 
       out.append(self._CreateStructList('%stransition_row_%s' %
                                         (self._Prefix(),
