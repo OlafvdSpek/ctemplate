@@ -48,8 +48,8 @@ GENERATE_FSM="$TOOLS_DIR/generate_fsm.py"
 EXPECTED="`cat $OUTPUT_FILE`"
 if [ -z "$EXPECTED" ]; then die "Error reading $OUTPUT_FILE"; fi
 
-# Let's make sure the script works with python2.2 and above
-for PYTHON in "" "python2.2" "python2.3" "python2.4" "python2.5" "python2.6"; do
+# Let's make sure the script works with python3.5 and above
+for PYTHON in "" "python3.5" "python3.6" "python3.7" "python3.8" "python3.9"; do
   # Skip the versions of python that are not installed.
   if [ -n "$PYTHON" ]; then
     $PYTHON -h >/dev/null 2>/dev/null || continue
