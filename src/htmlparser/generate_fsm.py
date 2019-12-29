@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Copyright (c) 2008, Google Inc.
 # All rights reserved.
@@ -282,7 +282,8 @@ class FSMGenerateC(FSMGenerateAbstract):
     for state in self._config.states:
       transition_row = []
       for c in range(0, 255):
-        transition_row.append('    /* %06s */ %s' % (repr(chr(c)),
+        ch_repr = str(repr(chr(c)).encode("ASCII", "backslashreplace"), "ASCII")
+        transition_row.append('    /* %06s */ %s' % (ch_repr,
                                                      state_table[state][c]))
 
       out.append(self._CreateStructList('%stransition_row_%s' %
