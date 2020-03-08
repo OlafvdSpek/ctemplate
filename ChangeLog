@@ -1,3 +1,8 @@
+Sun Mar 08 18:00:14 2020  Olaf van der Spek <olafvdspek@gmail.com>
+
+	* ctemplate: version 2.4 release
+	* Switch to Python 3
+
 Wed Mar 19 20:02:51 2014  Olaf van der Spek <olafvdspek@gmail.com>
 
 	* ctemplate: version 2.3 release

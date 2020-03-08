@@ -1,3 +1,8 @@
+== 08 March 2020 ==
+
+Ctemplate 2.4
+Switch to Python 3
+
 == 19 March 2014 ==
 
 Ctemplate 2.3 has been released. Fixed some more C++11 issues. 
