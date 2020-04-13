@@ -80,7 +80,7 @@ print "#include <string>\n\n";
 
 # Read in template file and print template as a string
 # MOE:begin_strip
-print "const string ${base_name} (\n";
+print "const std::string ${base_name} (\n";
 # MOE:end_strip_and_replace print "const std::string ${base_name} (\n";
 while (<>) {
   chomp;
