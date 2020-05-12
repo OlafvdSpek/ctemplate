@@ -93,8 +93,7 @@ template <class T, class C> class ArenaAllocator {
   ArenaAllocator(C* arena) : arena_(arena) { }  // NOLINT
   ~ArenaAllocator() { }
 
-  pointer allocate(size_type n,
-                   std::allocator<void>::const_pointer /*hint*/ = 0) {
+  pointer allocate(size_type n) {
     assert(arena_ && "No arena to allocate from!");
     return reinterpret_cast<T*>(arena_->AllocAligned(n * sizeof(T),
                                                      kAlignment));
