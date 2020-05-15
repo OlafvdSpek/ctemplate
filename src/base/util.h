@@ -52,7 +52,7 @@
   void operator=(const TypeName&)
 
 // Starting with Visual C++ 2005, WinNT.h includes ARRAYSIZE.
-#if !defined(_MSC_VER) || _MSC_VER < 1400
+#ifndef ARRAYSIZE
 #define ARRAYSIZE(a) \
   ((sizeof(a) / sizeof(*(a))) / \
    static_cast<size_t>(!(sizeof(a) % sizeof(*(a)))))

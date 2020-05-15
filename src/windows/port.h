@@ -69,7 +69,10 @@
 #endif
 
 /* file I/O */
-#define PATH_MAX 1024
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
 #define access  _access
 #define getcwd  _getcwd
 #define open    _open
