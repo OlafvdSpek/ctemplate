@@ -1,4 +1,4 @@
-// Copyright (c) 2008, Google Inc.
+// Copyright (c) 2021, guanlong huang Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // ---
-// Authors: jcrim@google.com (Jay Crim)
+// Authors: gl041188@gmail.com (guanlong huang)
 //          csilvers@google.com (Craig Silverstein)
 
 #include <config.h>
