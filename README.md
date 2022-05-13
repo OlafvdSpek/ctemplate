@@ -34,8 +34,8 @@ This code should work on any modern C++ system. It has been tested on Linux
 (Ubuntu, Fedora, RedHat), Solaris 10 x86, FreeBSD 6.0, OS X 10.3 and 10.4, and
 Windows under both VC++7 and VC++8.
 
-There are a few Windows-specific details; see README.windows for more
-information.
+There are a few Windows-specific details; see the [Windows README](README_windows.txt)
+for more information.
 
 CTemplate and Threads
 ---------------------
