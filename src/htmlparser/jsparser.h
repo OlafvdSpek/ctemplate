@@ -46,13 +46,20 @@ namespace ctemplate_htmlparser {
  * than the biggest token we want to lookup plus 3: Two delimiters plus an empty
  * ring buffer slot. */
 #define JSPARSER_RING_BUFFER_SIZE 18
+#define JSPARSER_NUM_STATES 20
 
 enum js_state_external_enum {
     JSPARSER_STATE_TEXT,
     JSPARSER_STATE_Q,
     JSPARSER_STATE_DQ,
     JSPARSER_STATE_REGEXP,
-    JSPARSER_STATE_COMMENT
+    JSPARSER_STATE_COMMENT,
+    JSPARSER_STATE_INT_JS_REGEXP_SLASH,
+    jsparser_state_transitions,
+    jsparser_states_internal_names,
+    JSPARSER_STATE_INT_JS_TEXT,
+    JSPARSER_STATE_INT_JS_SLASH,
+    JSPARSER_STATE_INT_JS_COMMENT_AFTER
 };
 
 /* Stores the context of the javascript parser.

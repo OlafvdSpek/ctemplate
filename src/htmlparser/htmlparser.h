@@ -63,14 +63,41 @@ namespace ctemplate_htmlparser {
 
 
 enum htmlparser_state_external_enum {
+    HTMLPARSER_STATE_INT_VALUE,
     HTMLPARSER_STATE_TEXT,
     HTMLPARSER_STATE_TAG,
+    HTMLPARSER_STATE_TAG_SPACE,
+    HTMLPARSER_STATE_INT_TAG_NAME,
     HTMLPARSER_STATE_ATTR,
     HTMLPARSER_STATE_VALUE,
+    HTMLPARSER_STATE_INT_VALUE_Q,
+    HTMLPARSER_STATE_INT_VALUE_DQ,
+    HTMLPARSER_STATE_INT_VALUE_TEXT,
     HTMLPARSER_STATE_COMMENT,
     HTMLPARSER_STATE_JS_FILE,
     HTMLPARSER_STATE_CSS_FILE,
+    HTMLPARSER_STATE_INT_TAG_CLOSE,
+    HTMLPARSER_STATE_INT_VALUE_Q_START,
+    HTMLPARSER_STATE_INT_VALUE_DQ_START,
     HTMLPARSER_STATE_ERROR
+};
+
+enum htmlparser_state_cdata_enum
+{
+    HTMLPARSER_STATE_INT_CDATA_TEXT,
+    HTMLPARSER_STATE_INT_CDATA_COMMENT_START,
+    HTMLPARSER_STATE_INT_CDATA_COMMENT_START_DASH,
+    HTMLPARSER_STATE_INT_CDATA_COMMENT_BODY,
+    HTMLPARSER_STATE_INT_CDATA_COMMENT_DASH,
+    HTMLPARSER_STATE_INT_CDATA_COMMENT_DASH_DASH,
+    HTMLPARSER_STATE_INT_CDATA_LT,
+    HTMLPARSER_STATE_INT_CDATA_MAY_CLOSE
+};
+
+enum htmlparser_state_internal_enum
+{
+    htmlparser_state_transitions,
+    htmlparser_states_internal_names
 };
 
 enum htmlparser_mode {
@@ -164,40 +191,40 @@ const char *entityfilter_process(entityfilter_ctx *ctx, char c);
  */
 typedef struct htmlparser_ctx_s {
 
-  /* Holds a reference to the statemachine context. */
-  statemachine_ctx *statemachine;
+    /* Holds a reference to the statemachine context. */
+    statemachine_ctx *statemachine;
 
-  /* Holds a reference to the statemachine definition in use. Right now this is
-   * only used so we can deallocate it at the end.
-   *
-   * It should be readonly and contain the same values across jsparser
-   * instances.
-   */
-  /* TODO(falmeida): Change statemachine_def to const. */
-  statemachine_definition *statemachine_def;
+    /* Holds a reference to the statemachine definition in use. Right now this is
+     * only used so we can deallocate it at the end.
+     *
+     * It should be readonly and contain the same values across jsparser
+     * instances.
+     */
+    /* TODO(falmeida): Change statemachine_def to const. */
+    statemachine_definition *statemachine_def;
 
-  /* Holds a reference to the javascript parser. */
-  jsparser_ctx *jsparser;
+    /* Holds a reference to the javascript parser. */
+    jsparser_ctx *jsparser;
 
-  /* Holds a reference to the entity filter. Used for decoding html entities
-   * inside javascript attributes. */
-  entityfilter_ctx *entityfilter;
+    /* Holds a reference to the entity filter. Used for decoding html entities
+     * inside javascript attributes. */
+    entityfilter_ctx *entityfilter;
 
-  /* Offset into the current attribute value where 0 is the first character in
-   * the value. */
-  int value_index;
+    /* Offset into the current attribute value where 0 is the first character in
+     * the value. */
+    int value_index;
 
-  /* True if currently processing javascript. */
-  int in_js;
+    /* True if currently processing javascript. */
+    int in_js;
 
-  /* Current tag name. */
-  char tag[HTMLPARSER_MAX_STRING];
+    /* Current tag name. */
+    char tag[HTMLPARSER_MAX_STRING];
 
-  /* Current attribute name. */
-  char attr[HTMLPARSER_MAX_STRING];
+    /* Current attribute name. */
+    char attr[HTMLPARSER_MAX_STRING];
 
-  /* Contents of the current value capped to HTMLPARSER_MAX_STRING. */
-  char value[HTMLPARSER_MAX_STRING];
+    /* Contents of the current value capped to HTMLPARSER_MAX_STRING. */
+    char value[HTMLPARSER_MAX_STRING];
 
 } htmlparser_ctx;
 

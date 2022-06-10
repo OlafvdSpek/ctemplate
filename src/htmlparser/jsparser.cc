@@ -124,7 +124,13 @@ static inline int state_external(int state)
 {
   assert(state < JSPARSER_NUM_STATES);
   assert(state >= 0);
-  return jsparser_states_external[state];
+    switch (state) {
+        case 0:
+            return js_state_external_enum::JSPARSER_STATE_TEXT;
+            break;
+        //TODO:还有几种case需要处理
+    }
+  return 0;
 }
 
 /* Returns true if the character is an ecmascript whitespace or line terminator
@@ -548,8 +554,8 @@ static statemachine_definition *create_statemachine_definition()
     return NULL;
 
   /* TODO(falmeida): Check return value. */
-  statemachine_definition_populate(def, jsparser_state_transitions,
-                                   jsparser_states_internal_names);
+  statemachine_definition_populate(def, nullptr,
+                                   nullptr);
 
   statemachine_in_state(def, JSPARSER_STATE_INT_JS_TEXT,
                         in_state_js_text);
