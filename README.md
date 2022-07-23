@@ -20,7 +20,7 @@ and
 
 ## Compiling
 
-To compile test applications with these classes, run `./autogen.sh && ./configure` followed by
+To compile test applications with these classes, run `sudo ./autogen.sh && ./configure`(in version 2.4, just need to run`sudo ./autogen.sh`) followed by
 `make` on unixoid platforms like Linux or MacOSX.
 
 To install these header files on your system, run `make install`.
