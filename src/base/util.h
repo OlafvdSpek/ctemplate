@@ -181,10 +181,10 @@ inline int atoi32(const char* s) {
 }
 
 inline void StripWhiteSpace(std::string* str) {
-  int str_length = str->length();
+  size_t str_length = str->length();
 
   // Strip off leading whitespace.
-  int first = 0;
+  size_t first = 0;
   while (first < str_length && isspace(str->at(first))) {
     ++first;
   }
@@ -199,7 +199,7 @@ inline void StripWhiteSpace(std::string* str) {
   }
 
   // Strip off trailing whitespace.
-  int last = str_length - 1;
+  size_t last = str_length - 1;
   while (last >= 0 && isspace(str->at(last))) {
     --last;
   }
