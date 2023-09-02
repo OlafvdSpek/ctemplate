@@ -194,20 +194,17 @@ class small_map {
       }
     }
 
-    inline bool operator==(const iterator& other) const {
-      if (array_iter_ != NULL) {
-        return array_iter_ == other.array_iter_;
+    friend bool operator==(const iterator& a, const iterator& b) {
+      if (a.array_iter_ != NULL) {
+        return a.array_iter_ == b.array_iter_;
       } else {
-        return other.array_iter_ == NULL && hash_iter_ == other.hash_iter_;
+        return b.array_iter_ == NULL && a.hash_iter_ == b.hash_iter_;
       }
     }
 
-    inline bool operator!=(const iterator& other) const {
-      return !(*this == other);
+    friend bool operator!=(const iterator& a, const iterator& b) {
+      return !(a == b);
     }
-
-    bool operator==(const const_iterator& other) const;
-    bool operator!=(const const_iterator& other) const;
 
    private:
     friend class small_map;
@@ -277,16 +274,16 @@ class small_map {
       }
     }
 
-    inline bool operator==(const const_iterator& other) const {
-      if (array_iter_ != NULL) {
-        return array_iter_ == other.array_iter_;
+    friend bool operator==(const const_iterator& a, const const_iterator& b) {
+      if (a.array_iter_ != NULL) {
+        return a.array_iter_ == b.array_iter_;
       } else {
-        return other.array_iter_ == NULL && hash_iter_ == other.hash_iter_;
+        return b.array_iter_ == NULL && a.hash_iter_ == b.hash_iter_;
       }
     }
 
-    inline bool operator!=(const const_iterator& other) const {
-      return !(*this == other);
+    friend bool operator!=(const const_iterator& a, const const_iterator& b) {
+      return !(a == b);
     }
 
    private:
@@ -548,21 +545,6 @@ class small_map {
     }
   }
 };
-
-template <typename NormalMap, int kArraySize, typename EqualKey,
-          typename Functor>
-inline bool small_map<NormalMap, kArraySize, EqualKey,
-                      Functor>::iterator::operator==(
-    const const_iterator& other) const {
-  return other == *this;
-}
-template <typename NormalMap, int kArraySize, typename EqualKey,
-          typename Functor>
-inline bool small_map<NormalMap, kArraySize, EqualKey,
-                      Functor>::iterator::operator!=(
-    const const_iterator& other) const {
-  return other != *this;
-}
 
 }
 
