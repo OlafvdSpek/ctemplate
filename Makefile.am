@@ -408,7 +408,7 @@ statemachine.c: $(top_srcdir)/src/htmlparser/statemachine.cc
 	cp $< $@
 
 BUILT_SOURCES += statemachine.c
-CLEANFILES = statemachine.c
+CLEANFILES = $(BUILT_SOURCES)
 
 TESTS += statemachine_test
 WINDOWS_PROJECTS += vsprojects/statemachine_test/statemachine_test.vcxproj
