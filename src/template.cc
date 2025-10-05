@@ -510,7 +510,7 @@ static TemplateContext GetTemplateContextFromPragma(
 // is traversed.
 // Returns NULL if there is no suitable modifier for that context in
 // which the case the caller is expected to fail the template initialization.
-static const vector<const ModifierAndValue*> GetModifierForContext(
+static vector<const ModifierAndValue*> GetModifierForContext(
     TemplateContext my_context, HtmlParser *htmlparser,
     const Template* my_template) {
   assert(AUTO_ESCAPE_MODE(my_context));
