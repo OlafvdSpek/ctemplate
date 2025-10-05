@@ -74,7 +74,7 @@ class FooEscaper : public ctemplate::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData*,
-              ExpandEmitter* outbuf, const string& arg) const {
+              ExpandEmitter* outbuf, const string& arg) const override {
     assert(arg.empty());    // we don't take an argument
     outbuf->Emit("foo");
   }
@@ -85,7 +85,7 @@ class NullEscaper : public ctemplate::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData*,
-              ExpandEmitter* outbuf, const string& arg) const {
+              ExpandEmitter* outbuf, const string& arg) const override {
     assert(arg.empty());    // we don't take an argument
   }
 };
@@ -95,7 +95,7 @@ class DoubleEscaper : public ctemplate::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData* data,
-              ExpandEmitter* outbuf, const string& arg) const {
+              ExpandEmitter* outbuf, const string& arg) const override {
     assert(arg.empty());    // we don't take an argument
     string tmp = ctemplate::javascript_escape(in, inlen);
     ctemplate::html_escape.Modify(tmp.data(), tmp.size(), data, outbuf, "");

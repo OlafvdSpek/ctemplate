@@ -178,11 +178,11 @@ bool IntEqVerbose(int a, int b) {
 class SizeofEmitter : public ExpandEmitter {
   string* const outbuf_;
  public:
-  SizeofEmitter(string* outbuf) : outbuf_(outbuf) {}
-  virtual void Emit(char c) { Emit(&c, 1); }
-  virtual void Emit(const string& s) { Emit(s.data(), s.length()); }
-  virtual void Emit(const char* s) { Emit(s, strlen(s)); }
-  virtual void Emit(const char*, size_t slen) { outbuf_->append(slen, 'X'); }
+  explicit SizeofEmitter(string* outbuf) : outbuf_(outbuf) {}
+  void Emit(char c) override { Emit(&c, 1); }
+  void Emit(const string& s) override { Emit(s.data(), s.length()); }
+  void Emit(const char* s) override { Emit(s, strlen(s)); }
+  void Emit(const char*, size_t slen) override { outbuf_->append(slen, 'X'); }
 };
 
 }  // unnamed namespace
@@ -274,7 +274,7 @@ class DynamicModifier : public ctemplate::TemplateModifier {
  public:
   void Modify(const char* in, size_t inlen,
               const PerExpandData* per_expand_data,
-              ExpandEmitter* outbuf, const string& arg) const {
+              ExpandEmitter* outbuf, const string& arg) const override {
     assert(arg.empty());    // we don't take an argument
     assert(per_expand_data);
     const char* value = per_expand_data->LookupForModifiersAsString("value");
@@ -290,13 +290,13 @@ class EmphasizeTemplateModifier : public ctemplate::TemplateModifier {
   }
 
   bool MightModify(const PerExpandData* per_expand_data,
-                   const string& arg) const {
+                   const string& arg) const override {
     return strstr(arg.c_str(), match_.c_str()) != NULL;
   }
 
   void Modify(const char* in, size_t inlen,
               const PerExpandData* per_expand_data,
-              ExpandEmitter* outbuf, const string& arg) const {
+              ExpandEmitter* outbuf, const string& arg) const override {
     outbuf->Emit(">>");
     outbuf->Emit(in, inlen);
     outbuf->Emit("<<");
@@ -315,40 +315,40 @@ class CustomTestAnnotator : public ctemplate::TextTemplateAnnotator {
   CustomTestAnnotator() : event_count_(0) { }
   void Reset() { event_count_ = 0; }
 
-  virtual void EmitOpenInclude(ExpandEmitter* emitter, const string& value) {
+  void EmitOpenInclude(ExpandEmitter* emitter, const string& value) override {
     EmitTestPrefix(emitter);
     ctemplate::TextTemplateAnnotator::EmitOpenInclude(emitter, value);
   }
-  virtual void EmitCloseInclude(ExpandEmitter* emitter) {
+  void EmitCloseInclude(ExpandEmitter* emitter) override {
     EmitTestPrefix(emitter);
     ctemplate::TextTemplateAnnotator::EmitCloseInclude(emitter);
   }
-  virtual void EmitOpenFile(ExpandEmitter* emitter, const string& value) {
+  void EmitOpenFile(ExpandEmitter* emitter, const string& value) override {
     EmitTestPrefix(emitter);
     ctemplate::TextTemplateAnnotator::EmitOpenFile(emitter, value);
   }
-  virtual void EmitCloseFile(ExpandEmitter* emitter) {
+  void EmitCloseFile(ExpandEmitter* emitter) override {
     EmitTestPrefix(emitter);
     ctemplate::TextTemplateAnnotator::EmitCloseFile(emitter);
   }
-  virtual void EmitOpenSection(ExpandEmitter* emitter, const string& value) {
+  void EmitOpenSection(ExpandEmitter* emitter, const string& value) override {
     EmitTestPrefix(emitter);
     ctemplate::TextTemplateAnnotator::EmitOpenSection(emitter, value);
   }
-  virtual void EmitCloseSection(ExpandEmitter* emitter) {
+  void EmitCloseSection(ExpandEmitter* emitter) override {
     EmitTestPrefix(emitter);
     ctemplate::TextTemplateAnnotator::EmitCloseSection(emitter);
   }
-  virtual void EmitOpenVariable(ExpandEmitter* emitter, const string& value) {
+  void EmitOpenVariable(ExpandEmitter* emitter, const string& value) override {
     EmitTestPrefix(emitter);
     ctemplate::TextTemplateAnnotator::EmitOpenVariable(emitter, value);
   }
-  virtual void EmitCloseVariable(ExpandEmitter* emitter) {
+  void EmitCloseVariable(ExpandEmitter* emitter) override {
     EmitTestPrefix(emitter);
     ctemplate::TextTemplateAnnotator::EmitCloseVariable(emitter);
   }
-  virtual void EmitFileIsMissing(ExpandEmitter* emitter,
-                                    const string& value) {
+  void EmitFileIsMissing(ExpandEmitter* emitter,
+                         const string& value) override {
     EmitTestPrefix(emitter);
     ctemplate::TextTemplateAnnotator::EmitFileIsMissing(emitter, value);
   }

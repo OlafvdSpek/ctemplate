@@ -76,9 +76,9 @@ class Template;
 
 #define MODIFY_SIGNATURE_                                               \
  public:                                                                \
-  virtual void Modify(const char* in, size_t inlen,                     \
+  void Modify(const char* in, size_t inlen,                             \
                       const PerExpandData*, ExpandEmitter* outbuf,      \
-                      const std::string& arg) const
+                      const std::string& arg) const override
 
 // If you wish to write your own modifier, it should subclass this
 // method.  Your subclass should only define Modify(); for efficiency,

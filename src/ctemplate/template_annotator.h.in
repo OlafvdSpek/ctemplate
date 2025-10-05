@@ -114,16 +114,16 @@ class @ac_windows_dllexport@ TemplateAnnotator {
 class @ac_windows_dllexport@ TextTemplateAnnotator : public TemplateAnnotator {
  public:
   TextTemplateAnnotator() { }
-  virtual void EmitOpenInclude(ExpandEmitter* emitter, const std::string& value);
-  virtual void EmitCloseInclude(ExpandEmitter* emitter);
-  virtual void EmitOpenFile(ExpandEmitter* emitter, const std::string& value);
-  virtual void EmitCloseFile(ExpandEmitter* emitter);
-  virtual void EmitOpenSection(ExpandEmitter* emitter, const std::string& value);
-  virtual void EmitCloseSection(ExpandEmitter* emitter);
-  virtual void EmitOpenVariable(ExpandEmitter* emitter, const std::string& value);
-  virtual void EmitCloseVariable(ExpandEmitter* emitter);
-  virtual void EmitFileIsMissing(ExpandEmitter* emitter,
-                                 const std::string& value);
+  void EmitOpenInclude(ExpandEmitter* emitter, const std::string& value) override;
+  void EmitCloseInclude(ExpandEmitter* emitter) override;
+  void EmitOpenFile(ExpandEmitter* emitter, const std::string& value) override;
+  void EmitCloseFile(ExpandEmitter* emitter) override;
+  void EmitOpenSection(ExpandEmitter* emitter, const std::string& value) override;
+  void EmitCloseSection(ExpandEmitter* emitter) override;
+  void EmitOpenVariable(ExpandEmitter* emitter, const std::string& value) override;
+  void EmitCloseVariable(ExpandEmitter* emitter) override;
+  void EmitFileIsMissing(ExpandEmitter* emitter,
+                                 const std::string& value) override;
 
  private:
   // Can't invoke copy constructor or assignment operator
