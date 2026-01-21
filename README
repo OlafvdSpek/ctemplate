@@ -29,7 +29,7 @@ If your code isn't multi-threaded, you can instead use the
 ctemplate_nothread library:
    -lctemplate_nothreads
 
-To summarize, there are two ways to link in ctemlpate in non-threaded
+To summarize, there are two ways to link in ctemplate in non-threaded
 applications.  For instance:
    1) gcc -o my_app my_app.o -lctemplate -pthread
    2) gcc -o my_app my_app.o -lctemplate_nothreads
