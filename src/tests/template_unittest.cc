@@ -291,7 +291,7 @@ class EmphasizeTemplateModifier : public ctemplate::TemplateModifier {
 
   bool MightModify(const PerExpandData* per_expand_data,
                    const string& arg) const {
-    return strstr(arg.c_str(), match_.c_str());
+    return strstr(arg.c_str(), match_.c_str()) != NULL;
   }
 
   void Modify(const char* in, size_t inlen,
