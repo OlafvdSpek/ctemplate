@@ -115,11 +115,11 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
       variable_(variable) {
     }
 
-    void operator=(str_ref value) {
+    void operator=(str_ref value) const {
       dict_.SetValue(variable_, TemplateString(value.data(), value.size()));
     }
 
-    void operator=(long value) {
+    void operator=(long value) const {
       dict_.SetIntValue(variable_, value);
     }
 
