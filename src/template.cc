@@ -935,7 +935,7 @@ class TextTemplateNode : public TemplateNode {
     VLOG(2) << "Constructing TextTemplateNode: "
             << string(token_.text, token_.textlen) << endl;
   }
-  virtual ~TextTemplateNode() {
+  ~TextTemplateNode() override {
     VLOG(2) << "Deleting TextTemplateNode: "
             << string(token_.text, token_.textlen) << endl;
   }
@@ -943,22 +943,22 @@ class TextTemplateNode : public TemplateNode {
   // Expands the text node by simply outputting the text string. This
   // virtual method does not use TemplateDictionaryInterface or PerExpandData.
   // Returns true iff all the template files load and parse correctly.
-  virtual bool Expand(ExpandEmitter *output_buffer,
-                      const TemplateDictionaryInterface *,
-                      PerExpandData *,
-                      const TemplateCache *) const {
+  bool Expand(ExpandEmitter *output_buffer,
+              const TemplateDictionaryInterface *,
+              PerExpandData *,
+              const TemplateCache *) const override {
     output_buffer->Emit(token_.text, token_.textlen);
     return true;
   }
 
   // A noop for text nodes
-  virtual void WriteHeaderEntries(string *outstring,
-                                  const string& filename) const {
+  void WriteHeaderEntries(string *outstring,
+                          const string& filename) const override {
     return;
   }
 
   // Appends a representation of the text node to a string.
-  virtual void DumpToString(int level, string *out) const {
+  void DumpToString(int level, string *out) const override {
     assert(out);
     AppendTokenWithIndent(level, out, "Text Node: -->|", token_, "|<--\n");
   }
@@ -983,7 +983,7 @@ class VariableTemplateNode : public TemplateNode {
     VLOG(2) << "Constructing VariableTemplateNode: "
             << string(token_.text, token_.textlen) << endl;
   }
-  virtual ~VariableTemplateNode() {
+  ~VariableTemplateNode() override {
     VLOG(2) << "Deleting VariableTemplateNode: "
             << string(token_.text, token_.textlen) << endl;
   }
@@ -991,13 +991,13 @@ class VariableTemplateNode : public TemplateNode {
   // Expands the variable node by outputting the value (if there is one)
   // of the node variable which is retrieved from the dictionary
   // Returns true iff all the template files load and parse correctly.
-  virtual bool Expand(ExpandEmitter *output_buffer,
-                      const TemplateDictionaryInterface *dictionary,
-                      PerExpandData *per_expand_data,
-                      const TemplateCache *cache) const;
+  bool Expand(ExpandEmitter *output_buffer,
+              const TemplateDictionaryInterface *dictionary,
+              PerExpandData *per_expand_data,
+              const TemplateCache *cache) const override;
 
-  virtual void WriteHeaderEntries(string *outstring,
-                                  const string& filename) const {
+  void WriteHeaderEntries(string *outstring,
+                          const string& filename) const override {
     WriteOneHeaderEntry(outstring, string(token_.text, token_.textlen),
                         filename);
   }
@@ -1005,7 +1005,7 @@ class VariableTemplateNode : public TemplateNode {
   // Appends a representation of the variable node to a string. We
   // also append the modifiers for that variable in the form:
   // :modifier1[=val1][:modifier2][=val2]...\n
-  virtual void DumpToString(int level, string *out) const {
+  void DumpToString(int level, string *out) const override {
     assert(out);
     AppendTokenWithIndent(level, out, "Variable Node: ", token_,
                           PrettyPrintTokenModifiers(token_.modvals) + "\n");
@@ -1055,26 +1055,26 @@ class PragmaTemplateNode : public TemplateNode {
     VLOG(2) << "Constructing PragmaTemplateNode: "
             << string(token_.text, token_.textlen) << endl;
   }
-  virtual ~PragmaTemplateNode() {
+  ~PragmaTemplateNode() override {
     VLOG(2) << "Deleting PragmaTemplateNode: "
             << string(token_.text, token_.textlen) << endl;
   }
 
   // A no-op for pragma nodes.
-  virtual bool Expand(ExpandEmitter *output_buffer,
-                      const TemplateDictionaryInterface *,
-                      PerExpandData *,
-                      const TemplateCache *) const {
+  bool Expand(ExpandEmitter *output_buffer,
+              const TemplateDictionaryInterface *,
+              PerExpandData *,
+              const TemplateCache *) const override {
     return true;
   };
 
   // A no-op for pragma nodes.
-  virtual void WriteHeaderEntries(string *outstring,
-                                  const string& filename) const { }
+  void WriteHeaderEntries(string *outstring,
+                          const string& filename) const override { }
 
   // Appends a representation of the pragma node to a string. We output
   // the full text given in {{%...}} verbatim.
-  virtual void DumpToString(int level, string *out) const {
+  void DumpToString(int level, string *out) const override {
     assert(out);
     AppendTokenWithIndent(level, out, "Pragma Node: -->|", token_, "|<--\n");
   }
@@ -1131,18 +1131,18 @@ class TemplateTemplateNode : public TemplateNode {
   // and then outputting this newly expanded template in place of the
   // original variable.
   // Returns true iff all the template files load and parse correctly.
-  virtual bool Expand(ExpandEmitter *output_buffer,
-                      const TemplateDictionaryInterface *dictionary,
-                      PerExpandData *per_expand_data,
-                      const TemplateCache *cache) const;
+  bool Expand(ExpandEmitter *output_buffer,
+              const TemplateDictionaryInterface *dictionary,
+              PerExpandData *per_expand_data,
+              const TemplateCache *cache) const override;
 
-  virtual void WriteHeaderEntries(string *outstring,
-                                  const string& filename) const {
+  void WriteHeaderEntries(string *outstring,
+                          const string& filename) const override {
     WriteOneHeaderEntry(outstring, string(token_.text, token_.textlen),
                         filename);
   }
 
-  virtual void DumpToString(int level, string *out) const {
+  void DumpToString(int level, string *out) const override {
     assert(out);
     AppendTokenWithIndent(level, out, "Template Node: ", token_, "\n");
   }
@@ -1285,7 +1285,7 @@ bool TemplateTemplateNode::ExpandOnce(
 class SectionTemplateNode : public TemplateNode {
  public:
   SectionTemplateNode(const TemplateToken& token, bool hidden_by_default);
-  virtual ~SectionTemplateNode();
+  ~SectionTemplateNode() override;
 
   // The highest level parsing method. Reads a single token from the
   // input -- taken from my_template->parse_state_ -- and adds the
@@ -1313,17 +1313,17 @@ class SectionTemplateNode : public TemplateNode {
   //     allowing the section template syntax to be used for both conditional
   //     and iterative text).
   // Returns true iff all the template files load and parse correctly.
-  virtual bool Expand(ExpandEmitter *output_buffer,
-                      const TemplateDictionaryInterface *dictionary,
-                      PerExpandData* per_expand_data,
-                      const TemplateCache *cache) const;
+  bool Expand(ExpandEmitter *output_buffer,
+              const TemplateDictionaryInterface *dictionary,
+              PerExpandData* per_expand_data,
+              const TemplateCache *cache) const override;
 
   // Writes a header entry for the section name and calls the same
   // method on all the nodes in the section
-  virtual void WriteHeaderEntries(string *outstring,
-                                  const string& filename) const;
+  void WriteHeaderEntries(string *outstring,
+                          const string& filename) const override;
 
-  virtual void DumpToString(int level, string *out) const;
+  void DumpToString(int level, string *out) const override;
 
  private:
   const TemplateToken token_;   // text is the name of the section

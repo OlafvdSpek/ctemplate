@@ -401,9 +401,9 @@ CleanseCss cleanse_css;
 // (validate_url_and_css_escape) and is not directly exposed.
 class CssUrlEscape : public TemplateModifier {
  public:
-  virtual void Modify(const char* in, size_t inlen,
-                      const PerExpandData*, ExpandEmitter* outbuf,
-                      const string& arg) const;
+  void Modify(const char* in, size_t inlen,
+              const PerExpandData*, ExpandEmitter* outbuf,
+              const string& arg) const override;
 };
 
 // URL-encodes the characters [\n\r\\'"()<>*] to ensure the URL can be safely

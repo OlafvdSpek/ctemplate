@@ -493,16 +493,16 @@ class CTEMPLATE_DLL_DECL UnsafeArena : public BaseArena {
   char* AllocWithHandle(const size_t size, Handle* handle) {
     return reinterpret_cast<char*>(GetMemoryWithHandle(size, handle));
   }
-  virtual char* SlowAlloc(size_t size) {  // "slow" 'cause it's virtual
+  char* SlowAlloc(size_t size) override {  // "slow" 'cause it's virtual
     return Alloc(size);
   }
-  virtual void SlowFree(void* memory, size_t size) {  // "slow" 'cause it's virt
+  void SlowFree(void* memory, size_t size) override {  // "slow" 'cause it's virt
     Free(memory, size);
   }
-  virtual char* SlowRealloc(char* memory, size_t old_size, size_t new_size) {
+  char* SlowRealloc(char* memory, size_t old_size, size_t new_size) override {
     return Realloc(memory, old_size, new_size);
   }
-  virtual char* SlowAllocWithHandle(const size_t size, Handle* handle) {
+  char* SlowAllocWithHandle(const size_t size, Handle* handle) override {
     return AllocWithHandle(size, handle);
   }
 
@@ -580,7 +580,7 @@ class CTEMPLATE_DLL_DECL SafeArena : public BaseArena {
   SafeArena(char* first_block, const size_t block_size)
     : BaseArena(first_block, block_size, false) { }
 
-  virtual void Reset() LOCKS_EXCLUDED(mutex_) {
+  void Reset() override LOCKS_EXCLUDED(mutex_) {
     MutexLock lock(&mutex_);      // in case two threads Reset() at same time
     BaseArena::Reset();
   }
@@ -615,16 +615,16 @@ class CTEMPLATE_DLL_DECL SafeArena : public BaseArena {
     MutexLock lock(&mutex_);
     return reinterpret_cast<char*>(GetMemoryWithHandle(size, handle));
   }
-  virtual char* SlowAlloc(size_t size) {  // "slow" 'cause it's virtual
+  char* SlowAlloc(size_t size) override {  // "slow" 'cause it's virtual
     return Alloc(size);
   }
-  virtual void SlowFree(void* memory, size_t size) {  // "slow" 'cause it's virt
+  void SlowFree(void* memory, size_t size) override {  // "slow" 'cause it's virt
     Free(memory, size);
   }
-  virtual char* SlowRealloc(char* memory, size_t old_size, size_t new_size) {
+  char* SlowRealloc(char* memory, size_t old_size, size_t new_size) override {
     return Realloc(memory, old_size, new_size);
   }
-  virtual char* SlowAllocWithHandle(const size_t size, Handle* handle) {
+  char* SlowAllocWithHandle(const size_t size, Handle* handle) override {
     return AllocWithHandle(size, handle);
   }
 

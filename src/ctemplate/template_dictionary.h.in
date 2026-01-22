@@ -212,7 +212,7 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
   // Dump goes to stdout/stderr, while DumpToString goes to the given string.
   // 'indent' is how much to indent each line of the output.
   void Dump(int indent=0) const;
-  virtual void DumpToString(std::string* out, int indent=0) const;
+  void DumpToString(std::string* out, int indent=0) const override;
 
 
   // --- DEPRECATED ESCAPING FUNCTIONALITY
@@ -341,14 +341,14 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
 
   // How Template::Expand() and its children access the template-dictionary.
   // These fill the API required by TemplateDictionaryInterface.
-  virtual TemplateString GetValue(const TemplateString& variable) const;
-  virtual bool IsHiddenSection(const TemplateString& name) const;
-  virtual bool IsUnhiddenSection(const TemplateString& name) const {
+  TemplateString GetValue(const TemplateString& variable) const override;
+  bool IsHiddenSection(const TemplateString& name) const override;
+  bool IsUnhiddenSection(const TemplateString& name) const override {
     return !IsHiddenSection(name);
   }
-  virtual bool IsHiddenTemplate(const TemplateString& name) const;
-  virtual const char* GetIncludeTemplateName(
-      const TemplateString& variable, int dictnum) const;
+  bool IsHiddenTemplate(const TemplateString& name) const override;
+  const char* GetIncludeTemplateName(
+      const TemplateString& variable, int dictnum) const override;
 
   // Determine whether there's anything set in this dictionary
   bool Empty() const;
@@ -372,8 +372,8 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
   //   This is SectionIterator exactly, just with a different name to
   //   self-document the fact the value applies to a template include.
   // Caller frees return value.
-  virtual TemplateDictionaryInterface::Iterator* CreateTemplateIterator(
-      const TemplateString& section_name) const;
+  TemplateDictionaryInterface::Iterator* CreateTemplateIterator(
+      const TemplateString& section_name) const override;
 
   // CreateSectionIterator
   //   Factory method implementation that constructs a iterator representing the
@@ -381,8 +381,8 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
   //   implementation checks the local dictionary itself, not the template-wide
   //   dictionary or the global dictionary.
   // Caller frees return value.
-  virtual TemplateDictionaryInterface::Iterator* CreateSectionIterator(
-      const TemplateString& section_name) const;
+  TemplateDictionaryInterface::Iterator* CreateSectionIterator(
+      const TemplateString& section_name) const override;
 
   // TemplateDictionary-specific implementation of dictionary iterators.
   template <typename T>   // T is *TemplateDictionary::const_iterator
@@ -391,9 +391,9 @@ class @ac_windows_dllexport@ TemplateDictionary : public TemplateDictionaryInter
     friend class TemplateDictionary;
     Iterator(T begin, T end) : begin_(begin), end_(end) { }
    public:
-    virtual ~Iterator() { }
-    virtual bool HasNext() const;
-    virtual const TemplateDictionaryInterface& Next();
+    ~Iterator() override { }
+    bool HasNext() const override;
+    const TemplateDictionaryInterface& Next() override;
    private:
     T begin_;
     const T end_;
